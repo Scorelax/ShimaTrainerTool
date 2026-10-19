@@ -20,7 +20,6 @@ import { abilityList } from '../utils/battle-lists.js';
 import { renderMapEditor } from './map-editor.js';
 import { createMapStore } from './map-store.js';
 import { setLiveSession } from './live-map-store.js';
-import { updateSetup, flushSetup, loadSetup, getSetup } from './setup-store.js';
 import { createEncounterWithMap } from './encounters.js';
 import { captureRulesHtml, speciesDetail, openSpeciesInfo, paintSpeciesImages } from './species-info.js';
 import { getClock, WEATHER } from './world-clock.js';
@@ -122,14 +121,14 @@ async function drawSetup() {
   _store = createMapStore(saved, (m) => DmAPI.saveState('adventure-map', m), { creatures: true });
   const busy = _shown === 'battle';
   document.getElementById('advBar').innerHTML = `
-    <h2>🧭 Adventure <span class="dm-pill todo" title="Only you see it -- open it to the players with Allow player placement, or put it on the table screen">Being prepared</span></h2>
+    <h2>🧭 Adventure <span class="dm-pill todo" title="The players don't see it yet -- open it to them with Allow player placement, or put it on the table screen">Being prepared</span></h2>
     <span class="dm-hint">${busy ? 'A battle is running -- prepare the map meanwhile; it can be opened once the battle has ended.'
       : 'Put Pokémon, NPCs, objects and items on the map ahead of time -- hidden ones only you see.'}</span>
     ${switchesHtml(false, busy)}
     <span class="dm-adv-btns">
       <button class="dm-btn small" id="advLoad" title="Replace this map with another one: a saved map, an encounter's map, or the Battle module's Map setup">📂 Load a map…</button>
       <button class="dm-btn small" id="advGuide" title="How hard each Pokémon is to catch">🔴 Capture guide</button>
-      <button class="dm-btn small" id="advToBattle" title="Put a copy of this map (background, objects, terrain) into the Battle module's Map setup -- the map the next battle you start there is fought on">📋 Copy to Battle setup</button>
+      <button class="dm-btn small" id="advToBattle" title="A new encounter in the encounter builder with a copy of this map (background, objects, terrain, traps) -- for a battle later. You stay here.">📋 Copy to an encounter</button>
       <button class="dm-btn primary" id="advToEnc" title="A new encounter in Encounter setup with this map -- its objects, Pokémon and NPCs where they stand, hidden ones too">⚔️ Start encounter</button>
     </span>`;
   const body = document.getElementById('advBody');
@@ -144,24 +143,43 @@ async function drawSetup() {
   document.getElementById('advGuide').addEventListener('click', () => captureGuide(_store.getSetup().map.terrain));
   document.getElementById('advToBattle').addEventListener('click', async () => {
     await _store.flushSetup().catch(() => {});
-    copyToBattleSetup(_store.getSetup().map);
+    copyToEncounter(_store.getSetup().map);
   });
 }
 
-/** "Copy to Battle setup": the Battle module's Map setup (the map the next battle started there is fought on) becomes a
- * copy of this map -- its background, objects, terrain and traps; the adventure's creatures stay here. */
-async function copyToBattleSetup(map) {
-  if (!await showCombatConfirm("Replace the Battle module's Map setup with a copy of this map (background, objects and terrain)? Creatures already placed there are taken off their squares -- they stay in the battle setup.",
-    { title: 'Copy to Battle setup', yesLabel: 'Copy it', noLabel: 'Cancel' })) return;
-  const { creatures: _ignored, ...plain } = map || {};
-  if (!getSetup()) await loadSetup().catch(() => null); // (the battle setup may not be loaded in this tab yet)
-  updateSetup((s) => { s.map = { ...s.map, ...JSON.parse(JSON.stringify(plain)), weather: s.map.weather, ready: true }; s.creatures.forEach((c) => { c.position = null; }); });
+/** "Copy to an encounter" (the user's call, 2026-10-20: a new encounter, not the Battle module's Map setup): a new
+ * encounter in the encounter builder with a copy of this map -- background, objects, terrain and traps; the adventure's
+ * Pokemon and NPCs stay here ("Start encounter" takes them along). The DM stays on the adventure. */
+async function copyToEncounter(map) {
+  if (!map?.cols) { showCombatAlert('Make the map first.', { title: 'Copy to an encounter' }); return; }
+  const name = await askEncounterName('📋 Copy to an encounter', 'Adventure map',
+    'A new encounter in the encounter builder (Encounters) with a copy of this map -- background, objects, terrain and traps. Add the creatures there. The adventure map stays as it is.');
+  if (name === null) return;
   try {
-    await flushSetup();
-    toast("Copied -- it's the map in Battle → Map setup now.");
+    const enc = await createEncounterWithMap(map, name || 'Adventure map');
+    toast(`"${enc.name}" is in the encounter builder.`);
   } catch (err) {
-    showCombatAlert(err.message, { title: 'Copy to Battle setup' });
+    showCombatAlert(err.message, { title: 'Copy to an encounter' });
   }
+}
+
+/** The new encounter's name -- null when cancelled. */
+async function askEncounterName(title, start, hint) {
+  let typed = start;
+  const answer = await openDmModal({
+    title,
+    html: `<div class="dm-field"><label for="advEncName">What should the encounter be called?</label>
+      <input class="dm-input" id="advEncName" value="${escapeHtml(start)}" maxlength="60"></div>
+      <div class="dm-hint">${hint}</div>`,
+    buttons: [{ label: 'Cancel', value: null }, { label: 'Make it', kind: 'primary', value: 'ok' }],
+    onOpen: (body, close) => {
+      const input = body.querySelector('#advEncName');
+      input.select();
+      input.addEventListener('input', () => { typed = input.value; });
+      input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') close('ok'); });
+    },
+  });
+  return answer === 'ok' ? String(typed).trim() : null;
 }
 
 /** Opens the adventure on the saved adventure map (what's being edited here first, its creatures too) -- "Allow player
@@ -211,7 +229,7 @@ function drawRunning() {
     ${switchesHtml(true, false)}
     <span class="dm-adv-btns">
       <button class="dm-btn small" id="advGuide" title="How hard each Pokémon is to catch">🔴 Capture guide</button>
-      <button class="dm-btn small" id="advToBattle" title="Put a copy of this map (background, objects, terrain) into the Battle module's Map setup -- the map the next battle you start there is fought on">📋 Copy to Battle setup</button>
+      <button class="dm-btn small" id="advToBattle" title="A new encounter in the encounter builder with a copy of this map (background, objects, terrain, traps) -- for a battle later. You stay here.">📋 Copy to an encounter</button>
       <button class="dm-btn primary" id="advToEnc" title="A new encounter in Encounter setup with this map as it is now -- its objects, your Pokémon and NPCs where they stand, hidden ones too">⚔️ Start encounter</button>
       <button class="dm-btn danger" id="advEnd" title="The players leave the map -- everything you put on it stays for next time">■ Close the map</button>
     </span>`;
@@ -232,7 +250,7 @@ function drawRunning() {
   renderMapEditor(document.getElementById('advEditor'), { live: true, adventure: true, title: 'The adventure, live' });
   document.getElementById('advGuide').addEventListener('click', () => captureGuide(_store?.getSetup().map.terrain));
   document.getElementById('advToEnc').addEventListener('click', () => encounterOnMap(boardAsMap(_session), liveCreatures(_session)));
-  document.getElementById('advToBattle').addEventListener('click', () => copyToBattleSetup(boardAsMap(_session)));
+  document.getElementById('advToBattle').addEventListener('click', () => copyToEncounter(boardAsMap(_session)));
   document.getElementById('advEnd').addEventListener('click', async () => {
     if (!await showCombatConfirm('Close the map? The players leave it. Everything on it -- your Pokémon and NPCs too -- stays as the adventure map for next time.', { title: 'Close the map', yesLabel: 'Close it', noLabel: 'Cancel' })) return;
     try {
@@ -276,15 +294,8 @@ async function encounterOnMap(map, creatures = []) {
   const npcs = creatures.filter(c => c.kind === 'npc' && c.npcId);
   const what = [mons.length && `${mons.length} Pokémon`, npcs.length && `${npcs.length} NPC${npcs.length === 1 ? '' : 's'}`,
     (map.objects || []).length && `${map.objects.length} object${map.objects.length === 1 ? '' : 's'}`].filter(Boolean);
-  const name = await openDmModal({
-    title: '⚔️ Start encounter',
-    html: `<div class="dm-field"><label for="advEncName">What should the encounter be called?</label>
-      <input class="dm-input" id="advEncName" value="Adventure encounter" maxlength="60"></div>
-      <div class="dm-hint">A new encounter in Encounter setup with a copy of this map${what.length ? ` and ${what.join(', ')} on it -- where they stand, hidden ones too` : ''}. Add more there, then import it in the Battle module.</div>`,
-    buttons: [{ label: 'Cancel', value: null }, { label: 'Make it', kind: 'primary', keepOpen: true,
-      onClick: (body) => { body.dataset.name = body.querySelector('#advEncName').value; return true; }, value: 'ok' }],
-    onOpen: (body) => { encounterOnMap._body = body; body.querySelector('#advEncName').select(); },
-  }) === 'ok' ? encounterOnMap._body.dataset.name : null;
+  const name = await askEncounterName('⚔️ Start encounter', 'Adventure encounter',
+    `A new encounter in Encounter setup with a copy of this map${what.length ? ` and ${what.join(', ')} on it -- where they stand, hidden ones too` : ''}. Add more there, then import it in the Battle module.`);
   if (name === null) return;
   try {
     await createEncounterWithMap(map, String(name).trim() || 'Adventure encounter', { creatures });

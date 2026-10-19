@@ -1580,9 +1580,14 @@ export class DmAPI {
     return (await DmAPI._post('admin-splash-delete', { file }, 'Deleting the splash')).data;
   }
 
-  /** Every battle's log on the Pi, newest first -> [{file, kind, started, ended, rounds, entries, who, caught}]. */
+  /** Every battle's log on the Pi, newest first -> [{file, kind, started, ended, rounds, entries, who, players, name, caught}]. */
   static async adminBattleLogs() {
     return (await API.request('dm', 'admin-battle-logs', {}, { useCache: false })).data || [];
+  }
+
+  /** The DM's name for a battle (an empty one: back to its players and date). */
+  static async adminRenameBattleLog(file, name) {
+    return (await DmAPI._post('admin-battle-log-name', { file, name }, 'Renaming the battle')).data;
   }
 
   /** One battle's log, every line. */

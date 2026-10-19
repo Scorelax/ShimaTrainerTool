@@ -315,6 +315,12 @@ def dm_admin_splash_delete(payload: dict):
     return _admin(lambda: admin.delete_splash(payload.get('file')))
 
 
+@app.post('/api/dm/admin-battle-log-name')
+def dm_admin_battle_log_name(payload: dict):
+    """The DM's name for a battle in the Admin module's battle logs ({file, name}; an empty name: the default one)."""
+    return _admin(lambda: admin.rename_battle_log(payload.get('file'), payload.get('name')))
+
+
 @app.post('/api/dm/npc-image')
 def dm_save_npc_image(payload: dict):
     """A picture for an NPC uploaded from the DM's computer, into the NPC pictures folder (routes_dm.save_npc_image)."""

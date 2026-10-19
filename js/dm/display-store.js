@@ -66,22 +66,27 @@ async function save() {
 
 // ---------------------------------------------------------------------------
 // The planner (the user's call, 2026-10-19): scenes the DM prepares without touching the display -- during a battle, or
-// for the next place the players go -- kept on the Pi (dm_state 'display-planner': [{id, name, scene, shownAt}]) and
-// queued until the DM shows one (or puts it over everything for a while: scene.override). While one is open in the
-// planner, the Display module edits it instead of the display (getTarget / updateTarget); everything else -- the battle
-// module's checkbox -- always changes the display itself (getScene / updateScene).
+// for the next place the players go -- kept on the Pi (dm_state 'display-planner': [{id, name, folder, scene, shownAt,
+// savedAt}]) and queued until the DM shows one. While one is open in the planner, the Display module edits a copy of
+// it (getTarget / updateTarget) that 💾 Save keeps (the user's call, 2026-10-20) -- everything else, the battle module's
+// checkbox too, always changes the display itself (getScene / updateScene).
 // ---------------------------------------------------------------------------
 
 let _plans = [];
 let _plansLoaded = false;
 let _planId = null;
+let _draft = null; // the open scene as it's being changed -- the plan keeps its saved scene until Save
+let _draftDirty = false;
 let _planTimer = null;
+const copyOf = sc => normaliseScene(JSON.parse(JSON.stringify(sc || null)));
 
 export async function loadPlans() {
   if (_plansLoaded) return _plans;
   const saved = await DmAPI.getState('display-planner').catch(() => null);
-  _plans = (Array.isArray(saved) ? saved : []).filter(p => p && p.id).map(p => ({ ...p, name: String(p.name || 'Scene'), scene: normaliseScene(p.scene) }));
+  _plans = (Array.isArray(saved) ? saved : []).filter(p => p && p.id)
+    .map(p => ({ ...p, name: String(p.name || 'Scene'), folder: String(p.folder || ''), scene: normaliseScene(p.scene) }));
   _plansLoaded = true;
+  window.addEventListener('beforeunload', (e) => { if (_draftDirty) { e.preventDefault(); e.returnValue = ''; } });
   return _plans;
 }
 
@@ -94,35 +99,67 @@ export function openPlan() {
   return _planId ? _plans.find(p => p.id === _planId) || null : null;
 }
 
+/** Opens a planned scene (null: none) -- a fresh copy of what's saved; unsaved changes to the one open are dropped. */
 export function setOpenPlan(id) {
   _planId = id || null;
+  const plan = openPlan();
+  _draft = plan ? copyOf(plan.scene) : null;
+  _draftDirty = false;
   notify();
+}
+
+/** The open scene has changes that aren't saved yet. */
+export function planDirty() {
+  return !!openPlan() && _draftDirty;
+}
+
+/** Keeps the open scene's changes (💾 Save). */
+export async function savePlan() {
+  const plan = openPlan();
+  if (!plan || !_draft) return;
+  plan.scene = copyOf(_draft);
+  plan.savedAt = new Date().toISOString();
+  _draftDirty = false;
+  notify();
+  await savePlansNow();
+}
+
+/** The open scene back as it was saved. */
+export function discardPlanChanges() {
+  setOpenPlan(_planId);
 }
 
 /** What the Display module works on: the planned scene open in the planner, or the display's own. */
 export function getTarget() {
-  return openPlan()?.scene || _scene;
+  return (openPlan() && _draft) || _scene;
 }
 
 export function updateTarget(fn) {
-  const plan = openPlan();
-  if (!plan) { updateScene(fn); return; }
-  fn(plan.scene);
+  if (!openPlan() || !_draft) { updateScene(fn); return; }
+  fn(_draft);
+  _draftDirty = true;
   notify();
-  savePlansSoon();
 }
 
-/** Changes the planner's list (a scene added, renamed, removed, marked shown...) and saves it. */
+/** Changes the planner's list (a scene added, renamed, moved, removed, marked shown...) and saves it. */
 export function updatePlans(fn) {
   fn(_plans);
-  if (_planId && !_plans.some(p => p.id === _planId)) _planId = null;
+  if (_planId && !_plans.some(p => p.id === _planId)) { _planId = null; _draft = null; _draftDirty = false; }
   notify();
   savePlansSoon();
 }
 
 function savePlansSoon() {
   clearTimeout(_planTimer);
-  _planTimer = setTimeout(() => {
-    DmAPI.saveState('display-planner', _plans).catch(err => toast(`Couldn't save the planner: ${err.message}`));
-  }, 400);
+  _planTimer = setTimeout(() => { savePlansNow().catch(() => {}); }, 400);
+}
+
+async function savePlansNow() {
+  clearTimeout(_planTimer);
+  try {
+    await DmAPI.saveState('display-planner', _plans);
+  } catch (err) {
+    toast(`Couldn't save the planner: ${err.message}`);
+    throw err;
+  }
 }

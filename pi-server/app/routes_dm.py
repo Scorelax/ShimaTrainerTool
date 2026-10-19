@@ -27,7 +27,8 @@ _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclu
                'adventure-map',  # the Adventure module's map (js/dm/adventure.js), until the adventure starts
                'display-folders',  # the Display module's folders for its pictures: [{id, name, parent}] (js/dm/display.js)
                'display-npc-folders',  # ...and for its NPCs: {folders: [{id, name, parent}], placed: {npc id: folder id}}
-               'display-planner'}  # its planned scenes, waiting to be shown: [{id, name, scene, shownAt}] (js/dm/display-store.js)
+               'display-planner',  # its planned scenes, waiting to be shown: [{id, name, folder, scene, shownAt}] (js/dm/display-store.js)
+               'display-plan-folders'}  # ...and their folders: [{id, name, parent}] (js/dm/display.js)
 # The species the players have ever caught (lowercase names) -- see caught_species.
 _CAUGHT_KEY = 'pokedex-caught'
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and
@@ -71,7 +72,7 @@ def handle(conn, action, params):
 
     if action == 'admin-battle-logs':
         from . import admin
-        return {'status': 'success', 'data': admin.battle_logs()}
+        return {'status': 'success', 'data': admin.battle_logs([t.get('name') for _, t in trainers.all_trainers(conn) if t.get('name')])}
 
     if action == 'admin-battle-log':
         from . import admin

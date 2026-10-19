@@ -13,8 +13,9 @@
 //
 // The planner (the user's call, 2026-10-19): the 📅 Planner switch at the top turns everything here onto a planned scene
 // instead of the display -- built with the same tabs, preview and editor while the display carries on (a battle, the
-// scene the players are in). Planned scenes wait in the queue under "On the screen": Show puts one on the display, and
-// ⚡ Override puts it over everything -- a battle too -- until "Stop override".
+// scene the players are in) -- and kept with 💾 Save, in folders. Planned scenes wait in the queue under "On the screen":
+// Show puts one on the display -- over the battle while one is on it, until Stop (the user's call, 2026-10-20: one
+// button, not Show and Override).
 import { DmAPI } from '../api.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { renderScene, BATTLE_PICTURES, SCREEN_RATIO, battleOnDisplay, normaliseScene } from '../utils/display-scene.js';
@@ -22,7 +23,7 @@ import { escapeHtml, getSpecies, newId, toast, openDmModal } from './dm-common.j
 // getScene / updateScene here are the scene being worked on -- the display's own, or the planned one open in the planner
 import {
   loadScene, onSceneChange, getScene as getLive, updateScene as updateLive, getTarget as getScene, updateTarget as updateScene,
-  loadPlans, getPlans, openPlan, setOpenPlan, updatePlans,
+  loadPlans, getPlans, openPlan, setOpenPlan, updatePlans, planDirty, savePlan, discardPlanChanges,
 } from './display-store.js';
 import { spriteSrc } from '../utils/sprite-media.js';
 
@@ -78,7 +79,7 @@ export async function renderDisplay(root, { session, firstTime } = {}) {
   _session = session || _session;
   if (!firstTime && root.querySelector('.dm-disp')) { postToPreview({ paused: false }); drawLayers(); return; } // keeps the search, tab and preview as they were
   root.innerHTML = '<div class="dm-loading">Loading…</div>';
-  await Promise.all([loadScene(), loadPlans()]);
+  await Promise.all([loadScene(), loadPlans(), loadPlanFolders()]);
   if (!_listening) {
     _listening = true;
     onSceneChange(() => {
@@ -249,12 +250,28 @@ function previewSession() {
   return _mode === 'plan' ? { active: false, participants: {}, turnOrder: [] } : _session;
 }
 
+/** Unsaved changes to the open scene: Save or drop them first -- false when the DM would rather stay. */
+async function settlePlan() {
+  if (!planDirty()) return true;
+  const plan = openPlan();
+  const keep = await showCombatConfirm(`"${plan.name}" has changes that aren't saved. Save them?`, { title: 'Unsaved changes', yesLabel: '💾 Save', noLabel: "Don't save" });
+  if (keep) {
+    try { await savePlan(); } catch { return false; }
+  } else {
+    discardPlanChanges();
+  }
+  return true;
+}
+
 async function switchMode(mode, planId = null) {
+  if (!await settlePlan()) return;
   _mode = mode;
   if (mode === 'plan') {
     await loadPlans();
     if (!getPlans().length) newPlan({ silent: true });
-    setOpenPlan(planId || openPlan()?.id || getPlans()[0].id);
+    const id = planId || openPlan()?.id || plansIn(_planFolder)[0]?.id || getPlans()[0].id;
+    _planFolder = getPlans().find(p => p.id === id)?.folder || '';
+    setOpenPlan(id);
   } else {
     setOpenPlan(null);
   }
@@ -262,104 +279,237 @@ async function switchMode(mode, planId = null) {
   draw();
 }
 
+async function openPlanned(id) {
+  if (id === openPlan()?.id || !await settlePlan()) return;
+  setOpenPlan(id);
+  if (_editor) closeEditor();
+  draw();
+}
+
 const copyScene = sc => JSON.parse(JSON.stringify({ background: sc.background || null, items: sc.items || [] }));
 
-/** A new planned scene (empty, or `from` a scene: what's on the display now), opened in the planner. */
+/** A new planned scene (empty, or `from` a scene: what's on the display now), in the folder open, opened in the planner. */
 function newPlan({ from = null, silent = false } = {}) {
   const id = newId('plan');
   updatePlans((list) => {
-    list.push({ id, name: `Scene ${list.length + 1}`, scene: normaliseScene(from ? copyScene(from) : null), createdAt: new Date().toISOString(), shownAt: null });
+    list.push({ id, name: `Scene ${list.length + 1}`, folder: _planFolder, scene: normaliseScene(from ? copyScene(from) : null),
+      createdAt: new Date().toISOString(), shownAt: null });
   });
   if (!silent) setOpenPlan(id);
   return id;
 }
 
+/** A planned scene as it looks now -- the open one with its unsaved changes. */
+const sceneOf = plan => (plan.id === openPlan()?.id ? getScene() : plan.scene);
+
 function planThumb(plan) {
-  const bg = plan.scene.background?.url;
-  const first = plan.scene.items.find(i => i.still || i.src);
+  const sc = sceneOf(plan);
+  const bg = sc.background?.url;
+  const first = sc.items.find(i => i.still || i.src);
   return bg ? `<span class="dm-disp-plan-thumb" style="background-image:url('${escapeHtml(bg)}')"></span>`
     : first ? `<span class="dm-disp-plan-thumb">${thumbHtml(first.src, '', { still: first.still })}</span>` : '<span class="dm-disp-plan-thumb empty">📅</span>';
 }
 
 function planSummary(plan) {
-  const n = plan.scene.items.length;
-  return [plan.scene.background ? escapeHtml(plan.scene.background.name || 'a background') : 'no background',
+  const sc = sceneOf(plan);
+  const n = sc.items.length;
+  return [sc.background ? escapeHtml(sc.background.name || 'a background') : 'no background',
     `${n} picture${n === 1 ? '' : 's'}`, plan.shownAt ? '✓ shown' : ''].filter(Boolean).join(' · ');
 }
 
-/** The override bar: a planned scene is over everything on the display. */
+/** The override bar: a planned scene is on the display over the battle. */
 function drawOverride() {
   const el = document.getElementById('dispOverride');
   if (!el) return;
   const o = getLive().override;
   el.hidden = !o;
-  el.innerHTML = o ? `<span>⚡ <b>${escapeHtml(o.name || 'A planned scene')}</b> is on the display over everything${battleOnDisplay(getLive(), _session) ? ' -- the battle is behind it' : ''}.</span>
-    <button class="dm-btn small danger" data-ov="stop">■ Stop override</button>` : '';
+  el.innerHTML = o ? `<span>📺 <b>${escapeHtml(o.name || 'A planned scene')}</b> is on the display${battleOnDisplay(getLive(), _session) ? ' over the battle' : ''}.</span>
+    <button class="dm-btn small danger" data-ov="stop" title="Back to what the display had">■ Stop</button>` : '';
+}
+
+// The planned scenes' folders (the user's call, 2026-10-20): [{id, name, parent}] in dm_state 'display-plan-folders'; a
+// scene keeps its folder's id (`folder`, '' = the top). The planner and the queue show the same folder.
+let _planFolders = [];
+let _planFolder = '';
+let _planFoldersLoaded = false;
+
+async function loadPlanFolders() {
+  if (_planFoldersLoaded) return;
+  const saved = await DmAPI.getState('display-plan-folders').catch(() => null);
+  _planFolders = (Array.isArray(saved) ? saved : []).filter(f => f && f.id).map(f => ({ id: f.id, name: String(f.name || 'Folder'), parent: f.parent || '' }));
+  _planFoldersLoaded = true;
+}
+
+function savePlanFolders() {
+  return DmAPI.saveState('display-plan-folders', _planFolders).catch(err => showCombatAlert(err.message, { title: 'Folders' }));
+}
+
+const plansIn = folder => getPlans().filter(p => (p.folder || '') === folder);
+
+function planFolderPath(id) {
+  const out = [];
+  const seen = new Set();
+  for (let f = _planFolders.find(x => x.id === id); f && !seen.has(f.id); f = _planFolders.find(x => x.id === f.parent)) {
+    seen.add(f.id);
+    out.unshift(f);
+  }
+  return out;
+}
+
+/** The path to the folder open, its folders, then its scenes -- `row(plan)` draws one. */
+function planBrowserHtml(row) {
+  if (_planFolder && !_planFolders.some(f => f.id === _planFolder)) _planFolder = '';
+  const subs = _planFolders.filter(f => (f.parent || '') === _planFolder).sort((a, b) => a.name.localeCompare(b.name));
+  const plans = plansIn(_planFolder);
+  const inside = f => getPlans().filter(p => p.folder === f.id).length + _planFolders.filter(x => x.parent === f.id).length;
+  return `<div class="dm-disp-crumbs dm-disp-plancrumbs">
+      <button class="dm-disp-crumb${_planFolder ? '' : ' here'}" data-plan-open-folder="" data-plan-drop="">📅 All scenes</button>
+      ${planFolderPath(_planFolder).map(f => `<span>›</span><button class="dm-disp-crumb${f.id === _planFolder ? ' here' : ''}" data-plan-open-folder="${escapeHtml(f.id)}" data-plan-drop="${escapeHtml(f.id)}">📁 ${escapeHtml(f.name)}</button>`).join('')}
+      <button class="dm-btn small dm-disp-newfolder" data-plan-act="new-folder" title="A folder for scenes, in the one open">＋ Folder</button>
+    </div>
+    ${subs.map(f => `
+      <div class="dm-disp-plan dm-disp-planfolder" data-plan-open-folder="${escapeHtml(f.id)}" data-plan-drop="${escapeHtml(f.id)}" data-plan-folder="${escapeHtml(f.id)}" role="button" tabindex="0" title="Open it -- or drag scenes onto it">
+        <span class="dm-disp-plan-thumb empty">📁</span>
+        <span class="dm-disp-layer-name"><strong>${escapeHtml(f.name)}</strong><small>${inside(f)} inside</small></span>
+        <button class="dm-icon-btn" data-plan-act="rename-folder" title="Rename">✎</button>
+        <button class="dm-icon-btn danger" data-plan-act="delete-folder" title="Delete the folder (what's in it moves up)">✕</button>
+      </div>`).join('')}
+    ${plans.map(row).join('')}
+    ${!plans.length && !subs.length ? `<div class="dm-hint">${_planFolder ? 'Nothing in this folder yet -- drag scenes onto it, or 📁 Move one here.' : 'No planned scenes yet.'}</div>` : ''}`;
 }
 
 /** Live: the planned scenes waiting to be shown. */
 function drawQueue() {
   const box = document.getElementById('dispQueue');
   if (!box) return;
-  const plans = getPlans();
   const over = getLive().override?.id;
   box.innerHTML = `
     <div class="dm-card-title"><span>📅 Queued scenes</span>
       <span class="dm-row dm-enc-titlebtns"><button class="dm-btn small" data-plan-act="new-live" title="Plan a new scene in the planner">＋ Plan a scene</button></span></div>
-    ${plans.length ? plans.map(p => `
-      <div class="dm-disp-plan${over === p.id ? ' overriding' : ''}${p.shownAt ? ' shown' : ''}" data-plan="${escapeHtml(p.id)}">
+    ${getPlans().length || _planFolders.length ? planBrowserHtml(p => `
+      <div class="dm-disp-plan${over === p.id ? ' overriding' : ''}${p.shownAt ? ' shown' : ''}" data-plan="${escapeHtml(p.id)}" draggable="true">
         ${planThumb(p)}
         <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}</strong><small>${planSummary(p)}</small></span>
-        <button class="dm-btn small primary" data-plan-act="show" title="Put it on the display (in place of the background and pictures there now)">Show</button>
-        <button class="dm-btn small${over === p.id ? ' danger' : ''}" data-plan-act="${over === p.id ? 'stop' : 'override'}"
-          title="${over === p.id ? 'Back to what the display had' : 'On the display over everything -- a battle too -- until you stop it'}">${over === p.id ? '■ Stop' : '⚡ Override'}</button>
+        ${over === p.id ? '<button class="dm-btn small danger" data-plan-act="stop" title="Back to what the display had">■ Stop</button>'
+          : `<button class="dm-btn small primary" data-plan-act="show" title="${showTitle()}">📺 Show</button>`}
         <button class="dm-icon-btn" data-plan-act="edit" title="Change it in the planner">✎</button>
-      </div>`).join('') : '<div class="dm-hint">Nothing queued -- prepare scenes in the 📅 Planner (during a battle too); they wait here until you show them.</div>'}`;
+      </div>`) : '<div class="dm-hint">Nothing queued -- prepare scenes in the 📅 Planner (during a battle too); they wait here until you show them.</div>'}`;
+  wirePlanDrag(box);
 }
 
-/** Planner: the planned scenes, the one open highlighted. */
+/** What 📺 Show does now: over the battle while one is on the display, else in place of the display's scene. */
+function showTitle() {
+  return battleOnDisplay(getLive(), _session)
+    ? 'Put it on the display over the battle -- until you press Stop'
+    : 'Put it on the display -- its background and pictures in place of the ones there now';
+}
+
+/** Planner: the planned scenes, the one open highlighted, with Save and Show for it. */
 function drawPlans() {
   const box = document.getElementById('dispPlans');
   if (!box) return;
   const open = openPlan();
   const over = getLive().override?.id;
+  const dirty = planDirty();
   box.innerHTML = `
     <div class="dm-card-title"><span>📅 Planned scenes</span>
       <span class="dm-row dm-enc-titlebtns">
-        <button class="dm-btn small" data-plan-act="new" title="An empty scene">＋ New</button>
+        <button class="dm-btn small" data-plan-act="new" title="An empty scene, in the folder open">＋ New</button>
         <button class="dm-btn small" data-plan-act="copy-live" title="A new scene starting from what's on the display now">⧉ From the display</button></span></div>
-    ${getPlans().map(p => `
-      <div class="dm-disp-plan${p.id === open?.id ? ' open' : ''}${over === p.id ? ' overriding' : ''}" data-plan="${escapeHtml(p.id)}" role="button" tabindex="0" title="Work on this one">
+    ${planBrowserHtml(p => `
+      <div class="dm-disp-plan${p.id === open?.id ? ' open' : ''}${over === p.id ? ' overriding' : ''}" data-plan="${escapeHtml(p.id)}" draggable="true" role="button" tabindex="0" title="Work on this one">
         ${planThumb(p)}
-        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}</strong><small>${planSummary(p)}</small></span>
+        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}${p.id === open?.id && dirty ? ' <span class="dm-warn-text" title="Not saved yet">●</span>' : ''}</strong><small>${planSummary(p)}</small></span>
         <button class="dm-icon-btn" data-plan-act="rename" title="Rename">✎</button>
+        <button class="dm-icon-btn" data-plan-act="move" title="Move it to another folder">📁</button>
         <button class="dm-icon-btn danger" data-plan-act="delete" title="Delete it">✕</button>
-      </div>`).join('')}
+      </div>`)}
     ${open ? `<div class="dm-row dm-disp-plan-go">
-      <button class="dm-btn small primary" data-plan-act="show" data-id="${escapeHtml(open.id)}">📺 Show it now</button>
-      <button class="dm-btn small${over === open.id ? ' danger' : ''}" data-plan-act="${over === open.id ? 'stop' : 'override'}" data-id="${escapeHtml(open.id)}">${over === open.id ? '■ Stop override' : '⚡ Override the display'}</button></div>
-      <div class="dm-hint">Everything you add here goes into "${escapeHtml(open.name)}" -- the display doesn't change. It waits in the queue (📺 Live) until you show it.</div>` : ''}`;
+      <button class="dm-btn small${dirty ? ' primary' : ''}" data-plan-act="save" data-id="${escapeHtml(open.id)}" ${dirty ? '' : 'disabled'} title="Keep the changes to this scene">${dirty ? '💾 Save' : '✓ Saved'}</button>
+      ${over === open.id ? `<button class="dm-btn small danger" data-plan-act="stop" data-id="${escapeHtml(open.id)}" title="Back to what the display had">■ Stop showing it</button>`
+        : `<button class="dm-btn small${dirty ? '' : ' primary'}" data-plan-act="show" data-id="${escapeHtml(open.id)}" title="${showTitle()}${dirty ? ' (saved first)' : ''}">📺 Show it on the display</button>`}</div>
+      <div class="dm-hint">Everything you add here goes into "${escapeHtml(open.name)}" -- the display doesn't change. 💾 Save keeps it; it waits in the queue (📺 Live) until you show it.</div>` : ''}`;
+  wirePlanDrag(box);
+}
+
+/** Drag a scene (a folder too, in the planner) onto a folder or a step of the path to move it there. */
+function wirePlanDrag(box) {
+  if (box._planDrag) return; // (the box stays -- only what's in it is redrawn)
+  box._planDrag = true;
+  const TYPE = 'application/x-dm-plan';
+  box.addEventListener('dragstart', (e) => {
+    const row = e.target.closest?.('[data-plan], [data-plan-folder]');
+    if (!row) return;
+    e.dataTransfer.setData(TYPE, JSON.stringify(row.dataset.plan ? { plan: row.dataset.plan } : { folder: row.dataset.planFolder }));
+    e.dataTransfer.effectAllowed = 'move';
+    row.classList.add('dragging');
+  });
+  box.addEventListener('dragend', () => box.querySelectorAll('.dragging, .drop-here').forEach(el => el.classList.remove('dragging', 'drop-here')));
+  box.addEventListener('dragover', (e) => {
+    const target = e.target.closest?.('[data-plan-drop]');
+    if (!target || ![...e.dataTransfer.types].includes(TYPE)) return;
+    e.preventDefault();
+    box.querySelectorAll('.drop-here').forEach(el => { if (el !== target) el.classList.remove('drop-here'); });
+    target.classList.add('drop-here');
+  });
+  box.addEventListener('dragleave', (e) => {
+    const target = e.target.closest?.('[data-plan-drop]');
+    if (target && !target.contains(e.relatedTarget)) target.classList.remove('drop-here');
+  });
+  box.addEventListener('drop', (e) => {
+    const target = e.target.closest?.('[data-plan-drop]');
+    const raw = e.dataTransfer.getData(TYPE);
+    if (!target || !raw) return;
+    e.preventDefault();
+    const into = target.dataset.planDrop;
+    const what = JSON.parse(raw);
+    if (what.plan) { movePlan(what.plan, into); return; }
+    const f = _planFolders.find(x => x.id === what.folder);
+    if (!f || f.id === into || planFolderPath(into).some(x => x.id === f.id)) return; // never into itself
+    f.parent = into;
+    savePlanFolders();
+    drawLayers();
+  });
+}
+
+function movePlan(id, into) {
+  const plan = getPlans().find(p => p.id === id);
+  if (!plan || (plan.folder || '') === into) return;
+  updatePlans(() => { plan.folder = into; });
 }
 
 async function onPlanClick(e) {
   if (e.target.closest('[data-ov="stop"]')) { stopOverride(); return; }
   const btn = e.target.closest('[data-plan-act]');
+  const folderRow = e.target.closest('[data-plan-folder]');
+  const openFolder = e.target.closest('[data-plan-open-folder]');
+  if (folderRow && btn) { planFolderAction(btn.dataset.planAct, _planFolders.find(f => f.id === folderRow.dataset.planFolder)); return; }
+  if (openFolder && !btn) { _planFolder = openFolder.dataset.planOpenFolder; drawLayers(); return; }
   const row = e.target.closest('[data-plan]');
   const plan = getPlans().find(p => p.id === (btn?.dataset.id || row?.dataset.plan));
   if (!btn) {
-    if (row && _mode === 'plan' && plan && plan.id !== openPlan()?.id) { setOpenPlan(plan.id); if (_editor) closeEditor(); draw(); }
+    if (row && _mode === 'plan' && plan) openPlanned(plan.id);
     return;
   }
   const act = btn.dataset.planAct;
-  if (act === 'new') { newPlan(); draw(); return; }
-  if (act === 'copy-live') { newPlan({ from: getLive() }); draw(); return; }
+  if (act === 'new-folder') { newPlanFolder(); return; }
+  if (act === 'new' || act === 'copy-live') {
+    if (!await settlePlan()) return;
+    newPlan(act === 'copy-live' ? { from: getLive() } : {});
+    draw();
+    return;
+  }
   if (act === 'new-live') { const id = newPlan({ silent: true }); switchMode('plan', id); return; }
   if (!plan) return;
   if (act === 'show') showPlan(plan);
-  else if (act === 'override') overridePlan(plan);
   else if (act === 'stop') stopOverride();
-  else if (act === 'edit') switchMode('plan', plan.id);
-  else if (act === 'rename') {
+  else if (act === 'save') {
+    try { await savePlan(); toast(`"${plan.name}" is saved.`); } catch { /* told */ }
+  } else if (act === 'edit') switchMode('plan', plan.id);
+  else if (act === 'move') {
+    const into = await pickPlanFolder(`📁 Move "${plan.name}" to…`);
+    if (into !== null) movePlan(plan.id, into);
+  } else if (act === 'rename') {
     const name = await askName('Rename the scene', plan.name);
     if (name) updatePlans(() => { plan.name = name; });
   } else if (act === 'delete') {
@@ -368,24 +518,75 @@ async function onPlanClick(e) {
     updatePlans((list) => { list.splice(list.indexOf(plan), 1); });
     if (wasOpen && _mode === 'plan') {
       if (!getPlans().length) newPlan({ silent: true });
-      setOpenPlan(getPlans()[0].id);
+      setOpenPlan((plansIn(_planFolder)[0] || getPlans()[0]).id);
       draw();
     }
   }
 }
 
-/** A planned scene onto the display: its background and pictures in place of what's there (it stays in the queue). */
-function showPlan(plan) {
-  const sc = copyScene(plan.scene);
-  updateLive((s) => { s.background = sc.background; s.items = sc.items; });
-  updatePlans(() => { plan.shownAt = new Date().toISOString(); });
-  toast(`"${plan.name}" is on the display${battleOnDisplay(getLive(), _session) ? ' -- behind the battle (⚡ Override shows it over it)' : ''}.`);
+async function newPlanFolder() {
+  const name = await askName('New folder');
+  if (!name) return;
+  _planFolders.push({ id: newId('pfold'), name, parent: _planFolder });
+  await savePlanFolders();
+  drawLayers();
 }
 
-function overridePlan(plan) {
+/** A folder's ✎ / ✕. Deleted, what's in it -- scenes and folders -- moves up into the folder it was in. */
+async function planFolderAction(act, f) {
+  if (!f) return;
+  if (act === 'rename-folder') {
+    const name = await askName('Rename the folder', f.name);
+    if (!name || name === f.name) return;
+    f.name = name;
+  } else if (act === 'delete-folder') {
+    const scenes = getPlans().filter(p => p.folder === f.id);
+    const subs = _planFolders.filter(x => x.parent === f.id);
+    const what = scenes.length || subs.length ? ` Its ${[scenes.length && `${scenes.length} scene${scenes.length === 1 ? '' : 's'}`, subs.length && `${subs.length} folder${subs.length === 1 ? '' : 's'}`].filter(Boolean).join(' and ')} move up a level -- nothing is deleted.` : '';
+    if (!await showCombatConfirm(`Delete the folder "${f.name}"?${what}`, { title: 'Delete folder', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+    if (scenes.length) updatePlans(() => { scenes.forEach((p) => { p.folder = f.parent || ''; }); });
+    subs.forEach((x) => { x.parent = f.parent || ''; });
+    _planFolders = _planFolders.filter(x => x.id !== f.id);
+    if (_planFolder === f.id) _planFolder = f.parent || '';
+  } else return;
+  await savePlanFolders();
+  drawLayers();
+}
+
+/** Every planned-scene folder as a tree -> the one picked ('' = the top), or null. */
+async function pickPlanFolder(title) {
+  const rows = [];
+  const walk = (parent, depth) => _planFolders.filter(f => (f.parent || '') === parent).sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((f) => { rows.push({ f, depth }); walk(f.id, depth + 1); });
+  walk('', 1);
+  const into = await openDmModal({
+    title,
+    html: `<div class="dm-disp-movelist">
+      <button class="dm-species-item" data-into=""><span class="dm-species-name">📅 All scenes</span></button>
+      ${rows.map(({ f, depth }) => `<button class="dm-species-item" data-into="${escapeHtml(f.id)}" style="padding-left:${0.6 + depth}rem"><span class="dm-species-name">📁 ${escapeHtml(f.name)}</span></button>`).join('')}
+    </div>${rows.length ? '' : '<div class="dm-hint">No folders yet -- make one with ＋ Folder.</div>'}`,
+    buttons: [{ label: 'Cancel', value: null }],
+    onOpen: (body, close) => body.addEventListener('click', (ev) => { const b = ev.target.closest('[data-into]'); if (b) close(b.dataset.into); }),
+  });
+  return into === null || into === undefined ? null : into;
+}
+
+/** 📺 Show (the user's call, 2026-10-20 -- one button): while a battle is on the display the scene goes over it until
+ * Stop; otherwise its background and pictures take the place of the display's own (it stays in the queue). The open
+ * scene is saved first -- what's shown is what's kept. */
+async function showPlan(plan) {
+  if (plan.id === openPlan()?.id && planDirty()) {
+    try { await savePlan(); } catch { return; }
+  }
   const sc = copyScene(plan.scene);
-  updateLive((s) => { s.override = { id: plan.id, name: plan.name, ...sc }; });
-  toast(`"${plan.name}" is over everything on the display -- Stop override puts it back.`);
+  if (battleOnDisplay(getLive(), _session)) {
+    updateLive((s) => { s.override = { id: plan.id, name: plan.name, ...sc }; });
+    toast(`"${plan.name}" is on the display over the battle -- Stop puts the battle back.`);
+  } else {
+    updateLive((s) => { s.background = sc.background; s.items = sc.items; s.override = null; });
+    toast(`"${plan.name}" is on the display.`);
+  }
+  updatePlans(() => { plan.shownAt = new Date().toISOString(); });
 }
 
 function stopOverride() {

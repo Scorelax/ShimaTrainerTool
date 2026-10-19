@@ -9,7 +9,7 @@ import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { POKEMON_TYPES } from '../utils/pokemon-types.js';
-import { escapeHtml, toast, getSpecies, forgetSpecies, typeBadges, multiSelectHtml, bindMultiSelects, readMultiSelect, attachSuggest, SAVING_THROWS, SKILLS } from './dm-common.js';
+import { escapeHtml, toast, openDmModal, getSpecies, forgetSpecies, typeBadges, multiSelectHtml, bindMultiSelects, readMultiSelect, attachSuggest, SAVING_THROWS, SKILLS } from './dm-common.js';
 import { prepareImage } from './display.js';
 import { loadMoves } from './move-picker.js';
 import { openPicker } from './picker.js';
@@ -713,6 +713,11 @@ function viewPicture(url) {
 // uploaded landscape is turned a quarter left first, so it looks the same on the table TV (which turns the board right).
 // ---------------------------------------------------------------------------
 
+let _objGroup = '';
+let _objQuery = '';
+/** An object's place: the first word of its name ("Cave Rock" -> Cave); one without a second word is in "Other". */
+const objGroup = o => (/\s/.test(o.label.trim()) ? o.label.trim().split(/\s+/)[0] : 'Other');
+
 async function drawMapPictures(body) {
   let assets;
   try {
@@ -721,6 +726,8 @@ async function drawMapPictures(body) {
     body.innerHTML = `<div class="dm-loading">Couldn't load the map pictures: ${escapeHtml(err.message)}</div>`;
     return;
   }
+  const groups = [...new Set(assets.objects.map(objGroup))].sort((a, b) => (a === 'Other') - (b === 'Other') || a.localeCompare(b));
+  if (_objGroup && !groups.includes(_objGroup)) _objGroup = '';
   const card = (a) => `
     <div class="dm-adm-mappic">
       <span class="dm-adm-mappic-img" data-view="${escapeHtml(a.url)}" title="Click to see it whole"><img src="${escapeHtml(a.url)}" alt="" loading="lazy"></span>
@@ -738,13 +745,38 @@ async function drawMapPictures(body) {
           <button class="dm-btn primary" id="admPicBackground">⬆ Upload a background</button>
         </span>
       </div>
-      <div class="dm-adm-mappics">
-        <div class="dm-card-title">Objects (${assets.objects.length})</div>
-        <div class="dm-adm-mapgrid">${assets.objects.map(card).join('') || '<div class="dm-hint">None yet.</div>'}</div>
-        <div class="dm-card-title" style="margin-top:0.8rem">Backgrounds (${assets.backgrounds.length})</div>
-        <div class="dm-adm-mapgrid wide">${assets.backgrounds.map(card).join('') || '<div class="dm-hint">None yet.</div>'}</div>
+      <div class="dm-adm-mapcols">
+        <section class="dm-adm-mapcol">
+          <div class="dm-adm-mapcol-head">
+            <div class="dm-card-title">Objects <span class="dm-pill" id="admObjCount">${assets.objects.length}</span></div>
+            <div class="dm-row dm-adm-mapfilter">
+              <select class="dm-input" id="admObjGroup" title="Only the objects for one place -- the first word of the name (Cave Rock, Forest Tree...)">
+                <option value="">Every place</option>
+                ${groups.map(g => `<option value="${escapeHtml(g)}"${g === _objGroup ? ' selected' : ''}>${escapeHtml(g)} (${assets.objects.filter(o => objGroup(o) === g).length})</option>`).join('')}
+              </select>
+              <input class="dm-input" id="admObjSearch" placeholder="Search the objects…" autocomplete="off" value="${escapeHtml(_objQuery)}">
+            </div>
+          </div>
+          <div class="dm-adm-mapgrid" id="admObjGrid"></div>
+        </section>
+        <section class="dm-adm-mapcol">
+          <div class="dm-adm-mapcol-head"><div class="dm-card-title">Backgrounds <span class="dm-pill">${assets.backgrounds.length}</span></div></div>
+          <div class="dm-adm-mapgrid wide">${assets.backgrounds.map(card).join('') || '<div class="dm-hint">None yet.</div>'}</div>
+        </section>
       </div>
     </div>`;
+  // The objects by place (the user's call, 2026-10-20): the first word of the name is where it belongs (Cave, Plains,
+  // Forest...), picked from the list -- with a search -- so a long list needn't be scrolled through.
+  const drawObjects = () => {
+    const q = _objQuery.trim().toLowerCase();
+    const shown = assets.objects.filter(o => (!_objGroup || objGroup(o) === _objGroup) && (!q || o.label.toLowerCase().includes(q)));
+    document.getElementById('admObjGrid').innerHTML = shown.map(card).join('')
+      || `<div class="dm-hint">${assets.objects.length ? 'No object matches that.' : 'None yet.'}</div>`;
+    document.getElementById('admObjCount').textContent = shown.length === assets.objects.length ? assets.objects.length : `${shown.length} / ${assets.objects.length}`;
+  };
+  drawObjects();
+  document.getElementById('admObjGroup').addEventListener('change', (e) => { _objGroup = e.target.value; drawObjects(); });
+  document.getElementById('admObjSearch').addEventListener('input', (e) => { _objQuery = e.target.value; drawObjects(); });
   const upload = async (kind, btn) => {
     const file = await pickFile(kind === 'object' ? 'image/png' : 'image/png,image/jpeg,image/webp');
     if (!file) return;
@@ -766,8 +798,11 @@ async function drawMapPictures(body) {
   };
   document.getElementById('admPicObject').addEventListener('click', (e) => upload('object', e.currentTarget));
   document.getElementById('admPicBackground').addEventListener('click', (e) => upload('background', e.currentTarget));
-  body.querySelectorAll('[data-view]').forEach(el => el.addEventListener('click', () => viewPicture(el.dataset.view)));
-  body.querySelectorAll('[data-del-pic]').forEach(b => b.addEventListener('click', async () => {
+  body.querySelector('.dm-adm-mapcols').addEventListener('click', async (e) => {
+    const view = e.target.closest('[data-view]');
+    if (view) { viewPicture(view.dataset.view); return; }
+    const b = e.target.closest('[data-del-pic]');
+    if (!b) return;
     if (!await showCombatConfirm(`Delete "${b.dataset.label}" from the Pi? Maps that use it lose it.`, { title: 'Delete picture', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
     try {
       await DmAPI.deleteBattleImage(b.dataset.delPic);
@@ -776,7 +811,7 @@ async function drawMapPictures(body) {
     } catch (err) {
       showCombatAlert(err.message, { title: 'Delete picture' });
     }
-  }));
+  });
 }
 
 /** A landscape picture turned a quarter left (counter-clockwise) into a portrait one; a portrait one as it is. */
@@ -806,6 +841,15 @@ async function portrait(dataUrl) {
 
 const KIND_LABEL = { pve: 'PvE', pvp: 'PvP', adventure: 'Adventure' };
 let _logFile = null;
+const logWhen = ts => (ts ? new Date(ts).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '');
+
+/** A battle's name: the DM's own (the user's call, 2026-10-20), else its players with the date and time. */
+function logTitle(l) {
+  if (l.name) return l.name;
+  const p = l.players || [];
+  const who = p.length > 1 ? `${p.slice(0, -1).join(', ')} & ${p[p.length - 1]}` : p[0] || 'No players';
+  return [who, logWhen(l.started)].filter(Boolean).join(' · ');
+}
 
 async function drawBattleLogs(body) {
   let logs;
@@ -815,17 +859,16 @@ async function drawBattleLogs(body) {
     body.innerHTML = `<div class="dm-loading">Couldn't load the battle logs: ${escapeHtml(err.message)}</div>`;
     return;
   }
-  const when = (ts) => (ts ? new Date(ts).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—');
   body.innerHTML = `
     <div class="dm-editor">
       <aside class="dm-editor-tools">
         <div class="dm-editor-head"><h2>📜 Battle logs</h2><span class="dm-pill ok">${logs.length}</span></div>
-        <input class="dm-input" id="admLogFilter" placeholder="Find a battle (who was in it)…" autocomplete="off">
+        <input class="dm-input" id="admLogFilter" placeholder="Find a battle (its name, who was in it)…" autocomplete="off">
         <div class="dm-pdx-list" id="admLogList">
           ${logs.map(l => `
-            <button class="dm-pdx-row dm-adm-logrow${l.file === _logFile ? ' selected' : ''}" data-log="${escapeHtml(l.file)}" data-search="${escapeHtml(`${l.who.join(' ')} ${l.kind}`.toLowerCase())}">
+            <button class="dm-pdx-row dm-adm-logrow${l.file === _logFile ? ' selected' : ''}" data-log="${escapeHtml(l.file)}" data-search="${escapeHtml(`${logTitle(l)} ${logWhen(l.started)} ${l.who.join(' ')} ${l.kind}`.toLowerCase())}">
               <span class="dm-adm-logkind ${escapeHtml(l.kind)}">${escapeHtml(KIND_LABEL[l.kind] || l.kind)}</span>
-              <span class="dm-pdx-main"><strong>${escapeHtml(when(l.started))}</strong>
+              <span class="dm-pdx-main"><strong class="dm-adm-logname">${escapeHtml(logTitle(l))}</strong><small class="dm-adm-logdate" ${l.name ? '' : 'hidden'}>${escapeHtml(logWhen(l.started))}</small>
                 <small>${escapeHtml(l.who.slice(0, 6).join(', ') || 'Nobody joined')}${l.who.length > 6 ? ` +${l.who.length - 6}` : ''}</small>
                 <small>${l.rounds ? `${l.rounds} round${l.rounds === 1 ? '' : 's'} · ` : ''}${l.entries} lines${l.caught ? ` · ${l.caught} caught` : ''}${l.ended ? '' : ' · not ended'}</small></span><span></span>
             </button>`).join('') || '<div class="dm-hint" style="padding:0.4rem">No battles yet.</div>'}
@@ -878,11 +921,43 @@ async function showBattleLog(meta) {
   view.innerHTML = `
     <div class="dm-adm-loghead">
       <h3 class="dm-cs-title"><span class="dm-adm-logkind ${escapeHtml(meta.kind)}">${escapeHtml(KIND_LABEL[meta.kind] || meta.kind)}</span>
-        ${escapeHtml(meta.started ? new Date(meta.started).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' }) : meta.file)}</h3>
-      <div class="dm-hint">${escapeHtml(meta.who.join(', ') || 'Nobody joined')}</div>
+        <span id="admLogTitle">${escapeHtml(logTitle(meta))}</span>
+        <button class="dm-icon-btn" id="admLogRename" title="Name this battle">✎</button></h3>
+      <div class="dm-hint">${escapeHtml(meta.started ? new Date(meta.started).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' }) : meta.file)}
+        · ${escapeHtml(meta.who.join(', ') || 'Nobody joined')}</div>
       <input class="dm-input" id="admLogSearch" placeholder="Search this battle (a name, a move…)" autocomplete="off">
     </div>
     <div id="admLogLines"></div>`;
   draw('');
   document.getElementById('admLogSearch').addEventListener('input', (e) => draw(e.target.value.trim().toLowerCase()));
+  document.getElementById('admLogRename').addEventListener('click', () => renameBattle(meta));
+}
+
+/** The DM names a battle -- an empty name puts the one made from its players and date back. */
+async function renameBattle(meta) {
+  let typed = meta.name || '';
+  const answer = await openDmModal({
+    title: '✎ Name this battle',
+    html: `<input class="dm-input" id="admLogName" value="${escapeHtml(meta.name || '')}" maxlength="120" placeholder="${escapeHtml(logTitle({ ...meta, name: null }))}">
+      <div class="dm-hint">Left empty, it's named after its players with the date and time.</div>`,
+    buttons: [{ label: 'Cancel', value: null }, { label: 'Save', kind: 'primary', value: 'save' }],
+    onOpen: (body, close) => {
+      const input = body.querySelector('#admLogName');
+      setTimeout(() => input.select(), 0);
+      input.addEventListener('input', () => { typed = input.value.trim(); });
+      input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') close('save'); });
+    },
+  });
+  if (answer !== 'save') return;
+  try {
+    meta.name = await DmAPI.adminRenameBattleLog(meta.file, typed);
+  } catch (err) { toast(err.message); return; }
+  const title = document.getElementById('admLogTitle');
+  if (title) title.textContent = logTitle(meta);
+  const row = document.querySelector(`#admLogList [data-log="${CSS.escape(meta.file)}"]`);
+  if (row) {
+    row.querySelector('.dm-adm-logname').textContent = logTitle(meta);
+    row.querySelector('.dm-adm-logdate').hidden = !meta.name;
+    row.dataset.search = `${logTitle(meta)} ${logWhen(meta.started)} ${meta.who.join(' ')} ${meta.kind}`.toLowerCase();
+  }
 }

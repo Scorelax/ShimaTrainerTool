@@ -29,6 +29,10 @@ const PREVIEW = new URLSearchParams(location.search).has('preview');
 let session = { active: false, participants: {}, turnOrder: [], turnIndex: 0, round: 0, reactingParticipantId: null };
 let scene = normaliseScene(null);
 let previewPaused = false;
+// The preview: what the DM console posted so far -- the Pi's copy (fetched below, and answered later) never replaces it.
+// It's the planned scene being worked on in the planner, which the Pi's display scene isn't.
+let postedScene = false;
+let postedSession = false;
 
 /** The preview's videos pause while the DM console has the Display module put away, and play again when it's back. */
 function syncPreviewPlayback() {
@@ -46,8 +50,8 @@ async function init() {
     useSpritePreviews(true);
     window.addEventListener('message', (e) => {
       if (e.origin !== location.origin || e.data?.source !== 'dm-display') return;
-      if (e.data.scene) scene = normaliseScene(e.data.scene);
-      if (e.data.session) session = e.data.session;
+      if (e.data.scene) { scene = normaliseScene(e.data.scene); postedScene = true; }
+      if (e.data.session) { session = e.data.session; postedSession = true; }
       if ('paused' in e.data) previewPaused = !!e.data.paused;
       if (e.data.scene || e.data.session) { drawScene(); render(); }
       if (e.data.scene || e.data.session || 'paused' in e.data) syncPreviewPlayback();
@@ -61,8 +65,8 @@ async function init() {
     CombatAPI.getState(),
     DmAPI.getState('display-scene').catch(() => null),
   ]);
-  if (result.status === 'success') session = result.data;
-  if (savedScene) scene = normaliseScene(savedScene);
+  if (result.status === 'success' && !postedSession) session = result.data;
+  if (savedScene && !postedScene) scene = normaliseScene(savedScene);
   drawScene();
   render();
   if (!PREVIEW) preloadAllAnimations();

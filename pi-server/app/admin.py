@@ -329,28 +329,75 @@ def _read_log(filename):
     return entries
 
 
-def battle_logs():
-    """[{file, kind, started, ended, rounds, entries, who, caught}] -- every battle on the Pi, newest first. `who`: the
-    creatures that joined; `ended`: when it ended (None for one still running or cut off)."""
+# The DM's own names for the battles (the user's call, 2026-10-20): {file: name}, beside the logs. A battle without one
+# is named on screen after its players, with the date and time.
+_LOG_NAMES = 'names.json'
+
+
+def _log_names():
     from .routes_combat import BATTLE_LOG_DIR
+    try:
+        with open(os.path.join(BATTLE_LOG_DIR, _LOG_NAMES), encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def battle_logs(trainer_names=()):
+    """[{file, kind, started, ended, rounds, entries, who, players, name, caught}] -- every battle on the Pi, newest first.
+    `who`: the creatures that joined; `players`: the players' trainers in it (a join's owner -- or, in a log from before
+    joins said whose they were, a name in `trainer_names`); `name`: the DM's name for it (None: not named); `ended`: when
+    it ended (None for one still running or cut off)."""
+    from .routes_combat import BATTLE_LOG_DIR, DM_OWNER
     names = sorted((n for n in os.listdir(BATTLE_LOG_DIR) if _LOG_NAME.match(n)), reverse=True) if os.path.isdir(BATTLE_LOG_DIR) else []
+    known = {str(t).lower(): t for t in trainer_names}
+    titles = _log_names()
     out = []
     for name in names:
         entries = _read_log(name)
         kind = name.rsplit('-', 1)[-1].split('.')[0] if '-' in name else ''
-        who = []
+        who, players = [], []
         for e in entries:
-            if e.get('type') == 'join' and e.get('actorName') and e['actorName'] not in who:
+            if e.get('type') != 'join' or not e.get('actorName'):
+                continue
+            if e['actorName'] not in who:
                 who.append(e['actorName'])
+            if 'actorOwner' in e:
+                owner = e.get('actorOwner') or ''
+                player = owner if owner and owner != DM_OWNER else None
+            else:
+                player = known.get(str(e['actorName']).lower())
+            if player and player not in players:
+                players.append(player)
         out.append({
             'file': name, 'kind': kind,
             'started': entries[0].get('ts') if entries else None,
             'ended': next((e.get('ts') for e in reversed(entries) if e.get('type') == 'session-end'), None),
             'rounds': max((js_parse_int(e.get('round')) or 0 for e in entries), default=0),
-            'entries': len(entries), 'who': who,
+            'entries': len(entries), 'who': who, 'players': players,
+            'name': titles.get(name) or None,
             'caught': sum(1 for e in entries if e.get('type') == 'capture'),
         })
     return out
+
+
+def rename_battle_log(filename, name):
+    """The DM's name for one battle (empty: back to the one made from its players and date)."""
+    from .routes_combat import BATTLE_LOG_DIR
+    if not _LOG_NAME.match(str(filename or '')) or not os.path.isfile(os.path.join(BATTLE_LOG_DIR, filename)):
+        raise ValueError('No such battle log')
+    titles = _log_names()
+    name = str(name or '').strip()[:120]
+    if name:
+        titles[filename] = name
+    else:
+        titles.pop(filename, None)
+    path = os.path.join(BATTLE_LOG_DIR, _LOG_NAMES)
+    with open(path + '.tmp', 'w', encoding='utf-8') as f:
+        json.dump(titles, f, ensure_ascii=False, indent=1)
+    os.replace(path + '.tmp', path)
+    return name or None
 
 
 def battle_log(filename):

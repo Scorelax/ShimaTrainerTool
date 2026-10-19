@@ -1064,7 +1064,6 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 /* Party module: a card title with a button at its right (Pokémon + Give Pokémon). */
 .dm-title-with-btn { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 /* Map editor: the object's turn, any angle. */
-.dm-obj-turn { width: 100%; margin: 0.2rem 0 0.6rem; accent-color: var(--dm-gold); }
 
 /* Map editor: the Pictures card's list, and the Traps tool's traps / hidden objects */
 .dm-pic-manage { margin-top: 0.5rem; }
@@ -1255,7 +1254,16 @@ span.dm-trap-pick { cursor: default; }
 .dm-adm-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; box-shadow: 0 16px 50px rgba(0, 0, 0, 0.7); }
 .dm-adm-lightbox .dm-icon-btn { position: absolute; top: 1rem; right: 1rem; }
 /* Admin: map pictures */
-.dm-adm-mappics { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; }
+/* Objects and backgrounds side by side, each scrolled on its own (the user's call, 2026-10-20) */
+.dm-adm-mapcols { flex: 1; min-height: 0; display: grid; grid-template-columns: 3fr 2fr; }
+.dm-adm-mapcol { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.dm-adm-mapcol + .dm-adm-mapcol { border-left: 1px solid var(--dm-line); }
+.dm-adm-mapcol-head { padding: 0.8rem 1rem 0.5rem; display: flex; flex-direction: column; gap: 0.45rem; border-bottom: 1px solid var(--dm-line); }
+.dm-adm-mapcol-head .dm-card-title { margin: 0; }
+.dm-adm-mapfilter { gap: 0.45rem; }
+.dm-adm-mapfilter select { flex: 0 0 auto; width: auto; max-width: 45%; }
+.dm-adm-mapfilter input { flex: 1; min-width: 0; }
+.dm-adm-mapcol .dm-adm-mapgrid { flex: 1; min-height: 0; overflow-y: auto; padding: 0.7rem 1rem 1rem; margin: 0; align-content: start; }
 .dm-adm-mapgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.6rem; margin-top: 0.4rem; }
 .dm-adm-mapgrid.wide { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
 .dm-adm-mappic { position: relative; display: flex; flex-direction: column; gap: 0.3rem; padding: 0.45rem; border: 1px solid var(--dm-line); border-radius: 10px; background: rgba(255, 255, 255, 0.03); }
@@ -1269,6 +1277,7 @@ span.dm-trap-pick { cursor: default; }
 /* Admin: battle logs */
 .dm-adm-logrow { grid-template-columns: 4.4rem 1fr auto; }
 .dm-adm-logrow small + small { margin-top: 1px; }
+.dm-adm-logrow .dm-adm-logdate[hidden] { display: none; }
 .dm-adm-logkind { display: inline-block; padding: 0.15rem 0.45rem; border-radius: 999px; font-size: 0.68rem; font-weight: 900; text-align: center;
   background: rgba(231, 76, 60, 0.25); color: #ff9b8f; }
 .dm-adm-logkind.pvp { background: rgba(52, 152, 219, 0.25); color: #8ccaf5; }
@@ -1283,14 +1292,10 @@ span.dm-trap-pick { cursor: default; }
 .dm-adm-logline.t-session-start, .dm-adm-logline.t-session-end { color: var(--dm-gold); font-weight: 700; }
 .dm-adm-logtime { color: var(--dm-muted); font-variant-numeric: tabular-nums; font-size: 0.78rem; padding-top: 1px; }
 
-/* Map editor: Add to the map, and the queue of picked things being placed */
+/* Map editor: Add to the map */
 .dm-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
 .dm-add-grid .dm-btn { padding: 0.55rem 0.4rem; font-weight: 800; }
 .dm-add-grid .dm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.dm-place-queue { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem 0.6rem; margin-bottom: 0.55rem; border-radius: 9px;
-  background: rgba(39, 174, 96, 0.12); border: 1px solid rgba(46, 204, 113, 0.5); }
-.dm-place-queue small { color: var(--dm-muted); font-size: 0.74rem; line-height: 1.3; }
-.dm-place-queue span { display: flex; gap: 0.35rem; margin-top: 0.15rem; }
 .dm-object-pick { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.5rem; }
 .dm-object-pick .dm-object-preview { width: 64px; height: 64px; flex: none; margin: 0; }
 .dm-object-pick > div:last-child { display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-start; min-width: 0; font-size: 0.86rem; }
@@ -1379,6 +1384,13 @@ span.dm-trap-pick { cursor: default; }
 .dm-disp-plan-thumb.empty { font-size: 1.1rem; opacity: 0.5; }
 .dm-disp-plan-go { margin: 0.55rem 0 0.3rem; gap: 0.4rem; flex-wrap: wrap; }
 .dm-disp-queue, .dm-disp-plans { flex: none; }
+/* The planned scenes' folders */
+.dm-disp-plancrumbs { margin: 0.1rem 0 0.35rem; }
+.dm-disp-plancrumbs .dm-disp-crumb { font-size: 0.8rem; padding: 0.22rem 0.5rem; }
+.dm-disp-planfolder { cursor: pointer; }
+.dm-disp-planfolder:hover { background: rgba(255, 255, 255, 0.04); }
+.dm-disp-plan.dragging { opacity: 0.45; }
+.dm-disp-planfolder.drop-here { border: 2px dashed #2ecc71; background: rgba(46, 204, 113, 0.16); }
 /* NPCs in folders: cards with the pick tick, draggable */
 .dm-disp-card.nopic { opacity: 0.45; }
 .dm-disp-card.picked { border-color: #4fc3f7; box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.45); }

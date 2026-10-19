@@ -1477,7 +1477,9 @@ def _add_participant(state, data):
     joined = state['participants'][pid]
     # A DM creature that joins hidden is a surprise -- its join is logged hidden (the players' screens leave it out).
     secret = {'hidden': True} if status != 'participating' and (joined.get('owner') or DM_OWNER) == DM_OWNER and state.get('battleType') != 'pvp' else {}
-    _log_event(state, 'join', text=f"{joined['name']} joined the battle", actorId=pid, actorName=joined['name'], **secret)
+    # actorOwner: whose it is -- the Admin module's battle logs name a battle after the players in it
+    _log_event(state, 'join', text=f"{joined['name']} joined the battle", actorId=pid, actorName=joined['name'],
+               actorOwner=joined.get('owner') or '', **secret)
 
 
 def _drop_pending_switch_involving(state, ids):

@@ -25,7 +25,9 @@ _CLOCK_KEY = 'world-clock'
 _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'display-scene', 'region-map-view',
                'pokedex-caught', 'saved-maps',  # saved-maps: the DM's battle maps kept for reuse (js/dm/map-editor.js)
                'adventure-map',  # the Adventure module's map (js/dm/adventure.js), until the adventure starts
-               'display-folders'}  # the Display module's folders for its pictures: [{id, name, parent}] (js/dm/display.js)
+               'display-folders',  # the Display module's folders for its pictures: [{id, name, parent}] (js/dm/display.js)
+               'display-npc-folders',  # ...and for its NPCs: {folders: [{id, name, parent}], placed: {npc id: folder id}}
+               'display-planner'}  # its planned scenes, waiting to be shown: [{id, name, scene, shownAt}] (js/dm/display-store.js)
 # The species the players have ever caught (lowercase names) -- see caught_species.
 _CAUGHT_KEY = 'pokedex-caught'
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and
@@ -66,10 +68,6 @@ def handle(conn, action, params):
         if not params.get('name'):
             raise ValueError('Missing species name')
         return {'status': 'success', 'data': admin.species_record(params['name'])}
-
-    if action == 'admin-moves':
-        from . import admin
-        return {'status': 'success', 'data': admin.custom_moves()}
 
     if action == 'admin-battle-logs':
         from . import admin
@@ -192,8 +190,8 @@ def handle(conn, action, params):
         return routes_combat.start_adventure(conn, _load_state(conn, 'adventure-map'), settings)
 
     if action == 'give-move':
-        # The Party module: a move (one of the move list's -- the DM's own custom ones too) taught to a player's Pokemon
-        # for good, or (`forget`) one of its custom moves taken away.
+        # The Party module / the battle: a move from the move list -- one it hasn't learned yet, or can't normally learn --
+        # taught to a player's Pokemon for good (its custom moves, like Edit Pokemon's), or (`forget`) one taken away.
         if not params.get('trainer') or not params.get('pokemon') or not params.get('move'):
             raise ValueError('Missing trainer, Pokemon or move')
         return give_move(conn, params['trainer'], params['pokemon'], params['move'],
@@ -435,14 +433,14 @@ def give_item(conn, trainer_name, item, quantity, custom=False, description=''):
 
 def give_move(conn, trainer_name, pokemon_name, move, forget=False):
     """Teaches `move` to the trainer's Pokemon (one of its custom moves -- the ones on top of what its levels give it), or
-    with `forget` takes one of those away. The move has to be on the move list (the DM's own custom moves are, admin.py)."""
+    with `forget` takes one of those away. The move has to be on the move list."""
     from . import live, owned
     pid, mon = owned.find(conn, trainer_name, pokemon_name)
     if pid is None:
         raise ValueError(f'{trainer_name} has no {pokemon_name}')
     found = gamedata.find_move(move)
     if not found and not forget:
-        raise ValueError(f'No move called {move} -- make it first')
+        raise ValueError(f'No move called {move}')
     name = found['name'] if found else str(move).strip()
     custom = [m for m in (mon.get('customMoves') or []) if str(m).strip()]
     if forget:

@@ -1361,3 +1361,27 @@ span.dm-trap-pick { cursor: default; }
 .bmap-token.dm-override.selected .bmap-token-portrait { box-shadow: 0 0 0 3px #ff9800, 0 0 14px rgba(255, 152, 0, 0.8); }
 .bmap-override-row { background: rgba(255, 152, 0, 0.12); border: 1px solid rgba(255, 152, 0, 0.55); border-radius: 8px; padding: 0.35rem 0.5rem; }
 .bmap-override-row .bmap-confirm-btn { background: #e67e22; }
+/* Display: Live / Planner, the override, the planned scenes and the queue */
+.dm-disp-mode { display: inline-flex; grid-template-columns: none; }
+.dm-disp-override { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.5rem 0.7rem; border-radius: 10px;
+  background: rgba(255, 152, 0, 0.14); border: 1px solid rgba(255, 152, 0, 0.6); font-size: 0.85rem; }
+.dm-disp-override[hidden] { display: none; }
+.dm-disp-override span { flex: 1; min-width: 12rem; }
+.dm-disp-plan { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.3rem; border-bottom: 1px solid var(--dm-line); border-radius: 8px; }
+.dm-disp-plans .dm-disp-plan { cursor: pointer; }
+.dm-disp-plans .dm-disp-plan:hover { background: rgba(255, 255, 255, 0.04); }
+.dm-disp-plan.open { background: rgba(255, 215, 0, 0.1); box-shadow: inset 3px 0 0 var(--dm-gold); }
+.dm-disp-plan.overriding { box-shadow: inset 3px 0 0 #ff9800; }
+.dm-disp-plan.shown .dm-disp-layer-name strong { color: var(--dm-muted); }
+.dm-disp-plan-thumb { flex: none; width: 64px; height: 36px; border-radius: 6px; background: rgba(255, 255, 255, 0.05) center / cover no-repeat;
+  display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
+.dm-disp-plan-thumb .dm-disp-thumb { width: 36px; height: 36px; background: none; }
+.dm-disp-plan-thumb.empty { font-size: 1.1rem; opacity: 0.5; }
+.dm-disp-plan-go { margin: 0.55rem 0 0.3rem; gap: 0.4rem; flex-wrap: wrap; }
+.dm-disp-queue, .dm-disp-plans { flex: none; }
+/* NPCs in folders: cards with the pick tick, draggable */
+.dm-disp-card.nopic { opacity: 0.45; }
+.dm-disp-card.picked { border-color: #4fc3f7; box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.45); }
+.dm-disp-card:hover .dm-disp-tick, .dm-disp-card.picked .dm-disp-tick { opacity: 1; }
+.dm-disp-card.picked .dm-disp-tick { background: #4fc3f7; border-color: #4fc3f7; color: #0b1a26; }
+.dm-disp-card.dragging, .dm-disp-bg.dragging { opacity: 0.45; }

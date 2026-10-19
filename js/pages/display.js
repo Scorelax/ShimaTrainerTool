@@ -95,7 +95,9 @@ async function init() {
 }
 
 function drawScene() {
-  renderScene(document.getElementById('sceneStage'), sceneOnScreen(scene, battleOnDisplay(scene, session)));
+  // A planned scene the DM put on over everything (the Display module's "Override"), else the scene -- without its
+  // pictures during a battle unless they're kept on
+  renderScene(document.getElementById('sceneStage'), scene.override || sceneOnScreen(scene, battleOnDisplay(scene, session)));
 }
 
 function preloadAllAnimations() {
@@ -116,8 +118,9 @@ function preloadAllAnimations() {
 function render() {
   const layer = document.getElementById('battleLayer');
   if (!layer) return;
-  const inBattle = battleOnDisplay(scene, session); // the DM can put the regular screen back during a battle
-  document.getElementById('idleLogo').hidden = inBattle || sceneHasContent(scene);
+  // the DM can put the regular screen back during a battle -- or a planned scene over it for a while (scene.override)
+  const inBattle = !scene.override && battleOnDisplay(scene, session);
+  document.getElementById('idleLogo').hidden = inBattle || sceneHasContent(scene.override || scene);
   layer.hidden = !inBattle;
   if (!inBattle) return;
 

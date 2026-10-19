@@ -10,11 +10,20 @@
 // Clicking the preview opens the big editor, where pictures are dragged around and resized from a corner (always
 // square). Every change goes to the display straight away (display-store.js); a picture can be put on hidden first and
 // shown with one click. A Pokemon goes on as its animated sprite whenever it has one.
+//
+// The planner (the user's call, 2026-10-19): the 📅 Planner switch at the top turns everything here onto a planned scene
+// instead of the display -- built with the same tabs, preview and editor while the display carries on (a battle, the
+// scene the players are in). Planned scenes wait in the queue under "On the screen": Show puts one on the display, and
+// ⚡ Override puts it over everything -- a battle too -- until "Stop override".
 import { DmAPI } from '../api.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { renderScene, BATTLE_PICTURES, SCREEN_RATIO, battleOnDisplay } from '../utils/display-scene.js';
+import { renderScene, BATTLE_PICTURES, SCREEN_RATIO, battleOnDisplay, normaliseScene } from '../utils/display-scene.js';
 import { escapeHtml, getSpecies, newId, toast, openDmModal } from './dm-common.js';
-import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
+// getScene / updateScene here are the scene being worked on -- the display's own, or the planned one open in the planner
+import {
+  loadScene, onSceneChange, getScene as getLive, updateScene as updateLive, getTarget as getScene, updateTarget as updateScene,
+  loadPlans, getPlans, openPlan, setOpenPlan, updatePlans,
+} from './display-store.js';
 import { spriteSrc } from '../utils/sprite-media.js';
 
 const SOURCES = { pokemon: '🐾 Pokémon', npcs: '👤 NPCs', trainers: '👥 Trainers', backgrounds: '🖼️ Backgrounds' };
@@ -32,24 +41,48 @@ let _addHidden = false;
 const _data = { pokemon: null, npcs: null, trainers: null, backgrounds: null };
 // The backgrounds' folders (the user's call, 2026-10-19): [{id, name, parent}] in dm_state 'display-folders' -- a picture
 // keeps its folder's id (`folder`, '' = the top). Pictures and folders are dragged onto a folder (or the path) to move.
+// Folders (the user's call, 2026-10-19): the Backgrounds tab's (each picture's folder is on its record on the Pi) and the
+// NPCs tab's (NPC id -> folder, kept with the folders: dm_state 'display-npc-folders'). The tab shown has its set in
+// _folders / _folder / _picked; useFolderSet swaps them when the tab changes.
+const FOLDERED = { backgrounds: 'display-folders', npcs: 'display-npc-folders' };
+let _folderSet = 'backgrounds';
+const _folderSets = {};
 let _folders = [];
 let _folder = ''; // the folder open
-const _picked = new Set(); // backgrounds picked to move together (ids)
+let _picked = new Set(); // pictures / NPCs picked to move together (ids)
+
+function useFolderSet(name) {
+  if (!FOLDERED[name] || name === _folderSet) return;
+  _folderSets[_folderSet] = { folders: _folders, open: _folder, picked: _picked };
+  const next = _folderSets[name] || { folders: [], open: '', picked: new Set() };
+  ({ folders: _folders, open: _folder, picked: _picked } = next);
+  _folderSet = name;
+}
+
+/** The folder open in tab `name` (an upload goes there). */
+function folderOpenIn(name) {
+  return name === _folderSet ? _folder : (_folderSets[name]?.open || '');
+}
+
+/** An entry's id and name, either tab's (a background: {id, name}; an NPC: {key, label}). */
+const idOf = e => e.id ?? e.key;
+const nameOf = e => e.name ?? e.label ?? '';
 let _listening = false;
 let _dragging = false;
 let _editor = null; // the big editor while it's open: {overlay, stage, area, selectedId, observer}
 let _previewObserver = null;
+let _mode = 'live'; // 'live': the display itself | 'plan': the planner (a planned scene)
 
 export async function renderDisplay(root, { session, firstTime } = {}) {
   _root = root;
   _session = session || _session;
   if (!firstTime && root.querySelector('.dm-disp')) { postToPreview({ paused: false }); drawLayers(); return; } // keeps the search, tab and preview as they were
   root.innerHTML = '<div class="dm-loading">Loading…</div>';
-  await loadScene();
+  await Promise.all([loadScene(), loadPlans()]);
   if (!_listening) {
     _listening = true;
-    onSceneChange((scene) => {
-      postToPreview({ scene });
+    onSceneChange(() => {
+      postToPreview({ scene: getScene() });
       if (_editor) drawEditorStage();
       if (_dragging) return; // the lists catch up when the picture is let go
       drawLayers();
@@ -70,7 +103,7 @@ export function displayAway() {
 export function displaySessionChanged(session) {
   const wasActive = !!_session?.active;
   _session = session;
-  postToPreview({ session });
+  postToPreview({ session: previewSession() });
   if (wasActive !== !!session?.active) drawLayers();
 }
 
@@ -82,18 +115,24 @@ function draw() {
   _root.innerHTML = `
     <div class="dm-disp">
       <div class="dm-disp-left">
-        <div class="dm-disp-head"><h2>📺 Display</h2></div>
+        <div class="dm-disp-head"><h2>📺 Display</h2>
+          <div class="dm-seg two dm-disp-mode" id="dispMode">
+            <button data-mode="live" class="${_mode === 'live' ? 'active' : ''}" title="What the display shows now">📺 Live</button>
+            <button data-mode="plan" class="${_mode === 'plan' ? 'active' : ''}" title="Prepare scenes without touching the display">📅 Planner</button>
+          </div></div>
+        <div class="dm-disp-override" id="dispOverride" hidden></div>
+        ${_mode === 'plan' ? '<div class="dm-card dm-disp-plans" id="dispPlans"></div>' : ''}
         <div class="dm-disp-preview" id="dispPreview" role="button" tabindex="0" title="Click to arrange the pictures">
           <iframe id="dispFrame" src="display.html?preview" tabindex="-1" title="The display" aria-hidden="true"></iframe>
           <span class="dm-disp-preview-hint">🔍 Click to arrange</span>
         </div>
-        <div class="dm-disp-battleinfo" title="During a battle the background stays, with the turn order and whoever's turn it is on top">
+        <div class="dm-disp-battleinfo" ${_mode === 'plan' ? 'hidden' : ''} title="During a battle the background stays, with the turn order and whoever's turn it is on top">
           <span>⚔️ During a battle</span>
           <div class="dm-seg two" id="dispBattlePictures"></div>
         </div>
         <div class="dm-card dm-disp-layers">
           <div class="dm-card-title">
-            <span>On the screen</span>
+            <span>${_mode === 'plan' ? 'In this scene' : 'On the screen'}</span>
             <span class="dm-row dm-enc-titlebtns">
               <button class="dm-btn small" id="dispHideAll"></button>
               <button class="dm-btn small danger" id="dispClear" title="Take every picture off (the background stays)">Clear pictures</button>
@@ -101,6 +140,7 @@ function draw() {
           </div>
           <div id="dispLayers"></div>
         </div>
+        ${_mode === 'live' ? '<div class="dm-card dm-disp-queue" id="dispQueue"></div>' : ''}
       </div>
       <div class="dm-disp-work" id="dispWork">
         <div class="dm-enc-tabs dm-disp-tabs" id="dispTabs">
@@ -138,7 +178,7 @@ function draw() {
   document.getElementById('dispGrid').addEventListener('click', onGridClick);
   document.getElementById('dispBattlePictures').addEventListener('click', (e) => {
     const b = e.target.closest('[data-bp]');
-    if (b) updateScene((s) => { s.battlePictures = b.dataset.bp; });
+    if (b) updateLive((s) => { s.battlePictures = b.dataset.bp; });
   });
   document.getElementById('dispHideAll').addEventListener('click', () => {
     const scene = getScene();
@@ -151,6 +191,11 @@ function draw() {
     updateScene((s) => { s.items = []; });
   });
   document.getElementById('dispLayers').addEventListener('click', onLayerClick);
+  document.getElementById('dispMode').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mode]');
+    if (b && b.dataset.mode !== _mode) switchMode(b.dataset.mode);
+  });
+  _root.querySelector('.dm-disp-left').addEventListener('click', onPlanClick);
 
   // Pictures dropped anywhere on the module are uploaded as backgrounds.
   const work = _root.querySelector('.dm-disp');
@@ -174,7 +219,7 @@ function wirePreview() {
   _previewObserver.observe(box);
   fitFrame();
   // Once it's loaded, it gets this page's copy of the scene (which may be a moment ahead of the Pi's) and the battle.
-  frame.addEventListener('load', () => postToPreview({ scene: getScene(), session: _session }));
+  frame.addEventListener('load', () => postToPreview({ scene: getScene(), session: previewSession() }));
   box.addEventListener('click', openEditor);
   box.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditor(); } });
 }
@@ -187,13 +232,165 @@ function postToPreview(msg) {
 function drawBattlePictures() {
   const box = document.getElementById('dispBattlePictures');
   if (!box) return;
-  const current = getScene().battlePictures;
+  const current = getLive().battlePictures;
   box.innerHTML = Object.entries(BATTLE_PICTURES).map(([k, l]) => `<button data-bp="${k}" class="${k === current ? 'active' : ''}">${l}</button>`).join('');
 }
 
 // ---------------------------------------------------------------------------
 // What's on the screen
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// The planner and the queue
+// ---------------------------------------------------------------------------
+
+/** The battle as the preview shows it: none while planning (a planned scene is shown as it will look). */
+function previewSession() {
+  return _mode === 'plan' ? { active: false, participants: {}, turnOrder: [] } : _session;
+}
+
+async function switchMode(mode, planId = null) {
+  _mode = mode;
+  if (mode === 'plan') {
+    await loadPlans();
+    if (!getPlans().length) newPlan({ silent: true });
+    setOpenPlan(planId || openPlan()?.id || getPlans()[0].id);
+  } else {
+    setOpenPlan(null);
+  }
+  if (_editor) closeEditor();
+  draw();
+}
+
+const copyScene = sc => JSON.parse(JSON.stringify({ background: sc.background || null, items: sc.items || [] }));
+
+/** A new planned scene (empty, or `from` a scene: what's on the display now), opened in the planner. */
+function newPlan({ from = null, silent = false } = {}) {
+  const id = newId('plan');
+  updatePlans((list) => {
+    list.push({ id, name: `Scene ${list.length + 1}`, scene: normaliseScene(from ? copyScene(from) : null), createdAt: new Date().toISOString(), shownAt: null });
+  });
+  if (!silent) setOpenPlan(id);
+  return id;
+}
+
+function planThumb(plan) {
+  const bg = plan.scene.background?.url;
+  const first = plan.scene.items.find(i => i.still || i.src);
+  return bg ? `<span class="dm-disp-plan-thumb" style="background-image:url('${escapeHtml(bg)}')"></span>`
+    : first ? `<span class="dm-disp-plan-thumb">${thumbHtml(first.src, '', { still: first.still })}</span>` : '<span class="dm-disp-plan-thumb empty">📅</span>';
+}
+
+function planSummary(plan) {
+  const n = plan.scene.items.length;
+  return [plan.scene.background ? escapeHtml(plan.scene.background.name || 'a background') : 'no background',
+    `${n} picture${n === 1 ? '' : 's'}`, plan.shownAt ? '✓ shown' : ''].filter(Boolean).join(' · ');
+}
+
+/** The override bar: a planned scene is over everything on the display. */
+function drawOverride() {
+  const el = document.getElementById('dispOverride');
+  if (!el) return;
+  const o = getLive().override;
+  el.hidden = !o;
+  el.innerHTML = o ? `<span>⚡ <b>${escapeHtml(o.name || 'A planned scene')}</b> is on the display over everything${battleOnDisplay(getLive(), _session) ? ' -- the battle is behind it' : ''}.</span>
+    <button class="dm-btn small danger" data-ov="stop">■ Stop override</button>` : '';
+}
+
+/** Live: the planned scenes waiting to be shown. */
+function drawQueue() {
+  const box = document.getElementById('dispQueue');
+  if (!box) return;
+  const plans = getPlans();
+  const over = getLive().override?.id;
+  box.innerHTML = `
+    <div class="dm-card-title"><span>📅 Queued scenes</span>
+      <span class="dm-row dm-enc-titlebtns"><button class="dm-btn small" data-plan-act="new-live" title="Plan a new scene in the planner">＋ Plan a scene</button></span></div>
+    ${plans.length ? plans.map(p => `
+      <div class="dm-disp-plan${over === p.id ? ' overriding' : ''}${p.shownAt ? ' shown' : ''}" data-plan="${escapeHtml(p.id)}">
+        ${planThumb(p)}
+        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}</strong><small>${planSummary(p)}</small></span>
+        <button class="dm-btn small primary" data-plan-act="show" title="Put it on the display (in place of the background and pictures there now)">Show</button>
+        <button class="dm-btn small${over === p.id ? ' danger' : ''}" data-plan-act="${over === p.id ? 'stop' : 'override'}"
+          title="${over === p.id ? 'Back to what the display had' : 'On the display over everything -- a battle too -- until you stop it'}">${over === p.id ? '■ Stop' : '⚡ Override'}</button>
+        <button class="dm-icon-btn" data-plan-act="edit" title="Change it in the planner">✎</button>
+      </div>`).join('') : '<div class="dm-hint">Nothing queued -- prepare scenes in the 📅 Planner (during a battle too); they wait here until you show them.</div>'}`;
+}
+
+/** Planner: the planned scenes, the one open highlighted. */
+function drawPlans() {
+  const box = document.getElementById('dispPlans');
+  if (!box) return;
+  const open = openPlan();
+  const over = getLive().override?.id;
+  box.innerHTML = `
+    <div class="dm-card-title"><span>📅 Planned scenes</span>
+      <span class="dm-row dm-enc-titlebtns">
+        <button class="dm-btn small" data-plan-act="new" title="An empty scene">＋ New</button>
+        <button class="dm-btn small" data-plan-act="copy-live" title="A new scene starting from what's on the display now">⧉ From the display</button></span></div>
+    ${getPlans().map(p => `
+      <div class="dm-disp-plan${p.id === open?.id ? ' open' : ''}${over === p.id ? ' overriding' : ''}" data-plan="${escapeHtml(p.id)}" role="button" tabindex="0" title="Work on this one">
+        ${planThumb(p)}
+        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}</strong><small>${planSummary(p)}</small></span>
+        <button class="dm-icon-btn" data-plan-act="rename" title="Rename">✎</button>
+        <button class="dm-icon-btn danger" data-plan-act="delete" title="Delete it">✕</button>
+      </div>`).join('')}
+    ${open ? `<div class="dm-row dm-disp-plan-go">
+      <button class="dm-btn small primary" data-plan-act="show" data-id="${escapeHtml(open.id)}">📺 Show it now</button>
+      <button class="dm-btn small${over === open.id ? ' danger' : ''}" data-plan-act="${over === open.id ? 'stop' : 'override'}" data-id="${escapeHtml(open.id)}">${over === open.id ? '■ Stop override' : '⚡ Override the display'}</button></div>
+      <div class="dm-hint">Everything you add here goes into "${escapeHtml(open.name)}" -- the display doesn't change. It waits in the queue (📺 Live) until you show it.</div>` : ''}`;
+}
+
+async function onPlanClick(e) {
+  if (e.target.closest('[data-ov="stop"]')) { stopOverride(); return; }
+  const btn = e.target.closest('[data-plan-act]');
+  const row = e.target.closest('[data-plan]');
+  const plan = getPlans().find(p => p.id === (btn?.dataset.id || row?.dataset.plan));
+  if (!btn) {
+    if (row && _mode === 'plan' && plan && plan.id !== openPlan()?.id) { setOpenPlan(plan.id); if (_editor) closeEditor(); draw(); }
+    return;
+  }
+  const act = btn.dataset.planAct;
+  if (act === 'new') { newPlan(); draw(); return; }
+  if (act === 'copy-live') { newPlan({ from: getLive() }); draw(); return; }
+  if (act === 'new-live') { const id = newPlan({ silent: true }); switchMode('plan', id); return; }
+  if (!plan) return;
+  if (act === 'show') showPlan(plan);
+  else if (act === 'override') overridePlan(plan);
+  else if (act === 'stop') stopOverride();
+  else if (act === 'edit') switchMode('plan', plan.id);
+  else if (act === 'rename') {
+    const name = await askName('Rename the scene', plan.name);
+    if (name) updatePlans(() => { plan.name = name; });
+  } else if (act === 'delete') {
+    if (!await showCombatConfirm(`Delete the planned scene "${plan.name}"?`, { title: 'Delete scene', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+    const wasOpen = openPlan()?.id === plan.id;
+    updatePlans((list) => { list.splice(list.indexOf(plan), 1); });
+    if (wasOpen && _mode === 'plan') {
+      if (!getPlans().length) newPlan({ silent: true });
+      setOpenPlan(getPlans()[0].id);
+      draw();
+    }
+  }
+}
+
+/** A planned scene onto the display: its background and pictures in place of what's there (it stays in the queue). */
+function showPlan(plan) {
+  const sc = copyScene(plan.scene);
+  updateLive((s) => { s.background = sc.background; s.items = sc.items; });
+  updatePlans(() => { plan.shownAt = new Date().toISOString(); });
+  toast(`"${plan.name}" is on the display${battleOnDisplay(getLive(), _session) ? ' -- behind the battle (⚡ Override shows it over it)' : ''}.`);
+}
+
+function overridePlan(plan) {
+  const sc = copyScene(plan.scene);
+  updateLive((s) => { s.override = { id: plan.id, name: plan.name, ...sc }; });
+  toast(`"${plan.name}" is over everything on the display -- Stop override puts it back.`);
+}
+
+function stopOverride() {
+  updateLive((s) => { s.override = null; });
+}
 
 /** A small picture. `still`: shown instead of an animated sprite -- for the little lists redrawn on every change (a video
  * there would start over, and decode, each time). Animated ones load the Pi's small sprite copy. */
@@ -216,7 +413,9 @@ function drawLayers() {
     hideAll.disabled = !scene.items.length;
   }
   const items = [...scene.items].reverse(); // the top one first
-  const putAway = battleOnDisplay(scene, _session) && scene.battlePictures !== 'keep' && items.length;
+  drawOverride();
+  if (_mode === 'plan') drawPlans(); else drawQueue();
+  const putAway = battleOnDisplay(scene, previewSession()) && scene.battlePictures !== 'keep' && items.length;
   box.innerHTML = `
     ${putAway ? '<div class="dm-disp-away">⚔️ Put away during the battle</div>' : ''}
     ${items.map(it => `
@@ -276,10 +475,15 @@ async function loadSource(name) {
     }));
     refreshSpriteUrls();
   } else if (name === 'npcs') {
-    _data.npcs = ((await DmAPI.npcs()).data || []).map(n => ({
+    const [npcs, kept] = await Promise.all([DmAPI.npcs(), DmAPI.getState('display-npc-folders').catch(() => null)]);
+    const placed = kept?.placed || {};
+    _data.npcs = (npcs.data || []).map(n => ({
       key: n.id, kind: 'npc', label: n.name || 'NPC', sub: n.role || n.location || '', still: n.image || '', animated: '',
-      search: `${n.name} ${n.role} ${n.faction} ${n.location}`.toLowerCase(),
+      search: `${n.name} ${n.role} ${n.faction} ${n.location}`.toLowerCase(), folder: placed[n.id] || '',
     }));
+    useFolderSet('npcs');
+    _folders = Array.isArray(kept?.folders) ? kept.folders : [];
+    if (_folder && !_folders.some(f => f.id === _folder)) _folder = '';
   } else if (name === 'trainers') {
     _data.trainers = ((await DmAPI.party()).data || []).map(({ trainer: t }) => ({
       key: t.name, kind: 'trainer', label: t.name, sub: `Lv ${t.level}`, still: t.image || '', animated: '', search: String(t.name).toLowerCase(),
@@ -287,6 +491,7 @@ async function loadSource(name) {
   } else if (name === 'backgrounds') {
     const [images, folders] = await Promise.all([DmAPI.displayImages(), DmAPI.getState('display-folders').catch(() => null)]);
     _data.backgrounds = images.data || [];
+    useFolderSet('backgrounds');
     _folders = Array.isArray(folders) ? folders : [];
     if (_folder && !_folders.some(f => f.id === _folder)) _folder = '';
   }
@@ -317,6 +522,7 @@ async function drawSource() {
   if (!grid) return;
   grid.className = `dm-disp-grid${_source === 'backgrounds' ? ' wide' : ''}`;
   if (!_data[_source]) grid.innerHTML = '<div class="dm-loading">Loading…</div>';
+  useFolderSet(_source);
   try { await loadSource(_source); } catch (err) { grid.innerHTML = `<div class="dm-hint">Couldn't load: ${escapeHtml(err.message)}</div>`; return; }
   drawGrid();
 }
@@ -342,6 +548,21 @@ function drawGrid() {
           <button class="dm-icon-btn danger" data-bgact="delete" title="Delete it from the Pi">✕</button>
         </span>
       </div>`).join('') : folders.length ? '' : `<div class="dm-hint dm-disp-empty">${q ? 'No picture matches that.' : _folder ? 'This folder is empty -- drag pictures here, or upload them while it\'s open.' : list.length ? 'No pictures out here -- they\'re all in folders.' : 'No pictures uploaded yet -- upload a few backgrounds (a route, a forest, a city…) and they stay here for next time.'}</div>`);
+    wireFolderDrag(grid);
+    drawPickedBar();
+    return;
+  }
+  if (_source === 'npcs') {
+    const shown = list.filter(e => (q ? e.search.includes(q) : (e.folder || '') === _folder));
+    const folders = q ? [] : _folders.filter(f => (f.parent || '') === _folder).sort((a, b) => a.name.localeCompare(b.name));
+    grid.innerHTML = `${foldersBarHtml(q)}${folders.map(folderCardHtml).join('')}` + (shown.length ? shown.map(e => `
+      <div class="dm-disp-card${_picked.has(e.key) ? ' picked' : ''}${e.still ? '' : ' nopic'}" data-add="${escapeHtml(e.key)}" data-entry="${escapeHtml(e.key)}" draggable="true" role="button" tabindex="0"
+        title="${e.still ? 'Put it on the display' : 'No picture'} -- drag it into a folder, or tick it (Ctrl + click) to move several">
+        <button class="dm-disp-tick" data-pick-bg title="${_picked.has(e.key) ? 'Unpick it' : 'Pick it -- to move several at once'}">✓</button>
+        ${thumbHtml(e.still, '')}
+        <span class="dm-disp-card-name">${escapeHtml(e.label)}</span>
+        ${e.sub || (q && e.folder) ? `<small>${escapeHtml(e.sub || '')}${q && e.folder ? ` · 📁 ${escapeHtml(folderPath(e.folder).map(f => f.name).join(' › '))}` : ''}</small>` : ''}
+      </div>`).join('') : folders.length ? '' : `<div class="dm-hint dm-disp-empty">${q ? 'No NPC matches that.' : _folder ? 'This folder is empty -- drag NPCs here.' : list.length ? 'No NPCs out here -- they\'re all in folders.' : 'No NPCs in the NPC library yet.'}</div>`);
     wireFolderDrag(grid);
     drawPickedBar();
     return;
@@ -378,12 +599,25 @@ function addPicture({ kind, label, still = '', animated = '' }) {
     // Side by side across the lower part of the screen, so a few added in a row don't land on top of each other.
     s.items.push({ id: newId('pic'), kind, label, src, still, animated, x: 0.12 + (n % 5) * 0.19, y: 0.64, size: 0.36, flip: false, hidden });
   });
-  toast(hidden ? `${label} is ready, hidden -- click Show to put it on.` : `${label} is on the display.`);
+  const plan = openPlan();
+  toast(plan ? `${label} is in "${plan.name}".` : hidden ? `${label} is ready, hidden -- click Show to put it on.` : `${label} is on the display.`);
 }
 
 async function onGridClick(e) {
-  if (_source === 'backgrounds' && e.target.closest('[data-picked-act]')) { onPickedBar(e.target.closest('[data-picked-act]').dataset.pickedAct); return; }
-  if (_source === 'backgrounds' && onFolderClick(e)) return;
+  if (FOLDERED[_source] && e.target.closest('[data-picked-act]')) { onPickedBar(e.target.closest('[data-picked-act]').dataset.pickedAct); return; }
+  if (FOLDERED[_source] && onFolderClick(e)) return;
+  const npcCard = _source === 'npcs' && e.target.closest('[data-entry]');
+  if (npcCard) {
+    const entry = _data.npcs.find(x => x.key === npcCard.dataset.entry);
+    if (!entry) return;
+    if (e.target.closest('[data-pick-bg]') || e.ctrlKey || e.metaKey || e.shiftKey || _picked.size) {
+      if (_picked.has(entry.key)) _picked.delete(entry.key); else _picked.add(entry.key);
+      drawGrid();
+      return;
+    }
+    if (entry.still) addPicture(entry);
+    return;
+  }
   const bgTool = e.target.closest('[data-bgact]');
   const bgCard = e.target.closest('[data-bg]');
   if (bgCard) {
@@ -497,7 +731,7 @@ async function uploadFiles(files) {
   for (const [i, file] of files.entries()) {
     if (btn) { btn.disabled = true; btn.textContent = `Uploading ${i + 1} of ${files.length}…`; }
     try {
-      const img = await DmAPI.saveDisplayImage({ name: file.name.replace(/\.[^.]+$/, ''), data: await prepareImage(file), folder: _folder });
+      const img = await DmAPI.saveDisplayImage({ name: file.name.replace(/\.[^.]+$/, ''), data: await prepareImage(file), folder: folderOpenIn('backgrounds') });
       _data.backgrounds.unshift(img);
       drawGrid();
     } catch (err) {
@@ -710,8 +944,9 @@ function onStagePointerDown(e) {
 }
 
 // ---------------------------------------------------------------------------
-// Folders for the backgrounds: the path to the folder open (each step a place to drop on), New folder, and the folders in
-// the one open -- open one by clicking it, drag pictures and folders onto it (or onto a step of the path) to move them.
+// Folders for the backgrounds and the NPCs: the path to the folder open (each step a place to drop on), New folder, and
+// the folders in the one open -- open one by clicking it, drag pictures / NPCs and folders onto it (or onto a step of the
+// path) to move them. Several picked (the tick, or Ctrl + click) move together.
 // ---------------------------------------------------------------------------
 
 /** The folder `id` and the ones above it, top first. */
@@ -725,74 +960,19 @@ function folderPath(id) {
   return out;
 }
 
-/** While pictures are picked: how many, Move to..., Unpick -- above the grid. */
-function drawPickedBar() {
-  const grid = document.getElementById('dispGrid');
-  if (!grid) return;
-  [..._picked].forEach((id) => { if (!(_data.backgrounds || []).some(b => b.id === id)) _picked.delete(id); });
-  grid.querySelector('.dm-disp-picked')?.remove();
-  if (!_picked.size) return;
-  const bar = document.createElement('div');
-  bar.className = 'dm-disp-picked';
-  bar.innerHTML = `<b>${_picked.size} picture${_picked.size === 1 ? '' : 's'} picked</b>
-    <span class="dm-hint">Drag them onto a folder, or</span>
-    <button class="dm-btn small primary" data-picked-act="move">📁 Move to…</button>
-    <button class="dm-btn small" data-picked-act="all">Pick all here</button>
-    <button class="dm-btn small" data-picked-act="clear">Unpick</button>`;
-  grid.prepend(bar);
-}
-
-async function onPickedBar(act) {
-  if (act === 'clear') { _picked.clear(); drawGrid(); return; }
-  if (act === 'all') {
-    const q = (_queries.backgrounds || '').trim().toLowerCase();
-    (_data.backgrounds || []).filter(b => (q ? b.name.toLowerCase().includes(q) : (b.folder || '') === _folder)).forEach(b => _picked.add(b.id));
-    drawGrid();
-    return;
-  }
-  // Move to...: every folder, as a tree
-  const rows = [];
-  const walk = (parent, depth) => _folders.filter(f => (f.parent || '') === parent).sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((f) => { rows.push({ f, depth }); walk(f.id, depth + 1); });
-  walk('', 1);
-  const into = await openDmModal({
-    title: `📁 Move ${_picked.size} picture${_picked.size === 1 ? '' : 's'} to…`,
-    html: `<div class="dm-disp-movelist">
-      <button class="dm-species-item" data-into=""><span class="dm-species-name">🖼️ All pictures</span></button>
-      ${rows.map(({ f, depth }) => `<button class="dm-species-item" data-into="${escapeHtml(f.id)}" style="padding-left:${0.6 + depth}rem"><span class="dm-species-name">📁 ${escapeHtml(f.name)}</span></button>`).join('')}
-    </div>`,
-    buttons: [{ label: 'Cancel', value: null }],
-    onOpen: (body, close) => body.addEventListener('click', (ev) => { const b = ev.target.closest('[data-into]'); if (b) close(b.dataset.into); }),
-  });
-  if (into === null || into === undefined) return;
-  await movePictures([..._picked], into);
-}
-
-async function movePictures(ids, into) {
-  try {
-    for (const id of ids) {
-      const b = (_data.backgrounds || []).find(x => x.id === id);
-      if (b) await movePicture(b, into);
-    }
-  } catch (err) {
-    showCombatAlert(err.message, { title: 'Move' });
-  }
-  _picked.clear();
-  drawGrid();
-}
-
 function foldersBarHtml(q) {
   if (q) return '<div class="dm-disp-crumbs"><span class="dm-hint">Searching every folder</span></div>';
+  const all = _source === 'npcs' ? '👤 All NPCs' : '🖼️ All pictures';
   return `<div class="dm-disp-crumbs">
-    <button class="dm-disp-crumb${_folder ? '' : ' here'}" data-open-folder="" data-drop-folder="">🖼️ All pictures</button>
+    <button class="dm-disp-crumb${_folder ? '' : ' here'}" data-open-folder="" data-drop-folder="">${all}</button>
     ${folderPath(_folder).map(f => `<span>›</span><button class="dm-disp-crumb${f.id === _folder ? ' here' : ''}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}">📁 ${escapeHtml(f.name)}</button>`).join('')}
     <button class="dm-btn small dm-disp-newfolder" data-new-folder>＋ New folder</button>
   </div>`;
 }
 
 function folderCardHtml(f) {
-  const inside = (_data.backgrounds || []).filter(b => b.folder === f.id).length + _folders.filter(x => x.parent === f.id).length;
-  return `<div class="dm-disp-folder" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}" data-drag-folder="${escapeHtml(f.id)}" draggable="true" role="button" tabindex="0" title="Open it -- or drop pictures on it">
+  const inside = (_data[_source] || []).filter(b => b.folder === f.id).length + _folders.filter(x => x.parent === f.id).length;
+  return `<div class="dm-disp-folder" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}" data-drag-folder="${escapeHtml(f.id)}" draggable="true" role="button" tabindex="0" title="Open it -- or drop ${_source === 'npcs' ? 'NPCs' : 'pictures'} on it">
     <span class="dm-disp-folder-icon">📁</span>
     <span class="dm-disp-bg-name">${escapeHtml(f.name)}<small>${inside} inside</small></span>
     <span class="dm-disp-bg-tools">
@@ -802,8 +982,12 @@ function folderCardHtml(f) {
   </div>`;
 }
 
+/** The tab's folders saved -- the NPCs' with which NPC is in which (an NPC's own record is the NPC module's). */
 function saveFolders() {
-  return DmAPI.saveState('display-folders', _folders).catch(err => showCombatAlert(err.message, { title: 'Folders' }));
+  const data = _folderSet === 'npcs'
+    ? { folders: _folders, placed: Object.fromEntries((_data.npcs || []).filter(e => e.folder).map(e => [e.key, e.folder])) }
+    : _folders;
+  return DmAPI.saveState(FOLDERED[_folderSet], data).catch(err => showCombatAlert(err.message, { title: 'Folders' }));
 }
 
 /** A click on a folder, a step of the path or New folder -- true when it was one of those. */
@@ -853,14 +1037,15 @@ async function renameFolder(f) {
   drawGrid();
 }
 
-/** A folder deleted: what's in it -- pictures and folders -- moves up into the folder it was in. */
+/** A folder deleted: what's in it -- pictures / NPCs and folders -- moves up into the folder it was in. */
 async function deleteFolder(f) {
-  const pics = (_data.backgrounds || []).filter(b => b.folder === f.id);
+  const things = (_data[_source] || []).filter(b => b.folder === f.id);
   const subs = _folders.filter(x => x.parent === f.id);
-  const what = pics.length || subs.length ? ` Its ${[pics.length && `${pics.length} picture${pics.length === 1 ? '' : 's'}`, subs.length && `${subs.length} folder${subs.length === 1 ? '' : 's'}`].filter(Boolean).join(' and ')} move up a level -- nothing is deleted.` : '';
+  const noun = _source === 'npcs' ? 'NPC' : 'picture';
+  const what = things.length || subs.length ? ` Its ${[things.length && `${things.length} ${noun}${things.length === 1 ? '' : 's'}`, subs.length && `${subs.length} folder${subs.length === 1 ? '' : 's'}`].filter(Boolean).join(' and ')} move up a level -- nothing is deleted.` : '';
   if (!await showCombatConfirm(`Delete the folder "${f.name}"?${what}`, { title: 'Delete folder', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
   try {
-    for (const b of pics) await movePicture(b, f.parent || '');
+    for (const b of things) await moveInto(b, f.parent || '');
   } catch (err) { showCombatAlert(err.message, { title: 'Delete folder' }); return; }
   subs.forEach((x) => { x.parent = f.parent || ''; });
   _folders = _folders.filter(x => x.id !== f.id);
@@ -869,22 +1054,86 @@ async function deleteFolder(f) {
   drawGrid();
 }
 
-async function movePicture(b, folder) {
+/** One picture / NPC into another folder ('' = the top) -- a picture's record on the Pi; an NPC's place is saved with the
+ * folders (saveFolders, after). */
+async function moveInto(b, folder) {
   if ((b.folder || '') === folder) return;
-  await DmAPI.saveDisplayImage({ id: b.id, folder });
+  if (_folderSet === 'backgrounds') await DmAPI.saveDisplayImage({ id: b.id, folder });
   b.folder = folder;
 }
 
-/** Drag a picture or a folder onto a folder (or a step of the path) to move it there. */
+/** While some are picked: how many, Move to..., Pick all here, Unpick -- above the grid. */
+function drawPickedBar() {
+  const grid = document.getElementById('dispGrid');
+  if (!grid) return;
+  const list = _data[_source] || [];
+  [..._picked].forEach((id) => { if (!list.some(b => idOf(b) === id)) _picked.delete(id); });
+  grid.querySelector('.dm-disp-picked')?.remove();
+  if (!_picked.size) return;
+  const noun = _source === 'npcs' ? 'NPC' : 'picture';
+  const bar = document.createElement('div');
+  bar.className = 'dm-disp-picked';
+  bar.innerHTML = `<b>${_picked.size} ${noun}${_picked.size === 1 ? '' : 's'} picked</b>
+    <span class="dm-hint">Drag them onto a folder, or</span>
+    <button class="dm-btn small primary" data-picked-act="move">📁 Move to…</button>
+    <button class="dm-btn small" data-picked-act="all">Pick all here</button>
+    <button class="dm-btn small" data-picked-act="clear">Unpick</button>`;
+  grid.prepend(bar);
+}
+
+async function onPickedBar(act) {
+  if (act === 'clear') { _picked.clear(); drawGrid(); return; }
+  if (act === 'all') {
+    const q = (_queries[_source] || '').trim().toLowerCase();
+    (_data[_source] || []).filter(b => (q ? (b.search || nameOf(b).toLowerCase()).includes(q) : (b.folder || '') === _folder))
+      .forEach(b => _picked.add(idOf(b)));
+    drawGrid();
+    return;
+  }
+  // Move to...: every folder, as a tree
+  const rows = [];
+  const walk = (parent, depth) => _folders.filter(f => (f.parent || '') === parent).sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((f) => { rows.push({ f, depth }); walk(f.id, depth + 1); });
+  walk('', 1);
+  const noun = _source === 'npcs' ? 'NPC' : 'picture';
+  const into = await openDmModal({
+    title: `📁 Move ${_picked.size} ${noun}${_picked.size === 1 ? '' : 's'} to…`,
+    html: `<div class="dm-disp-movelist">
+      <button class="dm-species-item" data-into=""><span class="dm-species-name">${_source === 'npcs' ? '👤 All NPCs' : '🖼️ All pictures'}</span></button>
+      ${rows.map(({ f, depth }) => `<button class="dm-species-item" data-into="${escapeHtml(f.id)}" style="padding-left:${0.6 + depth}rem"><span class="dm-species-name">📁 ${escapeHtml(f.name)}</span></button>`).join('')}
+    </div>`,
+    buttons: [{ label: 'Cancel', value: null }],
+    onOpen: (body, close) => body.addEventListener('click', (ev) => { const b = ev.target.closest('[data-into]'); if (b) close(b.dataset.into); }),
+  });
+  if (into === null || into === undefined) return;
+  await moveMany([..._picked], into);
+}
+
+async function moveMany(ids, into) {
+  try {
+    for (const id of ids) {
+      const b = (_data[_source] || []).find(x => idOf(x) === id);
+      if (b) await moveInto(b, into);
+    }
+    if (_folderSet === 'npcs') await saveFolders();
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Move' });
+  }
+  _picked.clear();
+  drawGrid();
+}
+
+/** Drag pictures / NPCs or a folder onto a folder (or a step of the path) to move them there. */
 function wireFolderDrag(grid) {
   if (grid._folderDrag) return;
   grid._folderDrag = true;
   const TYPE = 'application/x-dm-display';
   grid.addEventListener('dragstart', (e) => {
-    const pic = e.target.closest?.('[data-bg]');
+    const pic = e.target.closest?.('[data-bg], [data-entry]');
     const folder = e.target.closest?.('[data-drag-folder]');
-    if (!pic && !folder) return;
-    const ids = pic && _picked.has(pic.dataset.bg) ? [..._picked] : pic ? [pic.dataset.bg] : [];
+    if ((!pic && !folder) || !FOLDERED[_source]) return;
+    const id = pic ? (pic.dataset.bg || pic.dataset.entry) : null;
+    const ids = pic && _picked.has(id) ? [..._picked] : pic ? [id] : [];
     e.dataTransfer.setData(TYPE, JSON.stringify(pic ? { kind: 'picture', ids } : { kind: 'folder', id: folder.dataset.dragFolder }));
     e.dataTransfer.effectAllowed = 'move';
     (pic || folder).classList.add('dragging');
@@ -910,20 +1159,12 @@ function wireFolderDrag(grid) {
     target.classList.remove('drop-here');
     const into = target.dataset.dropFolder;
     const what = JSON.parse(raw);
-    try {
-      if (what.kind === 'picture') {
-        await movePictures(what.ids || [what.id], into);
-        return;
-      } else {
-        const f = _folders.find(x => x.id === what.id);
-        // never into itself or one of its own folders
-        if (!f || f.id === into || folderPath(into).some(x => x.id === f.id)) return;
-        f.parent = into;
-        await saveFolders();
-      }
-    } catch (err) {
-      showCombatAlert(err.message, { title: 'Move' });
-    }
+    if (what.kind === 'picture') { await moveMany(what.ids || [], into); return; }
+    const f = _folders.find(x => x.id === what.id);
+    // never into itself or one of its own folders
+    if (!f || f.id === into || folderPath(into).some(x => x.id === f.id)) return;
+    f.parent = into;
+    await saveFolders();
     drawGrid();
   });
 }

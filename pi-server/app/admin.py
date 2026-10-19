@@ -106,57 +106,6 @@ def save_item(item, is_new=False):
     return {**record, 'image': media.item_image_url(record['name']), 'edited': True}
 
 
-# ---------------------------------------------------------------------------
-# Custom moves (the user's call, 2026-10-19: the DM gives players' Pokemon -- and anyone in a battle -- moves of their own)
-# ---------------------------------------------------------------------------
-
-_MOVE_TYPES = ('Normal', 'Fire', 'Water', 'Grass', 'Electric', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic',
-               'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy', 'Cosmic')
-
-
-def custom_moves():
-    """The DM's own moves, as they're kept (MOVES_OVERLAY_FILE)."""
-    return sorted((m for m in species_data.read_overlay(gamedata.MOVES_OVERLAY_FILE).values() if isinstance(m, dict)),
-                  key=lambda m: str(m.get('name', '')).lower())
-
-
-def save_move(move):
-    """A custom move, new or changed: {name, type, action, range, duration, moveStat, vpCost, description, scaling,
-    attackRoll}. Its name can't be one of the move file's (those are the game's own); what it does is the DM's call at the
-    table -- it has no automatic effects, only the text (the battle rolls the dice its description names)."""
-    if not isinstance(move, dict):
-        raise ValueError('Not a move')
-    name = _text(move.get('name'))
-    if not name:
-        raise ValueError('The move needs a name')
-    overlay = dict(species_data.read_overlay(gamedata.MOVES_OVERLAY_FILE))
-    if name.lower() not in overlay and gamedata.find_move(name):
-        raise ValueError(f'{name} is already a move -- give it another name')
-    mtype = _text(move.get('type')).capitalize() or 'Normal'
-    if mtype not in _MOVE_TYPES:
-        raise ValueError(f'Unknown type: {mtype}')
-    duration = _text(move.get('duration')) or 'Instantaneous'
-    record = {
-        'name': name, 'type': mtype, 'action': _text(move.get('action')) or '1 action', 'range': _text(move.get('range')),
-        'duration': {'raw': duration, 'rounds': 0, 'concentration': 'concentration' in duration.lower(), 'varies': False},
-        'reaction': 'reaction' in _text(move.get('action')).lower(), 'categories': [], 'effects': [],
-        'description': _text(move.get('description')), 'moveStat': _text(move.get('moveStat')) or 'None',
-        'vpCost': _text(move.get('vpCost')) or '0', 'scaling': _text(move.get('scaling')),
-        'attackRoll': bool(move.get('attackRoll')), 'custom': True,
-    }
-    overlay[name.lower()] = record
-    _write_json(gamedata.MOVES_OVERLAY_FILE, overlay)
-    return record
-
-
-def delete_move(name):
-    overlay = dict(species_data.read_overlay(gamedata.MOVES_OVERLAY_FILE))
-    if overlay.pop(_text(name).lower(), None) is None:
-        raise ValueError(f'No custom move called {name}')
-    _write_json(gamedata.MOVES_OVERLAY_FILE, overlay)
-    return True
-
-
 def save_item_image(name, data_url):
     """An item's picture, saved as "<Item Name>.<ext>" in the item pictures folder."""
     item = next((i for i in gamedata.items() if i['name'].lower() == _text(name).lower()), None)

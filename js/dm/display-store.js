@@ -63,3 +63,66 @@ async function save() {
     if (_dirty && !_timer) _timer = setTimeout(save, SAVE_EVERY_MS);
   }
 }
+
+// ---------------------------------------------------------------------------
+// The planner (the user's call, 2026-10-19): scenes the DM prepares without touching the display -- during a battle, or
+// for the next place the players go -- kept on the Pi (dm_state 'display-planner': [{id, name, scene, shownAt}]) and
+// queued until the DM shows one (or puts it over everything for a while: scene.override). While one is open in the
+// planner, the Display module edits it instead of the display (getTarget / updateTarget); everything else -- the battle
+// module's checkbox -- always changes the display itself (getScene / updateScene).
+// ---------------------------------------------------------------------------
+
+let _plans = [];
+let _plansLoaded = false;
+let _planId = null;
+let _planTimer = null;
+
+export async function loadPlans() {
+  if (_plansLoaded) return _plans;
+  const saved = await DmAPI.getState('display-planner').catch(() => null);
+  _plans = (Array.isArray(saved) ? saved : []).filter(p => p && p.id).map(p => ({ ...p, name: String(p.name || 'Scene'), scene: normaliseScene(p.scene) }));
+  _plansLoaded = true;
+  return _plans;
+}
+
+export function getPlans() {
+  return _plans;
+}
+
+/** The planned scene open in the planner, or null (the Display module is on the display itself). */
+export function openPlan() {
+  return _planId ? _plans.find(p => p.id === _planId) || null : null;
+}
+
+export function setOpenPlan(id) {
+  _planId = id || null;
+  notify();
+}
+
+/** What the Display module works on: the planned scene open in the planner, or the display's own. */
+export function getTarget() {
+  return openPlan()?.scene || _scene;
+}
+
+export function updateTarget(fn) {
+  const plan = openPlan();
+  if (!plan) { updateScene(fn); return; }
+  fn(plan.scene);
+  notify();
+  savePlansSoon();
+}
+
+/** Changes the planner's list (a scene added, renamed, removed, marked shown...) and saves it. */
+export function updatePlans(fn) {
+  fn(_plans);
+  if (_planId && !_plans.some(p => p.id === _planId)) _planId = null;
+  notify();
+  savePlansSoon();
+}
+
+function savePlansSoon() {
+  clearTimeout(_planTimer);
+  _planTimer = setTimeout(() => {
+    DmAPI.saveState('display-planner', _plans).catch(err => toast(`Couldn't save the planner: ${err.message}`));
+  }, 400);
+}

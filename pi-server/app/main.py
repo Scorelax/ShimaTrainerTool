@@ -284,14 +284,6 @@ def dm_admin_item(payload: dict):
     return _admin(lambda: admin.save_item(payload.get('item'), bool(payload.get('isNew'))))
 
 
-@app.post('/api/dm/admin-move')
-def dm_admin_move(payload: dict):
-    """A custom move added or changed ({move}) -- or with {delete: name} taken off the list."""
-    if payload.get('delete'):
-        return _admin(lambda: admin.delete_move(payload['delete']))
-    return _admin(lambda: admin.save_move(payload.get('move')))
-
-
 @app.post('/api/dm/admin-item-image')
 def dm_admin_item_image(payload: dict):
     """An item's picture ({name, data: "data:image/...;base64,..."}), saved as "<Item Name>.<ext>"."""

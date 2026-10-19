@@ -4,7 +4,9 @@
 // arranges is exactly what the TV shows. During a battle the background stays and the battle (turn order, whoever's
 // turn it is) goes on top; the placed pictures are put away until it ends unless `battlePictures` is 'keep'.
 //
-// Scene: { background: {url, name} | null, items: [Item], battlePictures: 'away' | 'keep' }
+// Scene: { background: {url, name} | null, items: [Item], battlePictures: 'away' | 'keep', override }
+//   override: a planned scene the DM put on the display over everything else -- a battle too -- until they stop it
+//   ({id, name, background, items}, the Display module's planner: the user's call, 2026-10-19), or null.
 // Item:  { id, kind: 'pokemon' | 'npc' | 'trainer' | 'image', label, src, still, animated, x, y, size, flip, hidden }
 //   x, y = the picture's middle, as a share of the screen's width / height (0..1); size = its side as a share of the
 //   screen's height -- pictures are always square (the picture itself fits inside, never stretched). The TV is 16:9.
@@ -16,14 +18,19 @@ import { spriteSrc, BLANK_POSTER } from './sprite-media.js';
 export const SCREEN_RATIO = 16 / 9;
 export const BATTLE_PICTURES = { away: 'Put the pictures away', keep: 'Keep the pictures on' };
 
+const backgroundOf = s => (s?.background?.url ? { url: String(s.background.url), name: String(s.background.name || '') } : null);
+const itemsOf = s => (Array.isArray(s?.items) ? s.items.filter(i => i && i.id && i.src).map(i => (i.animated ? { ...i, src: i.animated } : i)) : []);
+
 export function normaliseScene(s) {
   const out = {
-    background: s?.background?.url ? { url: String(s.background.url), name: String(s.background.name || '') } : null,
-    items: Array.isArray(s?.items) ? s.items.filter(i => i && i.id && i.src).map(i => (i.animated ? { ...i, src: i.animated } : i)) : [],
+    background: backgroundOf(s),
+    items: itemsOf(s),
     battlePictures: BATTLE_PICTURES[s?.battlePictures] ? s.battlePictures : 'away',
     // The battle the DM has taken off the display (its log file -- one battle's id): the regular scene shows meanwhile.
     // Tied to that one battle, so the next one shows again even if the box was left unticked.
     hideBattle: typeof s?.hideBattle === 'string' ? s.hideBattle : '',
+    override: s?.override && typeof s.override === 'object'
+      ? { id: String(s.override.id || ''), name: String(s.override.name || ''), background: backgroundOf(s.override), items: itemsOf(s.override) } : null,
   };
   return out;
 }

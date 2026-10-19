@@ -1540,20 +1540,8 @@ export class DmAPI {
     return API.request('game-data', 'moves', {}, { useCache: false });
   }
 
-  static async adminMoves() {
-    return (await API.request('dm', 'admin-moves', {}, { useCache: false })).data || [];
-  }
-
-  /** A custom move added or changed -> the move as saved (it's on the move list for every device from then on). */
-  static async adminSaveMove(move) {
-    return (await DmAPI._post('admin-move', { move }, 'Saving the move')).data;
-  }
-
-  static async adminDeleteMove(name) {
-    return (await DmAPI._post('admin-move', { delete: name }, 'Deleting the move')).data;
-  }
-
-  /** A move taught to a player's Pokemon for good (one of its custom moves) -- or with `forget`, one taken away. */
+  /** A move from the move list taught to a player's Pokemon for good -- one it hasn't learned yet or can't normally
+   * learn (its custom moves, like Edit Pokemon's) -- or with `forget`, one taken away. */
   static async giveMove(trainer, pokemon, move, { forget = false } = {}) {
     return API.request('dm', 'give-move', { trainer, pokemon, move, ...(forget ? { forget: '1' } : {}) }, { useCache: false });
   }

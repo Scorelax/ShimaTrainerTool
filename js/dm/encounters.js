@@ -1017,10 +1017,24 @@ export async function importEncounterDialog() {
   if (enc) await loadIntoSetup(enc);
 }
 
-/** A new encounter built around a map (the Adventure module's "Encounter on this map"), opened in Encounter setup. */
-export async function createEncounterWithMap(map, name) {
+/** A new encounter built around a map (the Adventure's "Start encounter"), opened in Encounter setup -- with `creatures`
+ * (the adventure's Pokemon and NPCs, adventure.js's liveCreatures shape): each Pokemon an entry of its own, each NPC from
+ * the NPC library, both remembering where they stood (position; npcPlacement) and whether they were hidden. */
+export async function createEncounterWithMap(map, name, { creatures = [] } = {}) {
   try { await loadLibraryData(); } catch { /* the new one is saved either way */ }
-  const enc = { ...blankEncounter(), name: name || 'New encounter', map: { ...JSON.parse(JSON.stringify(map)), ready: true } };
+  const { creatures: _onIt, ...plain } = map || {};
+  const enc = { ...blankEncounter(), name: name || 'New encounter', map: { ...JSON.parse(JSON.stringify(plain)), ready: true } };
+  creatures.forEach((c) => {
+    if (c.kind === 'pokemon' && c.config?.species) {
+      enc.pokemon.push(newMon(c.config.species, Math.max(1, Math.min(20, Number(c.config.level) || 1)), {
+        name: c.name || c.config.species, nature: c.config.nature || '', abilities: c.config.abilities?.length ? c.config.abilities : [0],
+        heldBack: !!c.hidden, ...(c.position ? { position: { ...c.position } } : {}),
+      }));
+    } else if (c.kind === 'npc' && c.npcId && !enc.npcs.includes(c.npcId)) {
+      enc.npcs.push(c.npcId);
+      enc.npcPlacement = { ...(enc.npcPlacement || {}), [c.npcId]: { position: c.position ? { ...c.position } : null, hidden: !!c.hidden } };
+    }
+  });
   await saveNow(enc);
   _encounters.unshift(enc);
   _selectedId = enc.id;
@@ -1062,6 +1076,9 @@ async function loadIntoSetup(enc) {
     const built = [];
     for (const p of enc.pokemon) built.push(await buildEncounterMon(enc, p, null));
     const useMap = !!enc.map && body.dataset.map === '1';
+    // On its own map, each one starts where it stood when the encounter was made (the adventure's "Start encounter") --
+    // a hidden one too: on its square, hidden from the players until it's shown
+    if (useMap) built.forEach((c, i) => { if (enc.pokemon[i]?.position) c.position = { ...enc.pokemon[i].position }; });
     updateSetup((s) => {
       if (replace) s.creatures = [];
       if (useMap) {
@@ -1077,7 +1094,17 @@ async function loadIntoSetup(enc) {
     const missing = [];
     for (const id of enc.npcs) {
       const npc = npcById(id);
-      if (npc) await addEncounterNpc(enc, npc); else missing.push(id);
+      if (!npc) { missing.push(id); continue; }
+      const tid = await addEncounterNpc(enc, npc);
+      const placed = enc.npcPlacement?.[id];
+      if (placed) {
+        updateSetup((s) => {
+          const c = s.creatures.find(x => x.id === tid);
+          if (!c) return;
+          if (useMap && placed.position) c.position = { ...placed.position };
+          if (placed.hidden) c.heldBack = true;
+        });
+      }
     }
     await flushSetup();
     await DmAPI.saveState('encounter-run', { ...runFields(enc), eventState: {}, loadedAt: new Date().toISOString(), linked: true });
@@ -1109,7 +1136,7 @@ function runFields(enc) {
 function buildEncounterMon(enc, p, had) {
   return buildPokemonCreature(had?.id || newId(), p.species, p.name || p.species, monConfig(p), {
     encId: enc.id, encKey: `mon:${p.id}`, encSig: monSig(p), trainerId: null, heldBack: !!p.heldBack,
-    position: p.heldBack ? null : had?.position || null,
+    position: p.heldBack && !p.position ? null : had?.position || null, // (a hidden one with a square keeps it)
   });
 }
 
@@ -1121,6 +1148,7 @@ async function addEncounterNpc(enc, npc) {
     c.encId = enc.id;
     if (c.id === trainer.id) c.encKey = `npc:${npc.id}`;
   }));
+  return trainer.id;
 }
 
 let _syncing = Promise.resolve();

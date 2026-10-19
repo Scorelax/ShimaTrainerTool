@@ -67,6 +67,10 @@ def handle(conn, action, params):
             raise ValueError('Missing species name')
         return {'status': 'success', 'data': admin.species_record(params['name'])}
 
+    if action == 'admin-moves':
+        from . import admin
+        return {'status': 'success', 'data': admin.custom_moves()}
+
     if action == 'admin-battle-logs':
         from . import admin
         return {'status': 'success', 'data': admin.battle_logs()}
@@ -182,7 +186,18 @@ def handle(conn, action, params):
         return result
 
     if action == 'start-adventure':
-        return routes_combat.start_adventure(conn, _load_state(conn, 'adventure-map'))
+        settings = {k: params[k] in ('1', 'true') for k in ('canJoin', 'canMove') if params.get(k) in ('0', '1', 'true', 'false')}
+        if params.get('onScreen') in ('adventure', 'region'):
+            settings['onScreen'] = params['onScreen']
+        return routes_combat.start_adventure(conn, _load_state(conn, 'adventure-map'), settings)
+
+    if action == 'give-move':
+        # The Party module: a move (one of the move list's -- the DM's own custom ones too) taught to a player's Pokemon
+        # for good, or (`forget`) one of its custom moves taken away.
+        if not params.get('trainer') or not params.get('pokemon') or not params.get('move'):
+            raise ValueError('Missing trainer, Pokemon or move')
+        return give_move(conn, params['trainer'], params['pokemon'], params['move'],
+                         forget=str(params.get('forget', '')).lower() in ('1', 'true'))
 
     raise ValueError('Unknown dm action: ' + str(action))
 
@@ -205,6 +220,8 @@ def species_detail(conn, name):
         'evolvesTo': species_data.evolves_into_names(sp),
         # {target: what it takes (the text the players can be shown), or None when the encyclopedia doesn't say}
         'evolutionRequirements': {e['species']: e.get('requirement') or None for e in sp.get('evolvesInto') or []},
+        # {target: [each criterion as its own line]} -- the Pokedex module shows or hides each one by itself
+        'evolutionRequirementLines': {e['species']: species_data.requirement_lines(e) for e in sp.get('evolvesInto') or []},
         'catchDifficulty': (sp.get('encounter') or {}).get('catchDifficulty'),
         'level': (sp.get('encounter') or {}).get('minimumLevel') or 1,
         'ac': combat.get('ac'), 'hitDice': combat.get('hitDie'), 'hp': combat.get('baseHP'),
@@ -414,6 +431,28 @@ def give_item(conn, trainer_name, item, quantity, custom=False, description=''):
     trainers.save(conn, tid, trainer)
     live.publish({'type': 'trainer-data', 'trainer': trainer['name']})
     return {'status': 'success', 'inventory': trainer['inventory'], 'customItems': trainer['customItems']}
+
+
+def give_move(conn, trainer_name, pokemon_name, move, forget=False):
+    """Teaches `move` to the trainer's Pokemon (one of its custom moves -- the ones on top of what its levels give it), or
+    with `forget` takes one of those away. The move has to be on the move list (the DM's own custom moves are, admin.py)."""
+    from . import live, owned
+    pid, mon = owned.find(conn, trainer_name, pokemon_name)
+    if pid is None:
+        raise ValueError(f'{trainer_name} has no {pokemon_name}')
+    found = gamedata.find_move(move)
+    if not found and not forget:
+        raise ValueError(f'No move called {move} -- make it first')
+    name = found['name'] if found else str(move).strip()
+    custom = [m for m in (mon.get('customMoves') or []) if str(m).strip()]
+    if forget:
+        custom = [m for m in custom if m.lower() != name.lower()]
+    elif not any(m.lower() == name.lower() for m in custom):
+        custom.append(name)
+    mon['customMoves'] = custom
+    owned.save(conn, pid, mon)
+    live.publish({'type': 'trainer-data', 'trainer': mon.get('trainer') or trainer_name})
+    return {'status': 'success', 'data': {'customMoves': custom}}
 
 
 def give_money(conn, trainer_name, amount):

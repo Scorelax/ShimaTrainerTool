@@ -64,7 +64,7 @@ def _visibility(vis):
             for k in keys:
                 if k not in vis:
                     out[k] = vis[old]
-    for key in ('evoToTargets', 'evoReqTargets'):
+    for key in ('evoToTargets', 'evoReqTargets', 'evoReqLines'):
         if not isinstance(out.get(key), dict):
             out[key] = {}
     if not isinstance(out.get('extraVisibleMoves'), list):
@@ -123,6 +123,13 @@ def _species_entry(conn, sp, vis, own):
     targets = vis['evoToTargets'] if own else {t: bool(vis['evoTo']) for t in evolves_to}
     requirements = vis['evoReqTargets'] if own else {t: bool(vis['evoReq']) for t in evolves_to}
     need = {e['species']: species_data.requirement_lines(e) for e in sp.get('evolvesInto') or []}
+    # The Pokedex module can show some of a target's requirement lines and not others: {target: [the lines shown]}
+    # (a target it never narrowed down shows them all).
+    picked = vis['evoReqLines'] if own else {}
+    for t, lines in list(need.items()):
+        if isinstance(picked.get(t), list):
+            keep = {str(x).strip().lower() for x in picked[t]}
+            need[t] = [line for line in lines if line.strip().lower() in keep]
     entry['evolution'] = {
         'from': evolves_from if vis['evoFrom'] else None,
         # [{name, requirements}] -- what it takes, one line per criterion; [] unless the DM shows it

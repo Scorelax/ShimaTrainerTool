@@ -123,6 +123,8 @@ async function refreshActiveTrainerData(trainerName) {
     if (bundle.pokedexConfig) {
       setPokedexConfig(bundle.pokedexConfig);
     }
+    // The move list too: a move the DM taught may be one of the DM's own, new since this device loaded the list
+    if (Array.isArray(bundle.gameData?.moves)) sessionStorage.setItem('moves', JSON.stringify(bundle.gameData.moves));
 
     window.dispatchEvent(new CustomEvent('app:trainer-updated'));
   } catch (err) {

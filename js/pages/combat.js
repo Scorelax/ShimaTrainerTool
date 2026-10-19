@@ -148,6 +148,12 @@ function formatMod(val) {
 // MOVE / RECHARGE HELPERS
 // ============================================================================
 
+/** The move list read again (a custom move the DM just made is on it now). */
+export function refreshCombatMoves() {
+  _moves = null;
+  loadCombatMoves();
+}
+
 function loadCombatMoves() {
   if (_moves) return;
   const rawMovesData = sessionStorage.getItem('moves');
@@ -1287,8 +1293,8 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
         : '<div class="status-remove-hint">Not concentrating on anything</div>'}
     </div>` : '';
 
-  // --- Moves section (pokemon only) ---
-  const movesSection = c.type === 'pokemon' && c.moves.length > 0 ? `
+  // --- Moves section (a Pokemon's -- or a trainer the DM gave moves to, battle-live.js's Edit) ---
+  const movesSection = (c.moves || []).length > 0 ? `
     <div class="expanded-moves-section">
       <div class="expanded-section-label">Moves</div>
       <div class="expanded-moves-list">

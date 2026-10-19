@@ -6,10 +6,17 @@
 // themselves and when they may move (the switches on the running adventure's bar). Meanwhile the DM changes the map live,
 // moves anyone (the live map editor), and can turn the map into an encounter (Encounter setup) or the next battle's map.
 // The capture guide shows how hard each Pokemon is to catch, before anyone meets one.
+//
+// Later on 2026-10-19 (the user's call): no more "Start adventure". The DM prepares the map with its Pokemon and NPCs
+// (hidden or not) whenever they like -- kept with the map (map-store.js's `creatures`) -- and "Allow player placement"
+// opens it to the players (it goes live then, with everything on it; ticking it off again closes joining). "Start
+// encounter" takes the map as it is -- objects, Pokemon and NPCs where they stand, hidden ones too -- into a new encounter
+// in Encounter setup, so several maps and encounters can be prepared ahead of time.
 import { CombatAPI, DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { escapeHtml, typeBadges, getSpecies, toast, openDmModal } from './dm-common.js';
+import { DM, escapeHtml, typeBadges, getSpecies, toast, openDmModal } from './dm-common.js';
+import { abilityList } from '../utils/battle-lists.js';
 import { renderMapEditor } from './map-editor.js';
 import { createMapStore } from './map-store.js';
 import { setLiveSession } from './live-map-store.js';
@@ -70,54 +77,84 @@ function boardAsMap(session) {
   };
 }
 
+/** The DM's own creatures on the running adventure, the way the prepared map keeps them (map-store.js's creatures):
+ * [{id, kind: 'pokemon' | 'npc', name, config, npcId, participant, position, z, hidden}]. The players' aren't the map's. */
+function liveCreatures(session) {
+  return Object.values(session?.participants || {}).filter(p => (p.owner || DM) === DM).map((p) => {
+    const t = session.board?.tokens?.[p.id];
+    const isMon = p.combatantType !== 'trainer';
+    const slots = abilityList(p.abilities).map(a => a.slot).filter(n => n !== null && n !== undefined);
+    return {
+      id: p.id, kind: isMon ? 'pokemon' : 'npc', name: p.name,
+      config: isMon ? { species: p.speciesName || p.name, level: p.level || 1, nature: p.nature || '', abilities: slots.length ? slots : [0] } : null,
+      npcId: p.npcId || null, participant: { ...p, status: undefined }, hidden: p.status === 'spectating',
+      position: t ? { col: t.col, row: t.row, facing: t.facing || 0 } : null, z: t?.z || 0,
+    };
+  });
+}
+
+/** The players' switches: Allow player placement (opens the map, going live if it isn't) and Players can move. */
+function switchesHtml(live, busy) {
+  return `<span class="dm-adv-switches" id="advSwitches">
+      <label title="${busy ? 'A battle is running -- the map can be opened once it has ended' : 'The players can put themselves (and their Pokémon) on the map from their app -- the 🗺️ map button on the trainer card'}">
+        <input type="checkbox" id="advCanJoin" ${busy ? 'disabled' : ''}> Allow player placement</label>
+      ${live ? '<label title="The players can move and turn their trainer and Pokémon -- you move anyone either way"><input type="checkbox" id="advCanMove"> Players can move</label>' : ''}
+    </span>`;
+}
+
+async function onCanJoin(e) {
+  const on = e.target.checked;
+  try {
+    if (state(_session) === 'running') await CombatAPI.adventureSettings({ canJoin: on });
+    else if (on) await startAdventure({ canJoin: true, onScreen: 'adventure' });
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Allow player placement' });
+    e.target.checked = !on;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Not running: the adventure's map, and Start
 // ---------------------------------------------------------------------------
 
 async function drawSetup() {
   const saved = await DmAPI.getState('adventure-map').catch(() => null);
-  _store = createMapStore(saved, (m) => DmAPI.saveState('adventure-map', m));
+  _store = createMapStore(saved, (m) => DmAPI.saveState('adventure-map', m), { creatures: true });
   const busy = _shown === 'battle';
   document.getElementById('advBar').innerHTML = `
-    <h2>🧭 Adventure</h2>
-    <span class="dm-hint">${busy ? 'A battle is running -- the adventure can start once it has ended. The map can be prepared meanwhile.'
-      : 'The table\'s map without a battle: the players join with their trainer (and any of their party Pokémon) and walk around freely.'}</span>
+    <h2>🧭 Adventure <span class="dm-pill todo" title="Only you see it -- open it to the players with Allow player placement, or put it on the table screen">Being prepared</span></h2>
+    <span class="dm-hint">${busy ? 'A battle is running -- prepare the map meanwhile; it can be opened once the battle has ended.'
+      : 'Put Pokémon, NPCs, objects and items on the map ahead of time -- hidden ones only you see.'}</span>
+    ${switchesHtml(false, busy)}
     <span class="dm-adv-btns">
       <button class="dm-btn small" id="advLoad" title="Start from another map">📂 Use another map…</button>
-      <button class="dm-btn small" id="advToEnc" title="A new encounter in Encounter setup, built on this map">⚔️ Encounter on this map</button>
       <button class="dm-btn small" id="advGuide">🔴 Capture guide</button>
-      <button class="dm-btn primary" id="advStart" ${busy ? 'disabled' : ''} title="Starts it and puts its map on the table screen">▶ Start adventure</button>
+      <button class="dm-btn primary" id="advToEnc" title="A new encounter in Encounter setup with this map -- its objects, Pokémon and NPCs where they stand, hidden ones too">⚔️ Start encounter</button>
     </span>`;
   const body = document.getElementById('advBody');
   body.innerHTML = '<div class="dm-adv-editor" id="advEditor"></div>';
   renderMapEditor(document.getElementById('advEditor'), {
     store: _store, backLabel: '💾 Save', title: 'Adventure map', adventure: true, onDone: () => toast('The adventure map is saved.'),
   });
-  document.getElementById('advStart').addEventListener('click', startFromButton);
+  document.getElementById('advCanJoin').addEventListener('change', onCanJoin);
   document.getElementById('advLoad').addEventListener('click', loadOtherMap);
-  document.getElementById('advToEnc').addEventListener('click', () => encounterOnMap(_store.getSetup().map));
+  document.getElementById('advToEnc').addEventListener('click', async () => {
+    await _store.flushSetup().catch(() => {});
+    encounterOnMap(_store.getSetup().map, _store.getSetup().creatures);
+  });
   document.getElementById('advGuide').addEventListener('click', () => captureGuide(_store.getSetup().map.terrain));
 }
 
-/** Starts the adventure on the saved adventure map (what's being edited here first) -- also from PokeNav's "On the table
- * screen". Throws when it can't (no map yet, a battle running). */
-export async function startAdventure() {
+/** Opens the adventure on the saved adventure map (what's being edited here first, its creatures too) -- "Allow player
+ * placement", or PokeNav's "On the table screen". `settings`: {canJoin, onScreen} to start with. Throws when it can't (no
+ * map yet, a battle running). */
+export async function startAdventure(settings = {}) {
   if (_store) await _store.flushSetup();
-  const res = await DmAPI.startAdventure();
+  const res = await DmAPI.startAdventure(settings);
   // The reply itself, not only the live push -- whichever arrives first switches the screen.
   if (res?.data?.active) window.dispatchEvent(new CustomEvent('app:combat-updated', { detail: res.data }));
-  toast('The adventure has started -- the players join from their app (the 🗺️ map button on the trainer card).');
-}
-
-async function startFromButton() {
-  const btn = document.getElementById('advStart');
-  if (btn) { btn.disabled = true; btn.textContent = 'Starting…'; }
-  try {
-    await startAdventure();
-  } catch (err) {
-    showCombatAlert(err.message, { title: "Couldn't start the adventure" });
-    if (btn) { btn.disabled = false; btn.textContent = '▶ Start adventure'; }
-  }
+  toast(settings.canJoin ? 'The map is open -- the players place themselves from their app (the 🗺️ map button on the trainer card).'
+    : 'The adventure map is on the table screen -- tick Allow player placement when the players may join.');
 }
 
 /** Another map as the adventure's: Map setup's, an encounter's, or a saved one. */
@@ -150,29 +187,26 @@ async function loadOtherMap() {
 
 function drawRunning() {
   document.getElementById('advBar').innerHTML = `
-    <h2>🧭 Adventure <span class="dm-pill ok">Running</span></h2>
+    <h2>🧭 Adventure <span class="dm-pill ok" title="The players' devices and the table have the map">Open</span></h2>
     <span class="dm-adv-players" id="advPlayers"></span>
-    <span class="dm-adv-switches" id="advSwitches">
-      <label title="The players can join from their app and put themselves on the map"><input type="checkbox" id="advCanJoin"> Players can join &amp; place</label>
-      <label title="The players can move and turn their trainer and Pokémon -- you move anyone either way (the live map editor)"><input type="checkbox" id="advCanMove"> Players can move</label>
-    </span>
+    ${switchesHtml(true, false)}
     <span class="dm-adv-btns">
       <button class="dm-btn small" id="advGuide">🔴 Capture guide</button>
-      <button class="dm-btn small" id="advToEnc" title="A new encounter in Encounter setup, built on this map as it is now">⚔️ Encounter on this map</button>
       <button class="dm-btn small" id="advToBattle" title="Map setup's map becomes a copy of this one">🗺️ Next battle's map</button>
-      <button class="dm-btn danger" id="advEnd">■ End adventure</button>
+      <button class="dm-btn primary" id="advToEnc" title="A new encounter in Encounter setup with this map as it is now -- its objects, your Pokémon and NPCs where they stand, hidden ones too">⚔️ Start encounter</button>
+      <button class="dm-btn danger" id="advEnd" title="The players leave the map -- everything you put on it stays for next time">■ Close the map</button>
     </span>`;
   renderPlayers();
   renderSwitches();
-  ['advCanJoin', 'advCanMove'].forEach((id) => document.getElementById(id).addEventListener('change', async (e) => {
-    const key = id === 'advCanJoin' ? 'canJoin' : 'canMove';
+  document.getElementById('advCanJoin').addEventListener('change', onCanJoin);
+  document.getElementById('advCanMove').addEventListener('change', async (e) => {
     try {
-      await CombatAPI.adventureSettings({ [key]: e.target.checked });
+      await CombatAPI.adventureSettings({ canMove: e.target.checked });
     } catch (err) {
       showCombatAlert(err.message, { title: 'Adventure' });
       renderSwitches();
     }
-  }));
+  });
   const body = document.getElementById('advBody');
   body.innerHTML = '<div class="dm-adv-editor" id="advEditor"></div>';
   setLiveSession(_session);
@@ -180,7 +214,7 @@ function drawRunning() {
     live: true, adventure: true, backLabel: '💾 Save', title: 'The adventure, live', onDone: () => toast('Everything here goes to the table at once -- nothing to save.'),
   });
   document.getElementById('advGuide').addEventListener('click', () => captureGuide(_store?.getSetup().map.terrain));
-  document.getElementById('advToEnc').addEventListener('click', () => encounterOnMap(boardAsMap(_session)));
+  document.getElementById('advToEnc').addEventListener('click', () => encounterOnMap(boardAsMap(_session), liveCreatures(_session)));
   document.getElementById('advToBattle').addEventListener('click', async () => {
     if (!await showCombatConfirm("Make Map setup's map (the next battle's) a copy of this one? Anyone already placed there is taken off it.", { title: "Next battle's map", yesLabel: 'Copy it', noLabel: 'Cancel' })) return;
     const map = boardAsMap(_session);
@@ -189,12 +223,12 @@ function drawRunning() {
     toast("Copied -- it's Map setup's map now.");
   });
   document.getElementById('advEnd').addEventListener('click', async () => {
-    if (!await showCombatConfirm('End the adventure? The players leave the map. The map as it is now is kept as the adventure map for next time.', { title: 'End adventure', yesLabel: 'End it', noLabel: 'Cancel' })) return;
+    if (!await showCombatConfirm('Close the map? The players leave it. Everything on it -- your Pokémon and NPCs too -- stays as the adventure map for next time.', { title: 'Close the map', yesLabel: 'Close it', noLabel: 'Cancel' })) return;
     try {
-      await DmAPI.saveState('adventure-map', boardAsMap(_session));
+      await DmAPI.saveState('adventure-map', { ...boardAsMap(_session), creatures: liveCreatures(_session) });
       await CombatAPI.endSession();
     } catch (err) {
-      showCombatAlert(err.message, { title: 'End adventure' });
+      showCombatAlert(err.message, { title: 'Close the map' });
     }
   });
 }
@@ -223,26 +257,31 @@ function renderPlayers() {
   el.querySelectorAll('[data-img]').forEach(x => { if (x.dataset.img) patchPortraitMedia(x, x.dataset.img, ''); });
 }
 
-/** A new encounter in Encounter setup on this map, opened there. */
-async function encounterOnMap(map) {
-  if (!map?.cols) { showCombatAlert('Make the map first.', { title: 'Encounter on this map' }); return; }
+/** "Start encounter": a new encounter in Encounter setup with this map and everything on it -- the DM's Pokemon (each
+ * where it stands; a hidden one starts hidden, on its square) and NPCs (the same) -- opened there. */
+async function encounterOnMap(map, creatures = []) {
+  if (!map?.cols) { showCombatAlert('Make the map first.', { title: 'Start encounter' }); return; }
+  const mons = creatures.filter(c => c.kind === 'pokemon' && c.config?.species);
+  const npcs = creatures.filter(c => c.kind === 'npc' && c.npcId);
+  const what = [mons.length && `${mons.length} Pokémon`, npcs.length && `${npcs.length} NPC${npcs.length === 1 ? '' : 's'}`,
+    (map.objects || []).length && `${map.objects.length} object${map.objects.length === 1 ? '' : 's'}`].filter(Boolean);
   const name = await openDmModal({
-    title: '⚔️ Encounter on this map',
+    title: '⚔️ Start encounter',
     html: `<div class="dm-field"><label for="advEncName">What should the encounter be called?</label>
       <input class="dm-input" id="advEncName" value="Adventure encounter" maxlength="60"></div>
-      <div class="dm-hint">A new encounter in Encounter setup with a copy of this map -- add its Pokémon and NPCs there.</div>`,
+      <div class="dm-hint">A new encounter in Encounter setup with a copy of this map${what.length ? ` and ${what.join(', ')} on it -- where they stand, hidden ones too` : ''}. Add more there, then import it in the Battle module.</div>`,
     buttons: [{ label: 'Cancel', value: null }, { label: 'Make it', kind: 'primary', keepOpen: true,
       onClick: (body) => { body.dataset.name = body.querySelector('#advEncName').value; return true; }, value: 'ok' }],
     onOpen: (body) => { encounterOnMap._body = body; body.querySelector('#advEncName').select(); },
   }) === 'ok' ? encounterOnMap._body.dataset.name : null;
   if (name === null) return;
   try {
-    await createEncounterWithMap(map, String(name).trim() || 'Adventure encounter');
+    await createEncounterWithMap(map, String(name).trim() || 'Adventure encounter', { creatures });
   } catch (err) {
-    showCombatAlert(err.message, { title: 'Encounter on this map' });
+    showCombatAlert(err.message, { title: 'Start encounter' });
     return;
   }
-  toast('Made -- add its Pokémon and NPCs in Encounter setup, then import it in the Battle module.');
+  toast('Made -- it\'s open in Encounter setup. Import it in the Battle module to play it.');
   window.dispatchEvent(new CustomEvent('dm:open-encounters'));
 }
 

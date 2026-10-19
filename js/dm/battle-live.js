@@ -31,6 +31,8 @@ import { setLiveSession } from './live-map-store.js';
 import * as liveMapStore from './live-map-store.js';
 import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
 import { renderEncounters, monConfig } from './encounters.js';
+import { pickMoves } from './move-picker.js';
+import { openPicker } from './picker.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
 let species = [];
@@ -332,6 +334,22 @@ function renderVisibilityColumn(focusId, currentSession) {
   const el = document.getElementById('dmFocusSide');
   if (!el) return;
   const p = currentSession?.participants?.[focusId];
+  if (p && p.owner && p.owner !== DM && p.combatantType) {
+    // A player's trainer or Pokemon: what the DM may hand it mid-battle (the user's ask, 2026-10-19) -- a move, an item
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="dm-vis" data-id="${p.id}">
+        <div class="dm-vis-title">${escapeHtml(p.owner)}'s</div>
+        <div class="dm-vis-actions">
+          <button class="dm-btn small" data-pl-act="moves" title="Give it a move -- for this battle, or for good">✨ Moves</button>
+          ${p.combatantType === 'trainer' ? '<button class="dm-btn small" data-pl-act="item" title="Straight into their bag -- from the item list, or one of your own">🎒 Give an item</button>' : ''}
+        </div>
+        <div class="dm-vis-note">${(p.dmAddedMoves || []).length ? `You gave it: ${escapeHtml(p.dmAddedMoves.join(', '))}.` : 'Moves you give it show on its card on the player\'s device at once.'}</div>
+      </div>`;
+    el.querySelector('[data-pl-act="moves"]').addEventListener('click', () => openPlayerMoves(session.participants[p.id] || p));
+    el.querySelector('[data-pl-act="item"]')?.addEventListener('click', () => giveTrainerItem(p.owner));
+    return;
+  }
   if (!p || p.owner !== DM) {
     el.innerHTML = '';
     el.hidden = true;
@@ -534,7 +552,7 @@ function renderMapTab(selectId = null) {
   const body = document.getElementById('dmLiveMapBody');
   if (!session?.board) { body.innerHTML = '<div class="dm-loading">No battle map yet.</div>'; return; }
   if (mapMode === 'play') {
-    showBattleMap(session, DM, { container: body, selectId });
+    showBattleMap(session, DM, { container: body, selectId, dmOverride: true });
   } else {
     setLiveSession(session);
     renderMapEditor(body, { live: true, onDone: () => showLiveTab('battle') });
@@ -686,8 +704,96 @@ function parseSpeeds(text) {
   }).filter(Boolean);
 }
 
+/** A player's trainer or Pokemon mid-battle: the moves the DM gave it (taken away again with ×) and Add a move -- a
+ * Pokemon's for good if the DM likes (its record, give-move), otherwise only for this battle (dmAddedMoves, which the
+ * player's device adds to its own copy). Its own moves are the player's business. */
+async function openPlayerMoves(p) {
+  const isMon = p.combatantType === 'pokemon';
+  let added = [...(p.dmAddedMoves || [])];
+  const own = (p.moves || []).filter(m => !added.includes(m));
+  const draw = (body) => {
+    body.querySelector('#plMoves').innerHTML = own.map(m => `<span>${escapeHtml(m)}</span>`).join('')
+      + added.map(m => `<span class="custom">${escapeHtml(m)}<button type="button" class="dm-chip-x" data-drop-move="${escapeHtml(m)}" title="Take it away">×</button></span>`).join('')
+      + '<button type="button" class="dm-btn small" id="plAddMove">＋ Add a move</button>';
+  };
+  const fresh = [];
+  const ok = await openDmModal({
+    title: `✨ ${p.name}'s moves`,
+    html: `<div class="dm-move-chips" id="plMoves"></div>
+      ${isMon ? `<label class="dm-check" style="margin-top:0.6rem"><input type="checkbox" id="plTeach"><span>Teach the new ones for good <small>They stay in ${escapeHtml(p.owner)}'s ${escapeHtml(p.speciesName || p.name)}'s moves after the battle</small></span></label>` : ''}
+      <div class="dm-hint" style="margin-top:0.4rem">The gold ones are yours to give or take away -- the player sees them on its card at once.</div>`,
+    buttons: [{ label: 'Cancel', value: null }, { label: 'Save', kind: 'primary', value: 'ok', keepOpen: true, onClick: async (body) => {
+      try {
+        if (isMon && body.querySelector('#plTeach')?.checked) for (const m of fresh.filter(x => added.includes(x))) await DmAPI.giveMove(p.owner, p.speciesName || p.name, m);
+        await CombatAPI.dmUpdateParticipant(p.id, { moves: [...own, ...added], dmAddedMoves: added });
+        toast(`${p.name}'s moves changed.`);
+        return true;
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Moves' });
+        return false;
+      }
+    } }],
+    onOpen: (body) => {
+      draw(body);
+      body.querySelector('#plMoves').addEventListener('click', async (e) => {
+        const drop = e.target.closest('[data-drop-move]');
+        if (drop) { added = added.filter(m => m !== drop.dataset.dropMove); draw(body); return; }
+        if (!e.target.closest('#plAddMove')) return;
+        const picked = await pickMoves({ title: `✨ A move for ${p.name}`, exclude: [...own, ...added] });
+        if (picked?.length) { picked.forEach((m) => { if (!added.includes(m)) { added.push(m); fresh.push(m); } }); draw(body); }
+      });
+    },
+  });
+  return ok === 'ok';
+}
+
+/** The DM gives a player's trainer an item mid-battle: one from the item list, or (Create) one of the DM's own. */
+async function giveTrainerItem(trainer) {
+  const items = await DmAPI.adminItems().catch(() => []);
+  const res = await openPicker({
+    title: `🎒 Give ${trainer} an item`, imageFallback: 'assets/Bag.png', extraAction: { label: '＋ A custom item…' },
+    items: items.map(i => ({ key: i.name, label: i.name, sub: i.category, image: i.image || '' })),
+  });
+  if (!res) return;
+  let name = res.keys[0], custom = false, description = '', qty = 1;
+  if (res.extra) {
+    const form = {};
+    const ok = await openDmModal({
+      title: `🎒 A custom item for ${trainer}`,
+      html: `<div class="dm-field"><label for="ciName">Name</label><input class="dm-input" id="ciName" maxlength="60"></div>
+        <div class="dm-field"><label for="ciDesc">What it is / does</label><textarea class="dm-input" id="ciDesc" rows="3"></textarea></div>
+        <div class="dm-field"><label for="ciQty">How many</label><input class="dm-input" id="ciQty" type="number" min="1" value="1" style="max-width:6rem"></div>`,
+      buttons: [{ label: 'Cancel', value: null }, { label: 'Give it', kind: 'primary', value: 'ok', keepOpen: true, onClick: (body) => {
+        form.name = body.querySelector('#ciName').value.trim();
+        form.description = body.querySelector('#ciDesc').value.trim();
+        form.qty = Math.max(1, parseInt(body.querySelector('#ciQty').value, 10) || 1);
+        return !!form.name;
+      } }],
+    });
+    if (ok !== 'ok') return;
+    ({ name, description, qty } = form);
+    custom = true;
+  }
+  if (!name) return;
+  try {
+    await DmAPI.giveItem(trainer, name, qty, { custom, description });
+    toast(`${trainer} got ${qty} × ${name}.`);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Give an item' });
+  }
+}
+
 async function openEditCreature(p) {
   const isMon = p.combatantType === 'pokemon';
+  const playerOwned = !!p.owner && p.owner !== DM;
+  const playerMon = isMon && playerOwned;
+  const playerTrainer = !isMon && playerOwned && p.combatantType === 'trainer';
+  let moves = [...(p.moves || [])];
+  const drawMoves = (body) => {
+    const box = body.querySelector('#edMoveChips');
+    box.innerHTML = moves.map(m => `<span>${escapeHtml(m)}<button type="button" class="dm-chip-x" data-drop-move="${escapeHtml(m)}" title="Take it away">×</button></span>`).join('')
+      + '<button type="button" class="dm-btn small" id="edAddMove">＋ Add a move</button>';
+  };
   const sp = isMon ? species.find(s => String(s.name).toLowerCase() === String(p.speciesName).toLowerCase()) : null;
   const own = abilityList(p.abilities);
   const speciesAbilities = sp?.abilities || [];
@@ -709,8 +815,18 @@ async function openEditCreature(p) {
           <span>${escapeHtml(a.name)} <small>${escapeHtml(a.description)}</small></span></label>`).join('') || '<div class="dm-hint">Its species lists none.</div>'}
         <textarea class="dm-input" id="edAbilityOther" rows="2" placeholder="Other abilities -- one per line: Name; what it does">${escapeHtml(custom.map(a => `${a.name}; ${a.description}`).join('\n'))}</textarea>
       </div>
-      <div class="dm-field"><label for="edMoves">Moves <small class="dm-label-note">comma-separated</small></label><textarea class="dm-input" id="edMoves" rows="2">${escapeHtml((p.moves || []).join(', '))}</textarea></div>` : ''}
-      <div class="dm-row">${text('edItem', 'Held item', p.item, 'None')}${text('edSpeeds', 'Speeds', speedsText(p.speeds), 'Walking 30, Flying 60')}</div>
+      ` : ''}
+      <div class="dm-field"><label>Moves</label>
+        <div class="dm-move-chips" id="edMoveChips"></div>
+        ${playerMon ? `<label class="dm-check" style="margin-top:0.3rem"><input type="checkbox" id="edTeach" checked><span>Moves added here are ${escapeHtml(p.owner)}'s ${escapeHtml(p.speciesName || p.name)}'s for good <small>Untick: only for this battle</small></span></label>` : ''}
+      </div>
+      <div class="dm-row">${isMon ? `<div class="dm-field"><label for="edItem">Held item</label><div class="dm-row dm-edit-item">
+          <input class="dm-input" id="edItem" value="${escapeHtml(p.item || '')}" placeholder="None -- or type one of your own">
+          <button type="button" class="dm-btn small" id="edItemPick" title="One from the item list">🎒 Pick…</button></div></div>` : ''}
+        ${text('edSpeeds', 'Speeds', speedsText(p.speeds), 'Walking 30, Flying 60')}</div>
+      ${playerTrainer ? `<div class="dm-field"><label>${escapeHtml(p.owner)}'s inventory</label>
+        <button type="button" class="dm-btn small" id="edGiveItem">🎒 Give an item…</button>
+        <span class="dm-hint">Straight into their bag -- an item from the list or one of your own.</span></div>` : ''}
       <div class="dm-row">${text('edSaves', 'Saving throws', nameList(p.savingThrows).join(', '), 'e.g. Dexterity, Wisdom')}${text('edSkills', 'Skills', skillsText(p), 'e.g. Perception, Stealth+ (+ = expertise)')}</div>
       <div class="dm-hint" id="edNote">${isMon ? 'Recalculate works its numbers out again from its species at the level above (abilities and item as ticked; no nature or encounter bonuses) -- check them, then Save.' : ''}</div>
     </div>`;
@@ -730,7 +846,7 @@ async function openEditCreature(p) {
         set('edVp', Math.max(0, np.maxVP - ((p.maxVP || 0) - (p.currentVP || 0))));
         set('edMaxHp', np.maxHP); set('edMaxVp', np.maxVP); set('edAc', np.baseAc ?? np.ac); set('edProf', np.proficiency); set('edStab', np.stabBonusValue);
         SCORE_KEYS.forEach(k => set(`ed_${k}`, np[k]));
-        set('edMoves', (np.moves || []).join(', ')); set('edSaves', nameList(np.savingThrows).join(', ')); set('edSkills', skillsText(np)); set('edSpeeds', speedsText(np.speeds));
+        moves = [...(np.moves || [])]; drawMoves(body); set('edSaves', nameList(np.savingThrows).join(', ')); set('edSkills', skillsText(np)); set('edSpeeds', speedsText(np.speeds));
         set('edType1', np.type1 || ''); set('edType2', np.type2 || '');
         body.querySelector('#edNote').textContent = `Worked out again for a level ${level} ${p.speciesName} -- check the numbers, then Save.`;
       } catch (err) {
@@ -760,7 +876,6 @@ async function openEditCreature(p) {
     }
     if (isMon) {
       data.type1 = val(body, 'edType1'); data.type2 = val(body, 'edType2'); data.size = val(body, 'edSize');
-      data.moves = val(body, 'edMoves').split(',').map(m => m.trim()).filter(Boolean);
       const picked = [...body.querySelectorAll('input[name="edAbility"]:checked')].map(cb => speciesAbilities.find(a => String(a.slot) === cb.value)).filter(Boolean)
         .map(a => ({ slot: a.slot, name: a.name, description: a.description || '' }));
       // "Name; what it does" per line -- one the DM typed in has no slot.
@@ -771,7 +886,15 @@ async function openEditCreature(p) {
       data.abilities = [...picked, ...others];
     }
     if (!data.name) { showCombatAlert('It needs a name.', { title: 'Edit' }); return false; }
+    if (!isMon) delete data.item;
+    // The moves: the ones the DM added (here or before) are remembered, so a player's device adds them to its own copy
+    data.moves = moves;
+    const added = moves.filter(m => !(p.moves || []).includes(m));
+    data.dmAddedMoves = [...new Set([...(p.dmAddedMoves || []), ...added])].filter(m => moves.includes(m));
     try {
+      if (playerMon && added.length && body.querySelector('#edTeach')?.checked) {
+        for (const m of added) await DmAPI.giveMove(p.owner, p.speciesName || p.name, m);
+      }
       await CombatAPI.dmUpdateParticipant(p.id, data);
       forgetLocalCombatant(p.id);
       toast(`${data.name} changed.`);
@@ -781,7 +904,23 @@ async function openEditCreature(p) {
       return false;
     }
   } });
-  await openDmModal({ title: `✏️ Edit ${p.name}`, html, buttons, wide: true });
+  await openDmModal({ title: `✏️ Edit ${p.name}`, html, buttons, wide: true, onOpen: (body) => {
+    drawMoves(body);
+    body.querySelector('#edMoveChips').addEventListener('click', async (e) => {
+      const drop = e.target.closest('[data-drop-move]');
+      if (drop) { moves = moves.filter(m => m !== drop.dataset.dropMove); drawMoves(body); return; }
+      if (!e.target.closest('#edAddMove')) return;
+      const picked = await pickMoves({ title: `✨ A move for ${p.name}`, exclude: moves });
+      if (picked?.length) { moves = [...moves, ...picked.filter(m => !moves.includes(m))]; drawMoves(body); }
+    });
+    body.querySelector('#edItemPick')?.addEventListener('click', async () => {
+      const items = await DmAPI.adminItems().catch(() => []);
+      const res = await openPicker({ title: `🎒 A held item for ${p.name}`, imageFallback: 'assets/Bag.png',
+        items: items.map(i => ({ key: i.name, label: i.name, sub: i.category, image: i.image || '' })) });
+      if (res?.keys[0]) body.querySelector('#edItem').value = res.keys[0];
+    });
+    body.querySelector('#edGiveItem')?.addEventListener('click', () => giveTrainerItem(p.owner));
+  } });
 }
 
 function renderSpeciesResults() {

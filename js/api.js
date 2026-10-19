@@ -1335,9 +1335,14 @@ export class DmAPI {
     return API.request('dm', 'map-assets', {}, { useCache: false });
   }
 
-  /** Starts an adventure on the Adventure module's map (dm_state 'adventure-map'): the table's map without a battle. */
-  static async startAdventure() {
-    return API.request('dm', 'start-adventure', {}, { useCache: false, timeout: 30000 });
+  /** Starts an adventure on the Adventure module's map (dm_state 'adventure-map', with the creatures prepared on it): the
+   * table's map without a battle. `settings`: {canJoin, canMove, onScreen} to start with. */
+  static async startAdventure({ canJoin, canMove, onScreen } = {}) {
+    const params = {};
+    if (canJoin !== undefined) params.canJoin = canJoin ? '1' : '0';
+    if (canMove !== undefined) params.canMove = canMove ? '1' : '0';
+    if (onScreen) params.onScreen = onScreen;
+    return API.request('dm', 'start-adventure', params, { useCache: false, timeout: 30000 });
   }
 
   /** Starts the PvE battle from the saved setup -- only then can the players join. */
@@ -1527,6 +1532,30 @@ export class DmAPI {
   /** An item added (`isNew`) or edited -> the item as saved. */
   static async adminSaveItem(item, isNew) {
     return (await DmAPI._post('admin-item', { item, isNew }, 'Saving the item')).data;
+  }
+
+  /** The DM's custom moves, as they're kept -> [{name, type, action, range, duration: {raw}, moveStat, vpCost, description,
+   * scaling, attackRoll}]. */
+  static async allMoves() {
+    return API.request('game-data', 'moves', {}, { useCache: false });
+  }
+
+  static async adminMoves() {
+    return (await API.request('dm', 'admin-moves', {}, { useCache: false })).data || [];
+  }
+
+  /** A custom move added or changed -> the move as saved (it's on the move list for every device from then on). */
+  static async adminSaveMove(move) {
+    return (await DmAPI._post('admin-move', { move }, 'Saving the move')).data;
+  }
+
+  static async adminDeleteMove(name) {
+    return (await DmAPI._post('admin-move', { delete: name }, 'Deleting the move')).data;
+  }
+
+  /** A move taught to a player's Pokemon for good (one of its custom moves) -- or with `forget`, one taken away. */
+  static async giveMove(trainer, pokemon, move, { forget = false } = {}) {
+    return API.request('dm', 'give-move', { trainer, pokemon, move, ...(forget ? { forget: '1' } : {}) }, { useCache: false });
   }
 
   /** An item's picture ({name, data: a data: URL}) -> {image}. */

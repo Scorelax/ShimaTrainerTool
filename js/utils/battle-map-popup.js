@@ -22,6 +22,10 @@
 // Terrain moves show up here too: tile-limited zones tint their tiles (colour per terrain), a whole-map terrain
 // washes the whole stage, and a legend under the map lists what's active and for how long (battle-map-view.js).
 //
+// DM override (the user's ask, 2026-10-19): on the DM console's Map tab (`dmOverride`) the DM can pick ANY token -- a
+// player's trainer or Pokemon too, whoever's turn it is -- and move, turn or lift it, after "Confirm DM override"
+// (dm-place-token: no movement used, nothing in the way checked but the map's edge).
+//
 // Mirrors move-popup.js's overlay pattern (create the DOM once, reuse across calls) and target-picker.js's
 // self-contained-styles approach (injects its own copy of the shared .combat-popup-* base rules rather than
 // assuming another module already did).
@@ -109,6 +113,7 @@ let _zoom = null; // map-zoom.js: the map fitted to the screen, zoomed on its ow
 let _session = null;
 let _ownerName = null;
 let _selectedTokenId = null;
+let _dmOverride = false; // the DM console's Map tab: any token can be picked (see the header)
 // A clicked-but-not-yet-confirmed destination for _selectedTokenId.
 let _stagedDestination = null;
 // The cone tool (cone-area.js): a cone from the selected token, aimed at any angle by dragging on the map, like the line.
@@ -203,9 +208,10 @@ function _close() {
  * re-renders against the given session. `selectId` starts with that token
  * already selected (Disengage: straight into moving) -- only when it's the
  * viewer's own token and its turn, the same rule a click follows. */
-export function showBattleMap(session, trainerName, { selectId = null, container = null } = {}) {
+export function showBattleMap(session, trainerName, { selectId = null, container = null, dmOverride = false } = {}) {
   _session = session;
   _ownerName = trainerName;
+  _dmOverride = !!dmOverride;
   const pre = selectId && session.participants?.[selectId];
   _selectedTokenId = pre && session.board?.tokens?.[selectId] && pre.owner === trainerName
     && (_adventure(session) || selectId === _activeParticipantId(session)) ? selectId : null;
@@ -257,7 +263,7 @@ function _activeParticipantId(session) {
  * applied (move-effects.js's movementBudget, the same number the server enforces), minus the single shared
  * movementUsed counter (switching between speeds still draws from one pool, 5e's own rule). null with no speeds. */
 function _bestRemainingFt(p) {
-  if (_adventure()) return null; // no movement limit on an adventure
+  if (_adventure() || _overriding()) return null; // no movement limit on an adventure, nor for the DM's override
   return movementBudget(p)?.remaining ?? null;
 }
 
@@ -297,7 +303,7 @@ function _rotate(delta) {
   const next = (((before + delta) % 360) + 360) % 360;
   token.facing = next;
   _render();
-  CombatAPI.rotateToken(id, next).catch(err => {
+  (_overriding() ? CombatAPI.dmPlaceToken(id, { col: token.col, row: token.row, facing: next, z: token.z || 0 }) : CombatAPI.rotateToken(id, next)).catch(err => {
     token.facing = before;
     _render();
     showCombatAlert(err.message, { title: 'Error' });
@@ -312,7 +318,11 @@ function _render() {
 
   const hint = document.getElementById('bmapHint');
   if (hint) {
-    if (_stagedDestination) {
+    if (_overriding()) {
+      const name = _session.participants[_selectedTokenId]?.name || 'it';
+      hint.textContent = _stagedDestination ? `Confirm the DM override to move ${name} there -- or click a different cell.`
+        : `DM override: click a cell to move ${name} there · ⟲ ⟳ turn it at once. No movement is used, and it doesn't have to be its turn.`;
+    } else if (_stagedDestination) {
       hint.textContent = 'Confirm the move, or click a different cell.';
     } else if (_selectedTokenId && (_lineOn || _coneOn)) {
       const tool = _lineOn ? 'line' : 'cone';
@@ -354,6 +364,7 @@ function _render() {
 function _renderMovePanel() {
   const panel = document.getElementById('bmapMovePanel');
   if (!panel) return;
+  if (_overriding()) { _renderOverridePanel(panel); return; }
 
   // An adventure moves whichever of the player's own tokens is picked, as far as it likes.
   const adventure = _adventure();
@@ -425,6 +436,32 @@ function _renderMovePanel() {
   });
 }
 
+/** DM override: where the picked token goes, and "Confirm DM override" (dm-place-token -- anyone's token, any time). */
+function _renderOverridePanel(panel) {
+  const sel = _selected();
+  if (!sel || !_stagedDestination) { panel.hidden = true; return; }
+  panel.hidden = false;
+  const z0 = sel.pos.z || 0;
+  const z1 = _stagedAlt ?? z0;
+  panel.innerHTML = `
+    <div class="bmap-stage-row bmap-override-row">
+      <span>⚠ Move <b>${sel.p.name}</b> to (${_stagedDestination.col}, ${_stagedDestination.row})${z1 !== z0 ? `, ${_altText(z1)}` : ''} -- a DM override: ${sel.p.owner && sel.p.owner !== _ownerName ? `${sel.p.owner}'s token, ` : ''}no movement used</span>
+      <button type="button" class="bmap-confirm-btn" id="bmapConfirmOverride">Confirm DM override</button>
+      <button type="button" class="bmap-cancel-btn" id="bmapCancelStage">Cancel</button>
+    </div>`;
+  document.getElementById('bmapCancelStage').addEventListener('click', () => { _stagedDestination = null; _stagedAlt = null; _render(); });
+  document.getElementById('bmapConfirmOverride').addEventListener('click', (e) => {
+    const id = sel.id;
+    const { col, row } = _stagedDestination;
+    e.currentTarget.disabled = true;
+    e.currentTarget.textContent = 'Moving…';
+    CombatAPI.dmPlaceToken(id, { col, row, facing: sel.pos.facing || 0, z: z1 })
+      .then((res) => { if (res?.data?.participants) _session = res.data; })
+      .catch(err => showCombatAlert(err.message, { title: 'DM override' }))
+      .finally(() => { if (_selectedTokenId === id) { _stagedDestination = null; _stagedAlt = null; } _render(); });
+  });
+}
+
 /** Whether `pid` standing at (col, row), z ft up, would share space with another creature -- the same square at the same
  * height (routes_combat.py's _push_out_of_shared_space moves it aside if it ends its turn like that). */
 function _sharesSpaceAt(pid, col, row, z) {
@@ -455,6 +492,17 @@ function _renderStage() {
   const globalKind = activeTerrainSummary(_session).find(t => t.scope === 'all')?.kind;
   stageEl.className = stageEl.className.replace(/\bglobal-\w+/g, '').trim();
   if (globalKind) stageEl.classList.add(`global-${globalKind}`);
+}
+
+/** Whether `id` may be moved the normal way by this viewer right now: its own token, on its turn (any time on an adventure). */
+function _ownMove(id) {
+  const p = _session?.participants?.[id];
+  return !!p && !!_ownerName && p.owner === _ownerName && (_adventure() || id === _activeParticipantId(_session));
+}
+
+/** The DM moving a token it couldn't move the normal way (someone else's, or not its turn) -- DM override. */
+function _overriding() {
+  return _dmOverride && !!_selectedTokenId && !_ownMove(_selectedTokenId);
 }
 
 /** The selected token (if any) as { id, p, pos, size } -- the one thing the reach/cone overlays and toolbar key off. */
@@ -495,7 +543,7 @@ function _renderGrid() {
       const own = _selected();
       // Standing still isn't a move (movement comes in 5ft steps) -- unless an altitude change is staged with it.
       if (own && own.pos.col === col && own.pos.row === row && (_stagedAlt === null || _stagedAlt === (own.pos.z || 0))) return;
-      const wall = own && _blockedOnTheWay(own, col, row);
+      const wall = own && !_overriding() && _blockedOnTheWay(own, col, row);
       if (wall) {
         showCombatAlert(`You can't move through (${wall[0]}, ${wall[1]}) -- that square is blocked.`, { title: 'Blocked' });
         return;
@@ -576,7 +624,10 @@ function _renderTokens() {
     if (angle !== previous) requestAnimationFrame(() => requestAnimationFrame(() => { sprite.style.transform = spriteTransform(angle); }));
 
     // While a move is staged the token sits on the cell it's going to -- let clicks fall through to the cells beneath it.
-    if (isMyTurn && !staged) {
+    // The DM's override picks any token (outlined in orange).
+    if (_dmOverride && !isMyTurn) classes.push('dm-override');
+    el.className = classes.join(' ');
+    if ((isMyTurn || _dmOverride) && !staged) {
       el.addEventListener('click', () => {
         if ((_lineOn || _coneOn) && _selectedTokenId) return; // aiming -- a tap on the token is part of the drag
         _selectedTokenId = _selectedTokenId === id ? null : id;

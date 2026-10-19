@@ -57,10 +57,11 @@ function fallbackSettings() {
   return { ...Object.fromEntries(BOOL_KEYS.map(k => [k, false])), description: true, evoToTargets: {}, evoReqTargets: {}, movesMaxLevel: 1, extraVisibleMoves: [] };
 }
 
-/** "Sargent: Level 7 · Merchent: Level 7 Near ports" -- what each of its evolutions takes. */
+/** "Sargent: Level 7 · Merchent: Level 7, Near ports" -- what each of its evolutions takes. */
 function requirementsText(d) {
+  const lines = d.evolutionRequirementLines || {};
   const req = d.evolutionRequirements || {};
-  return (d.evolvesTo || []).map(t => `${t}: ${req[t] || 'not written down'}`).join(' · ') || '—';
+  return (d.evolvesTo || []).map(t => `${t}: ${(lines[t] || []).join(', ') || req[t] || 'not written down'}`).join(' · ') || '—';
 }
 
 function abilityText(d, slot) {
@@ -338,7 +339,7 @@ function settleEvolution(name, before) {
   }
   // The requirements the same way: "Evolution requirements" shows or hides every one, and it's on while any one is.
   s.evoReqTargets = { ...(s.evoReqTargets || {}) };
-  if (!!s.evoReq !== before.evoReq) targets.forEach((t) => { s.evoReqTargets[t] = !!s.evoReq; });
+  if (!!s.evoReq !== before.evoReq) { targets.forEach((t) => { s.evoReqTargets[t] = !!s.evoReq; }); delete s.evoReqLines; }
   else if (targets.some(t => !!s.evoReqTargets[t] !== before.reqs[t])) s.evoReq = targets.some(t => s.evoReqTargets[t]);
 }
 
@@ -489,15 +490,21 @@ function evoTargetsHtml(d, v) {
   const ownReqs = ownSettings(d.name)?.evoReqTargets || {};
   v = { ...v, evoToTargets: ownSettings(d.name) ? own : Object.fromEntries(targets.map(t => [t, !!v.evoTo])),
     evoReqTargets: ownSettings(d.name) ? ownReqs : Object.fromEntries(targets.map(t => [t, !!v.evoReq])) };
-  // Under each target, what it takes -- the players see it only with the target itself (the user's call, 2026-10-19).
-  const reqs = d.evolutionRequirements || {};
+  // Under each target, what it takes -- each criterion on its own line, shown or hidden by itself (the user's call,
+  // 2026-10-19): the players see a line only with the target itself.
+  const lines = d.evolutionRequirementLines || {};
+  const picked = ownSettings(d.name)?.evoReqLines || {};
   return `<div class="dm-pdx-sub">Evolution targets the players can see, and what each one takes
     ${targets.map((t) => {
-      const shown = !!v.evoToTargets?.[t], reqOn = !!v.evoReqTargets?.[t], req = reqs[t];
+      const shown = !!v.evoToTargets?.[t], reqOn = !!v.evoReqTargets?.[t];
+      const list = lines[t] || [];
+      const lineOn = line => reqOn && (!Array.isArray(picked[t]) || picked[t].some(x => x.toLowerCase() === line.toLowerCase()));
       return `<label class="dm-pdx-field small${shown ? ' on' : ''}"><input type="checkbox" data-evo="${escapeHtml(t)}" ${shown ? 'checked' : ''}><span class="dm-pdx-label">${escapeHtml(t)}</span></label>
-        <label class="dm-pdx-field small dm-pdx-req${reqOn && shown ? ' on' : ''}" title="${req ? (shown ? 'The players see what this evolution takes' : `Shown once ${escapeHtml(t)} is`) : 'The encyclopedia has no requirement for it'}">
-          <input type="checkbox" data-evoreq="${escapeHtml(t)}" ${reqOn ? 'checked' : ''} ${req ? '' : 'disabled'}>
-          <span class="dm-pdx-label">Requirement</span><span class="dm-pdx-value">${escapeHtml(req || '—')}</span></label>`;
+        ${list.length ? list.map(line => `<label class="dm-pdx-field small dm-pdx-req${lineOn(line) && shown ? ' on' : ''}" title="${shown ? 'The players see this line of what the evolution takes' : `Shown once ${escapeHtml(t)} is`}">
+          <input type="checkbox" data-evoline="${escapeHtml(t)}" data-line="${escapeHtml(line)}" ${lineOn(line) ? 'checked' : ''}>
+          <span class="dm-pdx-label">Requirement</span><span class="dm-pdx-value">${escapeHtml(line)}</span></label>`).join('')
+        : `<label class="dm-pdx-field small dm-pdx-req" title="The encyclopedia has no requirement for it"><input type="checkbox" disabled>
+          <span class="dm-pdx-label">Requirement</span><span class="dm-pdx-value">—</span></label>`}`;
     }).join('')}
   </div>`;
 }
@@ -535,8 +542,17 @@ function wireDetail(name, d) {
     editSettings(name, s => { s.evoToTargets = { ...(s.evoToTargets || {}), [cb.dataset.evo]: cb.checked }; });
     renderDetail();
   }));
-  box.querySelectorAll('[data-evoreq]').forEach(cb => cb.addEventListener('change', () => {
-    editSettings(name, s => { s.evoReqTargets = { ...(s.evoReqTargets || {}), [cb.dataset.evoreq]: cb.checked }; });
+  // One line of what an evolution takes: the target's shown lines are kept (evoReqLines), and its requirement is on while
+  // any line is
+  box.querySelectorAll('[data-evoline]').forEach(cb => cb.addEventListener('change', () => {
+    const t = cb.dataset.evoline;
+    const all = d?.evolutionRequirementLines?.[t] || [];
+    const shown = [...box.querySelectorAll('[data-evoline]')].filter(x => x.dataset.evoline === t && x.checked).map(x => x.dataset.line);
+    editSettings(name, (s) => {
+      s.evoReqTargets = { ...(s.evoReqTargets || {}), [t]: shown.length > 0 };
+      s.evoReqLines = { ...(s.evoReqLines || {}) };
+      if (shown.length === all.length) delete s.evoReqLines[t]; else s.evoReqLines[t] = shown;
+    });
     renderDetail();
   }));
   box.querySelectorAll('[data-extra]').forEach(cb => cb.addEventListener('change', () => {
@@ -556,6 +572,7 @@ function wireDetail(name, d) {
       s.movesMaxLevel = 20;
       if (d) s.evoToTargets = Object.fromEntries((d.evolvesTo || []).map(t => [t, true]));
       if (d) s.evoReqTargets = Object.fromEntries((d.evolvesTo || []).map(t => [t, true]));
+      delete s.evoReqLines;
     });
     renderDetail();
   });

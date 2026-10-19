@@ -34,6 +34,7 @@ const _data = { pokemon: null, npcs: null, trainers: null, backgrounds: null };
 // keeps its folder's id (`folder`, '' = the top). Pictures and folders are dragged onto a folder (or the path) to move.
 let _folders = [];
 let _folder = ''; // the folder open
+const _picked = new Set(); // backgrounds picked to move together (ids)
 let _listening = false;
 let _dragging = false;
 let _editor = null; // the big editor while it's open: {overlay, stage, area, selectedId, observer}
@@ -108,7 +109,7 @@ function draw() {
         <div class="dm-disp-work-body">
           <div class="dm-row dm-disp-searchrow">
             <input class="dm-input" id="dispSearch" placeholder="Search…" autocomplete="off" value="${escapeHtml(_queries[_source] || '')}">
-            <label class="dm-check dm-disp-addhidden" title="Put new pictures on hidden -- they show on the display once you click 👁"><input type="checkbox" id="dispAddHidden" ${_addHidden ? 'checked' : ''}><span>Add hidden</span></label>
+            <label class="dm-check dm-disp-addhidden" title="Put new pictures on hidden -- they show on the display once you click Show"><input type="checkbox" id="dispAddHidden" ${_addHidden ? 'checked' : ''}><span>Add hidden</span></label>
           </div>
           <div id="dispUploadRow" class="dm-disp-upload" hidden>
             <button class="dm-btn primary" id="dispUpload">⬆ Upload pictures</button>
@@ -211,7 +212,7 @@ function drawLayers() {
   const hideAll = document.getElementById('dispHideAll');
   if (hideAll) {
     const anyShown = scene.items.some(i => !i.hidden);
-    hideAll.textContent = anyShown ? '🙈 Hide all' : '👁 Show all';
+    hideAll.textContent = anyShown ? 'Hide all' : 'Show all';
     hideAll.disabled = !scene.items.length;
   }
   const items = [...scene.items].reverse(); // the top one first
@@ -223,7 +224,7 @@ function drawLayers() {
         ${thumbHtml(it.src, '', { still: it.still })}
         <span class="dm-disp-layer-name"><strong>${escapeHtml(it.label || 'Picture')}</strong>
           <small>${KIND_LABEL[it.kind] || 'Picture'} · ${Math.round((Number(it.size) || 0) * 100)}% high${it.hidden ? ' · <span class="dm-warn-text">hidden</span>' : ''}</small></span>
-        <button class="dm-icon-btn${it.hidden ? ' off' : ''}" data-l="hide" title="${it.hidden ? 'Show it on the display' : 'Hide it from the display (it stays here)'}">${it.hidden ? '🙈' : '👁'}</button>
+        <button class="dm-btn small dm-disp-showbtn${it.hidden ? ' off' : ''}" data-l="hide" title="${it.hidden ? 'Show it on the display' : 'Hide it from the display (it stays here)'}">${it.hidden ? 'Show' : 'Hide'}</button>
         <button class="dm-icon-btn danger" data-l="remove" title="Take it off">✕</button>
       </div>`).join('')}
     ${scene.background ? `<div class="dm-disp-bgrow">
@@ -331,8 +332,9 @@ function drawGrid() {
     const shown = list.filter(b => (q ? b.name.toLowerCase().includes(q) : (b.folder || '') === _folder));
     const folders = q ? [] : _folders.filter(f => (f.parent || '') === _folder).sort((a, b) => a.name.localeCompare(b.name));
     grid.innerHTML = `${foldersBarHtml(q)}${folders.map(folderCardHtml).join('')}` + (shown.length ? shown.map(b => `
-      <div class="dm-disp-bg${b.url === current ? ' current' : ''}" data-bg="${escapeHtml(b.id)}" draggable="true" role="button" tabindex="0" title="Put it on the display as the background -- or drag it into a folder">
+      <div class="dm-disp-bg${b.url === current ? ' current' : ''}${_picked.has(b.id) ? ' picked' : ''}" data-bg="${escapeHtml(b.id)}" draggable="true" role="button" tabindex="0" title="Put it on the display as the background -- drag it into a folder, or tick it (Ctrl + click) to move several">
         <span class="dm-disp-bg-img"><img src="${escapeHtml(b.url)}" alt="" loading="lazy" draggable="false"></span>
+        <button class="dm-disp-tick" data-pick-bg title="${_picked.has(b.id) ? 'Unpick it' : 'Pick it -- to move several at once'}">✓</button>
         <span class="dm-disp-bg-name">${b.url === current ? '✓ ' : ''}${escapeHtml(b.name)}${q && b.folder ? `<small> · 📁 ${escapeHtml(folderPath(b.folder).map(f => f.name).join(' › '))}</small>` : ''}</span>
         <span class="dm-disp-bg-tools">
           <button class="dm-icon-btn" data-bgact="pic" title="Put it on as a picture instead (to move and resize)">＋</button>
@@ -341,6 +343,7 @@ function drawGrid() {
         </span>
       </div>`).join('') : folders.length ? '' : `<div class="dm-hint dm-disp-empty">${q ? 'No picture matches that.' : _folder ? 'This folder is empty -- drag pictures here, or upload them while it\'s open.' : list.length ? 'No pictures out here -- they\'re all in folders.' : 'No pictures uploaded yet -- upload a few backgrounds (a route, a forest, a city…) and they stay here for next time.'}</div>`);
     wireFolderDrag(grid);
+    drawPickedBar();
     return;
   }
   const shown = list.filter(e => !q || e.search.includes(q));
@@ -375,16 +378,23 @@ function addPicture({ kind, label, still = '', animated = '' }) {
     // Side by side across the lower part of the screen, so a few added in a row don't land on top of each other.
     s.items.push({ id: newId('pic'), kind, label, src, still, animated, x: 0.12 + (n % 5) * 0.19, y: 0.64, size: 0.36, flip: false, hidden });
   });
-  toast(hidden ? `${label} is ready, hidden -- click 👁 to show it.` : `${label} is on the display.`);
+  toast(hidden ? `${label} is ready, hidden -- click Show to put it on.` : `${label} is on the display.`);
 }
 
 async function onGridClick(e) {
+  if (_source === 'backgrounds' && e.target.closest('[data-picked-act]')) { onPickedBar(e.target.closest('[data-picked-act]').dataset.pickedAct); return; }
   if (_source === 'backgrounds' && onFolderClick(e)) return;
   const bgTool = e.target.closest('[data-bgact]');
   const bgCard = e.target.closest('[data-bg]');
   if (bgCard) {
     const img = _data.backgrounds.find(b => b.id === bgCard.dataset.bg);
     if (!img) return;
+    // Picking: the tick, Ctrl / Cmd / Shift + click -- or any click while some are picked
+    if (!bgTool && (e.target.closest('[data-pick-bg]') || e.ctrlKey || e.metaKey || e.shiftKey || _picked.size)) {
+      if (_picked.has(img.id)) _picked.delete(img.id); else _picked.add(img.id);
+      drawGrid();
+      return;
+    }
     if (!bgTool) { updateScene((s) => { s.background = { url: img.url, name: img.name }; }); drawGrid(); toast(`${img.name} is the background now.`); return; }
     const act = bgTool.dataset.bgact;
     if (act === 'pic') addPicture({ kind: 'image', label: img.name, still: img.url });
@@ -581,7 +591,7 @@ function drawEditorSide() {
       </div>
       <div class="dm-disp-ed-btns">
         <button class="dm-btn small" data-e="flip">↔ Flip</button>
-        <button class="dm-btn small" data-e="hide" title="${it.hidden ? 'Show it on the display' : 'Hide it from the display (it stays here)'}">${it.hidden ? '👁 Show' : '🙈 Hide'}</button>
+        <button class="dm-btn small" data-e="hide" title="${it.hidden ? 'Show it on the display' : 'Hide it from the display (it stays here)'}">${it.hidden ? 'Show' : 'Hide'}</button>
         <button class="dm-btn small" data-e="dup">⧉ Duplicate</button>
         <button class="dm-btn small danger" data-e="remove">✕ Take it off</button>
       </div>` : '<div class="dm-hint">Click a picture to pick it.</div>'}
@@ -715,6 +725,62 @@ function folderPath(id) {
   return out;
 }
 
+/** While pictures are picked: how many, Move to..., Unpick -- above the grid. */
+function drawPickedBar() {
+  const grid = document.getElementById('dispGrid');
+  if (!grid) return;
+  [..._picked].forEach((id) => { if (!(_data.backgrounds || []).some(b => b.id === id)) _picked.delete(id); });
+  grid.querySelector('.dm-disp-picked')?.remove();
+  if (!_picked.size) return;
+  const bar = document.createElement('div');
+  bar.className = 'dm-disp-picked';
+  bar.innerHTML = `<b>${_picked.size} picture${_picked.size === 1 ? '' : 's'} picked</b>
+    <span class="dm-hint">Drag them onto a folder, or</span>
+    <button class="dm-btn small primary" data-picked-act="move">📁 Move to…</button>
+    <button class="dm-btn small" data-picked-act="all">Pick all here</button>
+    <button class="dm-btn small" data-picked-act="clear">Unpick</button>`;
+  grid.prepend(bar);
+}
+
+async function onPickedBar(act) {
+  if (act === 'clear') { _picked.clear(); drawGrid(); return; }
+  if (act === 'all') {
+    const q = (_queries.backgrounds || '').trim().toLowerCase();
+    (_data.backgrounds || []).filter(b => (q ? b.name.toLowerCase().includes(q) : (b.folder || '') === _folder)).forEach(b => _picked.add(b.id));
+    drawGrid();
+    return;
+  }
+  // Move to...: every folder, as a tree
+  const rows = [];
+  const walk = (parent, depth) => _folders.filter(f => (f.parent || '') === parent).sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((f) => { rows.push({ f, depth }); walk(f.id, depth + 1); });
+  walk('', 1);
+  const into = await openDmModal({
+    title: `📁 Move ${_picked.size} picture${_picked.size === 1 ? '' : 's'} to…`,
+    html: `<div class="dm-disp-movelist">
+      <button class="dm-species-item" data-into=""><span class="dm-species-name">🖼️ All pictures</span></button>
+      ${rows.map(({ f, depth }) => `<button class="dm-species-item" data-into="${escapeHtml(f.id)}" style="padding-left:${0.6 + depth}rem"><span class="dm-species-name">📁 ${escapeHtml(f.name)}</span></button>`).join('')}
+    </div>`,
+    buttons: [{ label: 'Cancel', value: null }],
+    onOpen: (body, close) => body.addEventListener('click', (ev) => { const b = ev.target.closest('[data-into]'); if (b) close(b.dataset.into); }),
+  });
+  if (into === null || into === undefined) return;
+  await movePictures([..._picked], into);
+}
+
+async function movePictures(ids, into) {
+  try {
+    for (const id of ids) {
+      const b = (_data.backgrounds || []).find(x => x.id === id);
+      if (b) await movePicture(b, into);
+    }
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Move' });
+  }
+  _picked.clear();
+  drawGrid();
+}
+
 function foldersBarHtml(q) {
   if (q) return '<div class="dm-disp-crumbs"><span class="dm-hint">Searching every folder</span></div>';
   return `<div class="dm-disp-crumbs">
@@ -818,7 +884,8 @@ function wireFolderDrag(grid) {
     const pic = e.target.closest?.('[data-bg]');
     const folder = e.target.closest?.('[data-drag-folder]');
     if (!pic && !folder) return;
-    e.dataTransfer.setData(TYPE, JSON.stringify(pic ? { kind: 'picture', id: pic.dataset.bg } : { kind: 'folder', id: folder.dataset.dragFolder }));
+    const ids = pic && _picked.has(pic.dataset.bg) ? [..._picked] : pic ? [pic.dataset.bg] : [];
+    e.dataTransfer.setData(TYPE, JSON.stringify(pic ? { kind: 'picture', ids } : { kind: 'folder', id: folder.dataset.dragFolder }));
     e.dataTransfer.effectAllowed = 'move';
     (pic || folder).classList.add('dragging');
   });
@@ -845,8 +912,8 @@ function wireFolderDrag(grid) {
     const what = JSON.parse(raw);
     try {
       if (what.kind === 'picture') {
-        const b = (_data.backgrounds || []).find(x => x.id === what.id);
-        if (b) await movePicture(b, into);
+        await movePictures(what.ids || [what.id], into);
+        return;
       } else {
         const f = _folders.find(x => x.id === what.id);
         // never into itself or one of its own folders

@@ -104,7 +104,7 @@ function renderList() {
   const wild = all.filter(c => c.kind === 'pokemon' && !trainers.some(t => t.id === c.trainerId));
   const row = (c, nested = false) => {
     const p = c.participant || {};
-    const where = c.heldBack ? '🙈 hidden' : c.position ? '📍 placed' : '⚠ not placed';
+    const where = c.heldBack ? (c.position ? 'hidden · on the map' : 'hidden') : c.position ? '📍 placed' : '⚠ not placed';
     return `
       <button class="dm-cs-row${nested ? ' nested' : ''}${_editing?.id === c.id ? ' selected' : ''}" data-creature="${c.id}">
         <span class="dm-cs-thumb" data-img="${escapeHtml(p.image || '')}"></span>

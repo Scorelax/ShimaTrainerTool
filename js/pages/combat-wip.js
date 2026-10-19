@@ -9,7 +9,7 @@
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { allCachedPokemon, displayName, pokemonKey } from '../utils/owned-pokemon.js';
-import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
+import { CombatAPI, PokemonAPI, TrainerAPI, DmAPI } from '../api.js';
 import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setMoveRowResolver, setWeatherAttackModeResolver, setCoverAttackModeResolver, setCritResolver } from '../utils/target-picker.js';
 import { setAnimationAnnouncer } from '../utils/battle-animation.js';
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
@@ -53,7 +53,7 @@ import {
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions, renderCombatCard,
   setCombatStateKey, setOnCombatStateSave, setOnLogEvent, setOnSwitchPokemon, setOnAddStatus, setOnLocalStatusClick, setOnBasicAction, setOnUseTrainerBuff, openSwitchPopup, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
-  persistedMoveCharges, COMBAT_CSS, showMoveDetailsReadOnly,
+  persistedMoveCharges, COMBAT_CSS, showMoveDetailsReadOnly, refreshCombatMoves,
 } from './combat.js';
 import { loadTrainer, storeTrainer } from '../utils/trainer-data.js';
 import { abilityList, nameList, skillLists } from '../utils/battle-lists.js';
@@ -1954,6 +1954,28 @@ async function _switchPokemonShared(bench, options = {}) {
   }
 }
 
+/** Moves the DM gave this creature mid-battle (the DM console's Edit -- participant.dmAddedMoves) join this device's own
+ * copy of it; one the DM took away again leaves it. A move this device has never heard of (one of the DM's own, made just
+ * now) has the move list fetched again. */
+let _movesFetch = null;
+function _mergeDmMoves(merged, prior, p) {
+  const now = p.dmAddedMoves || [];
+  const before = prior?._dmMoves || [];
+  if (!now.length && !before.length) return;
+  merged.moves = [...new Set([...(merged.moves || []).filter(m => !before.includes(m) || now.includes(m)), ...now])];
+  merged._dmMoves = [...now];
+  let known = [];
+  try { known = JSON.parse(sessionStorage.getItem('moves') || '[]').map(m => m.name); } catch { /* none yet */ }
+  if (!now.some(m => !known.includes(m)) || _movesFetch) return;
+  _movesFetch = DmAPI.allMoves()
+    .then((res) => {
+      if (Array.isArray(res?.data)) { sessionStorage.setItem('moves', JSON.stringify(res.data)); refreshCombatMoves(); }
+      if (session?.active) _syncMainFocus(session);
+    })
+    .catch(() => {})
+    .finally(() => { setTimeout(() => { _movesFetch = null; }, 30000); });
+}
+
 function _syncLocalCombatState(session) {
   _enterBattleSync();
 
@@ -1990,6 +2012,7 @@ function _syncLocalCombatState(session) {
       }
     }
     merged.id = p.id;
+    _mergeDmMoves(merged, prior, p);
     // The shared session owns the effects the shared combat applied; hand-added local
     // badges (combat.js's add-status buttons) are kept, the shared ones re-derived.
     merged.statusEffects = [

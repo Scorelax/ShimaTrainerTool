@@ -137,11 +137,11 @@ async function pickOnScreen(value) {
     if (running) {
       await CombatAPI.adventureSettings({ onScreen: value });
     } else if (value === 'adventure') {
-      if (!await showCombatConfirm('Start the adventure? Its map goes on the table screen, and the players can join from their app.', { title: 'Adventure map', yesLabel: 'Start it', noLabel: 'Cancel' })) {
+      if (!await showCombatConfirm('Put the adventure map on the table screen? The players can place themselves on it once you tick "Allow player placement" (Adventure Mode).', { title: 'Adventure map', yesLabel: 'Put it on', noLabel: 'Cancel' })) {
         renderStatus();
         return;
       }
-      await startAdventure();
+      await startAdventure({ canJoin: false, onScreen: 'adventure' });
     }
   } catch (err) {
     showCombatAlert(err.message, { title: 'On the table screen' });

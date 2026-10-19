@@ -9,6 +9,7 @@ import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, typeBadges, toast, attachSuggest } from './dm-common.js';
 import { xpOrStart, xpPanelHtml, xpButtonHtml, giveXpPopup } from './xp.js';
 import { givePokemonPopup } from './give-pokemon.js';
+import { pickMoves } from './move-picker.js';
 import { abilitiesOf, currentHP, currentVP, displayName, knownMoveNames, sensesList } from '../utils/owned-pokemon.js';
 
 /** "From: Bulbasaur · Evolves: Venusaur @ Level 15" */
@@ -255,7 +256,10 @@ function pokemonRowHtml(trainer, p, xp) {
         ${line('Saving throws', (p.savingThrows || []).join(', '))}${line('Skills', (p.skills || []).join(', '))}${line('Expertise', (p.expertise || []).join(', '))}${line('Hit / vitality dice', `d${c.hitDie || '?'} / d${c.vitalityDie || '?'}`)}
         ${line('Feats', (p.feats || []).join(', '))}${line('Gear', p.gear)}${line('Evolution', evolutionLine(p))}
         ${abilitiesOf(p).map(a => `<div class="dm-tline"><span>Ability</span><span><strong>${escapeHtml(a.name)}</strong>${a.description ? ` -- ${escapeHtml(a.description)}` : ''}</span></div>`).join('')}
-        <div class="dm-tline"><span>Moves</span><span class="dm-move-chips">${movesKnown(p).map(m => `<span>${escapeHtml(m)}</span>`).join('') || '—'}</span></div>
+        <div class="dm-tline"><span>Moves</span><span class="dm-move-chips">${movesKnown(p).map(m => ((p.customMoves || []).includes(m)
+          ? `<span class="custom" title="Taught on top of its level's moves">${escapeHtml(m)}<button class="dm-chip-x" data-forget-move="${escapeHtml(m)}" data-mon="${escapeHtml(p.name)}" title="Take this move away">×</button></span>`
+          : `<span>${escapeHtml(m)}</span>`)).join('') || '—'}
+          <button class="dm-btn small" data-teach="${escapeHtml(p.name)}" title="A move from the list -- or one of your own">＋ Teach a move</button></span></div>
         ${senses.length ? `<div class="dm-tline"><span>Senses</span><span>${senses.map(([s, v]) => `${s} ${escapeHtml(v)}`).join(' · ')}</span></div>` : ''}
         ${line('Notes', (p.comments || []).join(' · '))}
       </div>
@@ -339,6 +343,19 @@ function wireTrainer(name, items) {
   const run = async (fn, done) => {
     try { await fn(); if (done) toast(done); await reload(); } catch (err) { showCombatAlert(err.message, { title: name }); }
   };
+  // Moves: taught for good (its custom moves -- the player's app shows them at once), or a taught one taken away
+  _root.querySelectorAll('[data-teach]').forEach(b => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const mon = _party.find(x => x.trainer.name === name)?.pokemon.find(x => x.name === b.dataset.teach);
+    if (!mon) return;
+    const picked = await pickMoves({ title: `✨ Teach ${pokemonName(mon)} a move`, exclude: movesKnown(mon) });
+    if (!picked?.length) return;
+    run(async () => { for (const m of picked) await DmAPI.giveMove(name, mon.name, m); }, `${pokemonName(mon)} learned ${picked.join(', ')}`);
+  }));
+  _root.querySelectorAll('[data-forget-move]').forEach(b => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    run(() => DmAPI.giveMove(name, b.dataset.mon, b.dataset.forgetMove, { forget: true }), `${b.dataset.forgetMove} taken away`);
+  }));
   const amount = () => Math.max(0, parseInt(document.getElementById('moneyAmount').value, 10) || 0);
   document.getElementById('moneyAdd').addEventListener('click', () => {
     const a = amount();

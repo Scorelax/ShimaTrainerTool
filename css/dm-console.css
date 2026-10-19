@@ -1328,3 +1328,36 @@ span.dm-trap-pick { cursor: default; }
 .dm-catch-ball img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .dm-catch-ball:hover { transform: scale(1.12); }
 @keyframes dm-ball-pulse { 50% { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 0 20px rgba(231, 76, 60, 0.95); } }
+/* Moves handed out by the DM (Party, the battle's Edit): a taught one can be taken away */
+.dm-move-chips span.custom { border-color: rgba(255, 215, 0, 0.55); }
+.dm-move-chips .dm-btn.small { padding: 0.12rem 0.55rem; font-size: 0.76rem; }
+.dm-chip-x { margin-left: 0.3rem; padding: 0 0.15rem; border: none; background: none; color: var(--dm-muted); font-weight: 800; cursor: pointer; line-height: 1; }
+.dm-chip-x:hover { color: #ff6b6b; }
+.dm-edit-item { align-items: center; gap: 0.35rem; }
+.dm-edit-item .dm-input { flex: 1; }
+.dm-picker-foot > span:first-child { display: flex; align-items: center; gap: 0.6rem; }
+/* − value + (the map editor's sizes, a Pokemon's level) */
+.dm-stepper { display: flex; align-items: stretch; gap: 0.25rem; }
+.dm-stepper .dm-btn { min-width: 2.3rem; padding: 0.25rem 0.4rem; font-size: 1.15rem; font-weight: 800; line-height: 1; }
+.dm-stepper .dm-input { flex: 1; min-width: 0; text-align: center; -moz-appearance: textfield; }
+.dm-stepper .dm-input::-webkit-outer-spin-button, .dm-stepper .dm-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* The map editor: a creature hidden from the players (see-through), and the object being turned */
+.dm-map-token.dm-token-hidden { opacity: 0.5; outline: 2px dashed rgba(255, 255, 255, 0.6); outline-offset: -2px; border-radius: 50%; }
+.dm-map-stage.dm-turning { cursor: grabbing; }
+/* Display -> Backgrounds: several pictures picked at once */
+.dm-disp-tick { position: absolute; top: 5px; left: 5px; z-index: 2; width: 1.45rem; height: 1.45rem; padding: 0; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85); background: rgba(0, 0, 0, 0.45); color: transparent; font-weight: 900; font-size: 0.8rem; cursor: pointer;
+  opacity: 0; transition: opacity 0.15s; }
+.dm-disp-bg:hover .dm-disp-tick, .dm-disp-bg.picked .dm-disp-tick, .dm-disp-grid:has(.picked) .dm-disp-tick { opacity: 1; }
+.dm-disp-bg.picked { border-color: #4fc3f7; box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.45); }
+.dm-disp-bg.picked .dm-disp-tick { background: #4fc3f7; border-color: #4fc3f7; color: #0b1a26; }
+.dm-disp-picked { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; padding: 0.45rem 0.6rem;
+  border-radius: 9px; background: rgba(79, 195, 247, 0.12); border: 1px solid rgba(79, 195, 247, 0.45); }
+.dm-disp-movelist { display: flex; flex-direction: column; gap: 0.25rem; max-height: 55vh; overflow: auto; }
+.dm-disp-showbtn { min-width: 3.6rem; }
+.dm-disp-showbtn.off { border-color: rgba(255, 215, 0, 0.6); color: var(--dm-gold); }
+/* The battle map on the DM's Map tab: any token can be picked (DM override) */
+.bmap-token.dm-override { pointer-events: auto; cursor: pointer; }
+.bmap-token.dm-override.selected .bmap-token-portrait { box-shadow: 0 0 0 3px #ff9800, 0 0 14px rgba(255, 152, 0, 0.8); }
+.bmap-override-row { background: rgba(255, 152, 0, 0.12); border: 1px solid rgba(255, 152, 0, 0.55); border-radius: 8px; padding: 0.35rem 0.5rem; }
+.bmap-override-row .bmap-confirm-btn { background: #e67e22; }

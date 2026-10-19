@@ -797,7 +797,9 @@ def start_prepared_session(conn, setup):
             pid = data['id'] or next(reversed(state['participants']))  # _add_participant made one up if it had none
             pos = creature.get('position') or {}
             col, row = js_parse_int(pos.get('col')), js_parse_int(pos.get('row'))
-            if data['status'] == 'participating' and col is not None and row is not None and 0 <= col < cols and 0 <= row < rows:
+            # A hidden creature with a spot (the adventure's "Start encounter" keeps where it stood) starts on the map,
+            # hidden from the players until the DM shows it; one without a spot joins later.
+            if col is not None and row is not None and 0 <= col < cols and 0 <= row < rows:
                 board['tokens'][pid] = {'col': col, 'row': row, 'facing': (js_parse_int(pos.get('facing')) or 0) % 360, 'z': 0}
                 state['participants'][pid]['placed'] = True
         return _save_and_publish(conn, state)
@@ -867,11 +869,16 @@ def existing_adventure(conn):
     return bool(state.get('active')) and state.get('battleType') == 'adventure'
 
 
-def start_adventure(conn, m):
+def start_adventure(conn, m, settings=None):
     """The DM console's Adventure module (the user's ask, 2026-10-16): the table's battle map without a battle -- a
     session of battleType 'adventure' on the DM's adventure map. The players join with their trainer and, if they like,
     one Pokemon, and walk around freely: no turns, no initiative, no movement limit (_move_token / _rotate_token). Ending it
-    leaves no Post battle. Only when nothing else is running."""
+    leaves no Post battle. Only when nothing else is running.
+
+    Since 2026-10-19 (later) the DM prepares the map's Pokemon and NPCs ahead of time too: the map's `creatures` ([{id,
+    participant, position: {col, row, facing}, z, hidden}], adventure.js) are on it from the start -- a hidden one only on
+    the DM's screens. It starts when the DM opens it for the players ("Allow player placement") or puts it on the table
+    screen -- `settings`: the adventure settings to start with (adventure_settings)."""
     with _SESSION_LOCK:
         if load_state(conn).get('active'):
             raise ValueError('A battle is running -- the adventure can start once it has ended.')
@@ -881,7 +888,31 @@ def start_adventure(conn, m):
         state.update({'active': True, 'battleType': 'adventure', 'round': 0, 'log': [], 'logFile': _new_log_filename('adventure'),
                       'adventure': dict(_ADVENTURE_DEFAULTS)})
         _board_from_map(state['board'], m)
+        if settings:
+            _set_adventure_settings(state, {k: ('1' if v is True else '0' if v is False else v) for k, v in settings.items()})
         _log_event(state, 'session-start', text='Adventure started')
+        board = state['board']
+        cols, rows = board['grid']['cols'], board['grid']['rows']
+        for creature in m.get('creatures') or []:
+            if not isinstance(creature, dict):
+                continue
+            data = dict(creature.get('participant') or {})
+            if not data.get('name'):
+                continue
+            data.update({'owner': DM_OWNER, 'id': str(creature.get('id') or '') or None, 'initiative': 0,
+                         'status': 'spectating' if creature.get('hidden') else 'participating'})
+            data.setdefault('side', 'enemy')
+            _fill_species_size(conn, data)
+            _add_participant(state, data)
+            pid = data['id'] or next(reversed(state['participants']))
+            pos = creature.get('position') or {}
+            col, row = js_parse_int(pos.get('col')), js_parse_int(pos.get('row'))
+            n = footprint_size(state['participants'][pid].get('size'))
+            if col is None or row is None or not all(0 <= c < cols and 0 <= r < rows for c, r in footprint_cells(col, row, n)):
+                continue
+            board['tokens'][pid] = {'col': col, 'row': row, 'facing': (js_parse_int(pos.get('facing')) or 0) % 360,
+                                    'z': js_parse_int(creature.get('z')) or 0}
+            state['participants'][pid]['placed'] = True
         return _save_and_publish(conn, state)
 
 
@@ -1401,6 +1432,9 @@ def _add_participant(state, data):
         'combatantType': data.get('combatantType'),
         'speciesName': data.get('speciesName', ''),
         'nature': str(data.get('nature') or ''),  # a DM Pokemon's -- registered with it when it's caught
+        'npcId': str(data.get('npcId') or ''),  # an NPC trainer from the DM's NPC library (the adventure's "Start encounter")
+        # Moves the DM gave it mid-battle (battle-live.js's Edit) -- a player's device adds them to its own copy
+        'dmAddedMoves': [str(m) for m in (data.get('dmAddedMoves') or []) if str(m).strip()],
         'ac': data.get('ac'), 'baseAc': data.get('baseAc'), 'critMod': data.get('critMod', 0),
         'proficiency': data.get('proficiency'), 'stabBonusValue': data.get('stabBonusValue'),
         'str': data.get('str'), 'dex': data.get('dex'), 'con': data.get('con'),
@@ -4524,6 +4558,8 @@ def _dm_update_participant(state, pid, data):
             p[key] = value
     if 'moves' in data:
         p['moves'] = list(dict.fromkeys(str(m).strip() for m in (data['moves'] or []) if str(m).strip()))  # each once, in order
+    if 'dmAddedMoves' in data:
+        p['dmAddedMoves'] = list(dict.fromkeys(str(m).strip() for m in (data['dmAddedMoves'] or []) if str(m).strip()))
     if 'speeds' in data:
         p['speeds'] = [{'type': str(sp.get('type') or 'Walking'), 'ft': max(0, js_parse_int(sp.get('ft')) or 0)}
                        for sp in (data['speeds'] or []) if isinstance(sp, dict)]

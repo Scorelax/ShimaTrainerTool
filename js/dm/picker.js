@@ -10,10 +10,11 @@ const SHOWN_MAX = 300; // cards drawn at once -- the search narrows it down
  * openPicker({ title, items: [{ key, label, sub, image, search }], multi, hiddenOption, confirmLabel, hint, emptyText,
  *   imageFallback, compact })
  * -> Promise<{ keys: [...], hidden: bool } | null> (null: closed without picking). `image` may be an animated sprite.
- * `compact`: no pictures at all -- a list of names (moves).
+ * `compact`: no pictures at all -- a list of names (moves). `extraAction`: {label} -- a button left in the foot that closes
+ * the picker with {extra: true} (Create a custom move...).
  */
 export function openPicker({ title, items, multi = false, hiddenOption = false, confirmLabel = null, hint = '',
-  emptyText = 'Nothing to pick from.', imageFallback = 'assets/Pokeball.png', compact = false, hiddenDefault = false }) {
+  emptyText = 'Nothing to pick from.', imageFallback = 'assets/Pokeball.png', compact = false, hiddenDefault = false, extraAction = null }) {
   const picked = new Set();
   let hidden = hiddenDefault;
   return openDmModal({
@@ -23,12 +24,12 @@ export function openPicker({ title, items, multi = false, hiddenOption = false, 
       <div class="dm-picker${compact ? ' compact' : ''}">
         <div class="dm-picker-bar">
           <input class="dm-input" data-pk-search placeholder="Search…" autocomplete="off">
-          ${hiddenOption ? `<label class="dm-check dm-picker-hidden" title="Put them on hidden -- only you see them until you show them"><input type="checkbox" data-pk-hidden ${hidden ? 'checked' : ''}><span>🙈 Add hidden</span></label>` : ''}
+          ${hiddenOption ? `<label class="dm-check dm-picker-hidden" title="Put them on hidden -- only you see them until you show them"><input type="checkbox" data-pk-hidden ${hidden ? 'checked' : ''}><span>Add hidden</span></label>` : ''}
         </div>
         ${hint ? `<div class="dm-hint">${hint}</div>` : ''}
         <div class="dm-picker-grid" data-pk-grid></div>
         <div class="dm-picker-foot">
-          <span class="dm-hint" data-pk-count></span>
+          <span>${extraAction ? `<button class="dm-btn" data-pk-extra>${escapeHtml(extraAction.label)}</button> ` : ''}<span class="dm-hint" data-pk-count></span></span>
           <span><button class="dm-btn" data-pk-cancel>Cancel</button>
           ${multi ? `<button class="dm-btn primary" data-pk-ok disabled>${escapeHtml(confirmLabel || 'Add')}</button>` : ''}</span>
         </div>
@@ -82,6 +83,7 @@ export function openPicker({ title, items, multi = false, hiddenOption = false, 
       });
       body.querySelector('[data-pk-hidden]')?.addEventListener('change', (e) => { hidden = e.target.checked; });
       body.querySelector('[data-pk-cancel]').addEventListener('click', () => close(null));
+      body.querySelector('[data-pk-extra]')?.addEventListener('click', () => close({ keys: [], hidden, extra: true }));
       okBtn?.addEventListener('click', done);
       draw();
       refreshCount();

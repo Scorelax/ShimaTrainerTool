@@ -22,11 +22,16 @@
 // Add to the map (the user's call, 2026-10-19): Objects and Items -- and on the adventure, Pokémon and NPCs -- are picked
 // in a popup like a file explorer (picker.js: search, several at once, "Add hidden"), then placed one after another, a
 // click each. An item goes on as an object showing the item's picture. Uploading the pictures moved to the Admin module.
+//
+// Later that day: the adventure's Pokemon and NPCs go on while it's still being prepared too (kept with its map,
+// map-store.js's `creatures`), sizes have − / + buttons, and a placed object is moved with a click on it and then a
+// click where it should go (or dragged there) -- held still for a moment, the pointer turns it.
 import { CombatAPI, DmAPI } from '../api.js';
 import { mapObjectHtml, objectScreenRect, objectCells, footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, newId, toast, getSpecies, participantFromPokemon, participantFromTrainer, npcTrainerConfig } from './dm-common.js';
+import { creatureSpotProblem } from './map-view.js';
 import { openPicker } from './picker.js';
 import * as setupStore from './setup-store.js';
 import * as liveStore from './live-map-store.js';
@@ -69,6 +74,31 @@ const ed = {
 };
 
 const SIZES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic'];
+const HOLD_MS = 350; // a press held this long without moving turns the object; moved before that, it's dragged
+
+/** The adventure being prepared: its Pokemon and NPCs are the map's own (the store's creatures), not a battle's. */
+const prepCreatures = () => !_live && !!_opts.adventure;
+const creaturesTool = () => _live || prepCreatures();
+
+/** A number field with − and + buttons either side (the user's call, 2026-10-19 -- the browser's arrows are tiny). */
+function stepperHtml(id, value, { min = 0, max = 99, step = 1 } = {}) {
+  return `<div class="dm-stepper"><button type="button" class="dm-btn" data-step="${id}" data-d="-${step}" title="Less">−</button>
+    <input class="dm-input" id="${id}" type="number" min="${min}" max="${max}" step="${step}" value="${value}">
+    <button type="button" class="dm-btn" data-step="${id}" data-d="${step}" title="More">+</button></div>`;
+}
+
+/** The − / + buttons: the field's number moves by a step (within its min / max) and it tells its listeners. */
+function wireSteppers(scope) {
+  scope.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
+    const input = scope.querySelector(`#${b.dataset.step}`);
+    if (!input) return;
+    const next = Math.max(Number(input.min), Math.min(Number(input.max), (Number(input.value) || 0) + Number(b.dataset.d)));
+    if (next === Number(input.value)) return;
+    input.value = next;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }));
+}
 
 let _root = null;
 let _onDone = null;
@@ -258,7 +288,8 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
   _onDone = onDone;
   _live = live;
   _store = store || (live ? liveStore : setupStore);
-  if (!live && ed.tool === 'creatures') ed.tool = 'objects';
+  if (!live && !adventure && ed.tool === 'creatures') ed.tool = 'objects';
+  if (!live && !adventure) ed.creatureQueue = [];
   root.innerHTML = '<div class="dm-loading">Loading the map tools…</div>';
   try {
     await loadAssets();
@@ -312,17 +343,17 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
         <div class="dm-card">
           <div class="dm-card-title">Add to the map</div>
           <div class="dm-add-grid" id="mapAdd">
-            ${adventure ? `<button class="dm-btn" data-add="pokemon" ${_live ? '' : 'disabled'}>🐾 Pokémon</button>
-            <button class="dm-btn" data-add="npc" ${_live ? '' : 'disabled'}>👤 NPCs</button>` : ''}
+            ${adventure ? `<button class="dm-btn" data-add="pokemon">🐾 Pokémon</button>
+            <button class="dm-btn" data-add="npc">👤 NPCs</button>` : ''}
             <button class="dm-btn" data-add="object">🌲 Objects</button>
             <button class="dm-btn" data-add="item">🎒 Items</button>
           </div>
-          ${adventure && !_live ? '<div class="dm-hint" style="margin-top:0.35rem">Pokémon and NPCs go on once the adventure is running.</div>' : ''}
+          ${adventure && !_live ? '<div class="dm-hint" style="margin-top:0.35rem">Pokémon and NPCs wait on the map -- the players see them once the map is opened to them (hidden ones only when you show them).</div>' : ''}
         </div>
 
         <div class="dm-card">
           <div class="dm-tool-tabs" id="mapTools">
-            ${_live ? '<button data-tool="creatures">🧍 Creatures</button>' : ''}
+            ${_live || adventure ? '<button data-tool="creatures">🧍 Creatures</button>' : ''}
             <button data-tool="objects">🌲 Objects</button>
             <button data-tool="terrain">🟫 Terrain</button>
             <button data-tool="traps">🪤 Traps</button>
@@ -357,7 +388,7 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
     renderStage();
     // The square counts on the Traps panel follow too -- unless the DM is typing in it (a redraw would lose the text).
     const typing = document.activeElement?.closest?.('#mapToolPanel');
-    if ((_live && ed.tool === 'creatures') || (ed.tool === 'traps' && !typing)) renderToolPanel();
+    if ((creaturesTool() && ed.tool === 'creatures' && !typing) || (ed.tool === 'traps' && !typing)) renderToolPanel();
   });
 }
 
@@ -582,11 +613,11 @@ function renderToolPanel() {
           <button class="dm-btn small" id="objPick">${editing ? '↺ Another picture…' : '🌲 Pick objects…'}</button></div>
       </div>
       <div class="dm-row">
-        <div class="dm-field"><label for="objW">Width (squares)</label><input class="dm-input" id="objW" type="number" min="1" max="20" value="${ed.objW}"></div>
-        <div class="dm-field"><label for="objH">Height (squares)</label><input class="dm-input" id="objH" type="number" min="1" max="20" value="${ed.objH}"></div>
+        <div class="dm-field"><label for="objW">Width (squares)</label>${stepperHtml('objW', ed.objW, { min: 1, max: 20 })}</div>
+        <div class="dm-field"><label for="objH">Height (squares)</label>${stepperHtml('objH', ed.objH, { min: 1, max: 20 })}</div>
       </div>
       <div class="dm-row">
-        <div class="dm-field"><label for="objTall">How tall (ft)</label><input class="dm-input" id="objTall" type="number" min="0" max="500" step="5" value="${ed.objHeight}"></div>
+        <div class="dm-field"><label for="objTall">How tall (ft)</label>${stepperHtml('objTall', ed.objHeight, { min: 0, max: 500, step: 5 })}</div>
         <div class="dm-field"><label>Turn <span id="objRotLabel">${ed.objRot}°</span></label>
           <div class="dm-row"><button class="dm-btn" id="objRotL" title="Turn left 15°">⟲</button><button class="dm-btn" id="objRotR" title="Turn right 15°">⟳</button></div>
         </div>
@@ -602,7 +633,7 @@ function renderToolPanel() {
       <label class="dm-check"><input type="checkbox" id="objHidden" ${ed.objHidden ? 'checked' : ''}>
         <span>🙈 Hidden from the players <small>Only you see it (see-through) until you untick this -- its squares aren't difficult / blocked meanwhile.</small></span></label>
       ${editing ? `
-      <div class="dm-field"><label>Move it</label>
+      <div class="dm-field"><label>Move it a square</label>
         <div class="dm-row dm-obj-move">
           <button class="dm-btn" data-move-obj="-1,0" title="One square left">←</button><button class="dm-btn" data-move-obj="0,-1" title="One square up">↑</button>
           <button class="dm-btn" data-move-obj="0,1" title="One square down">↓</button><button class="dm-btn" data-move-obj="1,0" title="One square right">→</button>
@@ -613,8 +644,9 @@ function renderToolPanel() {
         <button class="dm-btn primary" id="objDoneEdit">✓ Done</button>
       </div>` : ''}` : '<div class="dm-hint">No object pictures yet -- upload them in the Admin module (Map pictures).</div>';
     hint.textContent = editing
-      ? 'Editing the outlined object -- hold it and move the pointer around it to turn it. Click an empty square (or Done) to finish.'
-      : 'Click a square to place the object there (its top-left corner) -- or hold and move the pointer around to turn it, then let go. Click a placed object to edit it.';
+      ? 'Picked up: click a square to move it there (or drag it) -- hold it still a moment, then move the pointer around it to turn it. Click it again (or Done) to put it down.'
+      : 'Click a square to place the object there -- or hold and move the pointer around to turn it, then let go. Click a placed object to move it, hold it to turn it.';
+    wireSteppers(panel);
     // Editing: every change goes straight onto the object (applyEdit). Placing: it only changes what the next one looks like.
     const changed = () => { if (ed.selectedId) applyEdit(); else renderGhost(); };
     document.getElementById('objPick')?.addEventListener('click', () => (ed.selectedId ? changeObjectPicture() : addToMap('object')));
@@ -651,8 +683,9 @@ function renderToolPanel() {
       <div class="dm-place-queue"><b>Placing ${escapeHtml(q.label)}${q.hidden ? ' 🙈' : ''}</b>
         <small>${ed.creatureQueue.length > 1 ? `Then: ${escapeHtml(ed.creatureQueue.slice(1).map(x => x.label).join(', '))}` : 'The last one picked'}</small>
         <span><button class="dm-btn small" id="queueSkip">Skip</button><button class="dm-btn small" id="queueStop">Stop</button></span></div>
-      ${q.kind === 'pokemon' ? `<div class="dm-field"><label for="queueLevel">Its level</label><input class="dm-input" id="queueLevel" type="number" min="1" max="20" value="${q.level}"></div>` : ''}
-      <div class="dm-hint">${q.hidden ? 'Hidden: only you see it until you show it (the Battle module\'s creatures list).' : 'The players see it as soon as it\'s on the map.'}</div>`;
+      ${q.kind === 'pokemon' ? `<div class="dm-field"><label for="queueLevel">Its level</label>${stepperHtml('queueLevel', q.level, { min: 1, max: 20 })}</div>` : ''}
+      <div class="dm-hint">${q.hidden ? 'Hidden: only you see it until you show it (the Creatures tool).' : prepCreatures() ? 'The players see it once the map is opened to them.' : 'The players see it as soon as it\'s on the map.'}</div>`;
+    wireSteppers(panel);
     hint.textContent = ed.placingCreature ? `Putting ${q.label} on the map…` : `Click a square to put ${q.label} there.`;
     document.getElementById('queueLevel')?.addEventListener('change', (e) => { q.level = Math.max(1, Math.min(20, Number(e.target.value) || q.level)); });
     document.getElementById('queueSkip').addEventListener('click', () => { ed.creatureQueue.shift(); renderToolPanel(); });
@@ -660,7 +693,8 @@ function renderToolPanel() {
   } else if (ed.tool === 'creatures') {
     const c = getSetup().creatures.find(x => x.id === ed.creatureId);
     panel.innerHTML = c ? `
-      <div class="dm-edit-head"><b>${escapeHtml(c.name)}</b><small>Facing ${c.position.facing}° · ${c.z ? `${c.z}ft up` : 'on the ground'}</small></div>
+      <div class="dm-edit-head"><b>${escapeHtml(c.name)}</b><small>Facing ${c.position.facing || 0}° · ${c.z ? `${c.z}ft up` : 'on the ground'}</small></div>
+      <label class="dm-check"><input type="checkbox" id="creHidden" ${c.hidden ? 'checked' : ''}><span>Hidden from the players <small>Only you see it (see-through) until you untick this.</small></span></label>
       <div class="dm-field"><label>Turn</label><div class="dm-row">
         <button class="dm-btn" data-cre="turn" data-v="-45" title="Turn left 45°">⟲ 45°</button><button class="dm-btn" data-cre="turn" data-v="45" title="Turn right 45°">⟳ 45°</button></div></div>
       <div class="dm-field"><label>Height</label><div class="dm-row">
@@ -669,16 +703,20 @@ function renderToolPanel() {
         <select class="dm-select" id="creSize">
           ${SIZES.map(z => `<option value="${z}" ${z.toLowerCase() === String(c.participant?.size || 'Medium').toLowerCase() ? 'selected' : ''}>${z}${{ Large: ' (2×2)', Huge: ' (3×3)', Gigantic: ' (4×4)' }[z] || ' (1 square)'}</option>`).join('')}
         </select></div>
-      <button class="dm-btn wide" data-cre="done">✓ Done with ${escapeHtml(c.name)}</button>`
-      : '<div class="dm-hint">Tap a creature on the map -- anyone\'s -- then tap a square to move it there. It doesn\'t use its movement, and it doesn\'t have to be its turn.</div>';
+      <div class="dm-row"><button class="dm-btn" data-cre="remove">🗑 Take it off the map</button>
+        <button class="dm-btn primary" data-cre="done">✓ Done</button></div>`
+      : `<div class="dm-hint">${prepCreatures() ? 'Tap a creature on the map, then tap a square to move it there. Add more with Pokémon / NPCs above.'
+        : 'Tap a creature on the map -- anyone\'s -- then tap a square to move it there. It doesn\'t use its movement, and it doesn\'t have to be its turn.'}</div>`;
     hint.textContent = c ? `Tap a square to move ${c.name} there · turn it or change its height on the left.` : 'Creatures: tap one to pick it.';
-    document.getElementById('creSize')?.addEventListener('change', (e) => { if (ed.creatureId) liveStore.setTokenSize(ed.creatureId, e.target.value); });
+    document.getElementById('creSize')?.addEventListener('change', (e) => { if (ed.creatureId) setCreatureSize(ed.creatureId, e.target.value); });
+    document.getElementById('creHidden')?.addEventListener('change', (e) => { if (ed.creatureId) setCreatureHidden(ed.creatureId, e.target.checked); });
     panel.querySelectorAll('[data-cre]').forEach(b => b.addEventListener('click', () => {
       if (b.dataset.cre === 'done') { ed.creatureId = null; renderToolPanel(); renderStage(); return; }
       const now = getSetup().creatures.find(x => x.id === ed.creatureId);
       if (!now) return;
+      if (b.dataset.cre === 'remove') { removeCreature(now); return; }
       const v = Number(b.dataset.v);
-      liveStore.placeToken(now.id, b.dataset.cre === 'turn' ? { facing: (((now.position.facing + v) % 360) + 360) % 360 } : { z: Math.max(-500, now.z + v) });
+      moveCreature(now.id, b.dataset.cre === 'turn' ? { facing: ((((now.position.facing || 0) + v) % 360) + 360) % 360 } : { z: Math.max(-500, (now.z || 0) + v) });
     }));
   } else if (ed.tool === 'traps') {
     renderTrapPanel(panel, hint);
@@ -791,7 +829,51 @@ function onCreaturePress(col, row) {
   if (hit && hit.id !== ed.creatureId) { ed.creatureId = hit.id; renderToolPanel(); renderStage(); return; }
   if (hit) { ed.creatureId = null; renderToolPanel(); renderStage(); return; }
   if (!ed.creatureId) return;
-  liveStore.placeToken(ed.creatureId, { col, row });
+  moveCreature(ed.creatureId, { col, row });
+}
+
+/** Moves / turns / lifts a creature: the running map's through the Pi (anyone's, any time), the prepared adventure's in
+ * its saved map. `change`: {col, row} | {facing} | {z}. */
+function moveCreature(id, change) {
+  if (_live) { liveStore.placeToken(id, change); return; }
+  const c = getSetup().creatures.find(x => x.id === id);
+  if (!c) return;
+  if ('col' in change) {
+    const problem = creatureSpotProblem(getSetup(), c, change.col, change.row);
+    if (problem) { toast(problem); return; }
+  }
+  updateSetup((st) => {
+    const x = st.creatures.find(y => y.id === id);
+    if (!x) return;
+    if ('z' in change) x.z = change.z;
+    x.position = { ...x.position, ...('col' in change ? { col: change.col, row: change.row } : {}), ...('facing' in change ? { facing: change.facing } : {}) };
+  });
+}
+
+function setCreatureSize(id, size) {
+  if (_live) { liveStore.setTokenSize(id, size); return; }
+  updateSetup((st) => { const x = st.creatures.find(y => y.id === id); if (x) x.participant = { ...x.participant, size }; });
+}
+
+/** Hidden from the players: the running map's creature sits out ('spectating' -- on no screen but the DM's), the prepared
+ * one starts that way. */
+async function setCreatureHidden(id, hidden) {
+  if (_live) {
+    try { await CombatAPI.setStatus(id, hidden ? 'spectating' : 'participating'); } catch (err) { showCombatAlert(err.message, { title: 'Hidden' }); }
+    return;
+  }
+  updateSetup((st) => { const x = st.creatures.find(y => y.id === id); if (x) x.hidden = hidden; });
+}
+
+async function removeCreature(c) {
+  if (!await showCombatConfirm(`Take ${c.name} off the map?`, { title: 'Take it off', yesLabel: 'Take it off', noLabel: 'Cancel' })) return;
+  ed.creatureId = null;
+  if (_live) {
+    try { await CombatAPI.removeParticipant(c.id); } catch (err) { showCombatAlert(err.message, { title: 'Take it off' }); }
+  } else {
+    updateSetup((st) => { st.creatures = st.creatures.filter(x => x.id !== c.id); });
+  }
+  renderToolPanel();
 }
 
 /** The board square under the pointer, worked out from where it is on the map (the objects sit above the grid). */
@@ -810,8 +892,20 @@ function cellAtPointer(e) {
 function startObjectPress(e, col, row) {
   const m = getSetup().map;
   const hit = topObjectAt(m, col, row);
-  if (!hit && ed.selectedId) { deselectObject(); return; }
-  if (hit && hit.id !== ed.selectedId) selectObject(hit);
+  // An object picked up: a click on an empty square moves it there (centred on that square)
+  if (!hit && ed.selectedId) {
+    const sx = m.rows - 1 - row, sy = col;
+    const before = [ed.editCx, ed.editCy];
+    ed.editCx = sx + 0.5; ed.editCy = sy + 0.5;
+    const [sw, sh] = screenBox();
+    if (sw % 2 === 0) ed.editCx += 0.5; // an even width can't be centred on one square -- it starts on the clicked one
+    if (sh % 2 === 0) ed.editCy += 0.5;
+    if (!applyEdit()) [ed.editCx, ed.editCy] = before;
+    renderGhost();
+    return;
+  }
+  const wasPicked = !!hit && hit.id === ed.selectedId;
+  if (hit && !wasPicked) selectObject(hit);
   if (!hit && !currentAsset()) return;
   let cx, cy;
   if (hit) { cx = ed.editCx; cy = ed.editCy; }
@@ -819,11 +913,37 @@ function startObjectPress(e, col, row) {
     const [sw, sh] = screenBox();
     cx = (m.rows - 1 - row) + sw / 2; cy = col + sh / 2;
   }
-  ed.gesture = { cx, cy, startRot: ed.objRot, ref: null, editing: hit?.id || null, turned: false, pointerId: e.pointerId };
+  // A placed object: 'press' until it's either dragged (moved before HOLD_MS) or held (then the pointer turns it).
+  // A new one turns from the start, as before.
+  ed.gesture = { cx, cy, cx0: cx, cy0: cy, startRot: ed.objRot, ref: null, editing: hit?.id || null, turned: false, pointerId: e.pointerId,
+    mode: hit ? 'press' : 'turn', x0: e.clientX, y0: e.clientY, wasPicked };
+  if (hit) {
+    ed.gesture.timer = setTimeout(() => {
+      if (ed.gesture?.mode !== 'press') return;
+      ed.gesture.mode = 'turn';
+      document.querySelector('#mapWrap .dm-map-stage')?.classList.add('dm-turning');
+      const hint = document.getElementById('mapHint');
+      if (hint) hint.textContent = 'Turning -- move the pointer around the object, then let go.';
+    }, HOLD_MS);
+  }
   ed.hover = { col, row };
-  const move = (ev) => { if (ev.pointerId === ed.gesture?.pointerId) turnByPointer(ev); };
+  const move = (ev) => {
+    const g = ed.gesture;
+    if (ev.pointerId !== g?.pointerId) return;
+    if (g.mode === 'press') {
+      const grid = document.querySelector('#mapWrap .dm-map-grid');
+      const square = grid ? grid.getBoundingClientRect().width / m.rows : 30;
+      if (Math.hypot(ev.clientX - g.x0, ev.clientY - g.y0) < square * 0.35) return; // a wobble, not a drag
+      clearTimeout(g.timer);
+      g.mode = 'drag';
+    }
+    if (g.mode === 'drag') dragByPointer(ev);
+    else turnByPointer(ev);
+  };
   const end = (ev) => {
     if (ev.pointerId !== ed.gesture?.pointerId) return;
+    clearTimeout(ed.gesture.timer);
+    document.querySelector('#mapWrap .dm-map-stage')?.classList.remove('dm-turning');
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', end);
     window.removeEventListener('pointercancel', end);
@@ -832,6 +952,20 @@ function startObjectPress(e, col, row) {
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
+  renderGhost();
+}
+
+/** Dragging a placed object: its centre follows the pointer, a whole square at a time. */
+function dragByPointer(e) {
+  const g = ed.gesture;
+  const grid = document.querySelector('#mapWrap .dm-map-grid');
+  if (!grid) return;
+  const m = getSetup().map;
+  const r = grid.getBoundingClientRect();
+  const dx = Math.round((e.clientX - g.x0) / (r.width / m.rows)), dy = Math.round((e.clientY - g.y0) / (r.height / m.cols));
+  if (g.cx === g.cx0 + dx && g.cy === g.cy0 + dy) return;
+  g.cx = g.cx0 + dx; g.cy = g.cy0 + dy;
+  g.turned = true; // (changed -- the ghost shows it where it's going)
   renderGhost();
 }
 
@@ -861,8 +995,16 @@ async function finishObjectPress(cancelled) {
   const m = getSetup().map;
   if (g.editing) {
     if (cancelled) { setObjectTurn(g.startRot, { apply: false }); renderGhost(); return; }
-    if (g.turned) applyEdit();
-    else renderGhost();
+    if (g.mode === 'drag' && g.turned) {
+      const before = [ed.editCx, ed.editCy];
+      ed.editCx = g.cx; ed.editCy = g.cy;
+      if (!applyEdit()) [ed.editCx, ed.editCy] = before;
+      return;
+    }
+    if (g.turned) { applyEdit(); return; }
+    // A click on the object already picked up puts it down
+    if (g.mode === 'press' && g.wasPicked) { deselectObject(); return; }
+    renderGhost();
     return;
   }
   if (cancelled) { renderGhost(); return; }
@@ -971,7 +1113,7 @@ function startCreatureQueue() {
 
 /** A name nobody on the map has yet: "Pidgey", then "Pidgey B", "Pidgey C"... */
 function freeName(base) {
-  const taken = new Set(Object.values(liveStore.session()?.participants || {}).map(p => p.name));
+  const taken = new Set(_live ? Object.values(liveStore.session()?.participants || {}).map(p => p.name) : getSetup().creatures.map(c => c.name));
   if (!taken.has(base)) return base;
   for (let i = 1; i < 26; i++) {
     const name = `${base} ${String.fromCharCode(65 + i)}`;
@@ -980,30 +1122,39 @@ function freeName(base) {
   return `${base} ${newId('').slice(-3)}`;
 }
 
-/** The adventure: the queue's next Pokemon / NPC joins as one of the DM's creatures (hidden: on no screen but the DM's)
- * and stands on the square clicked. */
+/** The adventure: the queue's next Pokemon / NPC stands on the square clicked -- on the running map it joins as one of
+ * the DM's creatures (hidden: on no screen but the DM's); on the map being prepared it's kept with the map, and joins
+ * when the adventure opens. */
 async function placeQueuedCreature(col, row) {
   const q = ed.creatureQueue[0];
   if (!q || ed.placingCreature) return;
   ed.placingCreature = true;
   renderToolPanel();
   try {
-    let participant;
+    let participant, config = null;
     if (q.kind === 'pokemon') {
       const natures = JSON.parse(sessionStorage.getItem('natures') || '[]').map(n => n.name);
       const name = freeName(q.label);
-      const res = await DmAPI.buildPokemon({ species: q.key, level: q.level, nature: natures[Math.floor(Math.random() * natures.length)] || '',
-        nickname: name !== q.label ? name : '' });
+      config = { species: q.key, level: q.level, nature: natures[Math.floor(Math.random() * natures.length)] || '', abilities: [0] };
+      const res = await DmAPI.buildPokemon({ ...config, nickname: name !== q.label ? name : '' });
       ({ participant } = participantFromPokemon(res.data));
     } else {
       ({ participant } = participantFromTrainer({ ...npcTrainerConfig(q.npc || {}), name: freeName(q.label) }));
+      participant.npcId = q.key;
     }
     participant.id = newId('adv');
     participant.owner = participant.owner || 'DM';
     participant.initiative = 0;
     participant.status = q.hidden ? 'spectating' : 'participating';
-    await CombatAPI.addParticipant(participant);
-    await CombatAPI.dmPlaceToken(participant.id, { col, row, facing: 0, z: 0 });
+    if (_live) {
+      await CombatAPI.addParticipant(participant);
+      await CombatAPI.dmPlaceToken(participant.id, { col, row, facing: 0, z: 0 });
+    } else {
+      const c = { id: participant.id, kind: q.kind, name: participant.name, config, npcId: q.kind === 'npc' ? q.key : null, participant, hidden: !!q.hidden };
+      const problem = creatureSpotProblem(getSetup(), c, col, row);
+      if (problem) { toast(problem); return; }
+      updateSetup((st) => { st.creatures.push({ ...c, position: { col, row, facing: 0 }, z: 0 }); });
+    }
     ed.creatureQueue.shift();
   } catch (err) {
     showCombatAlert(err.message, { title: `Couldn't put ${q.label} on the map` });

@@ -30,9 +30,10 @@ export function mapStageHtml(setup, { interactive = false, selectedId = null, pr
       cells.push(`<div class="dm-map-cell${mark ? ` mark-${mark}` : ''}${trap ? ` ${trap.cls}` : ''}"${trapAttr}${interactive ? ` data-cell="${col},${row}"` : ''}></div>`);
     }
   }
-  const tokens = setup.creatures.filter(c => c.position && !c.heldBack).map(c => {
+  // A hidden creature with a spot (the adventure's, or one an encounter brought along) is on the map, see-through
+  const tokens = setup.creatures.filter(c => c.position).map(c => {
     const r = tokenScreenRect(m, c.position.col, c.position.row, footprintForSize(c.participant?.size));
-    return `<div class="dm-map-token${c.id === selectedId ? ' selected' : ''}" data-token="${c.id}" title="${escapeHtml(c.name)}"
+    return `<div class="dm-map-token${c.id === selectedId ? ' selected' : ''}${c.hidden || c.heldBack ? ' dm-token-hidden' : ''}" data-token="${c.id}" title="${escapeHtml(c.name)}${c.hidden || c.heldBack ? ' (hidden from the players)' : ''}"
       style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"><div class="dm-map-token-art" data-img="${escapeHtml(c.participant?.image || '')}"></div></div>`;
   }).join('');
   return `

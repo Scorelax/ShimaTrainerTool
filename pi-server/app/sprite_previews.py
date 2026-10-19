@@ -1,4 +1,4 @@
-"""Small copies of the animated sprites (upstream.SPRITE_DIR) for everywhere a sprite is shown small -- the DM console's
+"""Small copies of the animated sprites (media.SPRITE_DIR) for everywhere a sprite is shown small -- the DM console's
 thumbnails, map tokens and the display preview. The sprites are 1080x1080 at ~12 Mbit/s, so a 72-pixel thumbnail still
 decodes full 1080p frames, and a page with a few dozen of them (the Display module's workspace) stutters. The copy is
 360 pixels at a fraction of the size, which looks the same at that size.
@@ -14,7 +14,7 @@ import subprocess
 import threading
 from urllib.parse import quote
 
-from . import upstream
+from . import media
 
 SPRITE_PREVIEW_DIR = os.path.expanduser(os.environ.get('SPRITE_PREVIEW_DIR', '~/pokemon-dnd/sprite-previews'))
 SPRITE_PREVIEW_URL_PREFIX = '/sprite-previews/'
@@ -31,7 +31,7 @@ def _paths(filename):
     name = os.path.basename(filename or '')
     if name != filename or not name.lower().endswith('.mp4'):
         return None
-    source = os.path.join(upstream.SPRITE_DIR, name)
+    source = os.path.join(media.SPRITE_DIR, name)
     if not os.path.isfile(source):
         return None
     return source, os.path.join(SPRITE_PREVIEW_DIR, name)
@@ -89,9 +89,9 @@ def _enqueue(name):
 
 def queue_missing():
     """Queues every sprite whose copy is missing or older than it (at startup)."""
-    if not os.path.isdir(upstream.SPRITE_DIR):
+    if not os.path.isdir(media.SPRITE_DIR):
         return
-    for name in sorted(os.listdir(upstream.SPRITE_DIR)):
+    for name in sorted(os.listdir(media.SPRITE_DIR)):
         paths = _paths(name)
         if paths and not _fresh(*paths):
             _enqueue(name)
@@ -110,5 +110,5 @@ def preview_file(filename):
 
 
 def original_url(filename):
-    source = os.path.join(upstream.SPRITE_DIR, filename)
-    return f'{upstream.SPRITE_URL_PREFIX}{quote(filename)}?t={int(os.path.getmtime(source))}'
+    source = os.path.join(media.SPRITE_DIR, filename)
+    return f'{media.SPRITE_URL_PREFIX}{quote(filename)}?t={int(os.path.getmtime(source))}'

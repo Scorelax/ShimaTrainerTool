@@ -8,6 +8,7 @@
 // this page in two tabs and add/remove/advance a session in one -- the
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
+import { allCachedPokemon, displayName, pokemonKey } from '../utils/owned-pokemon.js';
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setMoveRowResolver, setWeatherAttackModeResolver, setCoverAttackModeResolver, setCritResolver } from '../utils/target-picker.js';
 import { setAnimationAnnouncer } from '../utils/battle-animation.js';
@@ -43,7 +44,7 @@ import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler, moveCover } from '../utils/targetability.js';
 import { coverText } from '../utils/cover.js';
 import { areaPlacementFt, areaFromDescription, creatureDistanceFt } from '../utils/move-range.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, isConcentrationHolder, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn, isLevitating, altitudeLimits } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, isConcentrationHolder, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn, isLevitating, altitudeLimits } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import { showTypeCalculator } from '../utils/type-calculator.js';
 import {
@@ -52,8 +53,10 @@ import {
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions, renderCombatCard,
   setCombatStateKey, setOnCombatStateSave, setOnLogEvent, setOnSwitchPokemon, setOnAddStatus, setOnLocalStatusClick, setOnBasicAction, setOnUseTrainerBuff, openSwitchPopup, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
-  buildKnownMovesString, COMBAT_CSS, showMoveDetailsReadOnly,
+  persistedMoveCharges, COMBAT_CSS, showMoveDetailsReadOnly,
 } from './combat.js';
+import { loadTrainer, storeTrainer } from '../utils/trainer-data.js';
+import { abilityList, nameList } from '../utils/battle-lists.js';
 
 const WIP_CSS = `
   /* Breaks out of the SPA shell's own centered/padded ".app" container
@@ -870,9 +873,9 @@ function _combatantToParticipant(c) {
     str: c.str, dex: c.dex, con: c.con, int: c.int, wis: c.wis, cha: c.cha,
     strMod: c.strMod, dexMod: c.dexMod, conMod: c.conMod,
     intMod: c.intMod, wisMod: c.wisMod, chaMod: c.chaMod,
-    abilities: c.abilities || '', item: c.item || '',
+    abilities: abilityList(c.abilities), item: c.item || '',
     moves: c.moves || [],
-    savingThrows: c.savingThrows || '', skills: c.skills || '',
+    savingThrows: nameList(c.savingThrows), skills: nameList(c.skills),
   };
 }
 
@@ -897,12 +900,12 @@ function _richCombatantFromParticipant(p) {
     ac: p.ac, baseAc: p.baseAc, critMod: p.critMod || 0,
     maxHp: p.maxHP, currentHp: p.currentHP, maxVp: p.maxVP, currentVp: p.currentVP,
     proficiency: p.proficiency, stabBonusValue: p.stabBonusValue,
-    savingThrows: p.savingThrows || '', skills: p.skills || '',
+    savingThrows: nameList(p.savingThrows), skills: nameList(p.skills),
     str: p.str, dex: p.dex, con: p.con, int: p.int, wis: p.wis, cha: p.cha,
     strMod: p.strMod, dexMod: p.dexMod, conMod: p.conMod,
     intMod: p.intMod, wisMod: p.wisMod, chaMod: p.chaMod,
     moves: p.moves || [], types: [p.type1, p.type2].filter(Boolean),
-    abilities: effectiveAbilities(p) || '', item: p.item || '',
+    abilities: effectiveAbilities(p), item: p.item || '',
     size: p.size || '', speeds: p.speeds || [],
     rechargeStates: {}, statusEffects: [], isExpanded: false,
     hasStatBlock: true,
@@ -999,8 +1002,8 @@ function _onLocalCombatStateSave(state) {
 
 /** Writes a Pokemon's recharge-locked moves (rechargeStates -- "used this
  * short/long rest", see combat.js's buildPokemonCombatant/parseRecharge)
- * through to its real DB record (the same KnownMoves field, same
- * buildKnownMovesString format) -- combat.js's own endCombat does this for
+ * through to its real DB record (its moveCharges, see combat.js's
+ * persistedMoveCharges) -- combat.js's own endCombat does this for
  * the legacy flow, but that's tied to its own End Combat button and never
  * runs for a shared session. Without this, a once-per-rest move correctly
  * locks for the rest of THIS session (rechargeStates itself already tracks
@@ -1008,20 +1011,22 @@ function _onLocalCombatStateSave(state) {
  * move-use flow -- see move-effects-schema.md's own note on this) but
  * silently comes back fresh the next time this Pokemon enters ANY battle,
  * since the database was never actually told it was spent. Deduped against
- * the last string actually written, same pattern as HP/VP. Trainers don't
+ * the last value actually written, same pattern as HP/VP. Trainers don't
  * have recharge-locked moves in this game (Pokemon-only, same as
  * buildPokemonCombatant's own rechargeStates handling). */
 function _persistRechargeStates(state) {
   state.combatants.forEach(c => {
     if (c.type !== 'pokemon' || !c.entityKey || !_myParticipantIds.has(c.id)) return;
-    const knownMovesStr = buildKnownMovesString(c.rechargeStates || {});
-    if (_lastSyncedRecharge[c.id] === knownMovesStr) return;
-    _lastSyncedRecharge[c.id] = knownMovesStr;
+    const charges = persistedMoveCharges(c.rechargeStates || {});
+    const chargesStr = JSON.stringify(charges);
+    if (_lastSyncedRecharge[c.id] === chargesStr) return;
+    _lastSyncedRecharge[c.id] = chargesStr;
     const pd = JSON.parse(sessionStorage.getItem(c.entityKey) || 'null');
     if (!pd) return;
-    pd[59] = knownMovesStr;
+    pd.moveCharges = charges;
     sessionStorage.setItem(c.entityKey, JSON.stringify(pd));
-    PokemonAPI.update(pd).catch(e => console.error('Pokemon KnownMoves sync:', e));
+    PokemonAPI.updateLiveStats(_currentTrainerName(), pd.name, 'MoveCharges', chargesStr)
+      .catch(e => console.error('Pokemon move charges sync:', e));
   });
 }
 
@@ -1039,18 +1044,18 @@ function _persistStatsToDb(combatant, hp, vp) {
   if (_dmName) return; // the DM's creatures only live in the battle -- nothing in the database to update
   const trainerName = _currentTrainerName();
   if (combatant.type === 'trainer') {
-    const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-    if (!td.length) return;
-    td[34] = hp; td[35] = vp;
-    sessionStorage.setItem('trainerData', JSON.stringify(td));
+    const td = loadTrainer();
+    if (!td.name) return;
+    td.current.hp = hp; td.current.vp = vp;
+    storeTrainer(td);
     TrainerAPI.update(td).catch(e => console.error('Trainer HP/VP sync:', e));
   } else if (combatant.entityKey) {
     const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
     if (!pd) return;
-    pd[45] = hp; pd[46] = vp;
+    pd.current = { ...(pd.current || {}), hp, vp };
     sessionStorage.setItem(combatant.entityKey, JSON.stringify(pd));
-    PokemonAPI.updateLiveStats(trainerName, pd[2], 'HP', hp).catch(e => console.error('Pokemon HP sync:', e));
-    PokemonAPI.updateLiveStats(trainerName, pd[2], 'VP', vp).catch(e => console.error('Pokemon VP sync:', e));
+    PokemonAPI.updateLiveStats(trainerName, pd.name, 'HP', hp).catch(e => console.error('Pokemon HP sync:', e));
+    PokemonAPI.updateLiveStats(trainerName, pd.name, 'VP', vp).catch(e => console.error('Pokemon VP sync:', e));
   }
 }
 
@@ -1117,7 +1122,7 @@ function _isConcentrationMove(moveName) {
   const ts = moveFlagsFor(moveName).twoStage;
   if (ts?.stage === 'charge') return ts.concentration !== false;
   if (ts?.stage === 'hold') return false;
-  return /concentration/i.test(String((findMoveRow(moveName) || [])[5] || ''));
+  return /concentration/i.test(String((findMoveRow(moveName) || {}).duration || ''));
 }
 
 /** How long the concentration (or charge) lasts at most, as status `ends`: a charge holds until the end of the next
@@ -1126,7 +1131,7 @@ function _concentrationEnds(moveName) {
   const nextTurn = [{ type: 'until_turn', whose: 'holder', point: 'end', count: 1 }];
   const ts = moveFlagsFor(moveName).twoStage;
   if (ts?.stage === 'charge' && ts.window !== 'duration') return nextTurn;
-  const m = String((findMoveRow(moveName) || [])[5] || '').toLowerCase().match(/(\d+)\s*(minute|hour|round|turn)/);
+  const m = String((findMoveRow(moveName) || {}).duration || '').toLowerCase().match(/(\d+)\s*(minute|hour|round|turn)/);
   if (!m) return [];
   const n = Number(m[1]) * (m[2] === 'minute' ? 10 : m[2] === 'hour' ? 600 : 1);
   return n === 1 ? nextTurn : [{ type: 'rounds', n }];
@@ -1240,19 +1245,19 @@ async function _twoStageFlow(args, handler) {
     if (ts.release === 'bonus' && !_bonusActionFree(combatantId, moveName)) return 'handled';
     if (ts.release === 'bonus') _flowBonusRelease = same;
     const { computedData = {}, move } = args;
-    const row = findMoveRow(moveName) || move || [];
+    const row = findMoveRow(moveName) || move || {};
     // The move's own (level-scaled) dice; without `addMove` the MOVE modifier the move's first hit adds is left out.
-    const moveInBonus = /\+\s*MOVE/i.test(String(row[7] || ''));
+    const moveInBonus = /\+\s*MOVE/i.test(String(row.description || ''));
     const bonus = (computedData.damageBonus || 0) - (!ts.addMove && moveInBonus ? (computedData.highestMod || 0) : 0);
     const targetName = visibleToViewer(target, 'name') ? target.name : 'the target';
     const rolled = await promptDamageRoll({
-      dice: computedData.damageDice || '1d4', moveModBonus: bonus, moveName, damageType: row[1] || '',
+      dice: computedData.damageDice || '1d4', moveModBonus: bonus, moveName, damageType: row.type || '',
       bonusSource: ts.addMove ? (String(computedData.damageBreakdown || '').replace(/^\(|\)$/g, '') || 'MOVE') : 'bonuses',
       description: `${moveName}: ${targetName} is still ${ts.holdCondition} -- automatic damage, no attack roll.`,
     });
     if (rolled === null) return 'handled'; // closed: nothing happened, nothing spent
     try {
-      await _landHit({ attackerId: combatantId, targetId: target.id, damage: Math.max(0, rolled), moveType: row[1] || '', speciesName, moveName, move });
+      await _landHit({ attackerId: combatantId, targetId: target.id, damage: Math.max(0, rolled), moveType: row.type || '', speciesName, moveName, move });
     } catch (err) {
       showCombatAlert(err.message, { title: moveName });
     }
@@ -1294,10 +1299,9 @@ function _resolveMyPokemonKey(participantName) {
   // Cached per NAME -- it used to remember only the first Pokemon it found, so a Pokemon switched in later was built from
   // the first one's data (its card showed the Pokemon that had left).
   if (_myPokemonKeys.has(participantName)) return _myPokemonKeys.get(participantName);
-  for (const key of Object.keys(sessionStorage)) {
-    if (!key.startsWith('pokemon_')) continue;
-    const pData = JSON.parse(sessionStorage.getItem(key) || '[]');
-    if ((pData[36] || pData[2]) === participantName) {
+  for (const pData of allCachedPokemon()) {
+    if (displayName(pData) === participantName) {
+      const key = pokemonKey(pData.name);
       _myPokemonKeys.set(participantName, key);
       return key;
     }
@@ -1448,7 +1452,7 @@ setCoverAttackModeResolver((moveName, attackerId, targetId) => {
   return cover ? { mode: 'disadvantage', note: `${coverText(cover)}: disadvantage` } : null;
 });
 // Every picker greys out creatures beyond the move's reach -- the reach comes from the move's range text (move-range.js).
-setMoveRangeResolver(moveName => String((findMoveRow(moveName) || [])[6] || ''));
+setMoveRangeResolver(moveName => String((findMoveRow(moveName) || {}).range || ''));
 
 /** The state hiding `participant` from a move that can still hit `hitsStates`, or null: a semi-invulnerable condition
  * (Dig, Fly, Dive...), or burrowed on the map (a token below the ground, with a burrowing speed) -- underground, like
@@ -1473,7 +1477,7 @@ setTargetabilityResolver((participant, moveName) => {
   return null;
 });
 // Nasty Plot's "attacks with the Wisdom move power": which ability keys a move's power uses.
-setMoveAbilityResolver((moveName) => String(findMoveRow(moveName)?.[2] || '').split('/').map((m) => m.trim().toUpperCase()).filter(Boolean));
+setMoveAbilityResolver((moveName) => String(findMoveRow(moveName)?.moveStat || '').split('/').map((m) => m.trim().toUpperCase()).filter(Boolean));
 
 /** Throat Chop: "unable to activate sound based attacks for its next 1d4 turns". Rolls the 1d4 (typed in),
  * then disables every move the target KNOWS that's flagged `soundBased` (the move data's own flag) via the
@@ -1509,24 +1513,25 @@ async function _handleAbilitySwap({ mode, attackerId, targetId, moveName, ends, 
   const attacker = session?.participants?.[attackerId];
   const target = session?.participants?.[targetId];
   if (!attacker || !target) return;
-  const mine = parseAbilityList(effectiveAbilities(attacker));
-  const theirs = parseAbilityList(effectiveAbilities(target));
+  const mine = effectiveAbilities(attacker);
+  const theirs = effectiveAbilities(target);
   const needMine = mode !== 'replace_with';
   if ((needMine && !mine.length) || !theirs.length) {
     showCombatAlert(`${moveName} needs both creatures to have an ability on record -- apply it by hand.`, { title: moveName });
     return;
   }
-  const body = (a) => `${a.name}${a.desc ? `;${a.desc}` : ''}`;
-  const apply = async (holderId, replacedName, replacementText) => {
+  // value2 is the ability it gets, {name, description} -- Simple Beam's `replacement` is a name only.
+  const body = (a) => ({ name: a.name, description: a.description || '' });
+  const apply = async (holderId, replacedName, replacement) => {
     await CombatAPI.applyStatus(holderId, buildStatusSpec(
-      { kind: 'condition', apply: 'ability_override', value: replacedName, value2: replacementText },
+      { kind: 'condition', apply: 'ability_override', value: replacedName, value2: replacement },
       { sourceId: attackerId, sourceName: attacker.name, moveName, dc, ends }));
   };
   try {
     if (mode === 'replace_with') {
       const t = await pickOneAbility(theirs, { title: moveName, message: `Which of ${target.name}'s abilities becomes ${replacement}?` });
       if (!t) return;
-      await apply(targetId, t.name, replacement);
+      await apply(targetId, t.name, { name: replacement, description: '' });
     } else if (mode === 'give') {
       const t = await pickOneAbility(theirs, { title: moveName, message: `Which of ${target.name}'s abilities is replaced?` });
       if (!t) return;
@@ -1734,7 +1739,7 @@ async function _handleSleepPool({ casterId, effect, moveName }) {
     return;
   }
   const dice = tierAt(effect.diceTiers, caster.level) || effect.dice;
-  const mod = effect.addMove ? bestMoveStatModifier(findMoveRow(moveName) || [], caster) : 0;
+  const mod = effect.addMove ? bestMoveStatModifier(findMoveRow(moveName) || {}, caster) : 0;
   const pool = await promptValueRoll({ dice: mod ? `${dice}${mod > 0 ? '+' : ''}${mod}` : dice, moveName,
     description: `${moveName}: roll ${dice} + MOVE -- the total is how many hit points of creatures fall asleep` });
   if (pool === null || pool <= 0) return;
@@ -1858,12 +1863,9 @@ function _benchFor(session, myName) {
   if (!myName) return [];
   const mine = Object.values(session.participants || {}).filter(p => p.owner === myName && p.combatantType === 'pokemon');
   const keys = [];
-  for (const key of Object.keys(sessionStorage)) {
-    if (!key.startsWith('pokemon_')) continue;
-    try {
-      const slot = parseInt(JSON.parse(sessionStorage.getItem(key))[38], 10);
-      if (slot >= 1 && slot <= 6) keys.push({ key, slot });
-    } catch { /* an unreadable cache entry is just not a party member */ }
+  for (const p of allCachedPokemon()) {
+    const slot = parseInt(p.partySlot, 10);
+    if (slot >= 1 && slot <= 6) keys.push({ key: pokemonKey(p.name), slot });
   }
   keys.sort((a, b) => a.slot - b.slot);
   return keys.map(({ key }) => {
@@ -2044,7 +2046,7 @@ function _syncLocalCombatState(session) {
     merged.tempHp = tempHpRemaining(p);
     // Entrainment/Role Play/Skill Swap/Simple Beam: the session's BASE abilities with any live overrides
     // applied (never persisted, so it reverts with the status / when the combat or the participant ends).
-    if (p.abilities) merged.abilities = effectiveAbilities(p);
+    if (p.abilities?.length) merged.abilities = effectiveAbilities(p);
     if (resolved) {
       merged.hasStatBlock = true;
       // Live stat statuses (AC -1, all abilities +1, ...) move the card's CURRENT AC and ability
@@ -2813,7 +2815,7 @@ function _foreignCombatantView(p, { masked = false } = {}) {
     strMod: eff.strMod, dexMod: eff.dexMod, conMod: eff.conMod,
     intMod: eff.intMod, wisMod: eff.wisMod, chaMod: eff.chaMod,
     proficiency: p.proficiency, abilities: effectiveAbilities(p), item: p.item, stabBonusValue: p.stabBonusValue,
-    savingThrows: p.savingThrows, skills: p.skills, size: p.size,
+    savingThrows: nameList(p.savingThrows), skills: nameList(p.skills), size: p.size,
     moves: p.moves || [], rechargeStates: {}, // this device doesn't track another player's recharge state
     initiativeTotal: p.initiative,
     statusEffects: (p.statuses || []).map(st => _statusToBadge(st, session?.round)),
@@ -2846,13 +2848,13 @@ function _maskForeignView(v, p) {
     ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach((k) => { v[k] = '?'; v[`${k}Mod`] = '?'; delete v.appliedStatMods[k]; });
     v.critMod = '?';
   }
-  if (!see('abilities')) v.abilities = '';
+  if (!see('abilities')) v.abilities = [];
   v.item = '';
-  v.skills = '';
-  v.savingThrows = '';
+  v.skills = [];
+  v.savingThrows = [];
   v.proficiency = null; // no Proficiency / Skills / Saving Throws rows (hasStatBlock was worked out above)
-  v.feats = '';
-  v.movement = '';
+  v.feats = [];
+  v.speeds = [];
   const seen = new Set(_movesSeen(session, p.id));
   v.moves = (v.moves || []).filter(name => seen.has(name));
   return v;
@@ -2867,7 +2869,7 @@ function _moveViewFor(p) {
   if (!_isDmEnemy(session, p)) return v;
   const see = (field) => visibleToViewer(p, field);
   return {
-    ...v, item: '', abilities: see('abilities') ? v.abilities : '', name: see('name') ? v.name : '???',
+    ...v, item: '', abilities: see('abilities') ? v.abilities : [], name: see('name') ? v.name : '???',
     hideNumbers: !see('stats') || !see('type'), hideLevel: !see('level'),
   };
 }
@@ -2943,16 +2945,16 @@ function _foreignFocusDetailsHtml(p) {
     }).join('')}</div>`);
   }
   if (see('abilities')) {
-    const abilities = parseAbilityList(effectiveAbilities(p));
+    const abilities = effectiveAbilities(p);
     if (abilities.length) {
-      parts.push(`<div class="wip-foreign-section">Abilities</div>${abilities.map(a => `<div class="wip-foreign-ability"><strong>${a.name}</strong>${a.desc ? ` -- ${a.desc}` : ''}</div>`).join('')}`);
+      parts.push(`<div class="wip-foreign-section">Abilities</div>${abilities.map(a => `<div class="wip-foreign-ability"><strong>${a.name}</strong>${a.description ? ` -- ${a.description}` : ''}</div>`).join('')}`);
     }
   }
   const seen = _movesSeen(session, p.id);
   if (seen.length) {
     const rows = JSON.parse(sessionStorage.getItem('moves') || '[]');
     parts.push(`<div class="wip-foreign-section">Moves seen</div><div class="wip-foreign-moves">${seen.map(name => {
-      const desc = (rows.find(r => r[0] === name) || [])[7] || '';
+      const desc = (rows.find(r => r.name === name) || {}).description || '';
       return `<span title="${String(desc).replace(/"/g, '&quot;')}">${name}</span>`;
     }).join('')}</div>`);
   }
@@ -3528,7 +3530,7 @@ function _guaranteedHitFor(combatantId, categories, moveName) {
   const attacker = session?.participants?.[combatantId];
   // Thunderstorm Dance's standing "all electric type moves are guaranteed to hit" -- NOT
   // consumed (unlike the one-shot flags below), scoped to the move's own type.
-  const moveType = String(findMoveRow(moveName)?.[1] || '').toUpperCase();
+  const moveType = String(findMoveRow(moveName)?.type || '').toUpperCase();
   if (moveType && (attacker?.statuses || []).some((st) => st.kind === 'condition' && st.apply === 'guaranteed_hit_type' && String(st.value || '').toUpperCase() === moveType)) return true;
   return !!guaranteedCritStatusId(attacker) || !!guaranteedHitStatusId(attacker);
 }
@@ -3634,7 +3636,7 @@ function _saveAbilityFor(moveName) {
   // 65 save moves have no effects recorded (Fiery Dance, Surf...): their text names the save -- "must make a DEX save",
   // "a Dexterity saving throw". Without it the save popup knew no ability, so no modifier was added (Voltey's 10 stayed 10).
   const m = /\b(STR|DEX|CON|INT|WIS|CHA|Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+sav/i
-    .exec(String((findMoveRow(moveName) || [])[7] || ''));
+    .exec(String((findMoveRow(moveName) || {}).description || ''));
   return m ? m[1].slice(0, 3).toUpperCase() : null;
 }
 
@@ -4629,7 +4631,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // reads the caster's level, passed here. attackerId (closure) is the caster.
       const caster = session?.participants?.[attackerId];
       try {
-        const rangeText = String((findMoveRow(moveName) || [])[6] || '');
+        const rangeText = String((findMoveRow(moveName) || {}).range || '');
         const area = await pickTerrainArea({
           session, casterId: attackerId, title: effect.name || moveName, kind: weatherKindOf({ name: effect.name || moveName }),
           radiusFt: radiusFtFromRange(rangeText),
@@ -4683,12 +4685,12 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       try {
         // Where does it go? The caster marks tiles on the map (pre-filled with the move's own radius around
         // them) or takes the whole map; only creatures standing on marked tiles are affected.
-        const moveRow = findMoveRow(moveName) || [];
+        const moveRow = findMoveRow(moveName) || {};
         const area = await pickTerrainArea({
           session, casterId: attackerId, title: effect.name || moveName, kind: zoneKind({ name: effect.name || moveName, rule: effect.rule }),
           // The move's own radius wins over parsing its range text ("60ft." is Spikes' reach, not its 15ft radius);
           // `center: 'point'` moves are placed by the caster, the rest are centered on them.
-          radiusFt: effect.radiusFt ?? radiusFtFromRange(moveRow[6]),
+          radiusFt: effect.radiusFt ?? radiusFtFromRange(moveRow.range),
           centeredOnCaster: effect.center !== 'point',
           allowCancel: true, // changed their mind: nothing has happened yet, so nothing is spent
         });
@@ -4801,7 +4803,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         // Trainer/Type Master/held-item bonuses a heal's "+MOVE" text was
         // never talking about. See bestMoveStatModifier's own docstring.
         moveModBonus: effect.amount?.moveMod && attacker
-          ? bestMoveStatModifier(findMoveRow(moveName) || [], attacker) * (effect.amount.moveModMultiplier || 1)
+          ? bestMoveStatModifier(findMoveRow(moveName) || {}, attacker) * (effect.amount.moveModMultiplier || 1)
           : 0,
         damageDealt: ctx.damageDealt,
         casterLevel: attacker?.level,
@@ -4847,7 +4849,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // so neither promptHealRoll nor promptDrainRoll fits -- promptValueRoll
       // is the bare-number sibling. Same "mutate a clone, fall through"
       // shape every other dynamic-value resolution here already uses.
-      const moveModBonus = effect.value.moveMod && attacker ? bestMoveStatModifier(findMoveRow(moveName) || [], attacker) : 0;
+      const moveModBonus = effect.value.moveMod && attacker ? bestMoveStatModifier(findMoveRow(moveName) || {}, attacker) : 0;
       const rolled = await promptValueRoll({ dice: effect.value.dice, moveModBonus, moveName });
       if (rolled === null) continue;
       effect = { ...effect, value: rolled };
@@ -4904,7 +4906,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // Leech Seed / Infestation / Fire Spin: a damage tick the server queues at the holder's turn boundary (routes_combat.py's
       // _queue_status_ticks) -- its dice, MOVE bonus and save DC are fixed now, from the caster.
       const t = effect.tick;
-      const moveRow = findMoveRow(moveName) || [];
+      const moveRow = findMoveRow(moveName) || {};
       effect = { ...effect, tick: {
         timing: t.timing || 'end', damageType: t.damageType || '', dice: tierAt(t.diceTiers, attacker?.level) || t.dice || '',
         flat: t.addMove && attacker ? bestMoveStatModifier(moveRow, attacker) : (t.flat || 0),
@@ -4920,13 +4922,13 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // Wing Command's "1d6 + your Charisma modifier": a dice bonus the player rolls later (see
       // diceBonusOptionsFor); the move's own modifier is folded into the dice label so the total
       // they type already includes it.
-      const mod = bestMoveStatModifier(findMoveRow(moveName) || [], attacker);
+      const mod = bestMoveStatModifier(findMoveRow(moveName) || {}, attacker);
       effect = { ...effect, amount: { dice: mod ? `${effect.amount.dice}${mod > 0 ? '+' : ''}${mod}` : effect.amount.dice } };
     }
     if (effect.kind === 'stat' && effect.amount && typeof effect.amount === 'object' && effect.amount.moveModifier) {
       // Fell Stinger's "double your ability modifier": one more copy of the move's own best
       // modifier (the same number a heal's `moveMod` adds), resolved to a flat number now.
-      const bonus = attacker ? bestMoveStatModifier(findMoveRow(moveName) || [], attacker) : 0;
+      const bonus = attacker ? bestMoveStatModifier(findMoveRow(moveName) || {}, attacker) : 0;
       effect = { ...effect, amount: bonus };
     }
     if (effect.kind === 'temp_hp' && effect.amount && typeof effect.amount === 'object' && effect.amount.meleeDamageSinceLastTurn) {
@@ -5403,7 +5405,7 @@ async function _handleReduceDamage({ reactorId, effect, moveName, computedData }
     showCombatAlert(`Couldn't find the damage roll to reduce -- refund it by hand if needed.`, { title: moveName });
     return;
   }
-  const row = findMoveRow(moveName) || [];
+  const row = findMoveRow(moveName) || {};
   const dice = tierAt(effect.diceTiers, reactor.level) || '1d6';
   const moveMod = effect.addMove ? bestMoveStatModifier(row, reactor) : 0;
   const reduction = await promptValueRoll({
@@ -5926,7 +5928,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
 
   const { targetId, rawRoll } = picked;
   const damageModifier = computedData.damageBonus || 0;
-  const moveType = (move && move[1]) || '';
+  const moveType = (move && move.type) || '';
 
   // What the recorded rolls say this hit triggered: natural-roll thresholds, a crit,
   // the secondary save's failure margin, plain on-hit effects. Computed BEFORE
@@ -6048,10 +6050,10 @@ async function _landHit({ attackerId, targetId, damage, moveType, speciesName, m
   let soften = null;
   if (pool !== 'vp' && target && targetId !== attackerId && _mayBeSoftened(target)) {
     const preview = (await CombatAPI.previewDamage(attackerId, targetId, damage, moveType, moveName, !!crit, pool))?.data || {};
-    const row = findMoveRow(moveName) || move || [];
+    const row = findMoveRow(moveName) || move || {};
     soften = await _abilityDamageReactions({
       attacker, target, damageDealt: preview.damageApplied,
-      event: { melee: isMeleeMoveRow(row), moveType: (move && move[1]) || row[1] || moveType || '', damaging: (preview.damageApplied ?? 0) > 0,
+      event: { melee: isMeleeMoveRow(row), moveType: (move && move.type) || row.type || moveType || '', damaging: (preview.damageApplied ?? 0) > 0,
         vulnerable: (preview.multiplier ?? 1) > 1, attackRoll, hpBefore: preview.hpBefore ?? hpBefore,
         damageDealt: preview.damageApplied, drain },
     });
@@ -6089,19 +6091,19 @@ async function _handleMultiHitAoe(args) {
  * still takes half the rolled damage. */
 const HALF_ON_SAVE_RE = /\bhalf (?:as much|(?:the )?damage)\b[^.]*?\b(?:on ?(?:a |the )?(?:succ|save|pass)|without)|\bsuccess(?:ful+(?:ly)?)?(?: save)?,? (?:they|it|the target|creatures)? ?(?:take|takes) half\b|\bhalf (?:damage )?on (?:a )?success/i;
 function _halvesOnSave(moveName) {
-  return HALF_ON_SAVE_RE.test(String((findMoveRow(moveName) || [])[7] || ''));
+  return HALF_ON_SAVE_RE.test(String((findMoveRow(moveName) || {}).description || ''));
 }
 
 /** The wall pickWallArea placed, as a zone on the map (routes_combat.py's set-terrain with cells): it lasts the move's
  * duration ("1 minute" -> 10 rounds) and, for a concentration move, ends with that concentration. */
 async function _placeWallZone(casterId, moveName, wall) {
   if (!wall?.cells?.length) return;
-  const row = findMoveRow(moveName) || [];
-  const dur = String(row[5] || '').toLowerCase().match(/(\d+)\s*(minute|hour|round|turn)/);
+  const row = findMoveRow(moveName) || {};
+  const dur = String(row.duration || '').toLowerCase().match(/(\d+)\s*(minute|hour|round|turn)/);
   const rounds = dur ? Number(dur[1]) * (dur[2] === 'minute' ? 10 : dur[2] === 'hour' ? 600 : 1) : null;
   const caster = session?.participants?.[casterId];
   try {
-    await CombatAPI.setTerrain(moveName, String(row[7] || ''), {
+    await CombatAPI.setTerrain(moveName, String(row.description || ''), {
       ...(rounds ? { rounds } : {}), sourceId: casterId, sourceName: caster?.name, cells: wall.cells, moveName,
       props: _isConcentrationMove(moveName) ? { concentration: true } : undefined,
     });
@@ -6154,7 +6156,7 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
   const damageModifier = computedData.damageBonus || 0;
   const dc = computedData.moveDC ?? 0;
   const hasDamage = !!computedData.damageDice;
-  const moveType = (move && move[1]) || '';
+  const moveType = (move && move.type) || '';
   const attackerName = session?.participants?.[combatantId]?.name || '?';
   const damageNotes = _targetDamageNotes(moveName);
   // Summed across every target this blast actually damaged -- a self-only
@@ -6418,7 +6420,7 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
     ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: { passed: picked.passed, failBy: picked.failBy ?? null }, ...extra },
   });
 
-  const moveType = (move && move[1]) || '';
+  const moveType = (move && move.type) || '';
   if (picked.passed) {
     CombatAPI.logEvent({
       type: 'save', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
@@ -6632,7 +6634,7 @@ async function _applyRecurringHeal(holderId, status) {
   const recipient = session?.participants?.[recipientId];
   if (!recipient) return;
   const moveModBonus = status.amount?.moveMod
-    ? bestMoveStatModifier(findMoveRow(status.moveName) || [], holder || recipient)
+    ? bestMoveStatModifier(findMoveRow(status.moveName) || {}, holder || recipient)
     : 0;
   await _handleApplyHeal({
     targetId: recipientId, effect: status, moveName: status.moveName || statusLabel(status),
@@ -6684,8 +6686,8 @@ const WIP_SAVE_PROMPT_KEY = 'combatWipLastSavePrompt';
  * "50ft., 10ft. radius"), height from its description ("40ft. high cylinder"), and whether it's centered on the caster or
  * on a point the caster places. Lines and cones are aimed from the caster instead ({lineFt} / {coneFt}). */
 function _aoeAreaFor(moveName) {
-  const row = findMoveRow(moveName) || [];
-  const range = String(row[6] || '');
+  const row = findMoveRow(moveName) || {};
+  const range = String(row.range || '');
   // A line move ("Self (80ft. line)") is aimed as a 5ft-wide strip instead (line-area-picker.js).
   const lineFt = lineFtFromRange(range);
   if (lineFt) return { lineFt };
@@ -6696,11 +6698,11 @@ function _aoeAreaFor(moveName) {
   // 20 foot radius centered on a point, Dark Void's "all creatures within 30 feet of you" (areaFromDescription).
   // Only for a move tagged as an area move -- "choose one creature within 60 feet" (Temporal Shift) isn't a 60ft circle.
   if (!/radius|circle|cylinder/i.test(range)) {
-    return moveCategoriesFor(moveName).includes('multi_hit_aoe') ? areaFromDescription(range, String(row[7] || '')) : null;
+    return moveCategoriesFor(moveName).includes('multi_hit_aoe') ? areaFromDescription(range, String(row.description || '')) : null;
   }
   const radiusFt = radiusFtFromRange(range);
   if (!radiusFt) return null;
-  const high = /(\d+)\s*(?:ft|feet|foot)\.?\s*high/i.exec(String(row[7] || ''));
+  const high = /(\d+)\s*(?:ft|feet|foot)\.?\s*high/i.exec(String(row.description || ''));
   // "50ft., 10ft. radius": the centre has to be dropped within 50ft of the caster.
   return { radiusFt, heightFt: high ? Number(high[1]) : null, centeredOnCaster: /\bself\b/i.test(range), maxCenterFt: areaPlacementFt(range) };
 }
@@ -6836,7 +6838,7 @@ async function _useActivatedAbility(participantId) {
   let effects = activatedAbilityEffects(p);
   if (!effects.length) return;
   const ability = effects[0].ability;
-  const desc = parseAbilityList(effectiveAbilities(p) || '').find(a => a.name === ability)?.desc || '';
+  const desc = effectiveAbilities(p).find(a => a.name === ability)?.description || '';
   const options = [...new Set(effects.map(t => t.effect.choice?.option).filter(Boolean))];
   if (options.length) {
     const pick = await pickOneMoveName(options, { title: ability, message: desc });
@@ -6897,7 +6899,7 @@ async function _promptAbilityTurn(pid, trigger) {
 async function _abilityMoveUsed(userId, moveName) {
   const user = session?.participants?.[userId];
   if (!user) return;
-  const moveType = (findMoveRow(moveName) || [])[1] || '';
+  const moveType = (findMoveRow(moveName) || {}).type || '';
   const event = { moveName, moveType };
   for (const { ability, index, effect: e } of abilityTriggers(user, 'move_used', event)) {
     try {
@@ -6927,7 +6929,7 @@ async function _abilityMoveUsed(userId, moveName) {
 async function _abilityTargetedTriggers(attackerId, targetId, move) {
   const target = session?.participants?.[targetId];
   if (!target || targetId === attackerId) return;
-  const cost = parseInt(move?.[4], 10) || 0;
+  const cost = parseInt(move?.vpCost, 10) || 0;
   for (const { ability, index, effect: e } of abilityTriggers(target, 'targeted', { direct: true })) {
     if (e.kind !== 'vp_cost_mod' || !cost) continue;
     await CombatAPI.abilityTrigger(targetId, ability, index, attackerId, Math.round(cost * ((e.multiplier || 2) - 1)))
@@ -7133,9 +7135,9 @@ async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attac
   const attacker = session?.participants?.[attackerId];
   const target = session?.participants?.[targetId];
   if (!attacker || !target || attackerId === targetId) return;
-  const row = findMoveRow(moveName) || move || [];
+  const row = findMoveRow(moveName) || move || {};
   const event = {
-    melee: isMeleeMoveRow(row), moveType: (move && move[1]) || row[1] || '', damaging: (damageDealt ?? 0) > 0,
+    melee: isMeleeMoveRow(row), moveType: (move && move.type) || row.type || '', damaging: (damageDealt ?? 0) > 0,
     vulnerable: (typeMultiplier ?? 1) > 1, attackRoll, hpBefore, damageDealt, drain,
   };
   // The target's Sturdy / Fur Coat was already asked before the hit landed (_abilityDamageReactions) -- damageDealt is
@@ -7247,14 +7249,14 @@ async function _secondWind(trainer, pokemon, closePopup) {
     showCombatAlert(`${trainer.name} has already used their bonus action this round.`, { title: 'Second Wind' });
     return false;
   }
-  const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  const level = parseInt(td[2], 10) || 1;
+  const td = loadTrainer();
+  const level = parseInt(td.level, 10) || 1;
   let skills = [];
   try { skills = JSON.parse(sessionStorage.getItem('skills') || '[]'); } catch { /* falls back to the level-3 dice */ }
   const text = skills.filter(s => s.name === 'Second Wind' && level >= s.level).sort((a, b) => b.level - a.level)[0]?.fullEffect || '';
   const dice = /(\d+d\d+)/i.exec(text)?.[1] || '2d4';
-  const prof = /proficiency/i.test(text) ? (parseInt(td[17], 10) || 0) : 0;
-  const bonus = (parseInt(td[32], 10) || 0) + prof; // trainerData[32] = CHA modifier, [17] = proficiency
+  const prof = /proficiency/i.test(text) ? (parseInt(td.combat.proficiency, 10) || 0) : 0;
+  const bonus = (parseInt(td.modifiers.charisma, 10) || 0) + prof;
   closePopup();
   const total = await promptHealRoll({
     dice, moveModBonus: bonus, targetName: pokemon.name, moveName: 'Second Wind', pool: 'VP',
@@ -7351,8 +7353,8 @@ export function dmEnemyParticipant(c) {
 
 function _currentTrainerName() {
   if (_dmName) return _dmName;
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  return trainerData[1] || '';
+  const trainerData = loadTrainer();
+  return trainerData.name || '';
 }
 
 /** DM console: places every one of the DM's creatures that isn't on the map yet, with the same placement screen the

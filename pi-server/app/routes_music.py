@@ -1,9 +1,9 @@
 """route=music — cross-device background music sync anchors.
 
-Deliberately a separate table from upstream_cache: that table's writes bump
-fetched_at, which drives the X-Data-Version header and wipes every client's
-localStorage game-data cache on change. A music-sync request has nothing to
-do with game data and must never trigger that.
+Deliberately its own table, not dm_state: the Pokedex settings' updated_at
+there drives the X-Data-Version header (gamedata.data_version), which wipes
+every client's game-data cache on change. A music-sync request has nothing to
+do with game data and must never come near that.
 
 Presence is tracked per listening device (music_listeners), not as a single
 running counter -- a plain increment/decrement counter drifts upward every

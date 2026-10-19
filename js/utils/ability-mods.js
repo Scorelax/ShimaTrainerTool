@@ -10,10 +10,11 @@
 //  - targetAbilityDamage(attacker, target, move, type): damage that depends on who's hit (Merciless, Rivalry, Magnet
 //    Pull) plus reminders for the defender's crit/reroll rules (Battle Armor, Paper Thin, Prism Armor), shown in the
 //    damage-roll step (target-picker.js).
-// A creature has ONE ability (its `abilities` text), with ability swaps applied and none under abilities_suppressed;
+// A creature has ONE ability (its `abilities` list), with ability swaps applied and none under abilities_suppressed;
 // `unknown`-tagged abilities never reach the client. A gate this side can't judge counts as not met.
 import { footprintCells, footprintForSize } from './battle-map-grid.js';
 import { creatureDistanceFt } from './move-range.js';
+import { abilityEntry, abilityList } from './battle-lists.js';
 
 let _data = {};       // ability name (lower case) -> { name, effects }
 let _abilityText = {}; // ability name -> rulebook text (reminders quote it)
@@ -32,21 +33,14 @@ const NEGATIVE = new Set(['blinded', 'charmed', 'deafened', 'frightened', 'grapp
   'slowed', 'taunted', 'drowsy', 'cursed', 'infested', 'seeded', 'bleeding', 'infected', 'disoriented', 'switch_locked', 'trapped',
   'move_disabled']);
 
-const _nameOf = (entry) => {
-  let head = String(entry || '').split(';')[0].trim();
-  const colon = head.indexOf(':');
-  if (colon !== -1 && /^\d+$/.test(head.slice(0, colon).trim())) head = head.slice(colon + 1);
-  return head.trim();
-};
-
 /** The creature's ability names (one, normally): ability swaps applied, none while suppressed. */
 export function abilityNamesOf(p) {
   const statuses = p?.statuses || p?.liveStatuses || [];
   if (statuses.some(s => s.kind === 'condition' && s.apply === 'abilities_suppressed')) return [];
-  let names = String(p?.abilities || '').split('|').filter(e => e.trim()).map(_nameOf).filter(Boolean);
+  let names = abilityList(p?.abilities).map(a => a.name);
   for (const s of statuses) {
     if (s.kind !== 'condition' || s.apply !== 'ability_override' || !s.value || !s.value2) continue;
-    names = names.map(n => (n.toLowerCase() === String(s.value).toLowerCase() ? _nameOf(s.value2) : n));
+    names = names.map(n => (n.toLowerCase() === String(s.value).toLowerCase() ? abilityEntry(s.value2).name : n));
   }
   return names;
 }
@@ -251,7 +245,7 @@ const _amount = (v, p) => (v === 'proficiency' ? Number(p?.proficiency) || 0 : v
  * recoil, negativeCondition }. A filter needing the target (superEffective) doesn't match here. */
 function _filterOk(f, move, info) {
   if (!f) return true;
-  const name = String(move[0] || '');
+  const name = String(move.name || '');
   if (f.moveTypes && !f.moveTypes.map(t => t.toLowerCase()).includes(String(info.type || '').toLowerCase())) return false;
   if (f.damaging && !info.damaging) return false;
   if (f.melee && !info.melee) return false;
@@ -275,7 +269,7 @@ function _scaledDice(e, level) {
 }
 
 /**
- * What the creature's ability does to one move. `move` is a moves-file row ([name, type, stat, action, vp, ...]);
+ * What the creature's ability does to one move. `move` is one of the move list's moves ({name, type, moveStat, vpCost, ...});
  * `info` = { damaging, melee, soundBased, attackRoll, recoil, negativeCondition } (the caller knows the move flags).
  * Returns { type, extraTypes, attack, damageFlat, diceMultiplier, extraDice: [], stabMultiplier, vpMultiplier, dcBonus,
  *           atkParts, dmgParts, notes }.
@@ -284,11 +278,11 @@ export function moveAbilityMods(combatant, move, info = {}) {
   // combat.js's local combatant lacks some session fields (owner, side) -- fill them from the live record.
   const live = _session?.participants?.[combatant?.id];
   const p = live ? { ...live, ...combatant } : combatant;
-  const mods = { type: move[1], extraTypes: [], attack: 0, damageFlat: 0, diceMultiplier: 1, diceMultiplierFrom: [], extraDice: [],
+  const mods = { type: move.type, extraTypes: [], attack: 0, damageFlat: 0, diceMultiplier: 1, diceMultiplierFrom: [], extraDice: [],
     stabMultiplier: 1, vpMultiplier: 1, dcBonus: 0, atkParts: [], dmgParts: [], notes: [] };
   const effs = abilityEffectsOf(p).filter(({ effect: e }) => _isPassiveSelf(e) && !_needsTarget(e) && _gatesHold(p, e, null));
   const ownTypes = () => [..._types(p), ...mods.extraTypes.map(t => t.toLowerCase())];
-  const ctx = () => ({ ...info, type: mods.type, vpCost: move[4], ownType: ownTypes().includes(String(mods.type || '').toLowerCase()) });
+  const ctx = () => ({ ...info, type: mods.type, vpCost: move.vpCost, ownType: ownTypes().includes(String(mods.type || '').toLowerCase()) });
 
   // The move's type first (Pixilate, Normalize, Liquid Voice...): every other filter reads the final type.
   for (const { ability, effect: e } of effs) {

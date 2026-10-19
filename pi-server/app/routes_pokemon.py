@@ -1,14 +1,8 @@
-"""route=pokemon — port of handlePokemonRoute and its sheet helpers."""
+"""route=pokemon -- the players' own Pokemon (owned.py: one object each) and the species lists (pokedex.py)."""
 import json
 
-from . import db, live, pokedex, upstream
-from .calculations import (
-    apply_feat_changes, calculate_hp_vp, calculate_modifiers,
-    proficiency_for_level, stab_for_level,
-)
-from .jsutil import js_parse_int, js_parse_int_or, js_truthy, floor_div2, intify
-
-P = db.POKEMON_COLUMNS
+from . import gamedata, live, media, owned, pokedex, trainers
+from .jsutil import js_parse_int
 
 
 def handle(conn, action, params):
@@ -40,13 +34,13 @@ def handle(conn, action, params):
         return delete_pokemon_for_trainer(conn, params['trainer'], params['name'])
 
     if action == 'recalculate-stats':
+        # The Pokemon as the edit page has it (not saved yet) and the feats it had before -- returned worked out again.
         if not params.get('data'):
             raise ValueError('Missing pokemon data')
-        recalc_data = json.loads(params['data'])
-        old_feats = params.get('oldFeats', '')
-        new_feats = recalc_data[50] or ''
-        result = apply_feat_changes(recalc_data, old_feats, new_feats)
-        return result
+        pokemon = json.loads(params['data'])
+        old_feats = json.loads(params.get('oldFeats') or '[]')
+        owned.apply_feat_changes(pokemon, old_feats, pokemon.get('feats') or [])
+        return {'status': 'success', 'newPokemonData': pokemon}
 
     if action == 'evolution-options':
         dex_entry = js_parse_int(params.get('dexEntry'))
@@ -57,13 +51,13 @@ def handle(conn, action, params):
         if not params.get('from') or not params.get('to'):
             raise ValueError('Missing from/to pokemon names')
         return {'status': 'success',
-                'url': upstream.local_evolution_video_url(params['from'], params['to'])}
+                'url': media.local_evolution_video_url(params['from'], params['to'])}
 
     if action == 'battle-animation':
         if not params.get('name'):
             raise ValueError('Missing pokemon name')
         return {'status': 'success',
-                'url': upstream.local_battle_animation_url(params['name'])}
+                'url': media.local_battle_animation_url(params['name'])}
 
     if action == 'party-status':
         return update_active_party_status(
@@ -85,278 +79,166 @@ def handle(conn, action, params):
         return pokedex.get_pokemon_abilities(conn, params['name'])
 
     if action == 'evolve':
-        if not params.get('currentName') or not params.get('trainer') or not params.get('data'):
+        if not params.get('trainer') or not params.get('currentName') or not params.get('target'):
             raise ValueError('Missing evolution parameters')
-        evolve_data = json.loads(params['data'])
-        calculated = calculate_modifiers(evolve_data, 'None', 'None')
-        if calculated['status'] == 'success':
-            # Always overwrite, never conditionally -- the incoming value
-            # here can be a self-uploaded sprite URL (evolution.js shows an
-            # MP4 on the target preview when one exists), which must never
-            # end up persisted as this Pokemon's canonical stored image.
-            resolved = upstream.local_pokemon_image_url(calculated['newPokemonData'][2], evolve_data[3])
-            calculated['newPokemonData'][1] = resolved or ''
-            replaced = replace_pokemon(conn, params['currentName'], params['trainer'],
-                                       calculated['newPokemonData'])
-            if replaced['status'] == 'success':
-                return {'status': 'success', 'message': replaced.get('message'),
-                        'newPokemonData': calculated['newPokemonData']}
-            return replaced
-        return calculated
+        return evolve_pokemon(conn, params['trainer'], params['currentName'], params['target'],
+                              json.loads(params.get('points') or '{}'))
 
     raise ValueError('Unknown pokemon action: ' + str(action))
 
 
 def get_pokemon_info(conn, trainer_name, pokemon_name, animated=True):
-    """pokemon/get -- returns the full row as a plain positional array (same
-    shape as a pokemonData entry from trainer/get, or register/evolve's
-    newPokemonData), not the old _INFO_FIELDS named-dict subset it used to
-    return. That subset only covered indices 0-44 -- missing utility slot
-    (56), shiny (61), live HP/VP/AC (45-47) and others every other part of
-    the app reads positionally -- and nothing else in the frontend actually
-    consumed the named-dict shape, so returning the same array shape as
-    everything else is strictly more correct, not just more consistent."""
-    for _, row in db.fetch_rows(conn, 'pokemon', P):
-        if (str(row[0]).lower() == trainer_name.lower()
-                and str(row[2]).lower() == pokemon_name.lower()):
-            row = list(row)
-            row[1] = upstream.pokemon_image_url(row[2], row[3], shiny=(row[61] == 'Y'), animated=animated)
-            return row
-    return None
+    """pokemon/get -- one of a trainer's Pokemon, with the picture the app shows."""
+    _, pokemon = owned.find(conn, trainer_name, pokemon_name)
+    return owned.with_image(pokemon, animated) if pokemon else None
 
 
-def register_pokemon_for_trainer(conn, trainer_name, new_pokemon_data):
-    # Never trust the client's image field for what gets permanently stored
-    # -- always resolve the static picture fresh, server-side, exactly like
-    # the evolve action already does unconditionally (the client's value may
-    # be a self-uploaded sprite URL or new-pokemon.js's Poke Ball
-    # placeholder). What the app shows is worked out from the species on
-    # every read anyway (get_pokemon_info / routes_trainer._with_pokemon_image).
-    new_pokemon_data[1] = upstream.local_pokemon_image_url(new_pokemon_data[2], new_pokemon_data[3]) or ''
+def build_registered_pokemon(conn, trainer_name, choice):
+    """The Pokemon the registration page (pokemon-form.js) asks for: `choice` = {species, level, nature, loyalty,
+    abilities: [slots], heldItem, nickname, shiny} -- built from its species (owned.from_species), with the trainer's
+    own bonuses: an Ace Trainer's Max Potential (+1 STR / DEX / CON before its nature, or 10ft on every speed it has)
+    and a Commander's +1 loyalty from level 5 (up to 10)."""
+    trainer = trainers.find(conn, trainer_name)[1] or {}
+    path = str(trainer.get('trainerPath') or '')
+    max_potential = str(trainer.get('maxPotential') or '')
+    loyalty = js_parse_int(choice.get('loyalty')) or 0
+    if path == 'Commander' and (js_parse_int(trainer.get('level')) or 1) >= 5:
+        loyalty = min(loyalty + 1, 10)
+    pokemon = owned.from_species(
+        conn, choice.get('species'), trainer=trainer_name, level=choice.get('level'), nature=choice.get('nature'),
+        ability_slots=choice.get('abilities') or [0], nickname=choice.get('nickname'),
+        held_item=choice.get('heldItem'), shiny=choice.get('shiny'), loyalty=loyalty)
+    if path == 'Ace Trainer' and max_potential in ('STR', 'DEX', 'CON'):
+        stat = owned.STAT_KEYS[max_potential.lower()]
+        pokemon['stats'][stat] = (js_parse_int(pokemon['stats'].get(stat)) or 10) + 1
+    if path == 'Ace Trainer' and max_potential == 'Speed':
+        pokemon['movement'] = {k: v + 10 if v else v for k, v in pokemon['movement'].items()}
+    return pokemon
 
-    apply_registration_stats(conn, new_pokemon_data)
+
+def register_pokemon_for_trainer(conn, trainer_name, data):
+    """A trainer caught a Pokemon: `data` is what the registration page chose (build_registered_pokemon)."""
+    if not isinstance(data, dict):
+        raise ValueError('Not a registration')
+    pokemon = build_registered_pokemon(conn, trainer_name, data)
+    pokemon['trainer'] = trainer_name
+    owned.apply_registration_stats(conn, pokemon)
 
     # Remembered as caught for good -- the DM console's Pokedex keeps its Poke Ball after this Pokemon evolves. The
     # first one of a species the players catch also shows them what they learned of it (routes_dm.reveal_caught_species).
     from .routes_dm import caught_before, record_caught
-    first_time = not caught_before(conn, new_pokemon_data[2])
-    db.insert_row(conn, 'pokemon', P, new_pokemon_data)
-    record_caught(conn, new_pokemon_data[2], new_pokemon_data, first_time)
+    first_time = not caught_before(conn, pokemon['name'])
+    owned.insert(conn, pokemon)
+    record_caught(conn, pokemon['name'], pokemon, first_time)
 
-    # Same trainer-data event _write_trainer_cell publishes for inventory/gear/
-    # money -- register is the other half of Benjakronk's external game-write
-    # API, and needs the same "already-open client picks this up live" fix.
+    # The same trainer-data event every change to a trainer publishes -- the trainer's other open devices (and the DM
+    # console's Party module) pick up the new Pokemon.
     live.publish({'type': 'trainer-data', 'trainer': trainer_name})
 
     return {'status': 'success',
-            'message': f'{trainer_name} caught a {new_pokemon_data[2]}!',
-            'newPokemonData': new_pokemon_data}
+            'message': f"{trainer_name} caught a {pokemon['name']}!",
+            'newPokemonData': owned.with_image(pokemon)}
 
 
-def apply_registration_stats(conn, new_pokemon_data, stat_overrides=None, stat_bonus=None):
-    """Fills in everything a freshly built Pokemon row leaves blank (nature-adjusted ability scores, HP/VP, initiative,
-    proficiency, STAB, modifiers, current HP/VP), in place. Shared by registering a Pokemon for a trainer and the DM
-    console's build-pokemon (routes_dm.py), so an enemy built there has exactly the numbers a player's would.
-    `stat_overrides` ({'str': 14, ...}, DM console only) replaces those final ability scores before everything that
-    depends on them (HP/VP, modifiers, initiative) is worked out; `stat_bonus` ({'str': 2, ...}, DM console only) is
-    added on top of them, at the same point."""
-    level = js_parse_int(new_pokemon_data[4])
-    hd = js_parse_int(new_pokemon_data[9])
-    vd = js_parse_int(new_pokemon_data[11])
-    str_ = js_parse_int(new_pokemon_data[15])
-    dex = js_parse_int(new_pokemon_data[16])
-    con = js_parse_int(new_pokemon_data[17])
-    int_ = js_parse_int(new_pokemon_data[18])
-    wis = js_parse_int(new_pokemon_data[19])
-    cha = js_parse_int(new_pokemon_data[20])
-    loyalty = js_parse_int_or(new_pokemon_data[33], 0)
-
-    # Nature stat adjustments
-    nature_name = new_pokemon_data[32] or ''
-    if nature_name:
-        stat_map = {'strength': 'str', 'dexterity': 'dex', 'constitution': 'con',
-                    'intelligence': 'int', 'wisdom': 'wis', 'charisma': 'cha'}
-        stats = {'str': str_, 'dex': dex, 'con': con, 'int': int_, 'wis': wis, 'cha': cha}
-        nature = next((n for n in get_nature_data(conn)
-                       if str(n['name']).lower() == str(nature_name).lower()), None)
-        if nature:
-            boost_key = stat_map.get(str(nature['boostStat']).lower())
-            nerf_key = stat_map.get(str(nature['nerfStat']).lower())
-            if boost_key:
-                stats[boost_key] += js_parse_int(nature['boostAmount'])
-            if nerf_key:
-                stats[nerf_key] -= js_parse_int(nature['nerfAmount'])
-        str_, dex, con, int_, wis, cha = (stats['str'], stats['dex'], stats['con'],
-                                          stats['int'], stats['wis'], stats['cha'])
-
-    if stat_overrides:
-        o = {k: js_parse_int(v) for k, v in stat_overrides.items() if js_parse_int(v) is not None}
-        str_, dex, con, int_, wis, cha = (o.get('str', str_), o.get('dex', dex), o.get('con', con),
-                                          o.get('int', int_), o.get('wis', wis), o.get('cha', cha))
-
-    if stat_bonus:
-        b = {k: js_parse_int(v) or 0 for k, v in stat_bonus.items()}
-        str_, dex, con, int_, wis, cha = (str_ + b.get('str', 0), dex + b.get('dex', 0), con + b.get('con', 0),
-                                          int_ + b.get('int', 0), wis + b.get('wis', 0), cha + b.get('cha', 0))
-
-    new_pokemon_data[15] = str_
-    new_pokemon_data[16] = dex
-    new_pokemon_data[17] = con
-    new_pokemon_data[18] = int_
-    new_pokemon_data[19] = wis
-    new_pokemon_data[20] = cha
-
-    hp, vp = calculate_hp_vp(str_, dex, con, int_, wis, cha, level, hd, vd, loyalty)
-
-    new_pokemon_data[10] = hp
-    new_pokemon_data[12] = vp
-    new_pokemon_data[30] = floor_div2(dex)               # initiative
-    new_pokemon_data[31] = proficiency_for_level(level)
-    new_pokemon_data[34] = stab_for_level(level)
-    new_pokemon_data[39] = floor_div2(str_)
-    new_pokemon_data[40] = floor_div2(dex)
-    new_pokemon_data[41] = floor_div2(con)
-    new_pokemon_data[42] = floor_div2(int_)
-    new_pokemon_data[43] = floor_div2(wis)
-    new_pokemon_data[44] = floor_div2(cha)
-    new_pokemon_data[45] = hp                            # currentHP
-    new_pokemon_data[46] = vp                            # currentVP
-
-
-def update_pokemon_data(conn, new_pokemon_data):
-    trainer_name = str(new_pokemon_data[0]).lower()
-    pokemon_name = str(new_pokemon_data[2]).lower()
-    for rowid, row in db.fetch_rows(conn, 'pokemon', P):
-        if str(row[0]).lower() == trainer_name and str(row[2]).lower() == pokemon_name:
-            # Never trust the client's image field here -- GET responses
-            # temporarily swap it to a self-uploaded MP4 URL for display
-            # (see upstream.local_sprite_url), and that swapped value ends up
-            # sitting in the client's copy of this Pokemon's data. This
-            # endpoint is for saving stat/move/item changes, not the image --
-            # always keep whatever's already canonically stored instead of
-            # whatever the client happened to be holding.
-            new_pokemon_data = list(new_pokemon_data)
-            new_pokemon_data[1] = row[1]
-            db.update_row(conn, 'pokemon', rowid, P, new_pokemon_data)
-            return {'status': 'success'}
-    return {'status': 'error', 'message': 'Pokémon not found.'}
+def update_pokemon_data(conn, pokemon):
+    """Saves a Pokemon the app changed (stats, moves, items...), found by its trainer and species."""
+    pid, _ = owned.find(conn, pokemon.get('trainer'), pokemon.get('name'))
+    if pid is None:
+        return {'status': 'error', 'message': 'Pokémon not found.'}
+    owned.save(conn, pid, pokemon)
+    return {'status': 'success'}
 
 
 def delete_pokemon_for_trainer(conn, trainer_name, pokemon_name):
-    """edit-pokemon.js's Release button -- removes exactly one trainer's
-    copy of a Pokemon, matched the same case-insensitive (trainer, name)
-    way every other lookup in this file already is, so another trainer's
-    Pokemon of the same species/nickname is never touched."""
-    trainer_key = str(trainer_name).lower()
-    pokemon_key = str(pokemon_name).lower()
-    for rowid, row in db.fetch_rows(conn, 'pokemon', P):
-        if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
-            db.delete_row(conn, 'pokemon', rowid)
-            live.publish({'type': 'trainer-data', 'trainer': trainer_name})
-            return {'status': 'success', 'message': f'{pokemon_name} released.'}
-    return {'status': 'error', 'message': 'Pokémon not found.'}
+    """edit-pokemon.js's Release button -- removes exactly that trainer's Pokemon (another trainer's of the same
+    species is never touched)."""
+    pid, _ = owned.find(conn, trainer_name, pokemon_name)
+    if pid is None:
+        return {'status': 'error', 'message': 'Pokémon not found.'}
+    owned.delete(conn, pid)
+    live.publish({'type': 'trainer-data', 'trainer': trainer_name})
+    return {'status': 'success', 'message': f'{pokemon_name} released.'}
 
 
-def replace_pokemon(conn, pre_evolved_name, trainer_name, new_pokemon_data):
-    for rowid, row in db.fetch_rows(conn, 'pokemon', P):
-        if (str(row[0]).lower() == trainer_name.lower()
-                and str(row[2]).lower() == pre_evolved_name.lower()):
-            db.update_row(conn, 'pokemon', rowid, P, new_pokemon_data)
-            return {'status': 'success', 'message': 'Pokémon replaced successfully.'}
-    return {'status': 'error', 'message': 'Pre-evolved Pokémon not found.'}
+def _hidden_ability_shown(conn, species):
+    """Whether the players' Pokedex shows `species`' hidden ability (visibility.js's isFieldVisible(name, 'hiddenAbility'))."""
+    config = gamedata.pokedex_config(conn)
+    vis = (config.get('visibility') or {}).get(str(species).lower())
+    if not isinstance(vis, dict):
+        vis = config.get('defaults') or {}
+    return vis.get('hiddenAbility') is True
+
+
+def evolve_pokemon(conn, trainer_name, current_name, target, points):
+    """`trainer_name`'s `current_name` evolves into `target`, with the ability-score `points` the player spent
+    (owned.evolve) -- stored in its place, so it keeps its XP."""
+    pid, current = owned.find(conn, trainer_name, current_name)
+    if pid is None:
+        return {'status': 'error', 'message': 'Pre-evolved Pokémon not found.'}
+    evolved = owned.evolve(conn, current, target, points, _hidden_ability_shown(conn, target))
+    owned.save(conn, pid, evolved)
+    live.publish({'type': 'trainer-data', 'trainer': trainer_name})
+    return {'status': 'success', 'message': 'Pokémon replaced successfully.', 'newPokemonData': owned.with_image(evolved)}
 
 
 def update_active_party_status(conn, trainer_name, pokemon_name, pokeslots, operation):
-    rows = db.fetch_rows(conn, 'pokemon', P)
-    trainer_key = str(trainer_name).lower()
-    pokemon_key = str(pokemon_name).lower()
-
-    active_party = sorted(
-        js_parse_int(row[38]) for _, row in rows
-        if str(row[0]).lower() == trainer_key and js_truthy(row[38])
-    )
-
+    mine = owned.all_owned(conn, trainer_name)
+    target = next(((i, p) for i, p in mine if str(p['name']).lower() == str(pokemon_name).lower()), None)
     if operation == 'add':
-        if len(active_party) >= pokeslots:
+        taken = {p.get('partySlot') for _, p in mine if p.get('partySlot')}
+        if len(taken) >= (pokeslots or 0):
             return {'status': 'error', 'message': 'Party is full'}
-        next_slot = 1
-        for i in range(1, pokeslots + 1):
-            if i not in active_party:
-                next_slot = i
-                break
-        for rowid, row in rows:
-            if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
-                db.set_cell(conn, 'pokemon', rowid, 'inactiveparty', next_slot)
-                break
+        next_slot = next((i for i in range(1, (pokeslots or 0) + 1) if i not in taken), 1)
+        if target:
+            target[1]['partySlot'] = next_slot
+            owned.save(conn, *target)
         return {'status': 'success', 'slot': next_slot}
-
     if operation == 'remove':
-        for rowid, row in rows:
-            if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
-                db.set_cell(conn, 'pokemon', rowid, 'inactiveparty', '')
-                break
+        if target:
+            target[1]['partySlot'] = None
+            owned.save(conn, *target)
         return {'status': 'success', 'message': 'Removed from party'}
     return None
 
 
 def update_utility_slot_status(conn, trainer_name, pokemon_name, operation):
-    rows = db.fetch_rows(conn, 'pokemon', P)
-    trainer_key = str(trainer_name).lower()
-    pokemon_key = str(pokemon_name).lower()
-    try:
-        if operation == 'add':
-            target_row = None
-            for rowid, row in rows:
-                if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
-                    target_row = (rowid, row)
-                    break
-            if target_row is None:
-                return {'status': 'error', 'message': 'Pokemon not found'}
-            target_rowid, target = target_row
-            if js_truthy(target[38]):
-                return {'status': 'error',
-                        'message': 'A Pokémon cannot be in the active party and the utility slot at the same time'}
-            for rowid, row in rows:
-                if str(row[0]).lower() == trainer_key and row[56] == 1 and str(row[2]).lower() != pokemon_key:
-                    db.set_cell(conn, 'pokemon', rowid, 'utilityslot', '')
-            db.set_cell(conn, 'pokemon', target_rowid, 'utilityslot', 1)
-            return {'status': 'success'}
-        elif operation == 'remove':
-            for rowid, row in rows:
-                if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
-                    db.set_cell(conn, 'pokemon', rowid, 'utilityslot', '')
-                    return {'status': 'success'}
+    """The one Pokemon a trainer has in the utility slot (never one that's in the active party)."""
+    mine = owned.all_owned(conn, trainer_name)
+    target = next(((i, p) for i, p in mine if str(p['name']).lower() == str(pokemon_name).lower()), None)
+    if target is None:
         return {'status': 'error', 'message': 'Pokemon not found'}
-    except Exception:
-        return {'status': 'error', 'message': 'Failed to update utility slot status'}
+    if operation == 'add':
+        if target[1].get('partySlot'):
+            return {'status': 'error',
+                    'message': 'A Pokémon cannot be in the active party and the utility slot at the same time'}
+        for i, p in mine:
+            if p.get('utilitySlot') and i != target[0]:
+                p['utilitySlot'] = False
+                owned.save(conn, i, p)
+        target[1]['utilitySlot'] = True
+        owned.save(conn, *target)
+        return {'status': 'success'}
+    if operation == 'remove':
+        target[1]['utilitySlot'] = False
+        owned.save(conn, *target)
+        return {'status': 'success'}
+    return {'status': 'error', 'message': 'Pokemon not found'}
 
 
 def write_pokemon_live_stats(conn, trainer_name, pokemon_name, stat, new_value):
-    trainer_key = str(trainer_name).lower()
-    pokemon_key = str(pokemon_name).lower()
-    try:
-        for rowid, row in db.fetch_rows(conn, 'pokemon', P):
-            if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
-                if stat == 'HP':
-                    db.set_cell(conn, 'pokemon', rowid, 'currentHP', js_parse_int(new_value))
-                elif stat == 'VP':
-                    db.set_cell(conn, 'pokemon', rowid, 'currentVP', js_parse_int(new_value))
-                elif stat == 'KnownMoves':
-                    db.set_cell(conn, 'pokemon', rowid, 'knownmoves', new_value)
-                elif stat == 'StatusCondition':
-                    db.set_cell(conn, 'pokemon', rowid, 'statuscondition',
-                                '' if new_value in (None, '') else new_value)
-                else:  # AC
-                    db.set_cell(conn, 'pokemon', rowid, 'currentAC', js_parse_int(new_value))
-                return {'status': 'success'}
+    """One live value, written straight away: HP / VP / AC (current), MoveCharges (JSON, owned.py's moveCharges) or
+    StatusConditions (JSON list of names)."""
+    pid, pokemon = owned.find(conn, trainer_name, pokemon_name)
+    if pid is None:
         return {'status': 'error', 'message': 'Pokémon not found for this trainer'}
-    except Exception:
-        return {'status': 'error', 'message': 'Failed to write Pokemon Live Stats'}
-
-
-def get_nature_data(conn):
-    return [{
-        'name': r[0], 'boostStat': r[1], 'boostAmount': r[2],
-        'nerfStat': r[3], 'nerfAmount': r[4],
-    } for r in conn.execute(
-        'SELECT name, boostStat, boostAmount, nerfStat, nerfAmount FROM natures ORDER BY ord')]
+    current = pokemon.setdefault('current', {})
+    if stat in ('HP', 'VP', 'AC'):
+        current[stat.lower()] = js_parse_int(new_value)
+    elif stat == 'MoveCharges':
+        pokemon['moveCharges'] = json.loads(new_value or '{}')
+    elif stat == 'StatusConditions':
+        pokemon['statusConditions'] = json.loads(new_value or '[]')
+    else:
+        return {'status': 'error', 'message': 'Unknown live stat: ' + str(stat)}
+    owned.save(conn, pid, pokemon)
+    return {'status': 'success'}

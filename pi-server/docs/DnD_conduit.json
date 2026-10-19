@@ -1,0 +1,6 @@
+{
+ "_about": "The conduit class (a trainer who fights alongside their Pokemon): features (by stage), battle styles, and the type awakenings -- {type: {effect, awakenings: [{name, levels: [3 texts]}]}}. Empty until written; read by the Pi server (gamedata.py).",
+ "features": [],
+ "battleStyles": [],
+ "typeAwakenings": {}
+}

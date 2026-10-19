@@ -1,38 +1,54 @@
 # Pi Server — Pokemon DnD Trainer Tool backend
 
-FastAPI + SQLite replacement for the Google Apps Script backend. Speaks the
-exact same `GET ?route=...&action=...` contract and returns the same
-positional-array JSON, so the **only frontend change is one line** in
-`js/api.js` (see Cutover below).
+FastAPI + SQLite: the whole backend of the app, running on the Pi. The app
+(the PWA in the folder above) is served from the same origin and always
+talks to `/api` there.
 
 ## Layout
 
 ```
 pi-server/
   app/               the server (FastAPI)
+  docs/              the game data: DnD_species.json, DnD_moves*.json,
+                     DnD_items.json, DnD_abilities.json, DnD_natures.json,
+                     DnD_feats.json, DnD_trainer_options.json,
+                     DnD_conduit.json, DnD_type_chart.json (+ their tools)
   scripts/
-    import_sheets.py     one-time: Google Sheets CSV exports -> SQLite
-    refresh_upstream.py  snapshot Benjakronk's pokedex/moves/items
+    convert_species.py   one-time: Benjakronk's 80-cell species rows -> DnD_species.json
+    species_snapshot.py  before/after check for changes to the species code
   data/pokedex.db    the database (created on first run, gitignored)
 ```
 
-## 1. Migrate the data (once, on any machine)
+## 1. The data
 
-1. In the game spreadsheet: **File → Download → Comma-separated values** for
-   each tab, saved into one folder with the tab's exact name:
-   `Trainer Data.csv`, `Pokemon Data.csv`, `Natures.csv`, `Trainer Feat.csv`,
-   `Feat list.csv`, `Type Chart.csv`, and optionally the three Conduit tabs.
-   (The `Item list` tab is not needed — items come from the upstream source.)
-2. ```
-   cd pi-server
-   python -m venv .venv
-   .venv/Scripts/pip install -r requirements.txt        (Windows)
-   .venv/bin/pip install -r requirements.txt            (Pi/Linux)
-   python scripts/import_sheets.py --csv-dir path/to/exports
-   python scripts/refresh_upstream.py
-   ```
+The database is created on first run (`data/pokedex.db`, override with env
+`POKEDEX_DB`). The live one is on the Pi; to work on a copy elsewhere, copy
+the Pi's file (or one of its nightly backups, below) into `data/`.
 
-Re-running `import_sheets.py` wipes and re-imports (upstream snapshots kept).
+- **Trainers** -- table `trainers`, one JSON object each (`app/trainers.py`
+  describes every field). Until 2026-10-19 they were 52-column rows; the
+  server moved them over once on its first start and kept the old table,
+  renamed `trainer_rows_backup` (read by nothing).
+- **The players' Pokémon** -- table `owned_pokemon`, one JSON object each
+  (`app/owned.py` describes every field). Until 2026-10-18 they were 62-column
+  rows in a `pokemon` table, moved over the same way (`pokemon_rows_backup`).
+- **The players' Pokédex settings** -- what they may see of each species, set
+  in the DM console's Pokédex module: `dm_state` key `pokedex-config`.
+- **Game data** -- species, moves, items, abilities and the rules (natures,
+  feats, specializations, trainer paths, affinities, trainer skills,
+  nationalities, the conduit class, the type chart) are the JSON files in
+  `docs/` (`app/gamedata.py`, `app/species.py`); edit, commit, pull on the Pi.
+  No restart needed. The rules were database tables imported once from the
+  old Google Sheet; the first start after 2026-10-19 drops them -- if the Pi's
+  held anything the files don't, it's written to `data/old_rule_tables.json`
+  first (compare it with `docs/`).
+- **The battle** -- table `combat_session` (the running one) and what the DM
+  console keeps in `dm_state` / `dm_npcs` / `dm_encounters`. A participant's
+  abilities, saving throws and skills are lists (`app/battle_lists.py`); until
+  2026-10-19 they were text ("0:Name;description|...", "Strength, Dexterity"),
+  turned into lists on the first start.
+
+`app/migrations.py` does every one of these moves, once.
 
 ## 2. Run the server
 
@@ -51,7 +67,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 # copy the whole project folder to the Pi, then:
 cd ~/pokemon-dnd/pi-server
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-# copy your pokedex.db into pi-server/data/  (or run the import on the Pi)
+# copy your pokedex.db into pi-server/data/
 ```
 
 `/etc/systemd/system/pokedex.service`:
@@ -92,66 +108,31 @@ predictable address. A dynamic public IP is irrelevant — Tailscale handles it.
 
 ### Backups (nightly)
 
-Two layers, both from `crontab -e` (actual entries on the live Pi, user `scorelax`):
+From `crontab -e` (user `scorelax` on the live Pi):
 
 ```bash
 # 04:00 local snapshot; .backup is safe while the server runs (WAL mode)
 0 4 * * * sqlite3 /home/scorelax/pokemon-dnd/pi-server/data/pokedex.db ".backup /home/scorelax/backups/pokedex-$(date +\%w).db"
-# 04:15 Google Sheets mirror (survives the Pi entirely)
-15 4 * * * cd /home/scorelax/pokemon-dnd/pi-server && SHEETS_BACKUP_URL=... SHEETS_BACKUP_SECRET=... .venv/bin/python scripts/backup_to_sheets.py >> /home/scorelax/backup.log 2>&1
 ```
 
-1. **Local snapshot** — weekday-numbered files give a rolling 7-day history.
-   Ideally point it at a USB stick, not the SD card.
-2. **Sheets mirror** — `scripts/backup_to_sheets.py` writes the trainers and
-   pokemon tables back into the game spreadsheet's `Trainer Data` /
-   `Pokemon Data` tabs (headers untouched), so the tabs stay importable:
-   full disaster recovery = download tabs as CSV → `import_sheets.py`.
-   One-time setup is described in `scripts/Backup_Receiver.gs`. Older days
-   are recoverable via the spreadsheet's File → Version history.
-   Note: after cutover the sheet is a mirror, not the admin UI — manual
-   edits to those two tabs get overwritten nightly.
+Weekday-numbered files give a rolling 7-day history. Ideally point it at a
+USB stick, not the SD card -- and copy one somewhere off the Pi now and then.
+(`scripts/backup_to_sheets.py` is gone: **remove its 04:15 line from the
+crontab** if it's still there.)
 
-### Upstream data mirror (daily)
+To restore: stop the service, copy a backup over `data/pokedex.db`, start it.
 
-`scripts/refresh_upstream.py` fetches Benjakronk's pokemon/moves/items/
-pokedex-config snapshots and stores them in SQLite. Already scheduled on the
-live Pi:
+Nothing else needs scheduling: nothing is fetched from anywhere. (The daily
+`refresh_upstream.py` that re-fetched the Pokédex settings from Benjakronk's
+GitHub repo is gone -- **remove its 16:00 line from the crontab** if it's still
+there.)
 
-```bash
-# 16:00 daily upstream snapshot refresh
-0 16 * * * cd /home/scorelax/pokemon-dnd/pi-server && .venv/bin/python scripts/refresh_upstream.py >> /home/scorelax/logs/dnd/upstream.log 2>&1
-```
+### The pictures
 
-(Note this job logs to `~/logs/dnd/upstream.log`, unlike the flat `~/backup.log`
-the other two jobs use — an existing inconsistency, not a typo.)
+Every picture comes from the Pi (`app/media.py`), in `~/pokemon-dnd/images/`
+-- first copied from the `images/` folders of Benjakronk's Pokédex repo:
 
-With this scheduled, the in-app **Reset Cache** button is a rare manual
-override — only needed if you want data sooner than the next run (e.g.
-Benjakronk added a species same-day and you want it live immediately). A
-failed fetch keeps the previous snapshot either way, so a bad run doesn't
-wipe anything.
-
-### Live upstream push (from Benjakronk's admin panel)
-
-`POST /api/upstream-push` with header `X-Push-Key: <secret>` and body
-`{"dataset": "pokedex-config", "data": ...}` stores the shared player-visible
-pokedex snapshot immediately — no waiting on GitHub raw's 5-minute CDN. This
-is the one upstream dataset that actually changes mid-session; pokemon-db,
-moves, and items stay on the nightly mirror above — see `PUSHABLE_DATASETS`
-in `app/upstream.py` to add another dataset to the push path later. Guarded
-by env `UPSTREAM_PUSH_KEY` on the service; **the endpoint is disabled (503)
-until that env var is set.** The full connect-and-use guide for Benjakronk is
-`docs/benjakronk-guide.md`. His own repo stays the source of truth: the
-nightly mirror still re-fetches from GitHub raw, the push is just the fast
-path.
-
-### Benjakronk's pictures (copied onto the Pi)
-
-Every picture from Benjakronk's repo comes from the Pi -- nothing is fetched
-from GitHub. Copy his `images/` subfolders into `~/pokemon-dnd/images/`:
-
-| His folder          | Pi folder (env override)                          | Served at               |
+| Repo folder         | Pi folder (env override)                          | Served at               |
 |---------------------|---------------------------------------------------|-------------------------|
 | `images/pokemon`    | `pokemon-images` (`POKEMON_IMAGE_DIR`)            | `/pokemon-images/`      |
 | `images/characters` | `npc` (`NPC_IMAGE_DIR`) -- also the DM console's NPC uploads | `/npc-images/` |
@@ -162,19 +143,19 @@ Next to them, `images/display-images` (`DISPLAY_IMAGE_DIR`, served at
 `/display-images/`) holds the pictures uploaded in the DM console's Display
 module. The server makes the folders at startup if they're missing, and new files
 show up without a restart. What the app shows is worked out on every read
-(`upstream.pokemon_image_url` / `upstream.trainer_image_url`): a Pokémon's
+(`media.pokemon_image_url` / `media.trainer_image_url`): a Pokémon's
 animated sprite, else its original picture; a trainer's self-made portrait,
-else Benjakronk's original picture of that name. The GitHub addresses still
-stored in older rows are only a hint (`upstream.localize_image_url` maps them
-to the same file on the Pi).
+else the NPC picture of that name. (Addresses in Benjakronk's repo stored
+before the pictures moved onto the Pi were made the Pi's own once, by
+`migrations.py`.)
 
 ### Animated sprites (self-uploaded, local only)
 
-Unrelated to Benjakronk's repo. Drop hand-made `.mp4` files into
+Drop hand-made `.mp4` files into
 `~/pokemon-dnd/pokemon-sprites` (folder path override: env `SPRITE_DIR`),
 named `<sanitized-species-name>.mp4` -- lowercase, non-alphanumeric
 characters collapsed to `-` (e.g. "Mr. Mime" → `mr-mime.mp4`), same rule
-`upstream.local_pokemon_image_url()` uses for the original pictures, just
+`media.local_pokemon_image_url()` uses for the original pictures, just
 without the dex-id prefix. `.gif` was supported early on but has since been dropped
 entirely -- animated GIF decoding runs frame-by-frame in software with no
 hardware acceleration, and paying that continuously (especially with
@@ -184,7 +165,7 @@ smaller files.
 
 No restart needed to pick up new files day-to-day
 (checked live via a filesystem stat on every request,
-`upstream.local_sprite_url()`) -- only the first time, so the `/gifs` mount
+`media.local_sprite_url()`) -- only the first time, so the `/gifs` mount
 appears (the URL prefix stays `/gifs` even after the folder's `pokemon-gifs` →
 `pokemon-sprites` rename and the gif-format drop -- it's baked into every
 Pokemon's stored image URL in the live DB, so renaming it would 404 all of
@@ -226,32 +207,11 @@ that species. Same live-filesystem-check, no-caching-layer,
 no-restart-to-add-files pattern as the other two -- only the very first file
 needs a restart, so the `/battle-animations` mount appears.
 
-None of these three folders are browsable directly (StaticFiles serves
-individual files, not directory listings), so
-`?route=game-data&action=media-list` returns what's in each one as
-`{pokemonSprites, battleAnimations, evolutionVideos}` -- kept as separate
-keys since `pokemonSprites` and `battleAnimations` share the exact same
-`<species-name>.mp4` filename convention for unrelated content. This is what
-lets Benjakronk's tooling discover and pull these without SSH/folder access;
-see `docs/benjakronk-guide.md`.
-
-## 4. Cutover (and rollback)
-
-In `js/api.js`, change `baseUrl` to the Pi:
-
-```js
-baseUrl: 'https://<pi-name>.<tailnet>.ts.net/api',
-```
-
-The Apps Script deployment stays untouched — **rollback = revert that line.**
 
 ## Admin
 
-Google Sheets is no longer the admin UI. Edit data with
-[DB Browser for SQLite](https://sqlitebrowser.org/) — tables `trainers` and
-`pokemon` have one named column per old sheet column, in the same order.
-Stop the server first (or use "Write Changes" promptly): SQLite locks the DB
-while DB Browser holds unsaved changes.
-
-The app's **Reset Cache** button re-fetches the upstream snapshots
-(pokedex/moves/items/config), same as before.
+Edit data with [DB Browser for SQLite](https://sqlitebrowser.org/) on a copy,
+or on the Pi with the service stopped (SQLite locks the database while DB
+Browser holds unsaved changes). A trainer is one row of `trainers`, a
+player's Pokémon one row of `owned_pokemon` -- the `json` column is the whole
+object (keep `name` / `trainer` the same as inside it).

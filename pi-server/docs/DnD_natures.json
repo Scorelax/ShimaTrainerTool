@@ -1,0 +1,145 @@
+{
+ "_about": "The natures a Pokemon can have: each raises one ability score and lowers another (owned.py applies them when a Pokemon is made). Read by the Pi server (gamedata.py); edit here, commit, git pull on the Pi.",
+ "natures": [
+  {
+   "name": "Apathetic",
+   "boostStat": "Constitution",
+   "boostAmount": 2,
+   "nerfStat": "Dexterity",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Brave",
+   "boostStat": "Strength",
+   "boostAmount": 2,
+   "nerfStat": "Wisdom",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Careful",
+   "boostStat": "Wisdom",
+   "boostAmount": 2,
+   "nerfStat": "Strength",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Cheerful",
+   "boostStat": "Charisma",
+   "boostAmount": 2,
+   "nerfStat": "Strength",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Clumsy",
+   "boostStat": "Dexterity",
+   "boostAmount": 2,
+   "nerfStat": "Wisdom",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Cocky",
+   "boostStat": "Strength",
+   "boostAmount": 2,
+   "nerfStat": "Charisma",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Curious",
+   "boostStat": "Wisdom",
+   "boostAmount": 2,
+   "nerfStat": "Constitution",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Dumb",
+   "boostStat": "Charisma",
+   "boostAmount": 2,
+   "nerfStat": "Wisdom",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Energetic",
+   "boostStat": "Dexterity",
+   "boostAmount": 2,
+   "nerfStat": "Charisma",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Grumpy",
+   "boostStat": "Constitution",
+   "boostAmount": 2,
+   "nerfStat": "Charisma",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Hardy",
+   "boostStat": "AC",
+   "boostAmount": 1,
+   "nerfStat": "Dexterity",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Hasty",
+   "boostStat": "Dexterity",
+   "boostAmount": 2,
+   "nerfStat": "Constitution",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Naughty",
+   "boostStat": "Wisdom",
+   "boostAmount": 2,
+   "nerfStat": "Charisma",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Nimble",
+   "boostStat": "AC",
+   "boostAmount": 1,
+   "nerfStat": "Strength",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Rash",
+   "boostStat": "Strength",
+   "boostAmount": 2,
+   "nerfStat": "Constitution",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Reckless",
+   "boostStat": "Strength",
+   "boostAmount": 2,
+   "nerfStat": "Dexterity",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Relaxed",
+   "boostStat": "Constitution",
+   "boostAmount": 2,
+   "nerfStat": "Strength",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Sassy",
+   "boostStat": "Charisma",
+   "boostAmount": 2,
+   "nerfStat": "Dexterity",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Skittish",
+   "boostStat": "Dexterity",
+   "boostAmount": 2,
+   "nerfStat": "Strength",
+   "nerfAmount": 2
+  },
+  {
+   "name": "Stubborn",
+   "boostStat": "Constitution",
+   "boostAmount": 2,
+   "nerfStat": "Wisdom",
+   "nerfAmount": 2
+  }
+ ]
+}

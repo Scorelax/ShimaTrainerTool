@@ -12,6 +12,7 @@ Deliberately not a 1:1 copy of every condition in the JS table -- adding an
 entry here happens when a phase actually needs server enforcement for it,
 not preemptively (see the status-conditions plan's own phased approach).
 """
+from .battle_lists import ability_list
 
 CONDITION_RULES = {
     'grappled': {'speedMultiplier': 0},
@@ -401,6 +402,10 @@ def terrain_kind(terrain):
     return next((k for k in TERRAIN_KEYWORDS if k in name), None)
 
 
+def _has_levitate(participant):
+    return any(a['name'].lower() == 'levitate' for a in ability_list((participant or {}).get('abilities')))
+
+
 def is_grounded(participant):
     """The terrain moves' own definition: "those that do not have a flying speed or Levitate,
     Magnet Rise, or similar ability". Smack Down's `grounded` condition overrides all of it."""
@@ -410,7 +415,7 @@ def is_grounded(participant):
     speeds = list((participant or {}).get('speeds') or []) + granted_speed_entries(participant)
     if any(str(sp.get('type', '')).lower() in ('flying', 'hovering') and (sp.get('ft') or 0) > 0 for sp in speeds):
         return False
-    if 'levitate' in str((participant or {}).get('abilities') or '').lower():
+    if _has_levitate(participant):
         return False
     for s in statuses:
         if s.get('kind') != 'condition':
@@ -431,7 +436,7 @@ def is_levitating(participant):
     statuses = p.get('statuses', [])
     if any(s.get('kind') == 'condition' and s.get('apply') == 'grounded' for s in statuses):
         return False
-    if 'levitate' in str(p.get('abilities') or '').lower():
+    if _has_levitate(p):
         return True
     if any(str(sp.get('type', '')).lower() == 'hovering' and (sp.get('ft') or 0) > 0 for sp in p.get('speeds') or []):
         return True

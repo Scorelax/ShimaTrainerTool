@@ -9,17 +9,19 @@ import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, typeBadges, toast, attachSuggest } from './dm-common.js';
 import { xpOrStart, xpPanelHtml, xpButtonHtml, giveXpPopup } from './xp.js';
 import { givePokemonPopup } from './give-pokemon.js';
+import { abilitiesOf, currentHP, currentVP, displayName, knownMoveNames, sensesList } from '../utils/owned-pokemon.js';
 
-// Positions in a trainer row (db.TRAINER_COLUMNS) and a Pokemon row (db.POKEMON_COLUMNS).
-const T = { image: 0, name: 1, level: 2, hd: 3, vd: 4, str: 5, hp: 11, vp: 12, ac: 13, speed: 14, saves: 15, init: 16, prof: 17, skills: 18,
-  money: 19, inventory: 20, league: 21, affinity: 23, spec: 24, path: 25, slots: 26, mods: 27, feats: 33, curHP: 34, curVP: 35, curAC: 36,
-  gear: 37, region: 38, cls: 39 };
-const P = { image: 1, name: 2, dex: 3, level: 4, type1: 5, type2: 6, abilities: 7, ac: 8, hd: 9, hp: 10, vd: 11, vp: 12, speed: 13, str: 15,
-  saves: 21, skills: 22, moves: 23, evo: 29, init: 30, prof: 31, nature: 32, loyalty: 33, stab: 34, item: 35, nick: 36, custom: 37, slot: 38,
-  mods: 39, curHP: 45, curVP: 46, curAC: 47, comment: 48, senses: 49, feats: 50, gear: 51, size: 57, status: 60, shiny: 61 };
+/** "From: Bulbasaur · Evolves: Venusaur @ Level 15" */
+function evolutionLine(p) {
+  const parts = [];
+  if ((p.evolvesFrom || []).length) parts.push(`From: ${p.evolvesFrom.join(' + ')}`);
+  (p.evolvesInto || []).forEach(e => parts.push(e.requirement ? `Evolves: ${e.species} @ ${e.requirement}` : `Evolves: ${e.species}`));
+  return parts.join(' · ');
+}
+
+// The trainers and their Pokemon are objects (pi-server/app/trainers.py, owned.py).
 const STATS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
-const MOVE_LEVELS = [1, 2, 6, 10, 14, 18];
-const SENSES = ['Sight', 'Hearing', 'Smell', 'Tremorsense', 'Echolocation', 'Telepathy', 'Blindsight', 'Darkvision', 'Truesight'];
+const STAT_NAMES = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
 
 let _root = null;
 let _party = [];
@@ -53,7 +55,7 @@ async function reload() {
 }
 
 function draw() {
-  const entry = _selected && _party.find(e => e.trainer[T.name] === _selected);
+  const entry = _selected && _party.find(e => e.trainer.name === _selected);
   if (entry) drawTrainer(entry); else { _selected = null; drawOverview(); }
 }
 
@@ -64,18 +66,23 @@ function draw() {
 const num = (v, d = 0) => (Number.isFinite(parseInt(v, 10)) ? parseInt(v, 10) : d);
 const sign = n => (n >= 0 ? `+${n}` : `${n}`);
 const pct = (cur, max) => (max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0);
-const current = (row, curIdx, maxIdx) => (row[curIdx] === '' || row[curIdx] == null ? num(row[maxIdx]) : num(row[curIdx]));
+// A trainer's current HP / VP (the max where none is stored)
+const curHP = t => num(t.current?.hp ?? t.combat?.maxHP);
+const curVP = t => num(t.current?.vp ?? t.combat?.maxVP);
+const list = l => (l || []).join(', ');
+const hpOf = p => currentHP(p);
+const vpOf = p => currentVP(p);
 
 function bars(cur, max, curVp, maxVp) {
   return `<div class="dm-bar hp"><i style="width:${pct(cur, max)}%"></i></div><div class="dm-bar vp"><i style="width:${pct(curVp, maxVp)}%"></i></div>`;
 }
 
 function partyOf(entry) {
-  return entry.pokemon.filter(p => num(p[P.slot]) >= 1 && num(p[P.slot]) <= 6).sort((a, b) => num(a[P.slot]) - num(b[P.slot]));
+  return entry.pokemon.filter(p => num(p.partySlot) >= 1 && num(p.partySlot) <= 6).sort((a, b) => num(a.partySlot) - num(b.partySlot));
 }
 
 function pokemonName(p) {
-  return p[P.nick] || p[P.name];
+  return displayName(p);
 }
 
 function patchImages(scope) {
@@ -100,23 +107,23 @@ function drawOverview() {
           const t = entry.trainer;
           const party = partyOf(entry);
           return `
-            <button class="dm-party-card" data-trainer="${escapeHtml(t[T.name])}">
+            <button class="dm-party-card" data-trainer="${escapeHtml(t.name)}">
               <div class="dm-party-top">
-                <span class="dm-party-portrait" data-img="${escapeHtml(t[T.image] || '')}"></span>
+                <span class="dm-party-portrait" data-img="${escapeHtml(t.image || '')}"></span>
                 <span class="dm-party-who">
-                  <strong>${escapeHtml(t[T.name])}</strong>
-                  <small>Lv ${escapeHtml(t[T.level])} · ${escapeHtml(t[T.cls] || 'Trainer')} · ₽${num(t[T.money]).toLocaleString()}</small>
-                  <span class="dm-party-hpvp">HP ${current(t, T.curHP, T.hp)}/${num(t[T.hp])} · VP ${current(t, T.curVP, T.vp)}/${num(t[T.vp])}</span>
-                  ${bars(current(t, T.curHP, T.hp), num(t[T.hp]), current(t, T.curVP, T.vp), num(t[T.vp]))}
+                  <strong>${escapeHtml(t.name)}</strong>
+                  <small>Lv ${escapeHtml(t.level)} · ${escapeHtml(t.trainerClass || 'Trainer')} · ₽${num(t.money).toLocaleString()}</small>
+                  <span class="dm-party-hpvp">HP ${curHP(t)}/${num(t.combat?.maxHP)} · VP ${curVP(t)}/${num(t.combat?.maxVP)}</span>
+                  ${bars(curHP(t), num(t.combat?.maxHP), curVP(t), num(t.combat?.maxVP))}
                 </span>
               </div>
               <div class="dm-party-mons">
                 ${party.length ? party.map(p => `
                   <span class="dm-party-mon" title="${escapeHtml(pokemonName(p))}">
-                    <span class="dm-party-sprite" data-img="${escapeHtml(p[P.image] || '')}"></span>
+                    <span class="dm-party-sprite" data-img="${escapeHtml(p.image || '')}"></span>
                     <span class="dm-party-mon-name">${escapeHtml(pokemonName(p))}</span>
-                    <span class="dm-party-mon-lv">Lv ${escapeHtml(p[P.level])}</span>
-                    <span class="dm-bar hp"><i style="width:${pct(current(p, P.curHP, P.hp), num(p[P.hp]))}%"></i></span>
+                    <span class="dm-party-mon-lv">Lv ${escapeHtml(p.level)}</span>
+                    <span class="dm-bar hp"><i style="width:${pct(hpOf(p), num(p.combat.maxHP))}%"></i></span>
                   </span>`).join('') : '<span class="dm-hint">No Pokémon in the party.</span>'}
               </div>
               <div class="dm-party-foot">${entry.pokemon.length} Pokémon in total</div>
@@ -135,23 +142,23 @@ function drawOverview() {
 
 function drawTrainer(entry) {
   const t = entry.trainer;
-  const name = t[T.name];
-  const all = [...partyOf(entry), ...entry.pokemon.filter(p => !(num(p[P.slot]) >= 1 && num(p[P.slot]) <= 6))];
+  const name = t.name;
+  const all = [...partyOf(entry), ...entry.pokemon.filter(p => !(num(p.partySlot) >= 1 && num(p.partySlot) <= 6))];
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
   // The DM-only XP that came with the rows (DmAPI.party), or where each record's level starts.
-  const xpFor = p => xpOrStart(entry.xp?.pokemon?.[entry.pokemon.indexOf(p)], p[P.level]);
+  const xpFor = p => xpOrStart(entry.xp?.pokemon?.[entry.pokemon.indexOf(p)], p.level);
   const scrollers = [..._root.querySelectorAll('.dm-trainer-col')].map(c => c.scrollTop);
 
   _root.innerHTML = `
     <div class="dm-trainer">
       <div class="dm-trainer-bar">
         <button class="dm-btn small" id="trainerBack">← All trainers</button>
-        <span class="dm-party-portrait small" data-img="${escapeHtml(t[T.image] || '')}"></span>
+        <span class="dm-party-portrait small" data-img="${escapeHtml(t.image || '')}"></span>
         <h2>${escapeHtml(name)}</h2>
-        <span class="dm-hint">Lv ${escapeHtml(t[T.level])} · ${escapeHtml(t[T.cls] || 'Trainer')}${t[T.region] ? ` · ${escapeHtml(t[T.region])}` : ''}</span>
+        <span class="dm-hint">Lv ${escapeHtml(t.level)} · ${escapeHtml(t.trainerClass || 'Trainer')}${t.region ? ` · ${escapeHtml(t.region)}` : ''}</span>
       </div>
       <div class="dm-trainer-cols">
-        <div class="dm-trainer-col">${trainerStatsHtml(t)}${xpPanelHtml(xpOrStart(entry.xp?.trainer, t[T.level]), t[T.level], 'id="trainerXp"')}</div>
+        <div class="dm-trainer-col">${trainerStatsHtml(t)}${xpPanelHtml(xpOrStart(entry.xp?.trainer, t.level), t.level, 'id="trainerXp"')}</div>
         <div class="dm-trainer-col">
           <div class="dm-card-title dm-title-with-btn">Pokémon (${all.length})<button class="dm-btn small primary" id="givePokemonBtn">+ Give Pokémon</button></div>
           ${all.map(p => pokemonRowHtml(name, p, xpFor(p))).join('') || '<div class="dm-hint">No Pokémon.</div>'}
@@ -163,19 +170,19 @@ function drawTrainer(entry) {
   _root.querySelectorAll('.dm-trainer-col').forEach((c, i) => { if (scrollers[i]) c.scrollTop = scrollers[i]; });
   wireTrainer(name, items);
   document.getElementById('givePokemonBtn').addEventListener('click', async () => {
-    if (await givePokemonPopup(name, { ownedSpecies: entry.pokemon.map(p => p[P.name]) })) {
+    if (await givePokemonPopup(name, { ownedSpecies: entry.pokemon.map(p => p.name) })) {
       toast(`Gave ${name} a Pokémon`);
       reload();
     }
   });
   document.getElementById('trainerXp').addEventListener('click', async () => {
-    if (await giveXpPopup({ label: name, trainer: name, xp: xpOrStart(entry.xp?.trainer, t[T.level]), level: t[T.level] }) !== null) reload();
+    if (await giveXpPopup({ label: name, trainer: name, xp: xpOrStart(entry.xp?.trainer, t.level), level: t.level }) !== null) reload();
   });
   _root.querySelectorAll('[data-xp-mon]').forEach(b => b.addEventListener('click', async (e) => {
     e.stopPropagation(); // not the card's open / close
-    const p = entry.pokemon.find(x => x[P.name] === b.dataset.xpMon);
+    const p = entry.pokemon.find(x => x.name === b.dataset.xpMon);
     if (!p) return;
-    if (await giveXpPopup({ label: `${name}'s ${pokemonName(p)}`, trainer: name, pokemon: p[P.name], xp: xpFor(p), level: p[P.level] }) !== null) reload();
+    if (await giveXpPopup({ label: `${name}'s ${pokemonName(p)}`, trainer: name, pokemon: p.name, xp: xpFor(p), level: p.level }) !== null) reload();
   }));
 }
 
@@ -185,120 +192,97 @@ function trainerStatsHtml(t) {
   return `
     <div class="dm-card-title">Trainer</div>
     <div class="dm-tstats">
-      ${cell('HP', `${current(t, T.curHP, T.hp)}/${num(t[T.hp])}`)}${cell('VP', `${current(t, T.curVP, T.vp)}/${num(t[T.vp])}`)}
-      ${cell('AC', t[T.curAC] && num(t[T.curAC]) !== num(t[T.ac]) ? `${num(t[T.curAC])} (${num(t[T.ac])})` : num(t[T.ac]))}
-      ${cell('Speed', `${escapeHtml(t[T.speed] || 30)}ft`)}${cell('Initiative', sign(num(t[T.init])))}${cell('Proficiency', sign(num(t[T.prof])))}
+      ${cell('HP', `${curHP(t)}/${num(t.combat?.maxHP)}`)}${cell('VP', `${curVP(t)}/${num(t.combat?.maxVP)}`)}
+      ${cell('AC', t.current?.ac != null && num(t.current.ac) !== num(t.combat?.ac) ? `${num(t.current.ac)} (${num(t.combat?.ac)})` : num(t.combat?.ac))}
+      ${cell('Speed', `${escapeHtml(t.combat?.walkingSpeed || 30)}ft`)}${cell('Initiative', sign(num(t.combat?.initiative)))}${cell('Proficiency', sign(num(t.combat?.proficiency)))}
     </div>
     <div class="dm-tstats six">
-      ${STATS.map((s, i) => cell(s, `${num(t[T.str + i], 10)} <small>${sign(num(t[T.mods + i], Math.floor((num(t[T.str + i], 10) - 10) / 2)))}</small>`)).join('')}
+      ${STATS.map((s, i) => cell(s, `${num(t.stats?.[STAT_NAMES[i]], 10)} <small>${sign(num(t.modifiers?.[STAT_NAMES[i]], Math.floor((num(t.stats?.[STAT_NAMES[i]], 10) - 10) / 2)))}</small>`)).join('')}
     </div>
-    ${line('Saving throws', t[T.saves])}${line('Skills', t[T.skills])}
-    ${line('Trainer path', t[T.path])}${line('Affinity', t[T.affinity])}${line('Specialization', t[T.spec])}
-    ${line('Poké slots', t[T.slots])}${line('League points', t[T.league])}${line('Hit / vitality dice', `d${t[T.hd] || '?'} / d${t[T.vd] || '?'}`)}
-    ${line('Feats', t[T.feats])}${line('Gear', t[T.gear])}`;
+    ${line('Saving throws', list(t.savingThrows))}${line('Skills', list(t.skills))}
+    ${line('Trainer path', t.trainerPath)}${line('Affinity', list(t.affinities))}${line('Specialization', list(t.specializations))}
+    ${line('Poké slots', t.pokeslots)}${line('League points', t.leaguePoints)}${line('Hit / vitality dice', `d${t.combat?.hitDie || '?'} / d${t.combat?.vitalityDie || '?'}`)}
+    ${line('Feats', list(t.feats))}${line('Gear', list(t.gear))}`;
 }
 
-function abilityList(raw) {
-  return String(raw || '').split('|').map(a => a.trim()).filter(Boolean).map(entry => {
-    const body = entry.includes(':') ? entry.slice(entry.indexOf(':') + 1) : entry;
-    const [n, ...desc] = body.split(';');
-    return { name: n.trim(), desc: desc.join(';').trim() };
-  });
-}
 
-/** "40ft, 30ft, -, -, 60ft, -" (walking, climbing, flying, hovering, swimming, burrowing) -> "Walk 40ft · Climb 30ft · Swim 60ft". */
-function speedText(raw) {
-  const kinds = ['Walk', 'Climb', 'Fly', 'Hover', 'Swim', 'Burrow'];
-  return String(raw || '').split(',').map(s => s.trim()).map((v, i) => (v && v !== '-' && kinds[i] ? `${kinds[i]} ${v}` : '')).filter(Boolean).join(' · ');
+/** "Walk 40ft · Climb 30ft · Swim 60ft" -- the speeds it has. */
+function speedLine(p) {
+  const kinds = { walking: 'Walk', climbing: 'Climb', flying: 'Fly', hovering: 'Hover', swimming: 'Swim', burrowing: 'Burrow' };
+  return Object.entries(kinds).map(([k, label]) => ((p.movement || {})[k] ? `${label} ${p.movement[k]}ft` : '')).filter(Boolean).join(' · ');
 }
 
 function movesKnown(p) {
-  const lvl = num(p[P.level], 1);
-  const known = [];
-  MOVE_LEVELS.forEach((req, i) => {
-    if (lvl >= req) String(p[P.moves + i] || '').split(',').map(m => m.trim()).filter(Boolean).forEach(m => known.push(m));
-  });
-  String(p[P.custom] || '').split(',').map(m => m.trim()).filter(Boolean).forEach(m => { if (!known.includes(m)) known.push(m); });
-  return known;
+  return [...new Set(knownMoveNames(p))];
 }
 
 function pokemonRowHtml(trainer, p, xp) {
-  const key = `${trainer}|${p[P.name]}`;
+  const key = `${trainer}|${p.name}`;
   const open = _expanded.has(key);
-  const slot = num(p[P.slot]);
-  const hp = current(p, P.curHP, P.hp), vp = current(p, P.curVP, P.vp);
+  const slot = num(p.partySlot);
+  const hp = hpOf(p), vp = vpOf(p);
   // A div rather than a button: it holds the XP button, and a button can't sit inside another one.
   const head = `
     <div class="dm-tmon-head" data-toggle="${escapeHtml(key)}" role="button" tabindex="0">
-      <span class="dm-party-sprite" data-img="${escapeHtml(p[P.image] || '')}"></span>
+      <span class="dm-party-sprite" data-img="${escapeHtml(p.image || '')}"></span>
       <span class="dm-tmon-main">
-        <strong>${escapeHtml(pokemonName(p))}${p[P.nick] ? ` <small>(${escapeHtml(p[P.name])})</small>` : ''}${p[P.shiny] === 'Y' ? ' ✨' : ''}</strong>
-        <small>${typeBadges(p[P.type1], p[P.type2])} Lv ${escapeHtml(p[P.level])} · ${slot >= 1 && slot <= 6 ? `party slot ${slot}` : 'not in the party'}</small>
-        <span class="dm-party-hpvp">HP ${hp}/${num(p[P.hp])} · VP ${vp}/${num(p[P.vp])}</span>
-        ${bars(hp, num(p[P.hp]), vp, num(p[P.vp]))}
+        <strong>${escapeHtml(pokemonName(p))}${p.nickname ? ` <small>(${escapeHtml(p.name)})</small>` : ''}${p.shiny ? ' ✨' : ''}</strong>
+        <small>${typeBadges(p.types?.primary, p.types?.secondary)} Lv ${escapeHtml(p.level)} · ${slot >= 1 && slot <= 6 ? `party slot ${slot}` : 'not in the party'}</small>
+        <span class="dm-party-hpvp">HP ${hp}/${num(p.combat.maxHP)} · VP ${vp}/${num(p.combat.maxVP)}</span>
+        ${bars(hp, num(p.combat.maxHP), vp, num(p.combat.maxVP))}
       </span>
-      ${xpButtonHtml(xp, p[P.level], `data-xp-mon="${escapeHtml(p[P.name])}"`)}
+      ${xpButtonHtml(xp, p.level, `data-xp-mon="${escapeHtml(p.name)}"`)}
       <span class="dm-tmon-caret">${open ? '▾' : '▸'}</span>
     </div>`;
   if (!open) return `<div class="dm-tmon">${head}</div>`;
   const cell = (label, value) => `<div class="dm-tstat"><span>${label}</span><strong>${value}</strong></div>`;
   const line = (label, value) => (value ? `<div class="dm-tline"><span>${label}</span><span>${escapeHtml(value)}</span></div>` : '');
-  const senses = String(p[P.senses] || '').split(',').map(s => s.trim());
+  const senses = sensesList(p);
+  const c = p.combat || {};
+  const curAC = p.current?.ac;
   return `
     <div class="dm-tmon open">${head}
       <div class="dm-tmon-body">
         <div class="dm-tstats">
-          ${cell('AC', p[P.curAC] && num(p[P.curAC]) !== num(p[P.ac]) ? `${num(p[P.curAC])} (${num(p[P.ac])})` : num(p[P.ac]))}
-          ${cell('Initiative', sign(num(p[P.init])))}${cell('Proficiency', sign(num(p[P.prof])))}${cell('STAB', sign(num(p[P.stab])))}
-          ${cell('Loyalty', num(p[P.loyalty]))}${cell('Nature', escapeHtml(p[P.nature] || '—'))}
+          ${cell('AC', curAC != null && num(curAC) !== num(c.ac) ? `${num(curAC)} (${num(c.ac)})` : num(c.ac))}
+          ${cell('Initiative', sign(num(c.initiative)))}${cell('Proficiency', sign(num(c.proficiency)))}${cell('STAB', sign(num(c.stab)))}
+          ${cell('Loyalty', num(p.loyalty))}${cell('Nature', escapeHtml(p.nature || '—'))}
         </div>
         <div class="dm-tstats six">
-          ${STATS.map((s, i) => cell(s, `${num(p[P.str + i], 10)} <small>${sign(num(p[P.mods + i], Math.floor((num(p[P.str + i], 10) - 10) / 2)))}</small>`)).join('')}
+          ${STATS.map((s, i) => { const v = num(p.stats?.[STAT_NAMES[i]], 10); return cell(s, `${v} <small>${sign(num(p.modifiers?.[STAT_NAMES[i]], Math.floor((v - 10) / 2)))}</small>`); }).join('')}
         </div>
-        ${line('Held item', p[P.item])}${line('Status', p[P.status])}${line('Size', p[P.size])}${line('Speed', speedText(p[P.speed]))}
-        ${line('Saving throws', p[P.saves])}${line('Skills', p[P.skills])}${line('Hit / vitality dice', `d${p[P.hd] || '?'} / d${p[P.vd] || '?'}`)}
-        ${line('Feats', p[P.feats])}${line('Gear', p[P.gear])}${line('Evolution', p[P.evo])}
-        ${abilityList(p[P.abilities]).map(a => `<div class="dm-tline"><span>Ability</span><span><strong>${escapeHtml(a.name)}</strong>${a.desc ? ` -- ${escapeHtml(a.desc)}` : ''}</span></div>`).join('')}
+        ${line('Held item', p.heldItem)}${line('Status', (p.statusConditions || []).join(', '))}${line('Size', p.size)}${line('Speed', speedLine(p))}
+        ${line('Saving throws', (p.savingThrows || []).join(', '))}${line('Skills', (p.skills || []).join(', '))}${line('Hit / vitality dice', `d${c.hitDie || '?'} / d${c.vitalityDie || '?'}`)}
+        ${line('Feats', (p.feats || []).join(', '))}${line('Gear', p.gear)}${line('Evolution', evolutionLine(p))}
+        ${abilitiesOf(p).map(a => `<div class="dm-tline"><span>Ability</span><span><strong>${escapeHtml(a.name)}</strong>${a.description ? ` -- ${escapeHtml(a.description)}` : ''}</span></div>`).join('')}
         <div class="dm-tline"><span>Moves</span><span class="dm-move-chips">${movesKnown(p).map(m => `<span>${escapeHtml(m)}</span>`).join('') || '—'}</span></div>
-        ${senses.some(s => s && s !== '-') ? `<div class="dm-tline"><span>Senses</span><span>${SENSES.map((s, i) => (senses[i] && senses[i] !== '-' ? `${s} ${escapeHtml(senses[i])}` : '')).filter(Boolean).join(' · ')}</span></div>` : ''}
-        ${line('Notes', p[P.comment])}
+        ${senses.length ? `<div class="dm-tline"><span>Senses</span><span>${senses.map(([s, v]) => `${s} ${escapeHtml(v)}`).join(' · ')}</span></div>` : ''}
+        ${line('Notes', (p.comments || []).join(' · '))}
       </div>
     </div>`;
 }
 
-/** The inventory cell as [{name, quantity, type, description, custom}] -- the format trainer-info.js reads: regular
- * items "Potion (x2), Antidote (x1)" (named after the items list), custom ones as JSON after ##CUSTOM##. */
-function parseInventory(text, items) {
-  const [regularText, customText] = String(text || '').split('##CUSTOM##');
-  const out = [];
-  let end = 0;
-  const re = /(.*?)\(x(\d+)\)\s*,?/g;
-  let m;
-  while ((m = re.exec(regularText)) !== null) {
-    const name = m[1].trim().replace(/^,|,$/g, '').trim();
-    if (name) out.push({ name, quantity: num(m[2], 1) });
-    end = re.lastIndex;
-    if (m[0] === '') break;
-  }
-  regularText.slice(end).split(',').map(s => s.trim()).filter(s => s && s.toLowerCase() !== 'none').forEach(name => out.push({ name, quantity: 1 }));
-  out.forEach(it => {
-    const data = items.find(i => i.name.toLowerCase() === it.name.toLowerCase());
-    it.type = data?.type || 'Other';
-    it.description = data ? `${data.description || ''}${data.effect ? ` ${data.effect}` : ''}`.trim() : '';
+/** The trainer's items as [{name, quantity, type, description, custom}] -- `type` the item list's category (or 'Other'),
+ * the trainer's own items under 'Custom items'. */
+function inventoryOf(t, items) {
+  const out = (t.inventory || []).map(it => {
+    const data = items.find(i => i.name.toLowerCase() === String(it.name).toLowerCase());
+    return {
+      name: it.name, quantity: num(it.quantity, 1), type: data?.category || 'Other',
+      description: data ? `${data.description || ''}${data.effect ? ` ${data.effect}` : ''}`.trim() : '',
+    };
   });
-  let custom = [];
-  try { custom = JSON.parse(customText || '[]') || []; } catch { custom = []; }
-  custom.forEach(c => out.push({ name: c.name, quantity: num(c.quantity, 1), type: 'Custom items', description: c.description || '', custom: true }));
+  (t.customItems || []).forEach(c => out.push({ name: c.name, quantity: num(c.quantity, 1), type: 'Custom items', description: c.description || '', custom: true }));
   return out;
 }
 
 function moneyAndItemsHtml(t, items) {
-  const inv = parseInventory(t[T.inventory], items);
+  const inv = inventoryOf(t, items);
   const groups = {};
   inv.forEach(it => { (groups[it.type] = groups[it.type] || []).push(it); });
   return `
     <div class="dm-card-title">Money</div>
-    <div class="dm-money">₽${num(t[T.money]).toLocaleString()}</div>
+    <div class="dm-money">₽${num(t.money).toLocaleString()}</div>
     <div class="dm-row">
       <input class="dm-input" id="moneyAmount" type="number" min="0" placeholder="Amount">
       <button class="dm-btn primary" id="moneyAdd">+ Give</button>
@@ -372,7 +356,7 @@ function wireTrainer(name, items) {
     document.querySelectorAll('[data-give-tab]').forEach(x => x.classList.toggle('active', x === b));
     document.querySelectorAll('[data-give-pane]').forEach(pane => { pane.hidden = pane.dataset.givePane !== b.dataset.giveTab; });
   }));
-  attachSuggest(document.getElementById('giveItemName'), () => items.map(i => ({ value: i.name, label: i.name, sub: i.type || '' })),
+  attachSuggest(document.getElementById('giveItemName'), () => items.map(i => ({ value: i.name, label: i.name, sub: i.category || '' })),
     { after: document.querySelector('.dm-give-item-row') });
   document.getElementById('giveItemBtn').addEventListener('click', () => {
     const typed = document.getElementById('giveItemName').value.trim();

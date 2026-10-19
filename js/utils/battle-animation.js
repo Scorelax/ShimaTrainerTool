@@ -1,5 +1,5 @@
 // Preload cache for self-uploaded per-species "use move" battle animations
-// (see upstream.BATTLE_ANIMATION_DIR on the Pi). Combat pages know every
+// (see media.BATTLE_ANIMATION_DIR on the Pi). Combat pages know every
 // Pokemon involved as soon as they load, well before any move gets
 // confirmed, so preloadBattleAnimation() is called then -- by the time the
 // player clicks Yes on a move, the clip (if one exists for that species) is

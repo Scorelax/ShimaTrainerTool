@@ -279,7 +279,7 @@ async function loadSource(name) {
     }));
   } else if (name === 'trainers') {
     _data.trainers = ((await DmAPI.party()).data || []).map(({ trainer: t }) => ({
-      key: t[1], kind: 'trainer', label: t[1], sub: `Lv ${t[2]}`, still: t[0] || '', animated: '', search: String(t[1]).toLowerCase(),
+      key: t.name, kind: 'trainer', label: t.name, sub: `Lv ${t.level}`, still: t.image || '', animated: '', search: String(t.name).toLowerCase(),
     }));
   } else if (name === 'backgrounds') {
     _data.backgrounds = (await DmAPI.displayImages()).data || [];

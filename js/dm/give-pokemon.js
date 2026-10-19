@@ -7,7 +7,7 @@ import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
 import {
   escapeHtml, typeBadges, natureOptions, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect,
-  openDmModal, getSpecies, participantFromPokemonRow, attachSuggest,
+  openDmModal, getSpecies, participantFromPokemon, attachSuggest,
 } from './dm-common.js';
 
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -95,11 +95,11 @@ export async function givePokemonPopup(trainer, { ownedSpecies = [] } = {}) {
       const res = await DmAPI.buildPokemon({ ...cfg, preview: true });
       if (seq !== previewSeq || !document.body.contains(body)) return;
       const row = res.data;
-      const { participant: p } = participantFromPokemonRow(row);
+      const { participant: p } = participantFromPokemon(row);
       body.querySelectorAll('[data-stat]').forEach(i => { i.placeholder = p[i.dataset.stat] ?? '?'; });
       body.querySelectorAll('[data-override]').forEach(i => { i.placeholder = p[i.dataset.override] ?? '?'; });
       const sign = n => (n >= 0 ? `+${n}` : `${n}`);
-      body.querySelector('#gpDerived').textContent = `Initiative ${sign(Number(row[30]) || 0)} · Proficiency +${row[31]} · STAB +${row[34]} · Skills: ${row[22] || '-'}`;
+      body.querySelector('#gpDerived').textContent = `Initiative ${sign(Number(row.combat.initiative) || 0)} · Proficiency +${row.combat.proficiency} · STAB +${row.combat.stab} · Skills: ${(row.skills || []).join(', ') || '-'}`;
       body.querySelector('#gpMoves').innerHTML = (p.moves || []).map(m => `<span>${escapeHtml(m)}</span>`).join('') || '<span class="dm-hint">None</span>';
     } catch (err) {
       if (seq === previewSeq) body.querySelector('#gpDerived').textContent = `Couldn't work the numbers out: ${err.message}`;
@@ -159,7 +159,7 @@ export async function givePokemonPopup(trainer, { ownedSpecies = [] } = {}) {
       // Lists that open under the field (attachSuggest), the species with their pictures.
       attachSuggest(speciesInput, () => species.map(s => ({ value: s.name, label: s.name, sub: `No. ${s.dex}`, image: s.image || '' })),
         { imageFallback: 'assets/Pokeball.png' });
-      attachSuggest(body.querySelector('#gpItem'), () => items.map(i => ({ value: i.name, label: i.name, sub: i.type || '' })));
+      attachSuggest(body.querySelector('#gpItem'), () => items.map(i => ({ value: i.name, label: i.name, sub: i.category || '' })));
       speciesInput.addEventListener('change', () => pickSpecies(body));
       speciesInput.addEventListener('input', () => pickSpecies(body));
       const form = body.querySelector('#gpForm');

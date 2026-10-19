@@ -1,5 +1,6 @@
 // Combat Page — Full encounter tracker with initiative, status effects, and move integration
 
+import { abilitiesOf, allCachedPokemon, currentHP, currentVP, displayName, knownMoveNames, pokemonKey } from '../utils/owned-pokemon.js';
 import { PokemonAPI, TrainerAPI, CombatAPI } from '../api.js';
 import { showToast } from '../utils/notifications.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData } from '../utils/pokemon-types.js';
@@ -11,6 +12,8 @@ import { setAbilityData, moveAbilityMods, activatedAbilityEffects, abilityExtraD
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 import { beginMove, commitMove } from '../utils/move-commit.js';
+import { addItem, currentAC as trainerCurrentAC, currentHP as trainerCurrentHP, currentVP as trainerCurrentVP, emptyTrainer, loadTrainer, storeTrainer } from '../utils/trainer-data.js';
+import { abilityList, nameList, speedsText } from '../utils/battle-lists.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
@@ -31,7 +34,7 @@ let _moveMap = null; // Map<name, moveData> for O(1) lookups
 
 /** True for a move whose action cost is a bonus action ("1 bonus action", ...). One per round per combatant. */
 function _isBonusActionMove(moveName) {
-  return /bonus action/i.test(_moveMap?.get(moveName)?.[3] || '');
+  return /bonus action/i.test(_moveMap?.get(moveName)?.action || '');
 }
 
 // Move-name -> category tags (see pi-server/docs/DnD_moves_categorized_draft.json
@@ -122,17 +125,10 @@ function getCachedItems() {
 // GAME HELPERS
 // ============================================================================
 
-/**
- * Returns true if the combatant has the named ability (case-insensitive).
- * Abilities are stored as "slot:name;desc|slot:name;desc" or "name;desc|name;desc".
- */
+/** True if the combatant has the named ability (case-insensitive) -- its `abilities` list (battle-lists.js). */
 function hasAbility(combatant, abilityName) {
-  if (!combatant?.abilities) return false;
   const target = abilityName.toLowerCase();
-  return combatant.abilities.split('|').some(a => {
-    const body = a.includes(':') ? a.substring(a.indexOf(':') + 1) : a;
-    return body.split(';')[0].trim().toLowerCase() === target;
-  });
+  return abilityList(combatant?.abilities).some(a => a.name.toLowerCase() === target);
 }
 
 function computeProficiency(level) {
@@ -157,8 +153,8 @@ function loadCombatMoves() {
   if (!rawMovesData) return;
   try {
     const clean = JSON.parse(rawMovesData.replace(/\\"/g, '"').replace(/\\r/g, '').replace(/\\n/g, ''));
-    _moves = clean.map(move => move.map(item => (typeof item === 'string' ? item.trim() : item)));
-    _moveMap = new Map(_moves.map(m => [m[0], m]));
+    _moves = clean.map(move => Object.fromEntries(Object.entries(move).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])));
+    _moveMap = new Map(_moves.map(m => [m.name, m]));
   } catch (e) {
     console.error('Failed to parse moves data:', e);
   }
@@ -197,32 +193,17 @@ function parseRecharge(actionType) {
 }
 
 /**
- * Parse saved KnownMoves string into a map.
- * "Flame Wheel(1)(SR),Earthquake(0)(LR)" → { "Flame Wheel": { chargesLeft:1, type:'SR' }, ... }
- */
-function parseKnownMoves(str) {
-  if (!str) return {};
-  const result = {};
-  str.split(',').map(s => s.trim()).filter(Boolean).forEach(part => {
-    const match = part.match(/^(.+?)\((\d+)\)\((\w+)\)$/);
-    if (match) result[match[1]] = { chargesLeft: parseInt(match[2]), type: match[3] };
-  });
-  return result;
-}
-
-/**
- * Build the KnownMoves string to save back to the database.
- * Only includes SR/LR moves — DICE-type recharge moves are combat-only and not persisted.
+ * The move charges to save on the Pokemon (its `moveCharges`: { "Flame Wheel": { chargesLeft: 1, type: 'SR' } }).
+ * Only SR/LR moves — DICE-type recharge moves are combat-only and not persisted.
  * Exported so combat-wip.js can persist a recharge-locked move's spent state through to
  * the DB itself (see its own _persistRechargeStates) -- this app's only OTHER place that
  * does this is endCombat below, which is legacy-combat-only (fires off its own End
- * Combat button), so the shared tool needs its own hook onto the same string format.
+ * Combat button).
  */
-export function buildKnownMovesString(rechargeStates) {
-  return Object.entries(rechargeStates)
+export function persistedMoveCharges(rechargeStates) {
+  return Object.fromEntries(Object.entries(rechargeStates)
     .filter(([, s]) => s.type !== 'DICE')
-    .map(([name, s]) => `${name}(${s.chargesLeft})(${s.type})`)
-    .join(',');
+    .map(([name, s]) => [name, { chargesLeft: s.chargesLeft, type: s.type }]));
 }
 
 /**
@@ -238,7 +219,7 @@ function initializeRechargeStates(state) {
       if (c.rechargeStates[moveName] !== undefined) return;
       const moveData = _moveMap.get(moveName);
       if (!moveData) return;
-      const recharge = parseRecharge(moveData[3] || '');
+      const recharge = parseRecharge(moveData.action || '');
       if (!recharge) return;
       if (recharge.type === 'DICE') {
         c.rechargeStates[moveName] = { chargesLeft: 1, maxCharges: 1, type: 'DICE', range: recharge.range };
@@ -256,48 +237,46 @@ function initializeRechargeStates(state) {
 // ============================================================================
 
 export function buildTrainerCombatant() {
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  const level = parseInt(trainerData[2]) || 1;
-  const str = parseInt(trainerData[5]) || 10;
-  const dex = parseInt(trainerData[6]) || 10;
-  const con = parseInt(trainerData[7]) || 10;
-  const int_ = parseInt(trainerData[8]) || 10;
-  const wis = parseInt(trainerData[9]) || 10;
-  const cha = parseInt(trainerData[10]) || 10;
-  const strMod = parseInt(trainerData[27]) || Math.floor((str - 10) / 2);
-  const dexMod = parseInt(trainerData[28]) || Math.floor((dex - 10) / 2);
-  const conMod = parseInt(trainerData[29]) || Math.floor((con - 10) / 2);
-  const intMod = parseInt(trainerData[30]) || Math.floor((int_ - 10) / 2);
-  const wisMod = parseInt(trainerData[31]) || Math.floor((wis - 10) / 2);
-  const chaMod = parseInt(trainerData[32]) || Math.floor((cha - 10) / 2);
-  const maxHp = parseInt(trainerData[11]) || 0;
-  const maxVp = parseInt(trainerData[12]) || 0;
-  const currentHp = (trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== '') ? parseInt(trainerData[34]) : maxHp;
-  const currentVp = (trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== '') ? parseInt(trainerData[35]) : maxVp;
-  const ac = parseInt(trainerData[36]) || parseInt(trainerData[13]) || 10;
-  const baseAc = parseInt(trainerData[13]) || 10;
-  // Single walking speed -- trainers have no other movement types (see
-  // TRAINER_COLUMNS in db.py, index 14). 30ft is the standard humanoid
-  // default when a sheet has none recorded, matching every other stat
-  // default above.
-  const walkingSpeed = parseInt(trainerData[14]) || 30;
+  const trainerData = loadTrainer();
+  const stats = trainerData.stats, mods = trainerData.modifiers;
+  const level = parseInt(trainerData.level) || 1;
+  const str = parseInt(stats.strength) || 10;
+  const dex = parseInt(stats.dexterity) || 10;
+  const con = parseInt(stats.constitution) || 10;
+  const int_ = parseInt(stats.intelligence) || 10;
+  const wis = parseInt(stats.wisdom) || 10;
+  const cha = parseInt(stats.charisma) || 10;
+  const modOf = (v, score) => (Number.isFinite(parseInt(v)) ? parseInt(v) : Math.floor((score - 10) / 2));
+  const strMod = modOf(mods.strength, str);
+  const dexMod = modOf(mods.dexterity, dex);
+  const conMod = modOf(mods.constitution, con);
+  const intMod = modOf(mods.intelligence, int_);
+  const wisMod = modOf(mods.wisdom, wis);
+  const chaMod = modOf(mods.charisma, cha);
+  const maxHp = parseInt(trainerData.combat.maxHP) || 0;
+  const maxVp = parseInt(trainerData.combat.maxVP) || 0;
+  const currentHp = parseInt(trainerCurrentHP(trainerData)) || 0;
+  const currentVp = parseInt(trainerCurrentVP(trainerData)) || 0;
+  const ac = parseInt(trainerCurrentAC(trainerData)) || 10;
+  const baseAc = parseInt(trainerData.combat.ac) || 10;
+  // Single walking speed -- trainers have no other movement types (combat.walkingSpeed, trainers.py). 30ft is the
+  // standard humanoid default when none is recorded, matching every other stat default above.
+  const walkingSpeed = parseInt(trainerData.combat.walkingSpeed) || 30;
   const speeds = [{ type: 'Walking', ft: walkingSpeed }];
 
   return {
     id: 'trainer', type: 'trainer', entityKey: 'trainerData',
-    name: trainerData[1] || 'Trainer',
-    image: trainerData[0] || 'assets/Pokeball.png',
+    name: trainerData.name || 'Trainer',
+    image: trainerData.image || 'assets/Pokeball.png',
     level, initiativeScore: dexMod, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: dexMod,
     ac, baseAc, critMod: 0, maxHp, currentHp, maxVp, currentVp,
-    proficiency: parseInt(trainerData[17]) || computeProficiency(level),
-    savingThrows: trainerData[15] || '',
-    skills: trainerData[18] || '',
+    proficiency: parseInt(trainerData.combat.proficiency) || computeProficiency(level),
+    savingThrows: [...trainerData.savingThrows],
+    skills: [...trainerData.skills],
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
     moves: [], types: [], rechargeStates: {},
-    feats: trainerData[33] || '',
-    inventory: trainerData[20] || '',
-    movement: `Walking: ${walkingSpeed}`,
+    feats: [...trainerData.feats],
     speeds,
     statusEffects: [], isExpanded: false
   };
@@ -306,59 +285,46 @@ export function buildTrainerCombatant() {
 export function buildPokemonCombatant(pokemonKey) {
   loadCombatMoves();
   loadMoveCategories();
-  const pokemonData = JSON.parse(sessionStorage.getItem(pokemonKey) || '[]');
-  const level = parseInt(pokemonData[4]) || 1;
-  const str = parseInt(pokemonData[15]) || 10;
-  const dex = parseInt(pokemonData[16]) || 10;
-  const con = parseInt(pokemonData[17]) || 10;
-  const int_ = parseInt(pokemonData[18]) || 10;
-  const wis = parseInt(pokemonData[19]) || 10;
-  const cha = parseInt(pokemonData[20]) || 10;
+  const pokemonData = JSON.parse(sessionStorage.getItem(pokemonKey) || '{}');
+  const stats = pokemonData.stats || {};
+  const level = parseInt(pokemonData.level) || 1;
+  const str = parseInt(stats.strength) || 10;
+  const dex = parseInt(stats.dexterity) || 10;
+  const con = parseInt(stats.constitution) || 10;
+  const int_ = parseInt(stats.intelligence) || 10;
+  const wis = parseInt(stats.wisdom) || 10;
+  const cha = parseInt(stats.charisma) || 10;
   const strMod = Math.floor((str - 10) / 2);
   const dexMod = Math.floor((dex - 10) / 2);
   const conMod = Math.floor((con - 10) / 2);
   const intMod = Math.floor((int_ - 10) / 2);
   const wisMod = Math.floor((wis - 10) / 2);
   const chaMod = Math.floor((cha - 10) / 2);
-  const maxHp = parseInt(pokemonData[10]) || 0;
-  const maxVp = parseInt(pokemonData[12]) || 0;
-  const currentHp = (pokemonData[45] !== null && pokemonData[45] !== undefined && pokemonData[45] !== '') ? parseInt(pokemonData[45]) : maxHp;
-  const currentVp = (pokemonData[46] !== null && pokemonData[46] !== undefined && pokemonData[46] !== '') ? parseInt(pokemonData[46]) : maxVp;
-  const proficiency = parseInt(pokemonData[31]) || computeProficiency(level);
-  const initiative = parseInt(pokemonData[30]) || dexMod;
+  const combat = pokemonData.combat || {};
+  const maxHp = parseInt(combat.maxHP) || 0;
+  const maxVp = parseInt(combat.maxVP) || 0;
+  const currentHp = currentHP(pokemonData);
+  const currentVp = currentVP(pokemonData);
+  const proficiency = parseInt(combat.proficiency) || computeProficiency(level);
+  const initiative = parseInt(combat.initiative) || dexMod;
 
-  // Parse learned moves by level
-  const moveIndices = [23, 24, 25, 26, 27, 28, 37];
-  const requiredLevels = [1, 2, 6, 10, 14, 18, 0];
-  const moves = [];
-  moveIndices.forEach((idx, i) => {
-    if (level >= requiredLevels[i] || (idx === 37 && pokemonData[idx])) {
-      const raw = pokemonData[idx] || '';
-      if (raw) raw.split(',').map(m => m.trim()).filter(Boolean).forEach(m => moves.push(m));
-    }
-  });
+  // The moves it knows: each level's up to its own, then its custom moves
+  const moves = knownMoveNames(pokemonData);
 
-  // Parse movement -- pokemonData[13] is "walking,climbing,flying,hovering,swimming,burrowing"
-  // (see pokemon-card.js's own copy of this same parse). `speeds` is the
-  // structured form the battle map's movement tracker uses (see
-  // battle-map-popup.js); `movement` stays the plain display string the
-  // move-details info-row has always shown.
-  const movementData = pokemonData[13] || '';
-  const movementValues = movementData.split(',').map(v => v.trim());
+  // Its speeds, as the battle map's movement tracker uses them (see battle-map-popup.js).
   const movementTypes = ['Walking', 'Climbing', 'Flying', 'Hovering', 'Swimming', 'Burrowing'];
-  const speeds = movementValues
-    .map((v, i) => ({ type: movementTypes[i], ft: parseInt(v, 10) || 0 }))
+  const speeds = movementTypes
+    .map(type => ({ type, ft: parseInt((pokemonData.movement || {})[type.toLowerCase()], 10) || 0 }))
     .filter(s => s.ft > 0);
-  const movementDisplay = speeds.map(s => `${s.type}: ${s.ft}`).join(', ');
 
-  // Initialize recharge states (using existing KnownMoves from pokemonData[59] if present)
-  const existingRecharges = parseKnownMoves(pokemonData[59] || '');
+  // Initialize recharge states (keeping the charges the Pokemon has left, its moveCharges)
+  const existingRecharges = pokemonData.moveCharges || {};
   const rechargeStates = {};
   if (_moves) {
     moves.forEach(moveName => {
       const moveData = _moveMap.get(moveName);
       if (!moveData) return;
-      const recharge = parseRecharge(moveData[3] || '');
+      const recharge = parseRecharge(moveData.action || '');
       if (!recharge) return;
       if (recharge.type === 'DICE') {
         // Dice-recharge moves always start fresh each combat — not persisted
@@ -375,32 +341,31 @@ export function buildPokemonCombatant(pokemonKey) {
   // Battle animation is keyed by species, not nickname -- and known as soon
   // as this combatant is built, well before any move gets confirmed -- so
   // kick off the preload right here rather than waiting on the move popup.
-  preloadBattleAnimation(pokemonData[2]);
+  preloadBattleAnimation(pokemonData.name);
 
   return {
     id: pokemonKey, type: 'pokemon', entityKey: pokemonKey,
-    name: pokemonData[36] || pokemonData[2] || 'Pokemon',
-    speciesName: pokemonData[2] || '',
-    image: pokemonData[1] || 'assets/Pokeball.png',
+    name: pokemonData.nickname || pokemonData.name || 'Pokemon',
+    speciesName: pokemonData.name || '',
+    image: pokemonData.image || 'assets/Pokeball.png',
     level, initiativeScore: initiative, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: initiative,
-    ac: parseInt(pokemonData[8]) || 10, baseAc: parseInt(pokemonData[8]) || 10, critMod: 0,
+    ac: parseInt(combat.ac) || 10, baseAc: parseInt(combat.ac) || 10, critMod: 0,
     maxHp, currentHp, maxVp, currentVp,
-    proficiency, stabBonusValue: parseInt(pokemonData[34]) || 2,
-    loyalty: parseInt(pokemonData[33]) || 0, // Frustration/Return's own damage_note condition
-    savingThrows: pokemonData[21] || '',
-    skills: pokemonData[22] || '',
+    proficiency, stabBonusValue: parseInt(combat.stab) || 2,
+    loyalty: parseInt(pokemonData.loyalty) || 0, // Frustration/Return's own damage_note condition
+    savingThrows: [...(pokemonData.savingThrows || [])],
+    skills: [...(pokemonData.skills || [])],
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
-    moves, types: [pokemonData[5], pokemonData[6]].filter(Boolean),
-    abilities: pokemonData[7] || '',
-    item: pokemonData[35] || '',
-    size: pokemonData[57] || '',
-    movement: movementDisplay,
+    moves, types: [pokemonData.types?.primary, pokemonData.types?.secondary].filter(Boolean),
+    abilities: abilitiesOf(pokemonData).map(a => ({ slot: a.slot, name: a.name, description: a.description || '' })),
+    item: pokemonData.heldItem || '',
+    size: pokemonData.size || '',
     speeds,
     rechargeStates,
-    feats: pokemonData[50] || '',
-    typeChart: pokemonData[53] || '',
-    statusEffects: (pokemonData[60] || '').split(',').map(s => s.trim()).filter(Boolean).map(name => ({ name, description: '', duration: -1 })),
+    feats: [...(pokemonData.feats || [])],
+    typeChart: pokemonData.typeMatchups || {},
+    statusEffects: (pokemonData.statusConditions || []).map(name => ({ name, description: '', duration: -1 })),
     isExpanded: false
   };
 }
@@ -514,18 +479,16 @@ export function renderCombat() {
 
 /** `adventure`: joining the DM's adventure (no battle) -- bringing a Pokemon along is optional. */
 export function renderSetupPhase({ showWipButton = true, adventure = false } = {}) {
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  const trainerName = trainerData[1] || 'Trainer';
-  const trainerImage = trainerData[0] || 'assets/Pokeball.png';
-  const trainerLevel = parseInt(trainerData[2]) || 1;
+  const trainerData = loadTrainer();
+  const trainerName = trainerData.name || 'Trainer';
+  const trainerImage = trainerData.image || 'assets/Pokeball.png';
+  const trainerLevel = parseInt(trainerData.level) || 1;
 
   const partyPokemon = [];
-  for (const key of Object.keys(sessionStorage)) {
-    if (!key.startsWith('pokemon_')) continue;
-    const pData = JSON.parse(sessionStorage.getItem(key));
-    const slot = parseInt(pData[38], 10);
+  for (const pData of allCachedPokemon()) {
+    const slot = parseInt(pData.partySlot, 10);
     if (slot >= 1 && slot <= 6) {
-      partyPokemon.push({ key, name: pData[36] || pData[2] || 'Unknown', image: pData[1] || 'assets/Pokeball.png', level: parseInt(pData[4]) || 1, types: [pData[5], pData[6]].filter(Boolean), slot });
+      partyPokemon.push({ key: pokemonKey(pData.name), name: displayName(pData) || 'Unknown', image: pData.image || 'assets/Pokeball.png', level: parseInt(pData.level) || 1, types: [pData.types?.primary, pData.types?.secondary].filter(Boolean), slot });
     }
   }
   partyPokemon.sort((a, b) => a.slot - b.slot);
@@ -1112,16 +1075,9 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
     </div>`;
 }
 
-function renderAbilitiesForCombat(raw) {
-  if (!raw) return '';
-  return raw.split('|').map(a => a.trim()).filter(Boolean).map(a => {
-    const colonIdx = a.indexOf(':');
-    const body = colonIdx !== -1 ? a.substring(colonIdx + 1) : a;
-    const parts = body.split(';');
-    const name = parts[0].trim();
-    const desc = parts.slice(1).join(';').trim();
-    return name ? `<div class="ability-entry"><strong>${name}</strong>${desc ? `<span class="ability-desc">: ${desc}</span>` : ''}</div>` : '';
-  }).join('');
+function renderAbilitiesForCombat(abilities) {
+  return abilityList(abilities).map(a =>
+    `<div class="ability-entry"><strong>${a.name}</strong>${a.description ? `<span class="ability-desc">: ${a.description}</span>` : ''}</div>`).join('');
 }
 
 function renderItemForCombat(itemName) {
@@ -1133,11 +1089,12 @@ function renderItemForCombat(itemName) {
 
 function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive, concentrationHtml = '' } = {}) {
   // --- Feats section (both) ---
-  const featsSection = c.feats ? `
+  const feats = nameList(c.feats);
+  const featsSection = feats.length ? `
     <div class="expanded-feats-section">
       <div class="expanded-section-label">Feats</div>
       <div class="feats-list">
-        ${c.feats.split(',').map(f => f.trim()).filter(Boolean).map(f => `<span class="feat-badge">${f}</span>`).join('')}
+        ${feats.map(f => `<span class="feat-badge">${f}</span>`).join('')}
       </div>
     </div>` : '';
 
@@ -1173,16 +1130,16 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
     'Animal Handling': 'WIS', 'Insight': 'WIS', 'Medicine': 'WIS', 'Perception': 'WIS', 'Survival': 'WIS',
     'Deception': 'CHA', 'Intimidation': 'CHA', 'Performance': 'CHA', 'Persuasion': 'CHA'
   };
+  const skills = nameList(c.skills), saves = nameList(c.savingThrows);
   const proficiencyDisplay = c.proficiency != null
-    ? `+${c.proficiency}${c.skills ? ' — ' + c.skills.split(',').map(s => {
-        const skill = s.trim().replace(/\+$/, '');
+    ? `+${c.proficiency}${skills.length ? ' — ' + skills.map(s => {
+        const skill = s.replace(/\+$/, '');
         const stat = SKILL_STAT[skill];
         return stat ? `${skill} (${stat})` : skill;
-      }).filter(Boolean).join(', ') : ''}`
+      }).join(', ') : ''}`
     : null;
-  const savingThrowDisplay = c.proficiency != null && c.savingThrows && c.savingThrows.trim() && c.savingThrows.trim().toLowerCase() !== 'none'
-    ? `+${c.proficiency} — ${c.savingThrows.split(',').map(s => s.trim()).filter(Boolean).join(', ')}`
-    : null;
+  const savingThrowDisplay = c.proficiency != null && saves.length ? `+${c.proficiency} — ${saves.join(', ')}` : null;
+  const movement = speedsText(c.speeds);
   const infoSection = c.type === 'pokemon' ? `
     <div class="expanded-info-section">
       <div class="expanded-section-label">Pokémon Info</div>
@@ -1190,7 +1147,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
         ${abilitiesHtml ? `<div class="info-row"><span class="info-label">Abilities</span><div class="info-ability-list">${abilitiesHtml}</div></div>` : ''}
         ${itemHtml     ? `<div class="info-row"><span class="info-label">Item</span><div>${itemHtml}</div></div>` : ''}
         ${c.size       ? `<div class="info-row"><span class="info-label">Size</span><span>${c.size}</span></div>` : ''}
-        ${c.movement   ? `<div class="info-row"><span class="info-label">Movement</span><span>${c.movement}</span></div>` : ''}
+        ${movement     ? `<div class="info-row"><span class="info-label">Movement</span><span>${movement}</span></div>` : ''}
         ${proficiencyDisplay ? `<div class="info-row"><span class="info-label">Proficiency</span><span>${proficiencyDisplay}</span></div>` : ''}
         ${savingThrowDisplay ? `<div class="info-row"><span class="info-label">Saving Throws</span><span>${savingThrowDisplay}</span></div>` : ''}
       </div>
@@ -1349,7 +1306,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
           if (readOnly) {
             // Coloured by type like the owner's own buttons (applyMoveColors only runs on the viewer's own card).
             const mv = _moveMap?.get(moveName);
-            const bg = mv ? getMoveTypeColor(mv[1]) : '';
+            const bg = mv ? getMoveTypeColor(mv.type) : '';
             const style = bg ? ` style="background-color:${bg};color:${getTextColorForBackground(bg)}"` : '';
             return `<div class="combat-move-row"><button type="button" class="combat-move-item combat-move-view" data-move="${moveName}" data-combatant-id="${c.id}"${style} title="See ${moveName}">${label}</button></div>`;
           }
@@ -2462,7 +2419,7 @@ function applyMoveColors() {
   document.querySelectorAll('.combat-move-item:not(.move-locked)').forEach(item => {
     const move = _moveMap.get(item.dataset.move);
     if (move) {
-      const bg = getMoveTypeColor(move[1]);
+      const bg = getMoveTypeColor(move.type);
       item.style.backgroundColor = bg;
       item.style.color = getTextColorForBackground(bg);
     }
@@ -2521,8 +2478,8 @@ function getStatMod(combatant, statName) {
 }
 
 function getHealDiceForLevel(move, level) {
-  const desc = move[7] || '';
-  const higherLevels = move[8] || '';
+  const desc = move.description || '';
+  const higherLevels = move.scaling || '';
   const baseMatch = desc.match(/regain\s+a\s+base\s+(\d+d\d+)/i);
   let dice = baseMatch ? baseMatch[1] : '1d6';
   if (higherLevels && level > 1) {
@@ -2765,10 +2722,10 @@ function showIngrainHealPopup(combatant, ingrainEffect, state, onConfirm) {
     // Sync HP to sessionStorage and API
     const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
     if (pd) {
-      pd[45] = combatant.currentHp;
+      pd.current.hp = combatant.currentHp;
       sessionStorage.setItem(combatant.entityKey, JSON.stringify(pd));
-      const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-      PokemonAPI.updateLiveStats(td[1], pd[2], 'HP', combatant.currentHp)
+      const td = loadTrainer();
+      PokemonAPI.updateLiveStats(td.name, pd.name, 'HP', combatant.currentHp)
         .catch(e => console.error('Ingrain HP sync:', e));
     }
 
@@ -2829,10 +2786,10 @@ function showDrainHealPopup(combatant, moveName, state) {
     // Sync to sessionStorage and API
     const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
     if (pd) {
-      pd[45] = combatant.currentHp;
+      pd.current.hp = combatant.currentHp;
       sessionStorage.setItem(combatant.entityKey, JSON.stringify(pd));
-      const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-      PokemonAPI.updateLiveStats(td[1], pd[2], 'HP', combatant.currentHp)
+      const td = loadTrainer();
+      PokemonAPI.updateLiveStats(td.name, pd.name, 'HP', combatant.currentHp)
         .catch(e => console.error('Drain HP sync:', e));
     }
 
@@ -2906,10 +2863,10 @@ function showDirectHealPopup(combatant, moveName, healDice, moveMod, stacks, sta
 
     const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
     if (pd) {
-      pd[45] = combatant.currentHp;
+      pd.current.hp = combatant.currentHp;
       sessionStorage.setItem(combatant.entityKey, JSON.stringify(pd));
-      const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-      PokemonAPI.updateLiveStats(td[1], pd[2], 'HP', combatant.currentHp)
+      const td = loadTrainer();
+      PokemonAPI.updateLiveStats(td.name, pd.name, 'HP', combatant.currentHp)
         .catch(e => console.error('Direct heal HP sync:', e));
     }
 
@@ -2956,10 +2913,10 @@ function showTrainerHpVpPopup(combatant, state) {
   vpInput.value = '';
 
   const syncTrainer = () => {
-    const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-    td[34] = combatant.currentHp;
-    td[35] = combatant.currentVp;
-    sessionStorage.setItem('trainerData', JSON.stringify(td));
+    const td = loadTrainer();
+    td.current.hp = combatant.currentHp;
+    td.current.vp = combatant.currentVp;
+    storeTrainer(td);
     TrainerAPI.update(td).catch(e => console.error('Trainer HP/VP sync:', e));
   };
 
@@ -3086,10 +3043,10 @@ function _syncStatusConditionToDb(c, state) {
   if (!pd) return;
   // The shared battle's card state holds only the one combatant on screen, so fall back to the logged-in trainer.
   const trainerName = state.combatants.find(x => x.type === 'trainer')?.name
-    || JSON.parse(sessionStorage.getItem('trainerData') || '[]')[1] || '';
-  pd[60] = c.statusEffects.filter(s => !s.serverStatusId).map(s => s.name).join(',');
+    || loadTrainer().name || '';
+  pd.statusConditions = c.statusEffects.filter(s => !s.serverStatusId).map(s => s.name);
   sessionStorage.setItem(c.entityKey, JSON.stringify(pd));
-  PokemonAPI.updateLiveStats(trainerName, pd[2], 'StatusCondition', pd[60]).catch(e => console.error('Status sync:', e));
+  PokemonAPI.updateLiveStats(trainerName, pd.name, 'StatusConditions', JSON.stringify(pd.statusConditions)).catch(e => console.error('Status sync:', e));
 }
 
 function addStatusEffect(combatantId, effectName, state, description = '') {
@@ -3143,7 +3100,7 @@ async function _handleBideClick(c, move, state, onBideResolve) {
     // never opens that popup at all, there's nothing on it to roll. Paid
     // once, on activation, not again on the later unleash click -- Bide is
     // "used" once, its payoff just lands a turn (or more) later.
-    const vpCost = parseInt(move[4]) || 0;
+    const vpCost = parseInt(move.vpCost) || 0;
     let newVp = c.currentVp - vpCost;
     let newHp = c.currentHp;
     if (newVp < 0) { newHp += newVp; newVp = 0; } // no floor -- see handleHpVpDelta
@@ -3216,24 +3173,24 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // Weather Ball: the move's type follows the weather. Overriding `move` here carries the new type everywhere
   // downstream -- STAB, the popup colour/label, and the damage handed to the shared-combat callbacks below.
   const _weatherType = weatherMoveType(moveEffectsFor(moveName), _weathers);
-  if (_weatherType && _weatherType !== move[1]) { move = [...move]; move[1] = _weatherType; }
+  if (_weatherType && _weatherType !== move.type) move = { ...move, type: _weatherType };
   // The zones this combatant is standing in (a tile-limited zone only counts for whoever is on it).
   const _zones = c.activeTerrains || (state.terrain ? [state.terrain] : []);
   // Ion Deluge: "any normal-type move activated within 50 feet of you is considered electric-type".
-  if (zoneRuleActive(_zones, 'ion_deluge') && move[1] === 'Normal') { move = [...move]; move[1] = 'Electric'; }
+  if (zoneRuleActive(_zones, 'ion_deluge') && move.type === 'Normal') move = { ...move, type: 'Electric' };
   // The shared battle's ability engine (ability-mods.js): what this creature's ability does to this move. Its type
   // first (Pixilate, Normalize...), since STAB and every type filter read it; the numbers are folded in once
   // computeMoveData has run (below). The legacy page never gets here (no ability data, _isSharedCombat false).
   const _moveFx = moveEffectsFor(moveName);
   const _abilityMods = _isSharedCombat ? moveAbilityMods(c, move, {
-    damaging: !!parseDamageDice(move[7] || '', move[8] || '', c.level),
+    damaging: !!parseDamageDice(move.description || '', move.scaling || '', c.level),
     melee: isMeleeMoveRow(move),
     soundBased: !!moveFlagsFor(moveName).soundBased,
     attackRoll: !moveFlagsFor(moveName).noAttackRoll,
     recoil: _moveFx.some(e => e.kind === 'recoil'),
     negativeCondition: _moveFx.some(e => e.kind === 'condition' && e.target !== 'self'),
   }) : null;
-  if (_abilityMods && _abilityMods.type !== move[1]) { move = [...move]; move[1] = _abilityMods.type; }
+  if (_abilityMods && _abilityMods.type !== move.type) move = { ...move, type: _abilityMods.type };
   // Storm Surge ("only while it is raining"), Aurora Veil ("only while it is hailing"), Endeavor ("not in the first round").
   // Limit Break (below 50% HP), Dawn Burst (above 75%), Snore (asleep), Recompose (no enemy in melee range). Statuses and the
   // nearest enemy are only known in the shared battle (bridged onto `c` by combat-wip.js); unknowns never block.
@@ -3248,7 +3205,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   const _useBlock = c.hasFloor === false ? `It isn't ${c.name}'s turn -- moves are used on its own turn (press React first for a reaction)`
     : (c.disabledMoves || []).includes(moveName) ? `${moveName} is disabled right now`
     : c.lockedMove && c.lockedMove !== moveName ? `Only ${c.lockedMove} can be used right now (Encore)`
-    : c.burrowed && moveFlagsFor(moveName).semiInvulnerable !== 'underground' && String(move[6] || '').trim().toLowerCase() !== 'self'
+    : c.burrowed && moveFlagsFor(moveName).semiInvulnerable !== 'underground' && String(move.range || '').trim().toLowerCase() !== 'self'
       ? 'Burrowed underground -- come up to the surface first (only a move like Dig, or one on itself, works from down there)'
       : null;
 
@@ -3278,10 +3235,10 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   }
 
   // Trainer path bonuses are the viewer's own trainer's -- another player's trainer isn't known here, so none for viewOnly.
-  const trainerData = viewOnly ? [] : JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  const trainerPath = trainerData[25] || '';
-  const trainerLevel = parseInt(trainerData[2]) || 1;
-  const specializationsStr = trainerData[24] || '';
+  const trainerData = viewOnly ? emptyTrainer() : loadTrainer();
+  const trainerPath = trainerData.trainerPath || '';
+  const trainerLevel = parseInt(trainerData.level) || 1;
+  const specializationsStr = trainerData.specializations.join(', ');
 
   // Magic Room suppresses held items for everyone inside it; Embargo for the one it hit.
   const _itemsSuppressed = zoneRuleActive(_zones, 'magic_room') || !!c.itemsEmbargoed;
@@ -3308,7 +3265,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       // undefined (-> computeMoveData's own default of 1) on the legacy
       // standalone engine.
       // Rototiller: grass-type creatures inside it double their STAB bonus on grass-type moves.
-      stabMultiplier: (c.stabMultiplier || 1) * (zoneRuleActive(_zones, 'rototiller') && move[1] === 'Grass' && (c.types || []).includes('Grass') ? 2 : 1)
+      stabMultiplier: (c.stabMultiplier || 1) * (zoneRuleActive(_zones, 'rototiller') && move.type === 'Grass' && (c.types || []).includes('Grass') ? 2 : 1)
         * (_abilityMods?.stabMultiplier || 1), // Sand Force, Reckless...
       // Live `damage_rolls` stat statuses -- WIP-bridged, undefined on the legacy engine.
       damageRollBonus: c.damageRollBonus,
@@ -3380,7 +3337,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     : undefined;
 
   // Heal dice display for "regain a base X hit points" moves
-  const _fullMoveDesc = (move[7] || '') + ' ' + (move[8] || '');
+  const _fullMoveDesc = (move.description || '') + ' ' + (move.scaling || '');
   const _isDirectHeal = /regain\s+a\s+base\s+.*?\s+hit\s+points/i.test(_fullMoveDesc);
   // Same drain-heal pattern move-popup.js's own post-use check already uses
   // -- reused here (rather than re-derived) so "is this move actually
@@ -3394,7 +3351,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   let _effFlat = 0;
   if (_isDirectHeal) {
     const _healDice = getHealDiceForLevel(move, c.level || 1);
-    const _healMoveMod = (move[2] || '').trim();
+    const _healMoveMod = (move.moveStat || '').trim();
     const _healModBonus = _healMoveMod ? getStatMod(c, _healMoveMod) : 0;
     const _healStacks = _moveLower === 'swallow' ? Math.max(_stacks, 1) : 1;
     const _diceStr = _healStacks > 1 ? `${_healDice} ×${_healStacks}` : _healDice;
@@ -3459,7 +3416,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   if (!_isDirectHeal && computedData.damageDice) {
     const _dmgNoteEffects = moveEffectsFor(moveName).filter(e => e.kind === 'damage_note');
     // Electric/Grassy/Psychic Terrain's doubled MOVE modifier applies to every move of its type, not just ones carrying effects.
-    const _terrainNote = terrainDamageNote(c.activeTerrains || (state.terrain ? [state.terrain] : []), move[1]);
+    const _terrainNote = terrainDamageNote(c.activeTerrains || (state.terrain ? [state.terrain] : []), move.type);
     if (_terrainNote) _dmgNoteEffects.push(_terrainNote);
     if (_dmgNoteEffects.length) {
       const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount, infoNote } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, _weathers, moveName);
@@ -3500,7 +3457,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // `powerUpStacks`, 0 on the legacy engine). Appended as a separate dice term, since the stack
   // dice (d6) can't merge into whatever the move's own dice are.
   const _powerUpStacks = c.powerUpStacks || 0;
-  if (_powerUpStacks > 0 && !_isDirectHeal && computedData.damageDice && String(move[6] || '').trim() === 'Melee') {
+  if (_powerUpStacks > 0 && !_isDirectHeal && computedData.damageDice && String(move.range || '').trim() === 'Melee') {
     const _current = _diceOverride || (computedData.damageBonus > 0 ? `${computedData.damageDice} + ${computedData.damageBonus}` : computedData.damageDice);
     _diceOverride = `${_current} + ${_powerUpStacks}d6`;
     _effDice = `${_effDice} + ${_powerUpStacks}d6`;
@@ -3562,19 +3519,19 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     vpCostOverride: (() => {
       // Escalating streak cost (Fury Cutter/...), then Spirit Growth's "moves drawing on WIS cost
       // half, rounded up" (WIP-bridged `vpHalvedAbilities`, empty on the legacy engine).
-      const base = parseInt(move[4], 10) || 0;
+      const base = parseInt(move.vpCost, 10) || 0;
       let cost = base + (_extraVpCost > 0 ? _extraVpCost : 0);
       // Overgrow/Blaze/Torrent/Swarm/Ferocity...: the ability's VP-cost multiplier (rounded up).
       if (_abilityMods && _abilityMods.vpMultiplier !== 1) cost = Math.ceil(cost * _abilityMods.vpMultiplier);
       const halved = c.vpHalvedAbilities || [];
-      const abilities = String(move[2] || '').split('/').map((m) => m.trim().toUpperCase());
+      const abilities = String(move.moveStat || '').split('/').map((m) => m.trim().toUpperCase());
       if (halved.some((a) => abilities.includes(a))) cost = Math.ceil(cost / 2);
       // Dig/Fly/...: the reappearing second use is free (the VP was paid on the vanishing first use).
       if ((c.semiHeldMoves || []).includes(moveName)) return 0;
       // A charged move's release / a hold move's follow-up (Swords Dance, Solar Beam, Bind...): paid on the first use.
       if (c.releasableMoves?.[moveName]) return 0;
       // Power-Up Punch: +1 VP per stack on every melee move.
-      if ((c.powerUpStacks || 0) > 0 && String(move[6] || '').trim() === 'Melee') cost += c.powerUpStacks;
+      if ((c.powerUpStacks || 0) > 0 && String(move.range || '').trim() === 'Melee') cost += c.powerUpStacks;
       return cost !== base ? cost : undefined;
     })(),
     deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker || _willDeferToReactiveSave || _willDeferToMultiHitAoe,
@@ -3642,8 +3599,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
 
       if (usedMoveName && usedMoveName.toLowerCase() === 'ingrain') {
         const ingrainMove = _moveMap?.get(usedMoveName);
-        const desc = ingrainMove?.[7] || '';
-        const higherLevels = ingrainMove?.[8] || '';
+        const desc = ingrainMove?.description || '';
+        const higherLevels = ingrainMove?.scaling || '';
         const pokemonLevel = target.level || 1;
         const baseDiceMatch = desc.match(/(\d+d\d+)/i);
         let healDice = baseDiceMatch ? baseDiceMatch[1] : '1d10';
@@ -3656,7 +3613,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
           }
           if (bestDice) healDice = bestDice;
         }
-        const moveMod = (ingrainMove?.[2] || '').trim();
+        const moveMod = (ingrainMove?.moveStat || '').trim();
         target.statusEffects = target.statusEffects.filter(se => se.name !== 'Ingrain');
         target.statusEffects.push({ name: 'Ingrain', duration: 3, healDice, moveMod });
       }
@@ -3716,7 +3673,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       if (!target) return;
       const healMove = _moveMap?.get(moveName);
       const healDice = getHealDiceForLevel(healMove || [], target.level || 1);
-      const moveMod = (healMove?.[2] || '').trim();
+      const moveMod = (healMove?.moveStat || '').trim();
       const isSwallow = moveName.toLowerCase() === 'swallow';
       const stacks = isSwallow ? (target.stockpileStacks || 0) : 1;
       if (isSwallow) {
@@ -3768,39 +3725,10 @@ function parseStatusCure(effectText) {
 }
 
 function decrementCombatInventoryItem(itemName) {
-  const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  const fullStr = td[20] || '';
-  const sepIdx = fullStr.indexOf('##CUSTOM##');
-  const regularStr = sepIdx >= 0 ? fullStr.slice(0, sepIdx) : fullStr;
-  const customStr  = sepIdx >= 0 ? fullStr.slice(sepIdx + 10) : null;
-
-  const items = regularStr.split(',').map(s => s.trim()).filter(Boolean);
-  const idx = items.findIndex(s => {
-    const m = s.match(/^(.+?)\s*\(x\d+\)$/);
-    return (m ? m[1].trim() : s) === itemName;
-  });
-
-  if (idx !== -1) {
-    const m = items[idx].match(/^(.+?)\s*\(x(\d+)\)$/);
-    const qty = m ? parseInt(m[2]) : 1;
-    if (qty <= 1) items.splice(idx, 1);
-    else items[idx] = `${itemName} (x${qty - 1})`;
-    const newRegular = items.join(', ');
-    td[20] = customStr ? `${newRegular}##CUSTOM##${customStr}` : newRegular;
-  } else if (customStr) {
-    let customItems = [];
-    try { customItems = JSON.parse(customStr) || []; } catch(e) {}
-    const ci = customItems.findIndex(i => i.name === itemName);
-    if (ci !== -1) {
-      if (customItems[ci].quantity <= 1) customItems.splice(ci, 1);
-      else customItems[ci].quantity--;
-      const newRegular = items.join(', ');
-      td[20] = customItems.length > 0
-        ? `${newRegular}##CUSTOM##${JSON.stringify(customItems)}`
-        : newRegular || 'None';
-    }
-  }
-  sessionStorage.setItem('trainerData', JSON.stringify(td));
+  const td = loadTrainer();
+  const custom = !td.inventory.some(i => i.name === itemName) && td.customItems.some(i => i.name === itemName);
+  addItem(td, itemName, -1, { custom });
+  storeTrainer(td);
   TrainerAPI.update(td).catch(e => console.error('Inventory sync:', e));
 }
 
@@ -3818,18 +3746,19 @@ function useCombatHealingItem(itemName, targetId, healAmount, stat) {
   decrementCombatInventoryItem(itemName);
 
   if (target.type === 'trainer') {
-    const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-    td[34] = target.currentHp; td[35] = target.currentVp;
-    sessionStorage.setItem('trainerData', JSON.stringify(td));
+    const td = loadTrainer();
+    td.current.hp = target.currentHp; td.current.vp = target.currentVp;
+    storeTrainer(td);
     TrainerAPI.update(td).catch(e => console.error('Trainer sync:', e));
   } else {
-    const pd = JSON.parse(sessionStorage.getItem(target.entityKey) || '[]');
-    pd[45] = target.currentHp; pd[46] = target.currentVp;
+    const pd = JSON.parse(sessionStorage.getItem(target.entityKey) || 'null');
+    if (!pd) return;
+    pd.current = { ...(pd.current || {}), hp: target.currentHp, vp: target.currentVp };
     sessionStorage.setItem(target.entityKey, JSON.stringify(pd));
     const trainerName = _battleState?.combatants.find(c => c.type === 'trainer')?.name || '';
     const apiStat = stat === 'HP' ? 'HP' : 'VP';
     const apiVal  = stat === 'HP' ? target.currentHp : target.currentVp;
-    PokemonAPI.updateLiveStats(trainerName, pd[2], apiStat, apiVal).catch(e => console.error('Pokemon sync:', e));
+    PokemonAPI.updateLiveStats(trainerName, pd.name, apiStat, apiVal).catch(e => console.error('Pokemon sync:', e));
   }
 }
 
@@ -3847,11 +3776,12 @@ function useCombatStatusCureItem(itemName, targetId, statusesToCure) {
   decrementCombatInventoryItem(itemName);
 
   if (target.type === 'pokemon') {
-    const pd = JSON.parse(sessionStorage.getItem(target.entityKey) || '[]');
+    const pd = JSON.parse(sessionStorage.getItem(target.entityKey) || 'null');
+    if (!pd) return;
     const trainerName = _battleState?.combatants.find(c => c.type === 'trainer')?.name || '';
-    pd[60] = target.statusEffects.map(s => s.name).join(',');
+    pd.statusConditions = target.statusEffects.map(s => s.name);
     sessionStorage.setItem(target.entityKey, JSON.stringify(pd));
-    PokemonAPI.updateLiveStats(trainerName, pd[2], 'StatusCondition', pd[60]).catch(e => console.error('Status sync:', e));
+    PokemonAPI.updateLiveStats(trainerName, pd.name, 'StatusConditions', JSON.stringify(pd.statusConditions)).catch(e => console.error('Status sync:', e));
   }
 }
 
@@ -3940,9 +3870,8 @@ function showTypeCalcPopup(combatantId, state) {
   const TYPE_NAMES = ["Normal","Fighting","Flying","Poison","Ground","Rock","Bug","Ghost","Steel","Fire","Water","Grass","Electric","Psychic","Ice","Dragon","Dark","Fairy"];
   const ALL_TYPES = [...TYPE_NAMES, "Cosmic"];
 
-  const chartVals = (c.typeChart || '').split(',').map(Number);
   const multMap = {};
-  TYPE_NAMES.forEach((name, i) => { multMap[name] = isNaN(chartVals[i]) ? 1 : chartVals[i]; });
+  TYPE_NAMES.forEach((name) => { const v = Number((c.typeChart || {})[name]); multMap[name] = isNaN(v) ? 1 : v; });
   multMap["Cosmic"] = 1;
 
   // Energy Intensive: shift Psychic up one damage tier
@@ -4044,11 +3973,12 @@ function showTypeCalcPopup(combatantId, state) {
 
   const trainerName = _battleState?.combatants.find(x => x.type === 'trainer')?.name || '';
   const syncPokemon = () => {
-    const pd = JSON.parse(sessionStorage.getItem(c.entityKey) || '[]');
-    pd[45] = c.currentHp; pd[46] = c.currentVp;
+    const pd = JSON.parse(sessionStorage.getItem(c.entityKey) || 'null');
+    if (!pd) return;
+    pd.current = { ...(pd.current || {}), hp: c.currentHp, vp: c.currentVp };
     sessionStorage.setItem(c.entityKey, JSON.stringify(pd));
-    PokemonAPI.updateLiveStats(trainerName, pd[2], 'HP', c.currentHp).catch(() => {});
-    PokemonAPI.updateLiveStats(trainerName, pd[2], 'VP', c.currentVp).catch(() => {});
+    PokemonAPI.updateLiveStats(trainerName, pd.name, 'HP', c.currentHp).catch(() => {});
+    PokemonAPI.updateLiveStats(trainerName, pd.name, 'VP', c.currentVp).catch(() => {});
   };
 
   document.getElementById('typeCalcAddBtn').onclick = () => {
@@ -4097,20 +4027,8 @@ function showTypeCalcPopup(combatantId, state) {
 
 // ---------------------------------------------------------------------------
 // Adding an item in battle (the user's ask, 2026-10-15): the same two ways as the trainer page's Add -- an item from the
-// game's list, or a custom one -- written to the same inventory string (regular items, then ##CUSTOM## + JSON).
+// game's list, or a custom one -- into the trainer's inventory / customItems (js/utils/trainer-data.js's addItem).
 // ---------------------------------------------------------------------------
-
-function _invParts(full) {
-  const str = full || '';
-  const i = str.indexOf('##CUSTOM##');
-  let custom = [];
-  if (i >= 0) { try { custom = JSON.parse(str.slice(i + 10)) || []; } catch { custom = []; } }
-  return { regular: i >= 0 ? str.slice(0, i) : str, custom };
-}
-
-function _invString(regular, custom) {
-  return custom && custom.length ? `${regular || ''}##CUSTOM##${JSON.stringify(custom)}` : (regular || '');
-}
 
 function _escInv(s) {
   return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -4145,8 +4063,8 @@ function _showCombatAddItem() {
       </div>
     </div>`;
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
-  const nameOf = it => (Array.isArray(it) ? it[0] : it?.name) || '';
-  const typeOf = it => (Array.isArray(it) ? it[1] : it?.type) || '';
+  const nameOf = it => it?.name || '';
+  const typeOf = it => it?.category || '';
   let tab = 'list';
   area.querySelectorAll('[data-add-tab]').forEach(b => b.addEventListener('click', () => {
     tab = b.dataset.addTab;
@@ -4174,36 +4092,22 @@ function _showCombatAddItem() {
   });
   document.getElementById('combatAddItemConfirm').addEventListener('click', () => {
     const qty = Math.max(1, parseInt(document.getElementById('combatAddItemQty').value, 10) || 1);
-    const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-    const { regular, custom } = _invParts(td[20]);
+    const td = loadTrainer();
     let added;
     if (tab === 'custom') {
       const name = document.getElementById('combatAddCustomName').value.trim();
       const description = document.getElementById('combatAddCustomDesc').value.trim();
       if (!name) { showCombatAlert('Give the item a name.', { title: 'Add item' }); return; }
-      const hit = custom.find(ci => String(ci.name).toLowerCase() === name.toLowerCase());
-      if (hit) { hit.quantity = (Number(hit.quantity) || 0) + qty; if (description) hit.description = description; }
-      else custom.push({ name, description, quantity: qty });
-      td[20] = _invString(regular, custom);
+      addItem(td, name, qty, { custom: true, description });
       added = name;
     } else {
       const typed = input.value.trim();
       const known = items.find(it => nameOf(it).toLowerCase() === typed.toLowerCase());
       if (!known) { showCombatAlert(typed ? `"${typed}" isn't in the item list -- pick one from the suggestions, or add it as a custom item.` : 'Pick an item first.', { title: 'Add item' }); return; }
-      const name = nameOf(known);
-      let found = false;
-      const list = (regular && regular !== 'None' ? regular.split(',').map(s => s.trim()).filter(Boolean) : []).map((s) => {
-        const m = s.match(/^(.+?)\s*\(x(\d+)\)$/);
-        const n = m ? m[1].trim() : s;
-        if (n.toLowerCase() !== name.toLowerCase()) return s;
-        found = true;
-        return `${n} (x${(m ? parseInt(m[2], 10) : 1) + qty})`;
-      });
-      if (!found) list.push(`${name} (x${qty})`);
-      td[20] = _invString(list.join(', '), custom);
-      added = name;
+      addItem(td, nameOf(known), qty);
+      added = nameOf(known);
     }
-    sessionStorage.setItem('trainerData', JSON.stringify(td));
+    storeTrainer(td);
     TrainerAPI.update(td).catch(e => console.error('Inventory sync:', e));
     showToast(`Added ${qty} × ${added}`);
     showCombatInventoryPopup();
@@ -4212,8 +4116,7 @@ function _showCombatAddItem() {
 }
 
 function showCombatInventoryPopup() {
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  const inventory = trainerData[20] || '';
+  const trainerData = loadTrainer();
   const itemsStr = sessionStorage.getItem('items');
   const categoriesEl = document.getElementById('combatInventoryCategories');
   if (!categoriesEl) return;
@@ -4229,8 +4132,7 @@ function showCombatInventoryPopup() {
   if (effEl)     effEl.textContent  = 'Item effects will appear here.';
   if (actionArea) actionArea.innerHTML = '';
 
-  const hasCombatCustom = inventory.includes('##CUSTOM##');
-  if ((!inventory || !itemsStr) && !hasCombatCustom) {
+  if ((!trainerData.inventory.length || !itemsStr) && !trainerData.customItems.length) {
     categoriesEl.innerHTML = '<li style="padding:1rem;color:#999;text-align:center;">No items in inventory</li>';
     document.getElementById('combatInventoryPopup').style.display = 'flex';
     return;
@@ -4238,28 +4140,18 @@ function showCombatInventoryPopup() {
 
   const itemsData = itemsStr ? JSON.parse(itemsStr) : [];
   const groupedItems = {};
-  const combatSepIdx = inventory.indexOf('##CUSTOM##');
-  const combatRegularInv = combatSepIdx >= 0 ? inventory.slice(0, combatSepIdx) : inventory;
-  combatRegularInv.split(',').map(s => s.trim()).filter(Boolean).forEach(s => {
-    const m = s.match(/^(.+?)\s*\(x(\d+)\)$/);
-    const name = m ? m[1].trim() : s;
-    const qty  = m ? parseInt(m[2]) : 1;
+  trainerData.inventory.forEach(({ name, quantity: qty }) => {
     const dbItem = itemsData.find(i => i.name === name);
     if (dbItem) {
-      const type = dbItem.type || 'Misc';
+      const type = dbItem.category || 'Misc';
       if (!groupedItems[type]) groupedItems[type] = [];
       groupedItems[type].push({ name, qty, description: dbItem.description || '', effect: dbItem.effect || '' });
     }
   });
-  if (combatSepIdx >= 0) {
-    try {
-      const combatCustom = JSON.parse(inventory.slice(combatSepIdx + 10)) || [];
-      if (combatCustom.length > 0) {
-        groupedItems['Custom Items'] = combatCustom.map(ci => ({
-          name: ci.name, qty: ci.quantity, description: ci.description || '', effect: ''
-        }));
-      }
-    } catch(e) {}
+  if (trainerData.customItems.length > 0) {
+    groupedItems['Custom Items'] = trainerData.customItems.map(ci => ({
+      name: ci.name, qty: ci.quantity, description: ci.description || '', effect: ''
+    }));
   }
 
   let html = '';
@@ -4366,8 +4258,8 @@ function getCombatMaxCharges(buffName, trainerLevel) {
 }
 
 function showCombatBuffsPopup() {
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  const trainerLevel = parseInt(trainerData[2]) || 1;
+  const trainerData = loadTrainer();
+  const trainerLevel = parseInt(trainerData.level) || 1;
   const skillsDataRaw = sessionStorage.getItem('skills');
   const nationalitiesDataRaw = sessionStorage.getItem('nationalities');
 
@@ -4378,7 +4270,7 @@ function showCombatBuffsPopup() {
 
   if (nationalitiesDataRaw) {
     const nationalitiesData = JSON.parse(nationalitiesDataRaw);
-    const nationality = nationalitiesData.find(n => n.nationality === trainerData[38]);
+    const nationality = nationalitiesData.find(n => n.nationality === trainerData.region);
     if (nationality) {
       content += `<div class="skill-item-container">
         <h3 class="skill-name-header">${nationality.regionBuff}</h3>
@@ -4388,11 +4280,11 @@ function showCombatBuffsPopup() {
   }
 
   const trainerBuffDefs = [
-    { name: 'Second Wind',      index: 40 },
-    { name: 'Rapid Orders',     index: 41 },
-    { name: 'Unbreakable Bond', index: 42 },
-    { name: 'Elemental Synergy',index: 43 },
-    { name: 'Master Trainer',   index: 44 }
+    { name: 'Second Wind',      key: 'secondWind' },
+    { name: 'Rapid Orders',     key: 'rapidOrders' },
+    { name: 'Unbreakable Bond', key: 'unbreakableBond' },
+    { name: 'Elemental Synergy',key: 'elementalSynergy' },
+    { name: 'Master Trainer',   key: 'masterTrainer' }
   ];
 
   if (skillsDataRaw) {
@@ -4410,7 +4302,7 @@ function showCombatBuffsPopup() {
     skillsByName.forEach((skillData, skillName) => {
       const buffDef = trainerBuffDefs.find(b => b.name === skillName);
       if (buffDef && skillData.isUnlocked) {
-        const currentCharges = parseInt(trainerData[buffDef.index]) || 0;
+        const currentCharges = parseInt(trainerData.charges[buffDef.key]) || 0;
         const maxCharges = getCombatMaxCharges(buffDef.name, trainerLevel);
         const dots = maxCharges > 0
           ? Array.from({ length: maxCharges }, (_, i) =>
@@ -4424,7 +4316,7 @@ function showCombatBuffsPopup() {
             ${dots ? `<div class="charge-dots">${dots}</div>` : ''}
           </div>
           <div class="skill-effect-box">${skillData.effect}</div>
-          ${maxCharges > 0 ? `<button class="use-buff-button" data-buff-index="${buffDef.index}" ${disabled}>Use</button>` : ''}
+          ${maxCharges > 0 ? `<button class="use-buff-button" data-buff-key="${buffDef.key}" ${disabled}>Use</button>` : ''}
         </div>`;
       } else {
         content += `<div class="skill-item-container">
@@ -4439,13 +4331,13 @@ function showCombatBuffsPopup() {
 
   container.querySelectorAll('.use-buff-button').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const buffIndex = parseInt(btn.dataset.buffIndex);
-      const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-      const current = parseInt(td[buffIndex]) || 0;
+      const buffKey = btn.dataset.buffKey;
+      const td = loadTrainer();
+      const current = parseInt(td.charges[buffKey]) || 0;
       if (current <= 0) return;
       // Shared battle: a buff with real logic (Second Wind, Rapid Orders) runs it first; the charge is only spent when
       // it went through (the hook resolves true). Anything it doesn't handle (null) just spends the charge, as before.
-      const buffName = trainerBuffDefs.find(b => b.index === buffIndex)?.name;
+      const buffName = trainerBuffDefs.find(b => b.key === buffKey)?.name;
       let closedByBuff = false;
       if (_onUseTrainerBuff && buffName) {
         const handled = await _onUseTrainerBuff(buffName, () => {
@@ -4454,8 +4346,8 @@ function showCombatBuffsPopup() {
         });
         if (handled === false) return;
       }
-      td[buffIndex] = current - 1;
-      sessionStorage.setItem('trainerData', JSON.stringify(td));
+      td.charges[buffKey] = current - 1;
+      storeTrainer(td);
       TrainerAPI.update(td).catch(e => console.error('Buff sync:', e));
       if (!closedByBuff) showCombatBuffsPopup(); // refresh the charge dots (not when the buff moved on, e.g. Rapid Orders)
     });
@@ -4469,15 +4361,15 @@ function showCombatBuffsPopup() {
 // ============================================================================
 
 async function endCombat(state) {
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  const trainerName = trainerData[1] || '';
+  const trainerData = loadTrainer();
+  const trainerName = trainerData.name || '';
 
   // Persist trainer
   const trainer = state.combatants.find(c => c.type === 'trainer');
   if (trainer) {
-    trainerData[34] = trainer.currentHp;
-    trainerData[35] = trainer.currentVp;
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    trainerData.current.hp = trainer.currentHp;
+    trainerData.current.vp = trainer.currentVp;
+    storeTrainer(trainerData);
     TrainerAPI.update(trainerData).catch(e => console.error('Trainer sync:', e));
   }
 
@@ -4488,24 +4380,16 @@ async function endCombat(state) {
   ];
 
   for (const c of allPokemon) {
-    const pokemonData = JSON.parse(sessionStorage.getItem(c.entityKey) || '[]');
-    const pokemonName = pokemonData[2];
-    pokemonData[45] = c.currentHp;
-    pokemonData[46] = c.currentVp;
-
-    const knownMovesStr = buildKnownMovesString(c.rechargeStates || {});
-    pokemonData[59] = knownMovesStr;
-
-    const statusCondStr = c.statusEffects.map(s => s.name).join(',');
-    pokemonData[60] = statusCondStr;
+    const pokemonData = JSON.parse(sessionStorage.getItem(c.entityKey) || 'null');
+    if (!pokemonData) continue;
+    pokemonData.current = { ...(pokemonData.current || {}), hp: c.currentHp, vp: c.currentVp };
+    pokemonData.moveCharges = persistedMoveCharges(c.rechargeStates || {});
+    pokemonData.statusConditions = c.statusEffects.map(s => s.name);
 
     sessionStorage.setItem(c.entityKey, JSON.stringify(pokemonData));
 
-    // Full update for HP, VP, KnownMoves
+    // One full update: HP, VP, move charges and status conditions
     PokemonAPI.update(pokemonData).catch(e => console.error('Pokemon sync:', e));
-    // Explicit StatusCondition update — uses clearContent() in GAS when empty, which reliably clears the cell
-    PokemonAPI.updateLiveStats(trainerName, pokemonName, 'StatusCondition', statusCondStr)
-      .catch(e => console.error('StatusCondition sync:', e));
   }
 
   sessionStorage.removeItem('combatState');

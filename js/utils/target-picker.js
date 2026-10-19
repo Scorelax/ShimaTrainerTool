@@ -143,7 +143,7 @@ let _coverModeResolver = () => null;
 export function setCoverAttackModeResolver(fn) { _coverModeResolver = typeof fn === 'function' ? fn : () => null; }
 let _moveFlagResolver = () => ({});
 export function setMoveFlagResolver(fn) { _moveFlagResolver = typeof fn === 'function' ? fn : () => ({}); }
-// Same injection for the move's data row ([name, type, stat, action, vp, duration, range, description, scaling]) --
+// Same injection for the move itself (the move list's {name, type, moveStat, action, vpCost, duration, range, ...}) --
 // the abilities' target-dependent damage (ability-mods.js's targetAbilityDamage) needs its type and range.
 let _moveRowResolver = () => null;
 // combat-wip.js: whether this attack roll is a critical hit for this move and attacker (crit range, Focus Energy, Laser

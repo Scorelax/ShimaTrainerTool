@@ -75,7 +75,7 @@ export function cellRect(board, col, row, size = 1) {
 }
 
 /** A participant's footprint in cells (an NxN square) from their stored
- * `size` string (see combat.js's buildPokemonCombatant, pokemonData[57] --
+ * `size` string (see combat.js's buildPokemonCombatant, the Pokemon's `size` --
  * a freeform sheet column, not a fixed enum, so this only special-cases
  * the two values the game currently distinguishes for map purposes and
  * falls back to 1 for everything else: Tiny/Small/Medium/blank/unknown, and

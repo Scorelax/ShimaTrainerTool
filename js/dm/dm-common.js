@@ -4,6 +4,7 @@ import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { getMoveTypeColor } from '../utils/pokemon-types.js';
 import { buildPokemonCombatant } from '../pages/combat.js';
 import { dmEnemyParticipant } from '../pages/combat-wip.js';
+import { nameList } from '../utils/battle-lists.js';
 
 export const DM = 'DM'; // routes_combat.py's DM_OWNER -- the owner of everything the DM controls
 
@@ -38,15 +39,15 @@ export function natureOptions(selected) {
   return natures.map(n => `<option value="${escapeHtml(n.name)}" ${n.name === selected ? 'selected' : ''}>${escapeHtml(natureLabel(n))}</option>`).join('');
 }
 
-// The same words the trainer and Pokemon records use (comma-separated full names), so the battle card reads them as-is.
+// The same words the trainer and Pokemon records use (lists of full names), so the battle card reads them as-is.
 export const SAVING_THROWS = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
 export const SKILLS = ['Acrobatics', 'Animal Handling', 'Arcana', 'Athletics', 'Deception', 'History', 'Insight', 'Intimidation',
   'Investigation', 'Medicine', 'Nature', 'Perception', 'Performance', 'Persuasion', 'Religion', 'Sleight of Hand', 'Stealth', 'Survival'];
 
-/** Splits a "Athletics, stealth" style list into names, matched to `known` spellings where possible. */
-export function splitList(text, known = []) {
-  return String(text || '').split(',').map(s => s.trim()).filter(Boolean)
-    .map(s => known.find(k => k.toLowerCase() === s.toLowerCase()) || s);
+/** A list of names (or "Athletics, stealth" text, as saved before they were lists), matched to `known` spellings where
+ * possible. */
+export function splitList(list, known = []) {
+  return nameList(list).map(s => known.find(k => k.toLowerCase() === s.toLowerCase()) || s);
 }
 
 /** A dropdown with a checkbox per option, for picking several (saving throws, skills). `locked` options show ticked
@@ -220,12 +221,12 @@ export function getSpecies() {
   return _speciesLoading;
 }
 
-/** A Pokemon row from DmAPI.buildPokemon as an enemy participant the DM owns -- built with the very same function a
- * player's own Pokemon is (combat.js's buildPokemonCombatant reads the row from sessionStorage), then the key is
- * removed again so nothing of the DM's lingers there. Returns { combatant, participant }. */
-export function participantFromPokemonRow(row) {
+/** A Pokemon from DmAPI.buildPokemon (pi-server/app/owned.py's object) as an enemy participant the DM owns -- built
+ * with the very same function a player's own Pokemon is (combat.js's buildPokemonCombatant reads it from
+ * sessionStorage), then the key is removed again so nothing of the DM's lingers there. Returns { combatant, participant }. */
+export function participantFromPokemon(pokemon) {
   const key = 'pokemon__dm_build';
-  sessionStorage.setItem(key, JSON.stringify(row));
+  sessionStorage.setItem(key, JSON.stringify(pokemon));
   let combatant;
   try { combatant = buildPokemonCombatant(key); } finally { sessionStorage.removeItem(key); }
   return { combatant, participant: dmEnemyParticipant(combatant) };
@@ -256,7 +257,7 @@ export function participantFromTrainer(t) {
     ac: Number(t.ac) || 10, baseAc: Number(t.ac) || 10, critMod: 0,
     maxHp: Number(t.maxHP) || 1, currentHp: Number(t.maxHP) || 1, maxVp: Number(t.maxVP) || 0, currentVp: Number(t.maxVP) || 0,
     proficiency: proficiencyForLevel(level),
-    savingThrows: t.savingThrows || '', skills: t.skills || '',
+    savingThrows: nameList(t.savingThrows), skills: nameList(t.skills),
     ...stats, ...mods,
     moves: [], types: [], size: '', speeds: [{ type: 'Walking', ft: Number(t.speed) || 30 }],
   };

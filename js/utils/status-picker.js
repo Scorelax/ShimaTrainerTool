@@ -114,9 +114,9 @@ export async function pickOneMoveName(moveNames, options = {}) {
 }
 
 /**
- * Shows a list of parsed abilities ({name, desc, raw}, see move-effects.js's parseAbilityList) and
+ * Shows a list of abilities ({name, description}, see move-effects.js's effectiveAbilities) and
  * resolves to the one picked, or null if cancelled/empty. Entrainment/Role Play/Skill Swap/Simple Beam.
  */
 export async function pickOneAbility(abilities, options = {}) {
-  return _pickFrom(abilities, (a) => ({ name: a.name, sub: a.desc }), options);
+  return _pickFrom(abilities, (a) => ({ name: a.name, sub: a.description }), options);
 }

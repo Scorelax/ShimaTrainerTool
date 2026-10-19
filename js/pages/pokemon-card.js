@@ -1,5 +1,6 @@
 // Pokemon Card Page - Detailed Pokemon Information Display with Info/Battle Pages
 
+import { abilitiesOf, allCachedPokemon, cachedPokemon, currentHP as currentHPOf, currentVP as currentVPOf, knownMoveNames, pokemonKey, sensesList, storePokemon } from '../utils/owned-pokemon.js';
 import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
@@ -7,6 +8,7 @@ import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMo
 import { showMovePopup, showDrainHealPopupForCard } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
+import { addItem, currentHP, currentVP, loadTrainer, storeTrainer } from '../utils/trainer-data.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -26,45 +28,42 @@ let _trainerData = null;
 
 export function renderPokemonCard(pokemonName) {
   // Load Pokemon data from session storage
-  const pokemonDataStr = sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`);
+  const pokemonData = cachedPokemon(pokemonName);
   const trainerDataStr = sessionStorage.getItem('trainerData');
 
-  if (!pokemonDataStr || !trainerDataStr) {
+  if (!pokemonData || !trainerDataStr) {
     return `<div class="error">Pokemon or trainer data not found. Please return to the trainer card.</div>`;
   }
 
-  const pokemonData = JSON.parse(pokemonDataStr);
-  const trainerData = JSON.parse(trainerDataStr);
+  const trainerData = loadTrainer();
 
   // Store selected Pokemon name for later use
   sessionStorage.setItem('selectedPokemonName', pokemonName);
 
   // Extract Pokemon info
-  const image = pokemonData[1] || 'assets/Pokeball.png';
-  const name = pokemonData[2] || 'Unknown';
-  const dexEntry = pokemonData[3] || '';
-  const level = pokemonData[4] || 1;
-  const type1 = pokemonData[5] || '';
-  const type2 = pokemonData[6] || '';
-  const abilitiesRaw = pokemonData[7] || '';
-  const ac = pokemonData[8] || 10;
-  const hd = pokemonData[9] || 0;
-  const hp = pokemonData[10] || 0;
-  const vd = pokemonData[11] || 0;
-  const vp = pokemonData[12] || 0;
-  const str = pokemonData[15] || 10;
-  const dex = pokemonData[16] || 10;
-  const con = pokemonData[17] || 10;
-  const int = pokemonData[18] || 10;
-  const wis = pokemonData[19] || 10;
-  const cha = pokemonData[20] || 10;
-  const savingThrow = pokemonData[21] || 'None';
-  const skills = pokemonData[22] || '';
-  // Note: proficiency is not stored at index 23 (that's Starting Moves), using proficiencyBonus instead
-  const initiative = pokemonData[30] || 0;
-  const proficiencyBonus = pokemonData[31] || 2;
-  const nature = pokemonData[32] || '';
-  const loyalty = pokemonData[33] || 0;
+  const image = pokemonData.image || 'assets/Pokeball.png';
+  const name = pokemonData.name || 'Unknown';
+  const dexEntry = pokemonData.dexNumber || '';
+  const level = pokemonData.level || 1;
+  const type1 = pokemonData.types.primary || '';
+  const type2 = pokemonData.types.secondary || '';
+  const ac = pokemonData.combat.ac || 10;
+  const hd = pokemonData.combat.hitDie || 0;
+  const hp = pokemonData.combat.maxHP || 0;
+  const vd = pokemonData.combat.vitalityDie || 0;
+  const vp = pokemonData.combat.maxVP || 0;
+  const str = pokemonData.stats.strength || 10;
+  const dex = pokemonData.stats.dexterity || 10;
+  const con = pokemonData.stats.constitution || 10;
+  const int = pokemonData.stats.intelligence || 10;
+  const wis = pokemonData.stats.wisdom || 10;
+  const cha = pokemonData.stats.charisma || 10;
+  const savingThrow = (pokemonData.savingThrows || []).join(', ') || 'None';
+  const skills = pokemonData.skills || [];
+  const initiative = pokemonData.combat.initiative || 0;
+  const proficiencyBonus = pokemonData.combat.proficiency || 2;
+  const nature = pokemonData.nature || '';
+  const loyalty = pokemonData.loyalty || 0;
 
   // Parse nature to identify boosted/nerfed stats using natures from sessionStorage
   let boostedStat = '';
@@ -92,27 +91,26 @@ export function renderPokemonCard(pokemonName) {
       nerfedStat = statNameMapping[nerfStatFull] || '';
     }
   }
-  const stabBonus = pokemonData[34] || 2;
-  const heldItemsStr = pokemonData[35] || '';
+  const stabBonus = pokemonData.combat.stab || 2;
+  const heldItemsStr = pokemonData.heldItem || '';
 
   // Parse held items (comma-separated)
   const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
 
-  // Size field (index 57)
-  const size = pokemonData[57] || 'Unknown';
-  const hasBrawny = (pokemonData[50] || '').split(',').map(f => f.trim()).some(f => f === 'Brawny');
+  const size = pokemonData.size || 'Unknown';
+  const hasBrawny = (pokemonData.feats || []).includes('Brawny');
 
-  // Type chart data for weaknesses, resistances, immunities (index 53)
-  const typeChartValues = pokemonData[53] ? pokemonData[53].split(',').map(Number) : [];
+  // Type chart data for weaknesses, resistances, immunities (typeMatchups: x damage taken from each type)
   const typeNames = [
     "Normal", "Fighting", "Flying", "Poison", "Ground", "Rock", "Bug", "Ghost",
     "Steel", "Fire", "Water", "Grass", "Electric", "Psychic", "Ice", "Dragon", "Dark", "Fairy"
   ];
+  const typeChartValues = typeNames.map(t => Number((pokemonData.typeMatchups || {})[t] ?? NaN));
 
   // Type Master Level 9: Resistance shift for first specialization type
-  const trainerPath = trainerData[25] || '';
-  const trainerLevel = parseInt(trainerData[2]) || 1;
-  const specializationsStr = trainerData[24] || '';
+  const trainerPath = trainerData.trainerPath || '';
+  const trainerLevel = parseInt(trainerData.level) || 1;
+  const specializationsStr = trainerData.specializations.join(', ');
 
   if (trainerPath === 'Type Master' && trainerLevel >= 9 && specializationsStr) {
     const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
@@ -151,13 +149,9 @@ export function renderPokemonCard(pokemonName) {
     }
   });
 
-  // Current HP/VP values (indices 45 and 46)
-  const currentHp = pokemonData[45] !== null && pokemonData[45] !== undefined && pokemonData[45] !== ''
-    ? parseInt(pokemonData[45])
-    : hp;
-  const currentVp = pokemonData[46] !== null && pokemonData[46] !== undefined && pokemonData[46] !== ''
-    ? parseInt(pokemonData[46])
-    : vp;
+  // Current HP/VP (the max where none is stored)
+  const currentHp = currentHPOf(pokemonData);
+  const currentVp = currentVPOf(pokemonData);
 
   // Helper function to get stat color based on nature
   const getStatColor = (statName) => {
@@ -166,38 +160,22 @@ export function renderPokemonCard(pokemonName) {
     if (nerfedStat && normalizedStatName === nerfedStat) return '#3B4CCA'; // Blue for nerfed
     return 'black'; // Default color
   };
-  const nickname = pokemonData[36] || '';
-  const inActiveParty = !!pokemonData[38];
-  const senses = pokemonData[49] || '';
-  const feats = pokemonData[50] || '';
-  const flavorText = pokemonData[52] || '';
-  const inUtilitySlot = pokemonData[56] === 1 || pokemonData[56] === '1';
-  const commentsRaw = pokemonData[48] || '';
-  const comments = commentsRaw ? commentsRaw.split(';').map(c => c.trim()).filter(c => c) : [];
+  const nickname = pokemonData.nickname || '';
+  const inActiveParty = !!pokemonData.partySlot;
+  const feats = pokemonData.feats || [];
+  const flavorText = pokemonData.description || '';
+  const inUtilitySlot = !!pokemonData.utilitySlot;
+  const comments = pokemonData.comments || [];
 
-  // Movement data (index 13 is comma-separated: walking,climbing,flying,hovering,swimming,burrowing)
-  const movementData = pokemonData[13] || '';
-  const movementValues = movementData.split(',').map(v => v.trim());
+  // Its speeds (feet; 0 = it can't)
   const movementTypes = ['Walking', 'Climbing', 'Flying', 'Hovering', 'Swimming', 'Burrowing'];
-  const movementDisplay = movementValues
-    .map((value, index) => value && value !== '-' && value !== '0' ? `${movementTypes[index]}: ${value}` : null)
+  const movementDisplay = movementTypes
+    .map(type => { const ft = (pokemonData.movement || {})[type.toLowerCase()]; return ft ? `${type}: ${ft}ft` : null; })
     .filter(m => m !== null)
     .join('\n') || 'Error loading movement';
 
-  // Parse learned moves from indices 23-28, 37 based on level
-  const moveIndices = [23, 24, 25, 26, 27, 28, 37];
-  const requiredLevels = [1, 2, 6, 10, 14, 18, 0]; // 0 means always available
-  const moves = [];
-
-  moveIndices.forEach((index, idx) => {
-    if (level >= requiredLevels[idx] || (index === 37 && pokemonData[index])) {
-      const movesAtIndex = pokemonData[index] || '';
-      if (movesAtIndex) {
-        const moveNames = movesAtIndex.split(',').map(m => m.trim()).filter(m => m);
-        moves.push(...moveNames);
-      }
-    }
-  });
+  // The moves it knows: each level's up to its own, then its custom moves
+  const moves = knownMoveNames(pokemonData);
 
   // Calculate modifiers
   const strMod = Math.floor((str - 10) / 2);
@@ -208,7 +186,7 @@ export function renderPokemonCard(pokemonName) {
   const chaMod = Math.floor((cha - 10) / 2);
 
   // Parse skills
-  const skillsArray = skills ? skills.split(',').map(s => s.trim()).filter(s => s) : [];
+  const skillsArray = skills;
   const allSkills = [
     { name: "Athletics", stat: "STR", mod: strMod },
     { name: "Acrobatics", stat: "DEX", mod: dexMod },
@@ -262,42 +240,13 @@ export function renderPokemonCard(pokemonName) {
   // STAB display
   const stab = `+${stabBonus}`;
 
-  // Parse senses data (comma-separated string)
-  const sensesData = senses || '';
-  const sensesValues = sensesData.split(',').map(value => value.trim());
-  const sensesTypes = ['Sight', 'Hearing', 'Smell', 'Tremorsense', 'Echolocation', 'Telepathy', 'Blindsight', 'Darkvision', 'Truesight'];
-  const sensesArray = sensesValues
-    .map((value, index) => {
-      if (value && value !== '-') {
-        return `${sensesTypes[index]}: ${value}`;
-      }
-      return null;
-    })
-    .filter(s => s !== null);
+  // Its senses ("Sight: Average", ...)
+  const sensesArray = sensesList(pokemonData).map(([label, value]) => `${label}: ${value}`);
   const sensesDisplay = sensesArray.join('\n');
 
-  // Parse abilities - format: "slotIndex:name;description|slotIndex:name;description"
-  const parsedAbilities = [];
-  if (abilitiesRaw) {
-    const abilitiesList = abilitiesRaw.split('|').map(a => a.trim()).filter(a => a);
-    abilitiesList.forEach((abilityData) => {
-      let abilityName, abilityDescription;
-      const colonIndex = abilityData.indexOf(':');
-      if (colonIndex !== -1 && colonIndex < 3) {
-        // New format with slot index
-        const withoutSlot = abilityData.substring(colonIndex + 1);
-        const parts = withoutSlot.split(';');
-        abilityName = parts[0].trim();
-        abilityDescription = parts.slice(1).join(';').trim() || 'No description available';
-      } else {
-        // Legacy format
-        const parts = abilityData.split(';');
-        abilityName = parts[0].trim();
-        abilityDescription = parts.slice(1).join(';').trim() || 'No description available';
-      }
-      parsedAbilities.push({ name: abilityName, description: abilityDescription });
-    });
-  }
+  // Its abilities
+  const parsedAbilities = abilitiesOf(pokemonData)
+    .map(a => ({ name: a.name, description: a.description || 'No description available' }));
 
   // Generate ability buttons HTML
   const abilityButtonsHTML = parsedAbilities.length > 0
@@ -308,9 +257,9 @@ export function renderPokemonCard(pokemonName) {
 
   // Parse feats and get details from pokemonFeats database
   const parsedFeats = [];
-  if (feats) {
+  if (feats.length) {
     const pokemonFeatsData = JSON.parse(sessionStorage.getItem('pokemonFeats') || '[]');
-    const featsList = feats.split(',').map(f => f.trim()).filter(f => f);
+    const featsList = feats;
 
     featsList.forEach((featName) => {
       const featData = pokemonFeatsData.find(f => f.name === featName);
@@ -2626,16 +2575,16 @@ export function renderPokemonCard(pokemonName) {
 
               <!-- Trainer Section -->
               <div>
-                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.5rem, 1vh, 0.75rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${trainerData[1]}</div>
+                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.5rem, 1vh, 0.75rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${trainerData.name}</div>
                 <div class="combat-stats-row">
                   <div class="combat-stat-column">
                     <div class="combat-stat-label">HP</div>
-                    <div class="combat-stat-value" id="trainerCombatCurrentHP">${(trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== '') ? trainerData[34] : trainerData[11]} / ${trainerData[11]}</div>
+                    <div class="combat-stat-value" id="trainerCombatCurrentHP">${currentHP(trainerData)} / ${trainerData.combat.maxHP}</div>
                     <input type="number" id="trainerHpChangeInput" class="combat-input" placeholder="HP Amount">
                   </div>
                   <div class="combat-stat-column">
                     <div class="combat-stat-label">VP</div>
-                    <div class="combat-stat-value" id="trainerCombatCurrentVP">${(trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== '') ? trainerData[35] : trainerData[12]} / ${trainerData[12]}</div>
+                    <div class="combat-stat-value" id="trainerCombatCurrentVP">${currentVP(trainerData)} / ${trainerData.combat.maxVP}</div>
                     <input type="number" id="trainerVpChangeInput" class="combat-input" placeholder="VP Amount">
                   </div>
                 </div>
@@ -2904,8 +2853,8 @@ export function renderPokemonCard(pokemonName) {
 
 export function attachPokemonCardListeners() {
   const pokemonName = sessionStorage.getItem('selectedPokemonName');
-  const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const pokemonData = cachedPokemon(pokemonName);
+  const trainerData = loadTrainer();
   // Cache for showMoveDetails to use without re-parsing sessionStorage
   _pokemonData = pokemonData;
   _trainerData = trainerData;
@@ -2942,33 +2891,17 @@ export function attachPokemonCardListeners() {
     }
   });
 
-  // ── Inventory string helpers ─────────────────────────────────────────────
-  function parseCustomItems(inventoryStr) {
-    if (!inventoryStr || !inventoryStr.includes('##CUSTOM##')) return [];
-    try { return JSON.parse(inventoryStr.split('##CUSTOM##')[1]) || []; } catch(e) { return []; }
-  }
-  function getRegularStr(inventoryStr) {
-    if (!inventoryStr) return '';
-    return inventoryStr.split('##CUSTOM##')[0];
-  }
-  function buildInventoryString(regularStr, customItems) {
-    if (!customItems || customItems.length === 0) return regularStr || '';
-    return `${regularStr || ''}##CUSTOM##${JSON.stringify(customItems)}`;
-  }
-
   // Refresh inventory display function
   function refreshInventoryDisplay() {
     const freshTrainerDataStr = sessionStorage.getItem('trainerData');
     if (!freshTrainerDataStr) return;
 
-    const freshTrainerData = JSON.parse(freshTrainerDataStr);
-    const inventory = freshTrainerData[20] || 'None';
+    const freshTrainerData = loadTrainer();
     const itemsStr = sessionStorage.getItem('items');
     const categoriesContainer = document.getElementById('inventoryCategories');
-    const customItemsList = parseCustomItems(inventory);
-    const regularInv = getRegularStr(inventory);
+    const customItemsList = freshTrainerData.customItems;
 
-    if ((regularInv === 'None' || !regularInv) && customItemsList.length === 0) {
+    if (!freshTrainerData.inventory.length && customItemsList.length === 0) {
       categoriesContainer.innerHTML = '<li style="padding: 2rem; text-align: center; color: #999;">No items in inventory</li>';
       document.getElementById('inventoryPopup')?.classList.add('active');
       return;
@@ -2976,20 +2909,12 @@ export function attachPokemonCardListeners() {
 
     // Parse items data and group by type
     const itemsData = itemsStr ? JSON.parse(itemsStr) : [];
-    const inventoryItems = regularInv && regularInv !== 'None'
-      ? regularInv.split(',').map(item => item.trim()).filter(Boolean)
-      : [];
 
-    // Extract item name and quantity
     const groupedItems = {};
-    inventoryItems.forEach(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const itemName = match ? match[1].trim() : itemStr;
-      const quantity = match ? parseInt(match[2], 10) : 1;
-
+    freshTrainerData.inventory.forEach(({ name: itemName, quantity }) => {
       const itemData = itemsData.find(i => i.name === itemName);
       if (itemData) {
-        const type = itemData.type || 'Misc';
+        const type = itemData.category || 'Misc';
         if (!groupedItems[type]) {
           groupedItems[type] = [];
         }
@@ -3247,10 +3172,10 @@ export function attachPokemonCardListeners() {
     tpBonusRollInput.value = '';
     tpBonusGroup.style.display = 'none';
 
-    const trainerDataForTP = JSON.parse(sessionStorage.getItem('trainerData'));
-    const isTactician = trainerDataForTP && trainerDataForTP[25] === 'Tactician';
-    const tacticianLevel = trainerDataForTP ? parseInt(trainerDataForTP[2], 10) || 1 : 1;
-    const currentTP = trainerDataForTP ? parseInt(trainerDataForTP[49], 10) || 0 : 0;
+    const trainerDataForTP = loadTrainer();
+    const isTactician = trainerDataForTP && trainerDataForTP.trainerPath === 'Tactician';
+    const tacticianLevel = trainerDataForTP ? parseInt(trainerDataForTP.level, 10) || 1 : 1;
+    const currentTP = trainerDataForTP ? parseInt(trainerDataForTP.tacticianPoints, 10) || 0 : 0;
     const maxTP = tacticianLevel;
 
     function updateTpSectionVisibility() {
@@ -3296,44 +3221,43 @@ export function attachPokemonCardListeners() {
 
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (trainerDataRaw) {
-      const td = JSON.parse(trainerDataRaw);
-      const trainerCurrentHP = td[34] !== '' && td[34] !== undefined ? parseInt(td[34]) : parseInt(td[11]);
-      const trainerCurrentVP = td[35] !== '' && td[35] !== undefined ? parseInt(td[35]) : parseInt(td[12]);
+      const td = loadTrainer();
+      const trainerCurrentHP = parseInt(currentHP(td));
+      const trainerCurrentVP = parseInt(currentVP(td));
       const value = JSON.stringify({
         type: 'trainer',
         key: 'trainerData',
         currentHP: trainerCurrentHP,
-        maxHP: parseInt(td[11]),
+        maxHP: parseInt(td.combat.maxHP),
         currentVP: trainerCurrentVP,
-        maxVP: parseInt(td[12]),
-        name: td[1]
+        maxVP: parseInt(td.combat.maxVP),
+        name: td.name
       });
       const statLabel = healing.stat === 'HP'
-        ? `${trainerCurrentHP}/${td[11]} HP`
-        : `${trainerCurrentVP}/${td[12]} VP`;
-      addTargetOption(value, `${td[1]} (Trainer) — ${statLabel}`);
+        ? `${trainerCurrentHP}/${td.combat.maxHP} HP`
+        : `${trainerCurrentVP}/${td.combat.maxVP} VP`;
+      addTargetOption(value, `${td.name} (Trainer) — ${statLabel}`);
     }
 
     // Add active party Pokemon
-    Object.keys(sessionStorage).filter(k => k.startsWith('pokemon_')).forEach(key => {
-      const pd = JSON.parse(sessionStorage.getItem(key));
-      if (pd[38]) {
-        const currentHP = pd[45] !== '' && pd[45] !== undefined ? parseInt(pd[45]) : parseInt(pd[10]);
-        const currentVP = pd[46] !== '' && pd[46] !== undefined ? parseInt(pd[46]) : parseInt(pd[12]);
-        const displayName = pd[36] || pd[2];
+    allCachedPokemon().forEach(pd => {
+      if (pd.partySlot) {
+        const currentHP = currentHPOf(pd);
+        const currentVP = currentVPOf(pd);
+        const displayName = pd.nickname || pd.name;
         const value = JSON.stringify({
           type: 'pokemon',
-          key: key,
-          speciesName: pd[2],
+          key: pokemonKey(pd.name),
+          speciesName: pd.name,
           currentHP: currentHP,
-          maxHP: parseInt(pd[10]),
+          maxHP: parseInt(pd.combat.maxHP),
           currentVP: currentVP,
-          maxVP: parseInt(pd[12]),
+          maxVP: parseInt(pd.combat.maxVP),
           name: displayName
         });
         const statLabel = healing.stat === 'HP'
-          ? `${currentHP}/${pd[10]} HP`
-          : `${currentVP}/${pd[12]} VP`;
+          ? `${currentHP}/${pd.combat.maxHP} HP`
+          : `${currentVP}/${pd.combat.maxVP} VP`;
         addTargetOption(value, `${displayName} — ${statLabel}`);
       }
     });
@@ -3424,46 +3348,46 @@ export function attachPokemonCardListeners() {
 
     // Apply healing to target
     if (targetData.type === 'trainer') {
-      const td = JSON.parse(sessionStorage.getItem('trainerData'));
+      const td = loadTrainer();
       if (healing.stat === 'HP') {
         const newHP = Math.min(targetData.currentHP + totalHealing, targetData.maxHP);
-        td[34] = newHP;
+        td.current.hp = newHP;
         // Update trainer combat tracker display
         const trainerHpEl = document.getElementById('trainerCombatCurrentHP');
         if (trainerHpEl) trainerHpEl.textContent = `${newHP} / ${targetData.maxHP}`;
       } else {
         const newVP = Math.min(targetData.currentVP + totalHealing, targetData.maxVP);
-        td[35] = newVP;
+        td.current.vp = newVP;
         const trainerVpEl = document.getElementById('trainerCombatCurrentVP');
         if (trainerVpEl) trainerVpEl.textContent = `${newVP} / ${targetData.maxVP}`;
       }
 
       // Decrement item quantity
       decrementItemQuantity(td, selectedItemData.name);
-      sessionStorage.setItem('trainerData', JSON.stringify(td));
+      storeTrainer(td);
 
       // Update database in background
       TrainerAPI.update(td).catch(error => {
         console.error('Failed to update trainer data:', error);
       });
       if (healing.stat === 'HP') {
-        TrainerAPI.updateLiveStats(td[1], 'HP', td[34]).catch(error => {
+        TrainerAPI.updateLiveStats(td.name, 'HP', td.current.hp).catch(error => {
           console.error('Failed to update trainer HP:', error);
         });
       } else {
-        TrainerAPI.updateLiveStats(td[1], 'VP', td[35]).catch(error => {
+        TrainerAPI.updateLiveStats(td.name, 'VP', td.current.vp).catch(error => {
           console.error('Failed to update trainer VP:', error);
         });
       }
     } else {
       // Pokemon target
       const pd = JSON.parse(sessionStorage.getItem(targetData.key));
-      const td = JSON.parse(sessionStorage.getItem('trainerData'));
+      const td = loadTrainer();
       const currentPokemonName = sessionStorage.getItem('selectedPokemonName');
       const isCurrentPokemon = currentPokemonName && targetData.key === `pokemon_${currentPokemonName.toLowerCase()}`;
       if (healing.stat === 'HP') {
         const newHP = Math.min(targetData.currentHP + totalHealing, targetData.maxHP);
-        pd[45] = newHP;
+        pd.current.hp = newHP;
         // Update current HP display and combat tracker
         if (isCurrentPokemon) {
           const currentHpEl = document.getElementById('currentHpValue');
@@ -3473,7 +3397,7 @@ export function attachPokemonCardListeners() {
         }
       } else {
         const newVP = Math.min(targetData.currentVP + totalHealing, targetData.maxVP);
-        pd[46] = newVP;
+        pd.current.vp = newVP;
         if (isCurrentPokemon) {
           const currentVpEl = document.getElementById('currentVpValue');
           if (currentVpEl) currentVpEl.textContent = newVP;
@@ -3488,22 +3412,22 @@ export function attachPokemonCardListeners() {
 
       // Decrement Tactician Points if spent
       if (tpSpent > 0) {
-        const prevTP = parseInt(td[49], 10) || 0;
-        td[49] = Math.max(prevTP - tpSpent, 0);
+        const prevTP = parseInt(td.tacticianPoints, 10) || 0;
+        td.tacticianPoints = Math.max(prevTP - tpSpent, 0);
       }
 
-      sessionStorage.setItem('trainerData', JSON.stringify(td));
+      storeTrainer(td);
 
       // Update database in background
       TrainerAPI.update(td).catch(error => {
         console.error('Failed to update inventory:', error);
       });
       if (healing.stat === 'HP') {
-        PokemonAPI.updateLiveStats(td[1], targetData.speciesName, 'HP', pd[45]).catch(error => {
+        PokemonAPI.updateLiveStats(td.name, targetData.speciesName, 'HP', pd.current.hp).catch(error => {
           console.error('Failed to update Pokemon HP:', error);
         });
       } else {
-        PokemonAPI.updateLiveStats(td[1], targetData.speciesName, 'VP', pd[46]).catch(error => {
+        PokemonAPI.updateLiveStats(td.name, targetData.speciesName, 'VP', pd.current.vp).catch(error => {
           console.error('Failed to update Pokemon VP:', error);
         });
       }
@@ -3516,27 +3440,8 @@ export function attachPokemonCardListeners() {
 
   // Helper to decrement item quantity in trainer data inventory string
   function decrementItemQuantity(td, itemName) {
-    const inventoryStr = td[20] || '';
-    const customItems = parseCustomItems(inventoryStr);
-    const regularStr = getRegularStr(inventoryStr);
-    let invItems = regularStr && regularStr !== 'None'
-      ? regularStr.split(',').map(item => item.trim()).filter(Boolean)
-      : [];
-
-    invItems = invItems.map(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const name = match ? match[1].trim() : itemStr;
-      const qty = match ? parseInt(match[2], 10) : 1;
-
-      if (name.toLowerCase() === itemName.toLowerCase()) {
-        const newQty = qty - 1;
-        if (newQty <= 0) return null;
-        return `${name} (x${newQty})`;
-      }
-      return itemStr;
-    }).filter(item => item !== null);
-
-    td[20] = buildInventoryString(invItems.length > 0 ? invItems.join(', ') : 'None', customItems);
+    const custom = !td.inventory.some(i => i.name.toLowerCase() === itemName.toLowerCase());
+    addItem(td, itemName, -1, { custom });
   }
 
   // Add Item Modal - Confirm button
@@ -3555,42 +3460,14 @@ export function attachPokemonCardListeners() {
       return;
     }
 
-    const td = JSON.parse(trainerDataRaw);
-    const inventoryStr = td[20] || '';
-    const customItems = parseCustomItems(inventoryStr);
-    const regularStr = getRegularStr(inventoryStr);
-    let invItems = regularStr && regularStr !== 'None'
-      ? regularStr.split(',').map(item => item.trim()).filter(Boolean)
-      : [];
-
-    // Check if item already exists
-    let found = false;
-    invItems = invItems.map(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const itemName = match ? match[1].trim() : itemStr;
-      const currentQty = match ? parseInt(match[2], 10) : 1;
-
-      if (itemName.toLowerCase() === selectedItemName.toLowerCase()) {
-        found = true;
-        const newQty = currentQty + quantity;
-        return `${itemName} (x${newQty})`;
-      }
-      return itemStr;
-    });
-
-    // If not found, add as new item
-    if (!found) {
-      invItems.push(`${selectedItemName} (x${quantity})`);
-    }
-
-    // Update sessionStorage immediately
-    td[20] = buildInventoryString(invItems.join(', '), customItems);
-    sessionStorage.setItem('trainerData', JSON.stringify(td));
+    const td = loadTrainer();
+    addItem(td, selectedItemName, quantity);
+    storeTrainer(td);
 
     // Play item sound based on type
     const allItems = JSON.parse(sessionStorage.getItem('items') || '[]');
-    const itemData = allItems.find(i => i[0] && i[0].toLowerCase() === selectedItemName.toLowerCase());
-    const itemType = itemData ? itemData[1] : '';
+    const itemData = allItems.find(i => i.name && i.name.toLowerCase() === selectedItemName.toLowerCase());
+    const itemType = itemData ? itemData.category : '';
     if (itemType === 'Berries') {
       audioManager.playSfx('Berry');
     } else if (itemType === 'Badges, Seals & Sigils') {
@@ -3653,47 +3530,15 @@ export function attachPokemonCardListeners() {
       return;
     }
 
-    const td = JSON.parse(trainerDataRaw);
-    const inventoryStr = td[20] || '';
-    let customItems = parseCustomItems(inventoryStr);
-    const regularStr = getRegularStr(inventoryStr);
-    let invItems = regularStr && regularStr !== 'None'
-      ? regularStr.split(',').map(item => item.trim()).filter(Boolean)
-      : [];
-
-    // Find the item by parsing each string
-    let found = false;
-    if (selectedItemData.fullData?.isCustom) {
-      customItems = customItems.map(ci => {
-        if (ci.name.toLowerCase() === selectedItemData.name.toLowerCase()) {
-          found = true;
-          return newQuantity === 0 ? null : { ...ci, quantity: newQuantity };
-        }
-        return ci;
-      }).filter(Boolean);
-    } else {
-      invItems = invItems.filter(itemStr => {
-        const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-        const itemName = match ? match[1].trim() : itemStr;
-        if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
-          found = true;
-          return newQuantity !== 0;
-        }
-        return true;
-      }).map(itemStr => {
-        const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-        const itemName = match ? match[1].trim() : itemStr;
-        if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
-          return `${itemName} (x${newQuantity})`;
-        }
-        return itemStr;
-      });
-    }
+    const td = loadTrainer();
+    const custom = !!selectedItemData.fullData?.isCustom;
+    const entry = td[custom ? 'customItems' : 'inventory'].find(i => i.name.toLowerCase() === selectedItemData.name.toLowerCase());
+    const found = !!entry;
+    if (entry) addItem(td, entry.name, newQuantity - (Number(entry.quantity) || 0), { custom });
 
     if (found) {
       // Update sessionStorage immediately
-      td[20] = buildInventoryString(invItems.length > 0 ? invItems.join(', ') : 'None', customItems);
-      sessionStorage.setItem('trainerData', JSON.stringify(td));
+      storeTrainer(td);
 
       // Close modal immediately
       document.getElementById('editItemModal').style.display = 'none';
@@ -3723,36 +3568,15 @@ export function attachPokemonCardListeners() {
       return;
     }
 
-    const td = JSON.parse(trainerDataRaw);
-    const inventoryStr = td[20] || '';
-    let customItems = parseCustomItems(inventoryStr);
-    const regularStr = getRegularStr(inventoryStr);
-    let invItems = regularStr && regularStr !== 'None'
-      ? regularStr.split(',').map(item => item.trim()).filter(Boolean)
-      : [];
-
-    // Find and remove item by parsing each string
-    let found = false;
-    if (selectedItemData.fullData?.isCustom) {
-      const before = customItems.length;
-      customItems = customItems.filter(ci => ci.name.toLowerCase() !== selectedItemData.name.toLowerCase());
-      found = customItems.length < before;
-    } else {
-      invItems = invItems.filter(itemStr => {
-        const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-        const itemName = match ? match[1].trim() : itemStr;
-        if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
-          found = true;
-          return false;
-        }
-        return true;
-      });
-    }
+    const td = loadTrainer();
+    const custom = !!selectedItemData.fullData?.isCustom;
+    const entry = td[custom ? 'customItems' : 'inventory'].find(i => i.name.toLowerCase() === selectedItemData.name.toLowerCase());
+    const found = !!entry;
+    if (entry) addItem(td, entry.name, -(Number(entry.quantity) || 0), { custom });
 
     if (found) {
       // Update sessionStorage
-      td[20] = buildInventoryString(invItems.length > 0 ? invItems.join(', ') : 'None', customItems);
-      sessionStorage.setItem('trainerData', JSON.stringify(td));
+      storeTrainer(td);
 
       // Close modal immediately
       document.getElementById('removeItemModal').style.display = 'none';
@@ -3952,8 +3776,8 @@ export function attachPokemonCardListeners() {
       return;
     }
 
-    // Party membership lives on the POKEMON's own record (pokemonData[38] -- which
-    // slot number, or '' for none), never on trainerData -- trainerData[26] is only
+    // Party membership lives on the POKEMON's own record (its partySlot -- which
+    // slot number, or null for none), never on trainerData -- trainerData.pokeslots is only
     // ever a single number (party capacity), passed to the API as info, same pattern
     // my-pokemon.js's own party toggle already uses correctly. This used to scan
     // trainerData[26..31] as six separate slot-name cells and write this Pokemon's
@@ -3962,41 +3786,41 @@ export function attachPokemonCardListeners() {
     // 31=WIS -- see edit-trainer.js), so an empty party slot landing on, say, 27
     // silently overwrote the trainer's STR modifier with a Pokemon's name. Real,
     // user-reported bug (2026-09-22) -- fixed by not touching trainerData at all.
-    const originalPokemonSlot = pokemonData[38];
+    const originalPokemonSlot = pokemonData.partySlot;
 
     // Optimistic update -- a placeholder slot number just for instant UI feedback;
     // the server's response.slot below is what's actually authoritative.
-    pokemonData[38] = isChecked ? '1' : '';
-    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+    pokemonData.partySlot = isChecked ? 1 : null;
+    storePokemon(pokemonData);
 
     // Now make the API call
     try {
       const action = isChecked ? 'add' : 'remove';
       const response = await PokemonAPI.updatePartyStatus(
-        trainerData[1],
-        pokemonData[2],
-        trainerData[26],
+        trainerData.name,
+        pokemonData.name,
+        trainerData.pokeslots,
         action
       );
 
       if (response.status === 'success') {
         // Update with actual slot from server if adding
         if (isChecked && response.slot) {
-          pokemonData[38] = response.slot;
-          sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+          pokemonData.partySlot = response.slot;
+          storePokemon(pokemonData);
         }
       } else {
         // Rollback on failure
-        pokemonData[38] = originalPokemonSlot;
-        sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+        pokemonData.partySlot = originalPokemonSlot;
+        storePokemon(pokemonData);
         e.target.checked = !isChecked;
         showError(response.message || 'Failed to update active party status');
       }
     } catch (error) {
       console.error('Error updating active party:', error);
       // Rollback on error
-      pokemonData[38] = originalPokemonSlot;
-      sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+      pokemonData.partySlot = originalPokemonSlot;
+      storePokemon(pokemonData);
       e.target.checked = !isChecked;
       showError('Failed to update active party status');
     }
@@ -4015,12 +3839,12 @@ export function attachPokemonCardListeners() {
     }
 
     // Store original state for rollback
-    const originalUtilityStatus = pokemonData[56];
+    const originalUtilityStatus = pokemonData.utilitySlot;
     const clearedPokemon = [];
 
     // Optimistic update - update sessionStorage immediately
-    pokemonData[56] = isChecked ? 1 : '';
-    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+    pokemonData.utilitySlot = isChecked;
+    storePokemon(pokemonData);
 
     // Clear utility slot from other Pokemon if adding
     if (isChecked) {
@@ -4028,9 +3852,9 @@ export function attachPokemonCardListeners() {
         const key = sessionStorage.key(i);
         if (key.startsWith('pokemon_') && key !== `pokemon_${pokemonName.toLowerCase()}`) {
           const otherPokemon = JSON.parse(sessionStorage.getItem(key));
-          if (otherPokemon[56] === 1 || otherPokemon[56] === '1') {
-            clearedPokemon.push({ key, originalValue: otherPokemon[56] });
-            otherPokemon[56] = '';
+          if (otherPokemon.utilitySlot) {
+            clearedPokemon.push({ key, originalValue: otherPokemon.utilitySlot });
+            otherPokemon.utilitySlot = false;
             sessionStorage.setItem(key, JSON.stringify(otherPokemon));
           }
         }
@@ -4038,15 +3862,15 @@ export function attachPokemonCardListeners() {
     }
 
     // Update trainer data timestamp to trigger refresh
-    sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    sessionStorage.setItem(`trainer_${trainerData.name.toLowerCase()}`, JSON.stringify(trainerData));
+    storeTrainer(trainerData);
 
     // Now make the API call
     try {
       const action = isChecked ? 'add' : 'remove';
       const response = await PokemonAPI.updateUtilitySlot(
-        trainerData[1],
-        pokemonData[2],
+        trainerData.name,
+        pokemonData.name,
         action
       );
 
@@ -4054,36 +3878,36 @@ export function attachPokemonCardListeners() {
         // Success - no message needed, update was already instant
       } else {
         // Rollback on failure
-        pokemonData[56] = originalUtilityStatus;
-        sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+        pokemonData.utilitySlot = originalUtilityStatus;
+        storePokemon(pokemonData);
 
         // Restore cleared Pokemon
         clearedPokemon.forEach(({ key, originalValue }) => {
           const otherPokemon = JSON.parse(sessionStorage.getItem(key));
-          otherPokemon[56] = originalValue;
+          otherPokemon.utilitySlot = originalValue;
           sessionStorage.setItem(key, JSON.stringify(otherPokemon));
         });
 
-        sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
-        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+        sessionStorage.setItem(`trainer_${trainerData.name.toLowerCase()}`, JSON.stringify(trainerData));
+        storeTrainer(trainerData);
         e.target.checked = !isChecked;
         showError(response.message || 'Failed to update utility slot status');
       }
     } catch (error) {
       console.error('Error updating utility slot:', error);
       // Rollback on error
-      pokemonData[56] = originalUtilityStatus;
-      sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+      pokemonData.utilitySlot = originalUtilityStatus;
+      storePokemon(pokemonData);
 
       // Restore cleared Pokemon
       clearedPokemon.forEach(({ key, originalValue }) => {
         const otherPokemon = JSON.parse(sessionStorage.getItem(key));
-        otherPokemon[56] = originalValue;
+        otherPokemon.utilitySlot = originalValue;
         sessionStorage.setItem(key, JSON.stringify(otherPokemon));
       });
 
-      sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
-      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+      sessionStorage.setItem(`trainer_${trainerData.name.toLowerCase()}`, JSON.stringify(trainerData));
+      storeTrainer(trainerData);
       e.target.checked = !isChecked;
       showError('Failed to update utility slot status');
     }
@@ -4248,15 +4072,14 @@ export function attachPokemonCardListeners() {
       if (val) newComments.push(val);
     });
 
-    const commentsString = newComments.join(';');
-    pokemonData[48] = commentsString;
+    pokemonData.comments = newComments;
 
     // Update button count
     const commentsBtn = document.getElementById('commentsButton');
     if (commentsBtn) commentsBtn.textContent = `💬 Comments (${newComments.length})`;
 
     // Save to sessionStorage immediately
-    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+    storePokemon(pokemonData);
 
     // Persist to database in background
     PokemonAPI.update(pokemonData).then(() => {
@@ -4377,9 +4200,9 @@ export function attachPokemonCardListeners() {
     if (currentVpEl) currentVpEl.textContent = newVp;
 
     // Save to sessionStorage
-    pokemonData[45] = newHp;
-    pokemonData[46] = newVp;
-    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+    pokemonData.current.hp = newHp;
+    pokemonData.current.vp = newVp;
+    storePokemon(pokemonData);
 
     // Clear inputs immediately after session save
     document.getElementById('hpChangeInput').value = '';
@@ -4388,10 +4211,10 @@ export function attachPokemonCardListeners() {
     // Persist to database in background
     try {
       if (hpChange !== 0) {
-        await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp);
+        await PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'HP', newHp);
       }
       if (vpChange !== 0) {
-        await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp);
+        await PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'VP', newVp);
       }
     } catch (error) {
       console.error('Error updating Pokemon live stats:', error);
@@ -4435,9 +4258,9 @@ export function attachPokemonCardListeners() {
     if (currentVpEl) currentVpEl.textContent = newVp;
 
     // Save to sessionStorage
-    pokemonData[45] = newHp;
-    pokemonData[46] = newVp;
-    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+    pokemonData.current.hp = newHp;
+    pokemonData.current.vp = newVp;
+    storePokemon(pokemonData);
 
     // Clear inputs and reset multiplier immediately after session save
     document.getElementById('hpChangeInput').value = '';
@@ -4448,14 +4271,14 @@ export function attachPokemonCardListeners() {
     // Persist to database in background
     try {
       if (vpOverflow) {
-        await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp);
-        await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp);
+        await PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'VP', newVp);
+        await PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'HP', newHp);
       } else {
         if (hpChange > 0) {
-          await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp);
+          await PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'HP', newHp);
         }
         if (vpChange > 0) {
-          await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp);
+          await PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'VP', newVp);
         }
       }
     } catch (error) {
@@ -4480,14 +4303,14 @@ export function attachPokemonCardListeners() {
     if (currentVpEl) currentVpEl.textContent = maxVp;
 
     // Save to sessionStorage
-    pokemonData[45] = maxHp;
-    pokemonData[46] = maxVp;
-    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+    pokemonData.current.hp = maxHp;
+    pokemonData.current.vp = maxVp;
+    storePokemon(pokemonData);
 
     // Persist to database
     try {
-      await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', maxHp);
-      await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', maxVp);
+      await PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'HP', maxHp);
+      await PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'VP', maxVp);
     } catch (error) {
       console.error('Error updating Pokemon live stats:', error);
       showError('Failed to save HP/VP restore to database');
@@ -4515,9 +4338,9 @@ export function attachPokemonCardListeners() {
     document.getElementById('trainerCombatCurrentVP').textContent = `${newVp} / ${maxVp}`;
 
     // Save to sessionStorage
-    trainerData[34] = newHp;
-    trainerData[35] = newVp;
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    trainerData.current.hp = newHp;
+    trainerData.current.vp = newVp;
+    storeTrainer(trainerData);
 
     // Clear inputs immediately after session save
     document.getElementById('trainerHpChangeInput').value = '';
@@ -4526,10 +4349,10 @@ export function attachPokemonCardListeners() {
     // Persist to database in background
     try {
       if (hpChange !== 0) {
-        await TrainerAPI.updateLiveStats(trainerData[1], 'HP', newHp);
+        await TrainerAPI.updateLiveStats(trainerData.name, 'HP', newHp);
       }
       if (vpChange !== 0) {
-        await TrainerAPI.updateLiveStats(trainerData[1], 'VP', newVp);
+        await TrainerAPI.updateLiveStats(trainerData.name, 'VP', newVp);
       }
     } catch (error) {
       console.error('Error updating Trainer live stats:', error);
@@ -4565,9 +4388,9 @@ export function attachPokemonCardListeners() {
     document.getElementById('trainerCombatCurrentVP').textContent = `${newVp} / ${maxVp}`;
 
     // Save to sessionStorage
-    trainerData[34] = newHp;
-    trainerData[35] = newVp;
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    trainerData.current.hp = newHp;
+    trainerData.current.vp = newVp;
+    storeTrainer(trainerData);
 
     // Clear inputs immediately after session save
     document.getElementById('trainerHpChangeInput').value = '';
@@ -4576,14 +4399,14 @@ export function attachPokemonCardListeners() {
     // Persist to database in background
     try {
       if (vpOverflow) {
-        await TrainerAPI.updateLiveStats(trainerData[1], 'VP', newVp);
-        await TrainerAPI.updateLiveStats(trainerData[1], 'HP', newHp);
+        await TrainerAPI.updateLiveStats(trainerData.name, 'VP', newVp);
+        await TrainerAPI.updateLiveStats(trainerData.name, 'HP', newHp);
       } else {
         if (hpChange > 0) {
-          await TrainerAPI.updateLiveStats(trainerData[1], 'HP', newHp);
+          await TrainerAPI.updateLiveStats(trainerData.name, 'HP', newHp);
         }
         if (vpChange > 0) {
-          await TrainerAPI.updateLiveStats(trainerData[1], 'VP', newVp);
+          await TrainerAPI.updateLiveStats(trainerData.name, 'VP', newVp);
         }
       }
     } catch (error) {
@@ -4603,14 +4426,14 @@ export function attachPokemonCardListeners() {
     document.getElementById('trainerCombatCurrentVP').textContent = `${maxVp} / ${maxVp}`;
 
     // Save to sessionStorage
-    trainerData[34] = maxHp;
-    trainerData[35] = maxVp;
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    trainerData.current.hp = maxHp;
+    trainerData.current.vp = maxVp;
+    storeTrainer(trainerData);
 
     // Persist to database
     try {
-      await TrainerAPI.updateLiveStats(trainerData[1], 'HP', maxHp);
-      await TrainerAPI.updateLiveStats(trainerData[1], 'VP', maxVp);
+      await TrainerAPI.updateLiveStats(trainerData.name, 'HP', maxHp);
+      await TrainerAPI.updateLiveStats(trainerData.name, 'VP', maxVp);
     } catch (error) {
       console.error('Error updating Trainer live stats:', error);
       showError('Failed to save Trainer HP/VP restore to database');
@@ -4632,8 +4455,8 @@ function loadMoveColorsAndListeners() {
     if (!rawMovesData) return;
     try {
       const clean = JSON.parse(rawMovesData.replace(/\\"/g, '"').replace(/\\r/g, '').replace(/\\n/g, ''));
-      _moves = clean.map(move => move.map(item => (typeof item === 'string' ? item.trim() : item)));
-      _moveMap = new Map(_moves.map(m => [m[0], m]));
+      _moves = clean.map(move => Object.fromEntries(Object.entries(move).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])));
+      _moveMap = new Map(_moves.map(m => [m.name, m]));
     } catch (e) {
       console.error('Failed to parse moves data:', e);
       return;
@@ -4645,7 +4468,7 @@ function loadMoveColorsAndListeners() {
     const moveName = moveItem.dataset.move;
     const move = _moveMap.get(moveName);
     if (move) {
-      const bgColor = getMoveTypeColor(move[1]);
+      const bgColor = getMoveTypeColor(move.type);
       moveItem.style.backgroundColor = bgColor;
       moveItem.style.color = getTextColorForBackground(bgColor);
       moveItem.addEventListener('click', () => showMoveDetails(moveName));
@@ -4662,25 +4485,25 @@ function showMoveDetails(moveName) {
   const trainerData = _trainerData;
 
   {
-    const type1 = pokemonData[5] || '';
-    const type2 = pokemonData[6] || '';
-    const str = parseInt(pokemonData[15]) || 10;
-    const dex = parseInt(pokemonData[16]) || 10;
-    const con = parseInt(pokemonData[17]) || 10;
-    const int = parseInt(pokemonData[18]) || 10;
-    const wis = parseInt(pokemonData[19]) || 10;
-    const cha = parseInt(pokemonData[20]) || 10;
-    const proficiency = parseInt(pokemonData[31]) || 2;
-    const stabBonusValue = parseInt(pokemonData[34]) || 2;
-    const heldItemsStr = pokemonData[35] || '';
+    const type1 = pokemonData.types.primary || '';
+    const type2 = pokemonData.types.secondary || '';
+    const str = parseInt(pokemonData.stats.strength) || 10;
+    const dex = parseInt(pokemonData.stats.dexterity) || 10;
+    const con = parseInt(pokemonData.stats.constitution) || 10;
+    const int = parseInt(pokemonData.stats.intelligence) || 10;
+    const wis = parseInt(pokemonData.stats.wisdom) || 10;
+    const cha = parseInt(pokemonData.stats.charisma) || 10;
+    const proficiency = parseInt(pokemonData.combat.proficiency) || 2;
+    const stabBonusValue = parseInt(pokemonData.combat.stab) || 2;
+    const heldItemsStr = pokemonData.heldItem || '';
     const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
 
     // Get Pokemon types and trainer info for move computation
     const pokemonTypes = [type1, type2].filter(t => t);
-    const pokemonLevel = parseInt(pokemonData[4]) || 1;
-    const trainerPath = trainerData[25] || '';
-    const trainerLevel = parseInt(trainerData[2]) || 1;
-    const specializationsStr = trainerData[24] || '';
+    const pokemonLevel = parseInt(pokemonData.level) || 1;
+    const trainerPath = trainerData.trainerPath || '';
+    const trainerLevel = parseInt(trainerData.level) || 1;
+    const specializationsStr = trainerData.specializations.join(', ');
 
     // Stat mods (also used by trainer path sections below)
     const strMod = Math.floor((str - 10) / 2);
@@ -4691,11 +4514,7 @@ function showMoveDetails(moveName) {
     const chaMod = Math.floor((cha - 10) / 2);
 
     // Compute attack/damage bonuses via shared utility
-    const abilitiesStr = pokemonData[7] || '';
-    const hasToughClaws = abilitiesStr.split('|').some(a => {
-      const body = a.includes(':') ? a.substring(a.indexOf(':') + 1) : a;
-      return body.split(';')[0].trim().toLowerCase() === 'tough claws';
-    });
+    const hasToughClaws = abilitiesOf(pokemonData).some(a => a.name.trim().toLowerCase() === 'tough claws');
 
     // Resolve held item DB entries once — used for both bonus calc and display
     const itemsData = JSON.parse(sessionStorage.getItem('items')) || [];
@@ -4724,18 +4543,11 @@ function showMoveDetails(moveName) {
         ).join('')
       : '';
 
-    const hasBrawny = (pokemonData[50] || '').split(',').map(f => f.trim()).some(f => f === 'Brawny');
-    const sizeText = (pokemonData[57] || 'Unknown') + (hasBrawny ? ' ✦' : '');
+    const hasBrawny = (pokemonData.feats || []).includes('Brawny');
+    const sizeText = (pokemonData.size || 'Unknown') + (hasBrawny ? ' ✦' : '');
 
-    // Get chargesLeft for this move from KnownMoves string (pokemonData[59])
-    let chargesLeft;
-    const _knownMovesStr = pokemonData[59] || '';
-    if (_knownMovesStr) {
-      for (const _entry of _knownMovesStr.split(',').map(e => e.trim())) {
-        const _km = _entry.match(/^(.+?)\((\d+)\)\((SR|LR|DICE)\)$/);
-        if (_km && _km[1].trim() === move[0]) { chargesLeft = parseInt(_km[2]); break; }
-      }
-    }
+    // The charges this move has left (its moveCharges)
+    const chargesLeft = (pokemonData.moveCharges || {})[move.name]?.chargesLeft;
 
     showMovePopup({
       move,
@@ -4776,39 +4588,30 @@ function showMoveDetails(moveName) {
         if (currentVpEl) currentVpEl.textContent = newVp;
         if (currentHpEl) currentHpEl.textContent = newHp;
 
-        pokemonData[46] = newVp;
-        pokemonData[45] = newHp;
+        pokemonData.current.vp = newVp;
+        pokemonData.current.hp = newHp;
 
-        // Decrement charge for recharge moves (SR/LR/DICE)
-        const _currentKnownMoves = pokemonData[59] || '';
-        if (_currentKnownMoves) {
-          let _chargeChanged = false;
-          pokemonData[59] = _currentKnownMoves.split(',').map(e => {
-            const _km = e.trim().match(/^(.+?)\((\d+)\)\((SR|LR|DICE)\)$/);
-            if (_km && _km[1].trim() === usedMoveName && parseInt(_km[2]) > 0) {
-              _chargeChanged = true;
-              return `${_km[1]}(${parseInt(_km[2]) - 1})(${_km[3]})`;
-            }
-            return e.trim();
-          }).filter(Boolean).join(',');
-          if (_chargeChanged) {
-            PokemonAPI.update(pokemonData).catch(e => console.error('Error saving move charges:', e));
-          }
+        // Use up a charge of a recharge move (SR/LR/DICE)
+        const _charge = (pokemonData.moveCharges || {})[usedMoveName];
+        if (_charge && _charge.chargesLeft > 0) {
+          _charge.chargesLeft -= 1;
+          PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'MoveCharges', JSON.stringify(pokemonData.moveCharges))
+            .catch(e => console.error('Error saving move charges:', e));
         }
 
-        sessionStorage.setItem(`pokemon_${pokemonData[2].toLowerCase()}`, JSON.stringify(pokemonData));
+        storePokemon(pokemonData);
 
-        PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp)
+        PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'VP', newVp)
           .catch(error => console.error('Error updating VP:', error));
 
         if (vpOverflow) {
-          PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp)
+          PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'HP', newHp)
             .catch(error => console.error('Error updating HP:', error));
         }
       },
       onDrainHeal: () => {
-        // pokemonData[45] was just updated by onUseMove; pokemonData[10] is max HP
-        showDrainHealPopupForCard(pokemonData, move[0], trainerData, pokemonData[45], pokemonData[10]);
+        // its current HP was just updated by onUseMove
+        showDrainHealPopupForCard(pokemonData, move.name, trainerData, pokemonData.current.hp, pokemonData.combat.maxHP);
       },
     });
   }

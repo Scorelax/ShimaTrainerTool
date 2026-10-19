@@ -1,5 +1,5 @@
 // Landing Page (Index) - Continue Journey or Start New Adventure
-import { GameDataAPI, ON_OLD_GITHUB_ADDRESS } from '../api.js';
+import { ON_OLD_GITHUB_ADDRESS } from '../api.js';
 import { audioManager } from '../utils/audio.js';
 import { getSettings, saveSettings } from '../utils/settings.js';
 
@@ -654,24 +654,8 @@ export function attachIndexListeners() {
     setTimeout(() => {
       document.getElementById('cacheModalCancel')?.addEventListener('click', hideCacheModal);
       document.getElementById('cacheModalConfirm')?.addEventListener('click', async () => {
-        // Show progress while the server refreshes its data
-        showCacheModal({
-          icon: '⏳',
-          title: 'Refreshing...',
-          message: 'Fetching fresh game data on the server. This usually takes a few seconds.',
-          buttons: '',
-        });
-
-        // Refresh the SERVER-side upstream cache in place (pokemon dex,
-        // moves, items, pokedex config) so the data is fresh AND the cache
-        // stays warm. Best-effort: keep going even if the backend is
-        // unreachable.
-        try {
-          await GameDataAPI.clearServerCache();
-        } catch (e) {
-          console.warn('Server cache clear failed (continuing):', e.message);
-        }
-
+        // Everything this device keeps of the game data goes; the page fetches it fresh from the Pi as it reloads (the
+        // Pi itself keeps nothing to refresh -- it reads its data files whenever they change).
         // Clear sessionStorage
         sessionStorage.clear();
 

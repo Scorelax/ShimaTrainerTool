@@ -1,7 +1,7 @@
 """route=combat -- the shared multiplayer combat session.
 
 One active session at a time, matching the rest of this app's "single shared
-state" model (see the one shared pokedex in upstream.py) -- this is a
+state" model (see the one shared pokedex config in gamedata.py) -- this is a
 tabletop group playing together, not a matchmaking service. State is stored
 as a single JSON blob in the combat_session table (see db.py) and re-read
 fresh on every action rather than cached in memory, same as everywhere else
@@ -37,11 +37,11 @@ import threading
 import uuid
 from datetime import datetime, timezone
 
-from . import abilities, db, live, routes_gamedata, upstream
+from . import abilities, battle_lists, db, gamedata, live, media
 from .conditions import is_levitating, untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, weather_damage_kind, is_grounded, grounded_in, altitude_limits
 from .jsutil import js_parse_int
 
-# Same os.environ-overridable, ~-expanded convention as upstream.py's other
+# Same os.environ-overridable, ~-expanded convention as media.py's other
 # *_DIR constants (SPRITE_DIR, BATTLE_ANIMATION_DIR, ...). One file per
 # battle session (see _new_log_filename), written incrementally as events
 # happen so a crash mid-battle still leaves whatever was logged up to that
@@ -148,7 +148,7 @@ _EMPTY_STATE = {
         'grid': {'cols': 10, 'rows': 12},  # portrait by default -- matches the table display's orientation
         'cells': {},   # "col,row" -> {'terrain': '<freeform DM-typed label>'}
         'tokens': {},  # participantId -> {'col': int, 'row': int}
-        # Chosen from list-backgrounds (see upstream.BATTLE_IMAGE_DIR), or
+        # Chosen from list-backgrounds (see media.BATTLE_IMAGE_DIR), or
         # None for the plain dark stage. Set once via the placement screen's
         # PvP-only dropdown (combat-wip.js) and shared by every viewer --
         # the same URL string every screen (in-app popup, placement, kiosk
@@ -236,7 +236,7 @@ def _handle(conn, action, params):
         if battle_type == 'pvp':
             # PvP starts on an 11x20 forest map (the user's call); still changeable on the placement screen.
             state['board']['grid'] = dict(_PVP_DEFAULT_GRID)
-            if os.path.isfile(os.path.join(upstream.BATTLE_IMAGE_DIR, _PVP_DEFAULT_BACKGROUND)):
+            if os.path.isfile(os.path.join(media.BATTLE_IMAGE_DIR, _PVP_DEFAULT_BACKGROUND)):
                 state['board']['backgroundImage'] = f'/battle-images/{_PVP_DEFAULT_BACKGROUND}'
         state['round'] = 1
         state['log'] = []
@@ -756,7 +756,9 @@ def start_prepared_session(conn, setup):
                              else 'A battle is already in progress -- end it before starting a new one.')
         state = copy.deepcopy(_EMPTY_STATE)
         state.update({'active': True, 'battleType': 'pve', 'round': 1, 'log': [], 'logFile': _new_log_filename('pve')})
-        _board_from_map(state['board'], setup.get('map') or {})
+        board = state['board']
+        _board_from_map(board, setup.get('map') or {})
+        cols, rows = board['grid']['cols'], board['grid']['rows']
         _log_event(state, 'session-start', text='Battle started (PVE)')
 
         for creature in setup.get('creatures') or []:
@@ -1114,16 +1116,10 @@ def _hover_token(conn, pid, col, row):
 
 
 def _find_move(conn, move_name):
-    """Row straight from the moves dataset -- [name, type, modifier,
-    actionType, vpCost, duration, range, desc, higherLevels], same array
-    shape move-popup.js already destructures client-side. None for an
-    unrecognized name (a still-being-typed custom/homebrew move), which
-    callers treat as "no VP cost, no type multiplier" rather than an error --
-    unrecognized shouldn't hard-block a turn."""
-    for row in upstream.fetch_moves(conn):
-        if row and str(row[0]).strip().lower() == move_name.strip().lower():
-            return row
-    return None
+    """The move as the app reads it (gamedata.moves: {name, type, moveStat, action, vpCost, ...}). None for an
+    unrecognized name (a still-being-typed custom/homebrew move), which callers treat as "no VP cost, no type
+    multiplier" rather than an error -- unrecognized shouldn't hard-block a turn."""
+    return gamedata.find_move(move_name)
 
 
 def _clamp_type_multiplier(raw):
@@ -1131,7 +1127,7 @@ def _clamp_type_multiplier(raw):
     double-weak/double-resist dual-type target -- only four outcomes exist:
     no effect (0), not very effective (0.5), neutral (1), super effective
     (2), regardless of how the two types' chart values would otherwise
-    multiply out. Collapses whatever calculate_type_effectiveness's
+    multiply out. Collapses whatever gamedata.type_matchups'
     multiplicative chart produced (0, 0.25, 0.5, 1, 2, or 4) into that set."""
     if raw <= 0:
         return 0
@@ -1169,10 +1165,9 @@ def _immunity_ignored(attacker, target, attack_type):
 
 
 def _type_multiplier(conn, attack_type, defend_type1, defend_type2, target=None, attacker=None):
-    """Reuses game-data/type-effectiveness's own chart lookup (routes_gamedata
-    .calculate_type_effectiveness), which returns one multiplier per
-    attacking type in type_chart_attack's order -- this just also resolves
-    that order to find attack_type's position, then clamps it to this game's
+    """Reuses game-data/type-effectiveness's own chart lookup
+    (gamedata.type_matchups: {attacking type: multiplier} against the
+    defending types), then clamps attack_type's to this game's
     four-outcome ruleset (see _clamp_type_multiplier). Defaults to 1
     (neutral) whenever any type is missing/unrecognized, same as an untyped
     participant or an off-chart move should behave.
@@ -1194,16 +1189,11 @@ def _type_multiplier(conn, attack_type, defend_type1, defend_type2, target=None,
             break
     if not attack_type or not defend_type1:
         return 1
-    values = routes_gamedata.calculate_type_effectiveness(conn, defend_type1, defend_type2)
-    if not values:
+    matchups = gamedata.type_matchups(defend_type1, defend_type2)
+    attack = next((t for t in matchups if t.upper() == str(attack_type).upper()), None)
+    if attack is None:
         return 1
-    attack_types = [r[0] for r in conn.execute('SELECT type FROM type_chart_attack ORDER BY ord')]
-    upper_attack = [str(t).upper() for t in attack_types]
-    try:
-        idx = upper_attack.index(str(attack_type).upper())
-    except ValueError:
-        return 1
-    raw = values[idx] if idx < len(values) else 1
+    raw = matchups[attack]
     if raw == 0 and (attacker or target) and _immunity_ignored(attacker, target, attack_type):
         # "...ignore any immunities granted by their type. If the secondary type gives it
         # vulnerability or resistance, it follows the secondary type for that effect": rate each
@@ -1212,8 +1202,7 @@ def _type_multiplier(conn, attack_type, defend_type1, defend_type2, target=None,
         for single in (defend_type1, defend_type2):
             if not single:
                 continue
-            single_values = routes_gamedata.calculate_type_effectiveness(conn, single, None)
-            single_raw = single_values[idx] if idx < len(single_values) else 1
+            single_raw = gamedata.type_matchups(single).get(attack, 1)
             raw *= single_raw if single_raw != 0 else 1
     result = _clamp_type_multiplier(raw)
     for s in statuses:
@@ -1235,9 +1224,9 @@ def _use_move(conn, pid, move_name, target_id, dice_roll, species):
     type effectiveness. Also fires the same animation cue play-animation
     does, so using a move for real is what actually drives the display
     module now instead of only the WIP page's manual test button."""
-    move_row = _find_move(conn, move_name)
-    vp_cost = (js_parse_int(move_row[4]) or 0) if move_row else 0
-    move_type = move_row[1] if move_row and len(move_row) > 1 else ''
+    move = _find_move(conn, move_name)
+    vp_cost = (js_parse_int(move['vpCost']) or 0) if move else 0
+    move_type = move['type'] if move else ''
 
     outcome = {}
     result = _mutate(conn, lambda s: outcome.update(
@@ -1356,9 +1345,10 @@ def _add_participant(state, data):
         'int': data.get('int'), 'wis': data.get('wis'), 'cha': data.get('cha'),
         'strMod': data.get('strMod'), 'dexMod': data.get('dexMod'), 'conMod': data.get('conMod'),
         'intMod': data.get('intMod'), 'wisMod': data.get('wisMod'), 'chaMod': data.get('chaMod'),
-        'abilities': data.get('abilities', ''), 'item': data.get('item', ''),
+        # The lists as lists (battle_lists.py) -- [{slot, name, description}] and names -- whatever the app sent.
+        'abilities': battle_lists.ability_list(data.get('abilities')), 'item': data.get('item', ''),
         'moves': data.get('moves', []),
-        'savingThrows': data.get('savingThrows', ''), 'skills': data.get('skills', ''),
+        'savingThrows': battle_lists.name_list(data.get('savingThrows')), 'skills': battle_lists.name_list(data.get('skills')),
         # Whether this participant has been placed on the battle map through
         # the (per-player) placement step -- see confirm-placement below.
         # Only ever checked client-side against a participant's own `owner`
@@ -3453,7 +3443,7 @@ def _ability_stat(state, holder_id, target_id, ability, effect):
     target = state['participants'][target_id]
     stats = [effect.get('stat')]
     if effect.get('stat') == 'saving_throw_abilities':
-        words = re.findall(r'[A-Za-z]+', str(target.get('savingThrows') or ''))
+        words = battle_lists.name_list(target.get('savingThrows'))
         stats = [_SAVE_ABILITY_KEYS[w[:3].lower()] for w in words if w[:3].lower() in _SAVE_ABILITY_KEYS]
     for stat in stats:
         spec = {'kind': 'stat', 'stat': stat, 'sourceId': holder_id, 'moveName': ability, 'ends': effect.get('ends') or []}
@@ -3918,16 +3908,15 @@ _BACKGROUND_FILENAME_RE = re.compile(r'^battle-(.+)\.(?:png|jpe?g|webp)$', re.IG
 
 def _list_backgrounds():
     """Battle-map background images available on disk (see
-    upstream.BATTLE_IMAGE_DIR) -- named battle-<key>.png, e.g.
+    media.BATTLE_IMAGE_DIR) -- named battle-<key>.png, e.g.
     battle-forest.png -> {"key": "forest", "label": "Forest", "url": "/battle-images/battle-forest.png"}.
     Not session state (doesn't touch `state` at all) -- just a filesystem
-    listing, same "browsable directory" reasoning as routes_gamedata.py's
-    media_list(), kept here instead since this is purely a combat/board
-    concern with nothing else needing to know about it."""
-    if not os.path.isdir(upstream.BATTLE_IMAGE_DIR):
+    listing, kept here since this is purely a combat/board concern with
+    nothing else needing to know about it."""
+    if not os.path.isdir(media.BATTLE_IMAGE_DIR):
         return {'status': 'success', 'backgrounds': []}
     backgrounds = []
-    for filename in sorted(os.listdir(upstream.BATTLE_IMAGE_DIR)):
+    for filename in sorted(os.listdir(media.BATTLE_IMAGE_DIR)):
         m = _BACKGROUND_FILENAME_RE.match(filename)
         if not m:
             continue
@@ -3944,10 +3933,10 @@ def list_map_objects():
     """The pictures the DM console's map editor can place on the map -- object-<key>.png in the same folder as the
     backgrounds (object-tree.png -> {"key": "tree", "label": "Tree", "url": "/battle-images/object-tree.png"}). A new
     file dropped in there shows up in the editor's list on its own."""
-    if not os.path.isdir(upstream.BATTLE_IMAGE_DIR):
+    if not os.path.isdir(media.BATTLE_IMAGE_DIR):
         return []
     out = []
-    for filename in sorted(os.listdir(upstream.BATTLE_IMAGE_DIR)):
+    for filename in sorted(os.listdir(media.BATTLE_IMAGE_DIR)):
         m = _OBJECT_FILENAME_RE.match(filename)
         if m:
             key = m.group(1)
@@ -3955,26 +3944,16 @@ def list_map_objects():
     return out
 
 
-_MOVE_DATA_CACHE = {'stamp': None, 'data': None}
-
-
 def _load_move_data_file():
-    """upstream.MOVES_FILE (DnD_moves_categorized_draft.json) -- the full per-move record (categories, effects,
-    reactionTrigger/reactionRange, ...), not just the raw [name, type, ...] row upstream.fetch_moves returns. Re-read whenever the
-    file changes (its modification time or size), so an in-progress editing session on the Pi is still picked up on the very next
-    read -- but not re-parsed on every call: the file is ~1 MB and this is consulted on every damage application and every token
-    move (False Swipe's flag, Pursuit's reaction check), which on a Pi was real, avoidable work. Callers treat the result as
-    read-only. {'moves': []} on any read failure -- every caller already treats a miss as "nothing special here", never a hard error."""
-    try:
-        stat = os.stat(upstream.MOVES_FILE)
-        stamp = (stat.st_mtime_ns, stat.st_size)
-        if _MOVE_DATA_CACHE['stamp'] != stamp:
-            with open(upstream.MOVES_FILE, encoding='utf-8') as f:
-                _MOVE_DATA_CACHE['data'] = json.load(f)
-            _MOVE_DATA_CACHE['stamp'] = stamp
-        return _MOVE_DATA_CACHE['data']
-    except (OSError, ValueError):
-        return {'moves': []}
+    """gamedata.MOVES_FILE (DnD_moves_categorized_draft.json) -- the full per-move record (categories, effects,
+    reactionTrigger/reactionRange, ...), not just the fields the app reads (gamedata.moves). gamedata.read_file reads
+    it again whenever it changes, so an in-progress editing session on the Pi is picked up on the very next read --
+    but doesn't re-parse it on every call: the file is ~1 MB and this is consulted on every damage application and
+    every token move (False Swipe's flag, Pursuit's reaction check), which on a Pi was real, avoidable work. Callers
+    treat the result as read-only. {'moves': []} on any read failure -- every caller already treats a miss as "nothing
+    special here", never a hard error."""
+    data = gamedata.read_file(gamedata.MOVES_FILE)
+    return data if data.get('moves') is not None else {'moves': []}
 
 
 def _list_move_categories():
@@ -4456,7 +4435,7 @@ def dm_set_board_map(conn, objects, marks, traps=None):
 
 # The DM console's Edit (the user's ask, 2026-10-16): anything about one of the DM's creatures, changed mid-battle. The
 # fields a participant record carries for its stat block, and what each is.
-_EDITABLE_TEXT = ('name', 'type1', 'type2', 'size', 'abilities', 'item', 'savingThrows', 'skills')
+_EDITABLE_TEXT = ('name', 'type1', 'type2', 'size', 'item')  # abilities / savingThrows / skills: lists (battle_lists.py)
 _EDITABLE_INT = ('level', 'maxHP', 'currentHP', 'maxVP', 'currentVP', 'ac', 'baseAc', 'critMod', 'proficiency', 'stabBonusValue',
                  'str', 'dex', 'con', 'int', 'wis', 'cha', 'strMod', 'dexMod', 'conMod', 'intMod', 'wisMod', 'chaMod', 'initiative')
 
@@ -4473,6 +4452,7 @@ def _dm_update_participant(state, pid, data):
     for key in _EDITABLE_TEXT:
         if key in data:
             p[key] = str(data[key] or '').strip()
+    p.update(battle_lists.lists_of({k: v for k, v in data.items() if k in ('abilities', 'savingThrows', 'skills')}))
     for key in _EDITABLE_INT:
         if key in data:
             value = js_parse_int(data[key])

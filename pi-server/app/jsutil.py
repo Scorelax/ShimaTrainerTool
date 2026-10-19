@@ -1,7 +1,5 @@
-"""Helpers that replicate JavaScript coercion semantics from Current_Code.gs.
-
-The Apps Script backend leans on JS quirks (parseInt on "45ft", truthiness,
-Number coercion in comparisons). These helpers keep the port behaviour-exact.
+"""JavaScript's coercion rules in Python (parseInt on "45ft", truthiness, Number coercion in comparisons) -- the server
+reads values the app wrote the way the app itself reads them.
 """
 import math
 import re
@@ -42,7 +40,7 @@ def js_number(value):
 
 
 def js_truthy(value):
-    """JS truthiness for sheet cell values ('' and 0 are falsy)."""
+    """JS truthiness for stored values ('' and 0 are falsy)."""
     if value is None or value is False:
         return False
     if isinstance(value, str):

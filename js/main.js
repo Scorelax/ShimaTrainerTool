@@ -19,7 +19,14 @@ import { showToast, showError } from './utils/notifications.js';
 import { audioManager } from './utils/audio.js';
 import { getSettings } from './utils/settings.js';
 import { initIdleSplash } from './utils/idle-splash.js';
+import { hasOldRows } from './utils/owned-pokemon.js';
+import { hasOldTrainerRow } from './utils/trainer-data.js';
 import { initLiveUpdates } from './utils/live-updates.js';
+
+/** Whether sessionStorage still holds the move list as the old 9-cell rows. */
+function hasOldMoveRows() {
+  try { return Array.isArray(JSON.parse(sessionStorage.getItem('moves') || '[]')[0]); } catch { return false; }
+}
 
 // ============================================================================
 // APPLICATION STATE
@@ -109,6 +116,13 @@ class Router {
         this.navigate(e.state.route, e.state.params, false);
       }
     });
+
+    // A tab still holding its Pokemon, trainer or move list as the old rows (logged in before the app switched to
+    // objects, 2026-10-18 / 19) starts over from the title screen -- logging in again loads them as objects.
+    if (hasOldRows() || hasOldTrainerRow() || hasOldMoveRows()) {
+      sessionStorage.clear();
+      window.location.hash = '';
+    }
 
     // Load initial route
     const hash = window.location.hash.slice(1) || 'index';
@@ -297,12 +311,9 @@ class Router {
   }
 
   async renderCombatWip() {
-    // Open to every trainer (not gated to one trainer) so multiple people
-    // can log in as different trainers to actually test the shared/live
-    // parts of this -- that's the only way to see it working for real
-    // until Benjakronk's own tool can drive it. The old combat page (see
-    // renderCombat above) stays the one actually used to play until the
-    // real switchover, which is well down the road.
+    // The shared battle: open to every trainer, the DM console runs it (its
+    // Battle module). The old combat page (see renderCombat above) is still
+    // there beside it.
     const content = document.getElementById('content');
     content.innerHTML = await renderCombatWip();
     attachCombatWipListeners();
@@ -351,7 +362,7 @@ async function initApp() {
     // Idle splash screensaver -- survives navigation, so init once here
     initIdleSplash();
 
-    // Live push notifications (Benjakronk's Pokedex pushes) -- one SSE
+    // Live push notifications (Pokedex settings, trainer data, the battle) -- one SSE
     // connection for the whole session, same "init once" reasoning as above
     initLiveUpdates();
 

@@ -1,44 +1,31 @@
 """FastAPI entry point.
 
-Speaks the same GET ?route=...&action=... contract as the Google Apps Script
-deployment, and serves the PWA static files from the same origin. The only
-frontend change needed is API_CONFIG.baseUrl in js/api.js.
+The app's API (GET /api?route=...&action=..., plus the POST endpoints below), and the PWA's static files from the same
+origin -- js/api.js always talks to the server that serves it.
 
 Run locally:  uvicorn app.main:app --host 0.0.0.0 --port 8080
 Env vars:     POKEDEX_DB (sqlite path), PWA_DIR (static files root)
 """
 import asyncio
-import hmac
 import json
 import mimetypes
 import os
 import queue as queue_mod
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Header, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, live, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews, upstream
+from . import db, gamedata, live, media, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
-
-# POST is for /api/upstream-push, pushed cross-origin from Benjakronk's
-# admin panel on benjakronk.github.io
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=['*'],
-    allow_methods=['GET', 'POST'],
-    allow_headers=['*'],
-    expose_headers=['X-Data-Version'],
-)
 
 db.init()
 
 
-# Binary media: self-uploaded MP4 sprites, evolution videos, Benjakronk's
-# splash mirror, and the bundled audio/images in PWA_DIR/assets (27MB of mp3s
+# Binary media: self-uploaded MP4 sprites, evolution videos, the splashes,
+# and the bundled audio/images in PWA_DIR/assets (27MB of mp3s
 # and pngs). These are large, rarely change, and are re-displayed constantly
 # during normal use (every navigation back to a screen showing an owned
 # Pokemon re-requests its sprite) -- no-store on these was forcing a full
@@ -47,19 +34,19 @@ db.init()
 # playing instantly from a local copy.
 #
 # Sprites and evolution videos are cached *hard* (no per-load network
-# round-trip at all): upstream.local_sprite_url/local_evolution_video_url
+# round-trip at all): media.local_sprite_url/local_evolution_video_url
 # stamp a `?t=<mtime>` onto the URL itself, so a replaced file gets a brand
 # new URL automatically -- nothing for the browser to revalidate, nothing to
 # ever go stale, nothing to manually clear.
-_VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', upstream.CHARACTER_IMAGE_URL_PREFIX,
-                             upstream.DISPLAY_IMAGE_URL_PREFIX, upstream.POKEMON_IMAGE_URL_PREFIX,
-                             upstream.NPC_IMAGE_URL_PREFIX, sprite_previews.SPRITE_PREVIEW_URL_PREFIX)
+_VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', media.CHARACTER_IMAGE_URL_PREFIX,
+                             media.DISPLAY_IMAGE_URL_PREFIX, media.POKEMON_IMAGE_URL_PREFIX,
+                             media.NPC_IMAGE_URL_PREFIX, sprite_previews.SPRITE_PREVIEW_URL_PREFIX)
 
 # The splashes, badges and the bundled PWA assets aren't stamped with a
 # version (their filenames stay constant even when the content behind them
 # changes), so they can't be cached hard the same way -- they keep
 # revalidating every load instead, same as before.
-_REVALIDATED_MEDIA_PREFIXES = (upstream.SPLASH_URL_PREFIX, upstream.BADGE_URL_PREFIX, '/assets/', '/battle-images/')
+_REVALIDATED_MEDIA_PREFIXES = (media.SPLASH_URL_PREFIX, media.BADGE_URL_PREFIX, '/assets/', '/battle-images/')
 
 
 @app.middleware('http')
@@ -90,23 +77,14 @@ async def caching_policy(request: Request, call_next):
 
 
 def _data_version():
-    """Newest upstream fetch time, plus when the species, item and move files last changed. Changes whenever the DM
-    console saves the pokedex config or an edited data file is pulled onto the Pi -- which tells clients to drop their
-    locally cached static game data."""
+    """gamedata.data_version (the Pokedex settings' last save, every data file's last change), plus the species files
+    and the species pictures folder (a picture added for a species shows on every device without waiting) -- whenever
+    it changes, the devices drop the game data they keep."""
     conn = db.connect()
     try:
-        row = conn.execute('SELECT MAX(fetched_at) FROM upstream_cache').fetchone()
-        fetched = (row and row[0]) or 'none'
+        return gamedata.data_version(conn, (species.SPECIES_FILE, species.ABILITIES_FILE, media.POKEMON_IMAGE_DIR))
     finally:
         conn.close()
-    files = []
-    # (the Pokemon pictures folder too: a picture added for a species shows on every device without waiting)
-    for path in (species.SPECIES_FILE, species.ABILITIES_FILE, upstream.ITEMS_FILE, upstream.MOVES_FILE, upstream.POKEMON_IMAGE_DIR):
-        try:
-            files.append(str(int(os.path.getmtime(path))))
-        except OSError:
-            files.append('-')
-    return f"{fetched}|{'|'.join(files)}"
 
 
 def _dispatch(params):
@@ -138,11 +116,11 @@ def _dispatch(params):
                 'endpoints': {
                     'pokemon': ['list', 'registered-list', 'get', 'register', 'update', 'delete',
                                 'evolution-options', 'party-status', 'utility-slot', 'live-stats'],
-                    'trainer': ['list', 'get', 'create', 'update', 'inventory', 'gear',
-                                'money', 'live-stats'],
+                    'trainer': ['list', 'get', 'get-full', 'create', 'update', 'money', 'affinity',
+                                'specialization', 'live-stats'],
                     'gameData': ['all', 'conduit', 'moves', 'natures',
-                                 'type-effectiveness', 'pokedex-config',
-                                 'splash-list', 'media-list'],
+                                 'type-effectiveness', 'pokedex-config', 'player-pokedex',
+                                 'splash-list'],
                     'battle': ['calculate-damage', 'roll-initiative'],
                     'music': ['sync', 'leave'],
                     'combat': ['get-state', 'create-session', 'end-session', 'leave-session', 'add-participant',
@@ -159,43 +137,14 @@ def _dispatch(params):
 
 
 @app.get('/api')
-@app.get('/exec')
 def api(request: Request):
     params = dict(request.query_params)
     try:
         result = _dispatch(params)
     except Exception as e:
-        # Same contract as the Apps Script doGet: HTTP 200 with an error payload
+        # HTTP 200 with an error payload -- every caller reads `status`
         result = {'error': str(e), 'status': 'error'}
     return JSONResponse(result, headers={'X-Data-Version': _data_version()})
-
-
-@app.post('/api/upstream-push')
-def push_upstream_dataset(payload: dict, x_push_key: str = Header(default='')):
-    """Direct push from Benjakronk's admin panel: updates one of the four
-    upstream snapshots (pokemon-db, moves, items, pokedex-config) immediately
-    instead of waiting for the next pull. Guarded by a shared secret (env
-    UPSTREAM_PUSH_KEY); disabled when the env var is unset."""
-    expected = os.environ.get('UPSTREAM_PUSH_KEY', '')
-    if not expected:
-        return JSONResponse(
-            {'status': 'error', 'error': 'push disabled: UPSTREAM_PUSH_KEY not set'},
-            status_code=503)
-    if not hmac.compare_digest(x_push_key, expected):
-        return JSONResponse({'status': 'error', 'error': 'invalid push key'},
-                            status_code=403)
-    dataset = payload.get('dataset')
-    conn = db.connect()
-    try:
-        upstream.store_pushed_dataset(conn, dataset, payload.get('data'))
-    except ValueError as e:
-        return JSONResponse({'status': 'error', 'error': str(e)}, status_code=400)
-    finally:
-        conn.close()
-    version = _data_version()
-    live.publish({'dataset': dataset, 'version': version})
-    return JSONResponse({'status': 'success', 'message': f'{dataset} stored'},
-                        headers={'X-Data-Version': version})
 
 
 @app.post('/api/dm/setup')
@@ -403,24 +352,25 @@ def dm_save_display_image(payload: dict):
 @app.post('/api/dm/pokedex-config')
 def save_dm_pokedex_config(payload: dict):
     """The DM console's Pokedex module: what the players may see of each species (pokedexConfig -- registered,
-    visibility, defaults). Live-pushed the same way Benjakronk's own publish is, so open devices pick it up at once."""
+    visibility, defaults), pushed live so open devices pick it up at once."""
     conn = db.connect()
     try:
-        upstream.store_local_pokedex_config(conn, payload.get('config'))
+        gamedata.store_pokedex_config(conn, payload.get('config'))
     except ValueError as e:
         return JSONResponse({'status': 'error', 'error': str(e)})
     finally:
         conn.close()
     version = _data_version()
-    live.publish({'dataset': 'pokedex-config', 'version': version})
+    live.publish({'type': 'pokedex-config', 'version': version})
     return JSONResponse({'status': 'success'}, headers={'X-Data-Version': version})
 
 
 @app.get('/api/events')
 async def live_events(request: Request):
-    """Server-Sent Events stream: notifies connected devices the instant
-    push_upstream_dataset() above lands a new Pokedex push, instead of
-    waiting for the next Reload Data / login. One connection per device,
+    """Server-Sent Events stream: tells connected devices the instant
+    something they show changes (the Pokedex settings, a trainer's data, the
+    battle, the DM console's records) instead of waiting for the next Reload
+    Data / login. One connection per device,
     opened once at app startup (see js/utils/live-updates.js) and reused for
     the whole session -- the frontend is a real SPA, not page-by-page
     navigation, so this doesn't need to reconnect between screens."""
@@ -443,15 +393,15 @@ async def live_events(request: Request):
     return StreamingResponse(event_stream(), media_type='text/event-stream')
 
 
-# Benjakronk's pictures, copied onto the Pi (see upstream.py): species, NPCs, badges and splashes. The folders are
+# The pictures on the Pi (see media.py): species, NPCs, badges and splashes. The folders are
 # made here if they aren't there yet, so files copied in later show up without a restart. Mounted before the PWA
 # catch-all so these paths win. Many species pictures are .jfif, which Python doesn't know as a JPEG -- without this
 # they'd be sent as plain text.
 mimetypes.add_type('image/jpeg', '.jfif')
-for _folder, _prefix, _name in ((upstream.POKEMON_IMAGE_DIR, upstream.POKEMON_IMAGE_URL_PREFIX, 'pokemon-images'),
-                                (upstream.NPC_IMAGE_DIR, upstream.NPC_IMAGE_URL_PREFIX, 'npc-images'),
-                                (upstream.BADGE_DIR, upstream.BADGE_URL_PREFIX, 'badges'),
-                                (upstream.SPLASH_DIR, upstream.SPLASH_URL_PREFIX, 'splashes')):
+for _folder, _prefix, _name in ((media.POKEMON_IMAGE_DIR, media.POKEMON_IMAGE_URL_PREFIX, 'pokemon-images'),
+                                (media.NPC_IMAGE_DIR, media.NPC_IMAGE_URL_PREFIX, 'npc-images'),
+                                (media.BADGE_DIR, media.BADGE_URL_PREFIX, 'badges'),
+                                (media.SPLASH_DIR, media.SPLASH_URL_PREFIX, 'splashes')):
     os.makedirs(_folder, exist_ok=True)
     app.mount(_prefix.rstrip('/'), StaticFiles(directory=_folder), name=_name)
 
@@ -470,45 +420,45 @@ def sprite_preview(filename: str):
 
 sprite_previews.queue_missing()
 
-# Self-uploaded animated sprites, mp4 only (see upstream.SPRITE_DIR /
-# upstream.local_sprite_url). URL prefix stays /gifs -- see
-# upstream.SPRITE_URL_PREFIX for why that's not renamed along with the folder.
-if os.path.isdir(upstream.SPRITE_DIR):
-    app.mount('/gifs', StaticFiles(directory=upstream.SPRITE_DIR), name='gifs')
+# Self-uploaded animated sprites, mp4 only (see media.SPRITE_DIR /
+# media.local_sprite_url). URL prefix stays /gifs -- see
+# media.SPRITE_URL_PREFIX for why that's not renamed along with the folder.
+if os.path.isdir(media.SPRITE_DIR):
+    app.mount('/gifs', StaticFiles(directory=media.SPRITE_DIR), name='gifs')
 
-# Self-uploaded evolution transition videos (see upstream.EVOLUTION_VIDEO_DIR /
-# upstream.local_evolution_video_url)
-if os.path.isdir(upstream.EVOLUTION_VIDEO_DIR):
-    app.mount('/evolution-videos', StaticFiles(directory=upstream.EVOLUTION_VIDEO_DIR),
+# Self-uploaded evolution transition videos (see media.EVOLUTION_VIDEO_DIR /
+# media.local_evolution_video_url)
+if os.path.isdir(media.EVOLUTION_VIDEO_DIR):
+    app.mount('/evolution-videos', StaticFiles(directory=media.EVOLUTION_VIDEO_DIR),
               name='evolution-videos')
 
-# Self-uploaded Pokemon cries (see upstream.CRY_DIR)
-if os.path.isdir(upstream.CRY_DIR):
-    app.mount('/cries', StaticFiles(directory=upstream.CRY_DIR), name='cries')
+# Self-uploaded Pokemon cries (see media.CRY_DIR)
+if os.path.isdir(media.CRY_DIR):
+    app.mount('/cries', StaticFiles(directory=media.CRY_DIR), name='cries')
 
-# Self-uploaded "use move" battle animations (see upstream.BATTLE_ANIMATION_DIR /
-# upstream.local_battle_animation_url)
-if os.path.isdir(upstream.BATTLE_ANIMATION_DIR):
-    app.mount('/battle-animations', StaticFiles(directory=upstream.BATTLE_ANIMATION_DIR),
+# Self-uploaded "use move" battle animations (see media.BATTLE_ANIMATION_DIR /
+# media.local_battle_animation_url)
+if os.path.isdir(media.BATTLE_ANIMATION_DIR):
+    app.mount('/battle-animations', StaticFiles(directory=media.BATTLE_ANIMATION_DIR),
               name='battle-animations')
 
-# Self-made trainer portraits (see upstream.CHARACTER_IMAGE_DIR / upstream.local_character_image_url)
-if os.path.isdir(upstream.CHARACTER_IMAGE_DIR):
-    app.mount(upstream.CHARACTER_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=upstream.CHARACTER_IMAGE_DIR),
+# Self-made trainer portraits (see media.CHARACTER_IMAGE_DIR / media.local_character_image_url)
+if os.path.isdir(media.CHARACTER_IMAGE_DIR):
+    app.mount(media.CHARACTER_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=media.CHARACTER_IMAGE_DIR),
               name='character-images')
 
-# Battle-map background images (see upstream.BATTLE_IMAGE_DIR / routes_combat.py's list-backgrounds)
-if os.path.isdir(upstream.BATTLE_IMAGE_DIR):
-    app.mount('/battle-images', StaticFiles(directory=upstream.BATTLE_IMAGE_DIR),
+# Battle-map background images (see media.BATTLE_IMAGE_DIR / routes_combat.py's list-backgrounds)
+if os.path.isdir(media.BATTLE_IMAGE_DIR):
+    app.mount('/battle-images', StaticFiles(directory=media.BATTLE_IMAGE_DIR),
               name='battle-images')
 
-# Pictures the DM uploads for the table TV (see upstream.DISPLAY_IMAGE_DIR) -- made here if it isn't there yet, since the
+# Pictures the DM uploads for the table TV (see media.DISPLAY_IMAGE_DIR) -- made here if it isn't there yet, since the
 # first upload comes after startup and a mount needs the folder to exist.
-os.makedirs(upstream.DISPLAY_IMAGE_DIR, exist_ok=True)
-app.mount(upstream.DISPLAY_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=upstream.DISPLAY_IMAGE_DIR),
+os.makedirs(media.DISPLAY_IMAGE_DIR, exist_ok=True)
+app.mount(media.DISPLAY_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=media.DISPLAY_IMAGE_DIR),
           name='display-images')
 
-# Serve the PWA from the same origin (mounted last so /api and /exec win)
+# Serve the PWA from the same origin (mounted last so /api wins)
 _default_pwa = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
 PWA_DIR = os.environ.get('PWA_DIR', _default_pwa)
 if os.path.isfile(os.path.join(PWA_DIR, 'index.html')):

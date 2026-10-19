@@ -1,8 +1,11 @@
 // Trainer Info Page - Detailed Trainer Information Display
 
+import { TrainerAPI } from '../api.js';
+import { allCachedPokemon, currentHP as currentHPOf, currentVP as currentVPOf, pokemonKey } from '../utils/owned-pokemon.js';
 import { showError, showSuccess } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
+import { addItem, currentHP, currentVP, featEntries, listText, loadTrainer, storeTrainer } from '../utils/trainer-data.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -12,15 +15,6 @@ let selectedItemData = null;
 // be removed before being re-added on every visit or it stacks duplicates.
 let trainerUpdateHandler = null;
 
-function parseFeatsFromString(featsStr) {
-  if (!featsStr || featsStr === 'None') return [];
-  return featsStr.split(',').map(entry => {
-    const colonIdx = entry.trim().indexOf(':');
-    if (colonIdx === -1) return { name: entry.trim(), data: '' };
-    return { name: entry.trim().slice(0, colonIdx), data: entry.trim().slice(colonIdx + 1) };
-  }).filter(f => f.name);
-}
-
 export function renderTrainerInfo() {
   // Load trainer data from session storage
   const trainerDataStr = sessionStorage.getItem('trainerData');
@@ -28,48 +22,43 @@ export function renderTrainerInfo() {
     return '<div class="error">No trainer data found. Please return to the home page.</div>';
   }
 
-  const trainerData = JSON.parse(trainerDataStr);
+  const trainerData = loadTrainer();
 
   // Extract trainer info
-  const trainerImage = trainerData[0] || 'assets/Pokeball.png';
-  const trainerName = trainerData[1] || 'Unknown Trainer';
-  const trainerLevel = trainerData[2] || 1;
-  const trainerHD = trainerData[3] || 0;
-  const trainerVD = trainerData[4] || 0;
-  const trainerSTR = trainerData[5] || 10;
-  const trainerDEX = trainerData[6] || 10;
-  const trainerCON = trainerData[7] || 10;
-  const trainerINT = trainerData[8] || 10;
-  const trainerWIS = trainerData[9] || 10;
-  const trainerCHA = trainerData[10] || 10;
-  const trainerHP = trainerData[11] || 0;
-  const trainerVP = trainerData[12] || 0;
-  const trainerAC = trainerData[13] || 10;
-  const trainerSpeed = trainerData[14] || 30;
+  const trainerImage = trainerData.image || 'assets/Pokeball.png';
+  const trainerName = trainerData.name || 'Unknown Trainer';
+  const trainerLevel = trainerData.level || 1;
+  const trainerHD = trainerData.combat.hitDie || 0;
+  const trainerVD = trainerData.combat.vitalityDie || 0;
+  const trainerSTR = trainerData.stats.strength || 10;
+  const trainerDEX = trainerData.stats.dexterity || 10;
+  const trainerCON = trainerData.stats.constitution || 10;
+  const trainerINT = trainerData.stats.intelligence || 10;
+  const trainerWIS = trainerData.stats.wisdom || 10;
+  const trainerCHA = trainerData.stats.charisma || 10;
+  const trainerHP = trainerData.combat.maxHP || 0;
+  const trainerVP = trainerData.combat.maxVP || 0;
+  const trainerAC = trainerData.combat.ac || 10;
+  const trainerSpeed = trainerData.combat.walkingSpeed || 30;
   const SAVE_ABBREV = { strength:'STR', dexterity:'DEX', constitution:'CON', intelligence:'INT', wisdom:'WIS', charisma:'CHA' };
-  const trainerSavingThrows = (trainerData[15] || 'None').split(',').map(s => { const k = s.trim().toLowerCase(); return SAVE_ABBREV[k] || s.trim(); }).join(', ');
-  const trainerInitiative = trainerData[16] || 0;
-  const trainerProficiency = trainerData[17] || 2;
-  const trainerSkills = trainerData[18] || '';
-  const trainerMoney = trainerData[19] || 0;
-  const trainerLeaguePoints = trainerData[21] || 0;
-  const strModifier = trainerData[27] || 0;
-  const dexModifier = trainerData[28] || 0;
-  const conModifier = trainerData[29] || 0;
-  const intModifier = trainerData[30] || 0;
-  const wisModifier = trainerData[31] || 0;
-  const chaModifier = trainerData[32] || 0;
-  const trainerFeats = trainerData[33] || 'None';
+  const trainerSavingThrows = listText(trainerData.savingThrows).split(',').map(s => { const k = s.trim().toLowerCase(); return SAVE_ABBREV[k] || s.trim(); }).join(', ');
+  const trainerInitiative = trainerData.combat.initiative || 0;
+  const trainerProficiency = trainerData.combat.proficiency || 2;
+  const trainerSkills = trainerData.skills.join(', ');
+  const trainerMoney = trainerData.money || 0;
+  const trainerLeaguePoints = trainerData.leaguePoints || 0;
+  const strModifier = trainerData.modifiers.strength || 0;
+  const dexModifier = trainerData.modifiers.dexterity || 0;
+  const conModifier = trainerData.modifiers.constitution || 0;
+  const intModifier = trainerData.modifiers.intelligence || 0;
+  const wisModifier = trainerData.modifiers.wisdom || 0;
+  const chaModifier = trainerData.modifiers.charisma || 0;
   // Explicit null/undefined/'' checks -- a trainer legitimately at 0 HP/VP/AC
   // must not fall back to the max value the way `||` would treat it.
-  const currentHP = (trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== '') ? trainerData[34] : trainerHP;
-  const currentVP = (trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== '') ? trainerData[35] : trainerVP;
-  const currentAC = (trainerData[36] !== null && trainerData[36] !== undefined && trainerData[36] !== '') ? trainerData[36] : trainerAC;
-  const gear = trainerData[37] || 'None';
-  const inventory = trainerData[20] || 'None';
-  const affinity = trainerData[23] || 'None';
-  const specialization = trainerData[24] || 'None';
-  const trainerPath = trainerData[25] || 'None';
+  const currentHP = (trainerData.current.hp !== null && trainerData.current.hp !== undefined && trainerData.current.hp !== '') ? trainerData.current.hp : trainerHP;
+  const currentVP = (trainerData.current.vp !== null && trainerData.current.vp !== undefined && trainerData.current.vp !== '') ? trainerData.current.vp : trainerVP;
+  const currentAC = (trainerData.current.ac !== null && trainerData.current.ac !== undefined && trainerData.current.ac !== '') ? trainerData.current.ac : trainerAC;
+  const trainerPath = trainerData.trainerPath || 'None';
 
   // Parse skills (comma-separated string)
   const skillsArray = trainerSkills ? trainerSkills.split(',').map(s => s.trim()).filter(s => s) : [];
@@ -105,10 +94,9 @@ export function renderTrainerInfo() {
   // Regex matches: "+N to <skill> skill check(s)" or "+N to all skill checks"
   const badgeSkillBonuses = {};
   const allItems = JSON.parse(sessionStorage.getItem('items') || '[]');
-  const inventoryNames = (trainerData[20] || '').split(',')
-    .map(s => s.replace(/\(x\d+\)/i, '').trim()).filter(Boolean);
+  const inventoryNames = trainerData.inventory.map(i => i.name);
   const earnedBadges = allItems.filter(item =>
-    item.type === 'Badges, Seals & Sigils' && inventoryNames.includes(item.name)
+    item.category === 'Badges, Seals & Sigils' && inventoryNames.includes(item.name)
   );
   const skillBonusRegex = /\+(\d+)\s+to\s+([\w\s]+?)\s+skill\s+checks?/gi;
   earnedBadges.forEach(badge => {
@@ -2114,7 +2102,7 @@ export function renderTrainerInfo() {
           <h3>Skills</h3>
           <div class="skills-grid">
             ${(() => {
-              const hasObservant = parseFeatsFromString(trainerFeats).some(f => f.name === 'Observant');
+              const hasObservant = trainerData.feats.includes('Observant');
               return allSkills.map(skill => {
                 const skillKey = skill.name.toLowerCase();
                 const profBonus = parseInt(trainerProficiency) || 2;
@@ -2576,7 +2564,7 @@ export function renderTrainerInfo() {
 
 export function attachTrainerInfoListeners() {
   const trainerDataStr = sessionStorage.getItem('trainerData');
-  const trainerData = trainerDataStr ? JSON.parse(trainerDataStr) : null;
+  const trainerData = trainerDataStr ? loadTrainer() : null;
 
   // Re-render in place when a live push (see live-updates.js) refreshes this
   // trainer's sessionStorage data -- e.g. Benjakronk handing over an item or
@@ -2630,37 +2618,19 @@ export function attachTrainerInfoListeners() {
     }));
   });
 
-  // Helper functions for custom item storage (stored as JSON after '##CUSTOM##' in trainerData[20])
-  function parseCustomItems(inventoryStr) {
-    if (!inventoryStr || !inventoryStr.includes('##CUSTOM##')) return [];
-    try { return JSON.parse(inventoryStr.split('##CUSTOM##')[1]) || []; } catch(e) { return []; }
-  }
-
-  function getRegularStr(inventoryStr) {
-    if (!inventoryStr) return '';
-    return inventoryStr.split('##CUSTOM##')[0];
-  }
-
-  function buildInventoryString(regularStr, customItems) {
-    if (!customItems || customItems.length === 0) return regularStr || '';
-    return `${regularStr || ''}##CUSTOM##${JSON.stringify(customItems)}`;
-  }
-
   // Helper function to refresh inventory display
   function refreshInventoryDisplay() {
     // Reload fresh trainer data from sessionStorage
     const freshTrainerDataStr = sessionStorage.getItem('trainerData');
     if (!freshTrainerDataStr) return;
 
-    const freshTrainerData = JSON.parse(freshTrainerDataStr);
-    const inventory = freshTrainerData[20] || 'None';
+    const freshTrainerData = loadTrainer();
     const itemsStr = sessionStorage.getItem('items');
     const categoriesContainer = document.getElementById('inventoryCategories');
 
-    const customItemsList = parseCustomItems(inventory);
-    const regularInv = getRegularStr(inventory);
+    const customItemsList = freshTrainerData.customItems;
 
-    if ((regularInv === 'None' || !regularInv || !itemsStr) && customItemsList.length === 0) {
+    if ((!freshTrainerData.inventory.length || !itemsStr) && customItemsList.length === 0) {
       categoriesContainer.innerHTML = '<li style="padding: 2rem; text-align: center; color: #999;">No items in inventory</li>';
       openPopup('inventoryPopup');
       return;
@@ -2668,20 +2638,12 @@ export function attachTrainerInfoListeners() {
 
     // Parse items data and group by type
     const itemsData = itemsStr ? JSON.parse(itemsStr) : [];
-    const inventoryItems = (regularInv && regularInv !== 'None' && itemsStr)
-      ? regularInv.split(',').map(item => item.trim()).filter(item => item)
-      : [];
 
-    // Extract item name and quantity
     const groupedItems = {};
-    inventoryItems.forEach(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const itemName = match ? match[1].trim() : itemStr;
-      const quantity = match ? parseInt(match[2], 10) : 1;
-
+    (itemsStr ? freshTrainerData.inventory : []).forEach(({ name: itemName, quantity }) => {
       const itemData = itemsData.find(i => i.name === itemName);
       if (itemData) {
-        const type = itemData.type || 'Misc';
+        const type = itemData.category || 'Misc';
         if (!groupedItems[type]) {
           groupedItems[type] = [];
         }
@@ -2910,15 +2872,15 @@ export function attachTrainerInfoListeners() {
   }
 
   // Helper function to use a buff (decrement charge)
-  function useBuff(buffName, chargeIndex) {
+  function useBuff(buffName, chargeKey) {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       showError('Trainer data not found.');
       return;
     }
 
-    const trainerData = JSON.parse(trainerDataRaw);
-    const currentCharges = parseInt(trainerData[chargeIndex], 10) || 0;
+    const trainerData = loadTrainer();
+    const currentCharges = parseInt(trainerData.charges[chargeKey], 10) || 0;
 
     if (currentCharges <= 0) {
       showError(`No charges remaining for ${buffName}`);
@@ -2926,10 +2888,10 @@ export function attachTrainerInfoListeners() {
     }
 
     // Decrement charge
-    trainerData[chargeIndex] = currentCharges - 1;
+    trainerData.charges[chargeKey] = currentCharges - 1;
 
     // Update session storage IMMEDIATELY
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    storeTrainer(trainerData);
 
     // Refresh the popup to show updated charges IMMEDIATELY
     showTrainerSkillsPopup();
@@ -2949,15 +2911,15 @@ export function attachTrainerInfoListeners() {
       return;
     }
 
-    const trainerData = JSON.parse(trainerDataRaw);
-    const trainerLevel = parseInt(trainerData[2], 10); // Trainer level
+    const trainerData = loadTrainer();
+    const trainerLevel = parseInt(trainerData.level, 10); // Trainer level
 
-    // Get buff charges from trainer data (indices 40-44)
-    const secondWindCharges = parseInt(trainerData[40], 10) || 0;
-    const rapidOrdersCharges = parseInt(trainerData[41], 10) || 0;
-    const unbreakableBondCharges = parseInt(trainerData[42], 10) || 0;
-    const elementalSynergyCharges = parseInt(trainerData[43], 10) || 0;
-    const masterTrainerCharges = parseInt(trainerData[44], 10) || 0;
+    // Get buff charges from trainer data
+    const secondWindCharges = parseInt(trainerData.charges.secondWind, 10) || 0;
+    const rapidOrdersCharges = parseInt(trainerData.charges.rapidOrders, 10) || 0;
+    const unbreakableBondCharges = parseInt(trainerData.charges.unbreakableBond, 10) || 0;
+    const elementalSynergyCharges = parseInt(trainerData.charges.elementalSynergy, 10) || 0;
+    const masterTrainerCharges = parseInt(trainerData.charges.masterTrainer, 10) || 0;
 
     // Fetch skills and nationalities data from sessionStorage
     const skillsDataRaw = sessionStorage.getItem('skills');
@@ -2970,7 +2932,7 @@ export function attachTrainerInfoListeners() {
 
     const skillsData = JSON.parse(skillsDataRaw);
     const nationalitiesData = JSON.parse(nationalitiesDataRaw);
-    const nationality = nationalitiesData.find(n => n.nationality === trainerData[38]);
+    const nationality = nationalitiesData.find(n => n.nationality === trainerData.region);
 
     // Build the popup content
     let content = '';
@@ -2990,11 +2952,11 @@ export function attachTrainerInfoListeners() {
 
     // Define the trainer buff skills with their charge data
     const trainerBuffs = [
-      { name: 'Second Wind', charges: secondWindCharges, index: 40 },
-      { name: 'Rapid Orders', charges: rapidOrdersCharges, index: 41 },
-      { name: 'Unbreakable Bond', charges: unbreakableBondCharges, index: 42 },
-      { name: 'Elemental Synergy', charges: elementalSynergyCharges, index: 43 },
-      { name: 'Master Trainer', charges: masterTrainerCharges, index: 44 }
+      { name: 'Second Wind', charges: secondWindCharges, key: 'secondWind' },
+      { name: 'Rapid Orders', charges: rapidOrdersCharges, key: 'rapidOrders' },
+      { name: 'Unbreakable Bond', charges: unbreakableBondCharges, key: 'unbreakableBond' },
+      { name: 'Elemental Synergy', charges: elementalSynergyCharges, key: 'elementalSynergy' },
+      { name: 'Master Trainer', charges: masterTrainerCharges, key: 'masterTrainer' }
     ];
 
     // Loop through each skill and display them
@@ -3041,7 +3003,7 @@ export function attachTrainerInfoListeners() {
               ${chargeDots}
             </div>
             <div class="skill-effect-box">${skillData.effect}</div>
-            <button class="use-buff-button" data-buff-name="${buffData.name}" data-buff-index="${buffData.index}" ${useButtonDisabled}>Use</button>
+            <button class="use-buff-button" data-buff-name="${buffData.name}" data-buff-key="${buffData.key}" ${useButtonDisabled}>Use</button>
           </div>
         `;
       } else {
@@ -3061,8 +3023,7 @@ export function attachTrainerInfoListeners() {
     document.querySelectorAll('.use-buff-button').forEach(button => {
       button.addEventListener('click', () => {
         const buffName = button.dataset.buffName;
-        const buffIndex = parseInt(button.dataset.buffIndex, 10);
-        useBuff(buffName, buffIndex);
+        useBuff(buffName, button.dataset.buffKey);
       });
     });
 
@@ -3177,10 +3138,10 @@ export function attachTrainerInfoListeners() {
     tpBonusRollInput.value = '';
     tpBonusGroup.style.display = 'none';
 
-    const trainerDataForTP = JSON.parse(sessionStorage.getItem('trainerData'));
-    const isTactician = trainerDataForTP && trainerDataForTP[25] === 'Tactician';
-    const tacticianLevel = trainerDataForTP ? parseInt(trainerDataForTP[2], 10) || 1 : 1;
-    const currentTP = trainerDataForTP ? parseInt(trainerDataForTP[49], 10) || 0 : 0;
+    const trainerDataForTP = loadTrainer();
+    const isTactician = trainerDataForTP && trainerDataForTP.trainerPath === 'Tactician';
+    const tacticianLevel = trainerDataForTP ? parseInt(trainerDataForTP.level, 10) || 1 : 1;
+    const currentTP = trainerDataForTP ? parseInt(trainerDataForTP.tacticianPoints, 10) || 0 : 0;
     const maxTP = tacticianLevel;
 
     function updateTpSectionVisibility() {
@@ -3226,44 +3187,43 @@ export function attachTrainerInfoListeners() {
 
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (trainerDataRaw) {
-      const td = JSON.parse(trainerDataRaw);
-      const trainerCurrentHP = td[34] !== '' && td[34] !== undefined ? parseInt(td[34]) : parseInt(td[11]);
-      const trainerCurrentVP = td[35] !== '' && td[35] !== undefined ? parseInt(td[35]) : parseInt(td[12]);
+      const td = loadTrainer();
+      const trainerCurrentHP = parseInt(currentHP(td));
+      const trainerCurrentVP = parseInt(currentVP(td));
       const value = JSON.stringify({
         type: 'trainer',
         key: 'trainerData',
         currentHP: trainerCurrentHP,
-        maxHP: parseInt(td[11]),
+        maxHP: parseInt(td.combat.maxHP),
         currentVP: trainerCurrentVP,
-        maxVP: parseInt(td[12]),
-        name: td[1]
+        maxVP: parseInt(td.combat.maxVP),
+        name: td.name
       });
       const statLabel = healing.stat === 'HP'
-        ? `${trainerCurrentHP}/${td[11]} HP`
-        : `${trainerCurrentVP}/${td[12]} VP`;
-      addTargetOption(value, `${td[1]} (Trainer) — ${statLabel}`);
+        ? `${trainerCurrentHP}/${td.combat.maxHP} HP`
+        : `${trainerCurrentVP}/${td.combat.maxVP} VP`;
+      addTargetOption(value, `${td.name} (Trainer) — ${statLabel}`);
     }
 
     // Add active party Pokemon
-    Object.keys(sessionStorage).filter(k => k.startsWith('pokemon_')).forEach(key => {
-      const pd = JSON.parse(sessionStorage.getItem(key));
-      if (pd[38]) {
-        const currentHP = pd[45] !== '' && pd[45] !== undefined ? parseInt(pd[45]) : parseInt(pd[10]);
-        const currentVP = pd[46] !== '' && pd[46] !== undefined ? parseInt(pd[46]) : parseInt(pd[12]);
-        const displayName = pd[36] || pd[2];
+    allCachedPokemon().forEach(pd => {
+      if (pd.partySlot) {
+        const currentHP = currentHPOf(pd);
+        const currentVP = currentVPOf(pd);
+        const displayName = pd.nickname || pd.name;
         const value = JSON.stringify({
           type: 'pokemon',
-          key: key,
-          speciesName: pd[2],
+          key: pokemonKey(pd.name),
+          speciesName: pd.name,
           currentHP: currentHP,
-          maxHP: parseInt(pd[10]),
+          maxHP: parseInt(pd.combat.maxHP),
           currentVP: currentVP,
-          maxVP: parseInt(pd[12]),
+          maxVP: parseInt(pd.combat.maxVP),
           name: displayName
         });
         const statLabel = healing.stat === 'HP'
-          ? `${currentHP}/${pd[10]} HP`
-          : `${currentVP}/${pd[12]} VP`;
+          ? `${currentHP}/${pd.combat.maxHP} HP`
+          : `${currentVP}/${pd.combat.maxVP} VP`;
         addTargetOption(value, `${displayName} — ${statLabel}`);
       }
     });
@@ -3356,42 +3316,42 @@ export function attachTrainerInfoListeners() {
 
     // Apply healing to target
     if (targetData.type === 'trainer') {
-      const td = JSON.parse(sessionStorage.getItem('trainerData'));
+      const td = loadTrainer();
       if (healing.stat === 'HP') {
         const newHP = Math.min(targetData.currentHP + totalHealing, targetData.maxHP);
-        td[34] = newHP;
+        td.current.hp = newHP;
       } else {
         const newVP = Math.min(targetData.currentVP + totalHealing, targetData.maxVP);
-        td[35] = newVP;
+        td.current.vp = newVP;
       }
 
       // Decrement item quantity
       decrementItemQuantity(td, selectedItemData.name);
-      sessionStorage.setItem('trainerData', JSON.stringify(td));
+      storeTrainer(td);
 
       // Update database in background
       TrainerAPI.update(td).catch(error => {
         console.error('Failed to update trainer data:', error);
       });
       if (healing.stat === 'HP') {
-        TrainerAPI.updateLiveStats(td[1], 'HP', td[34]).catch(error => {
+        TrainerAPI.updateLiveStats(td.name, 'HP', td.current.hp).catch(error => {
           console.error('Failed to update trainer HP:', error);
         });
       } else {
-        TrainerAPI.updateLiveStats(td[1], 'VP', td[35]).catch(error => {
+        TrainerAPI.updateLiveStats(td.name, 'VP', td.current.vp).catch(error => {
           console.error('Failed to update trainer VP:', error);
         });
       }
     } else {
       // Pokemon target
       const pd = JSON.parse(sessionStorage.getItem(targetData.key));
-      const td = JSON.parse(sessionStorage.getItem('trainerData'));
+      const td = loadTrainer();
       if (healing.stat === 'HP') {
         const newHP = Math.min(targetData.currentHP + totalHealing, targetData.maxHP);
-        pd[45] = newHP;
+        pd.current.hp = newHP;
       } else {
         const newVP = Math.min(targetData.currentVP + totalHealing, targetData.maxVP);
-        pd[46] = newVP;
+        pd.current.vp = newVP;
       }
       sessionStorage.setItem(targetData.key, JSON.stringify(pd));
 
@@ -3400,22 +3360,22 @@ export function attachTrainerInfoListeners() {
 
       // Decrement Tactician Points if spent
       if (tpSpent > 0) {
-        const prevTP = parseInt(td[49], 10) || 0;
-        td[49] = Math.max(prevTP - tpSpent, 0);
+        const prevTP = parseInt(td.tacticianPoints, 10) || 0;
+        td.tacticianPoints = Math.max(prevTP - tpSpent, 0);
       }
 
-      sessionStorage.setItem('trainerData', JSON.stringify(td));
+      storeTrainer(td);
 
       // Update database in background
       TrainerAPI.update(td).catch(error => {
         console.error('Failed to update inventory:', error);
       });
       if (healing.stat === 'HP') {
-        PokemonAPI.updateLiveStats(td[1], targetData.speciesName, 'HP', pd[45]).catch(error => {
+        PokemonAPI.updateLiveStats(td.name, targetData.speciesName, 'HP', pd.current.hp).catch(error => {
           console.error('Failed to update Pokemon HP:', error);
         });
       } else {
-        PokemonAPI.updateLiveStats(td[1], targetData.speciesName, 'VP', pd[46]).catch(error => {
+        PokemonAPI.updateLiveStats(td.name, targetData.speciesName, 'VP', pd.current.vp).catch(error => {
           console.error('Failed to update Pokemon VP:', error);
         });
       }
@@ -3428,39 +3388,8 @@ export function attachTrainerInfoListeners() {
 
   // Helper to decrement item quantity in trainer data inventory string
   function decrementItemQuantity(td, itemName) {
-    const fullStr = td[20] || '';
-    const regularStr = getRegularStr(fullStr);
-    const customItems = parseCustomItems(fullStr);
-
-    let invItems = regularStr && regularStr !== 'None'
-      ? regularStr.split(',').map(item => item.trim()).filter(item => item)
-      : [];
-
-    let found = false;
-    invItems = invItems.map(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const name = match ? match[1].trim() : itemStr;
-      const qty = match ? parseInt(match[2], 10) : 1;
-
-      if (name.toLowerCase() === itemName.toLowerCase()) {
-        found = true;
-        const newQty = qty - 1;
-        if (newQty <= 0) return null;
-        return `${name} (x${newQty})`;
-      }
-      return itemStr;
-    }).filter(item => item !== null);
-
-    if (!found) {
-      const ci = customItems.findIndex(i => i.name.toLowerCase() === itemName.toLowerCase());
-      if (ci >= 0) {
-        customItems[ci].quantity -= 1;
-        if (customItems[ci].quantity <= 0) customItems.splice(ci, 1);
-      }
-    }
-
-    const newRegular = invItems.length > 0 ? invItems.join(', ') : 'None';
-    td[20] = buildInventoryString(newRegular, customItems);
+    const custom = !td.inventory.some(i => i.name.toLowerCase() === itemName.toLowerCase());
+    addItem(td, itemName, -1, { custom });
   }
 
   // Trainer Buffs button
@@ -3482,7 +3411,7 @@ export function attachTrainerInfoListeners() {
       return;
     }
 
-    const trainerData = JSON.parse(trainerDataRaw);
+    const trainerData = loadTrainer();
     const isCustomTab = document.getElementById('tabCustomItem').classList.contains('active');
 
     if (isCustomTab) {
@@ -3496,16 +3425,7 @@ export function attachTrainerInfoListeners() {
         return;
       }
 
-      const existingCustom = parseCustomItems(trainerData[20] || '');
-      const regularStr = getRegularStr(trainerData[20] || '');
-      const existingIdx = existingCustom.findIndex(i => i.name.toLowerCase() === customName.toLowerCase());
-      if (existingIdx >= 0) {
-        existingCustom[existingIdx].quantity += customQty;
-        if (customDesc) existingCustom[existingIdx].description = customDesc;
-      } else {
-        existingCustom.push({ name: customName, description: customDesc, quantity: customQty });
-      }
-      trainerData[20] = buildInventoryString(regularStr, existingCustom);
+      addItem(trainerData, customName, customQty, { custom: true, description: customDesc });
       audioManager.playSfx('NewItem');
     } else {
       // --- Regular item path ---
@@ -3517,34 +3437,11 @@ export function attachTrainerInfoListeners() {
         return;
       }
 
-      const fullInvStr = trainerData[20] || '';
-      const regularStr = getRegularStr(fullInvStr);
-      const customItems = parseCustomItems(fullInvStr);
-
-      let inventoryItems = regularStr && regularStr !== 'None'
-        ? regularStr.split(',').map(item => item.trim()).filter(item => item)
-        : [];
-
-      let found = false;
-      inventoryItems = inventoryItems.map(itemStr => {
-        const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-        const itemName = match ? match[1].trim() : itemStr;
-        const currentQty = match ? parseInt(match[2], 10) : 1;
-        if (itemName.toLowerCase() === selectedItemName.toLowerCase()) {
-          found = true;
-          return `${itemName} (x${currentQty + quantity})`;
-        }
-        return itemStr;
-      });
-      if (!found) {
-        inventoryItems.push(`${selectedItemName} (x${quantity})`);
-      }
-
-      trainerData[20] = buildInventoryString(inventoryItems.join(', '), customItems);
+      addItem(trainerData, selectedItemName, quantity);
 
       const allItems = JSON.parse(sessionStorage.getItem('items') || '[]');
-      const itemData = allItems.find(i => i[0] && i[0].toLowerCase() === selectedItemName.toLowerCase());
-      const itemType = itemData ? itemData[1] : '';
+      const itemData = allItems.find(i => i.name && i.name.toLowerCase() === selectedItemName.toLowerCase());
+      const itemType = itemData ? itemData.category : '';
       if (itemType === 'Berries') {
         audioManager.playSfx('Berry');
       } else if (itemType === 'Badges, Seals & Sigils') {
@@ -3554,7 +3451,7 @@ export function attachTrainerInfoListeners() {
       }
     }
 
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    storeTrainer(trainerData);
 
     // Close modal and reset
     document.getElementById('addItemModal').style.display = 'none';
@@ -3609,71 +3506,21 @@ export function attachTrainerInfoListeners() {
       return;
     }
 
-    const trainerData = JSON.parse(trainerDataRaw);
-    const fullStr = trainerData[20] || '';
-    const regularStr = getRegularStr(fullStr);
-    const customItems = parseCustomItems(fullStr);
+    const trainerData = loadTrainer();
+    const custom = !!selectedItemData.isCustom;
+    const entry = trainerData[custom ? 'customItems' : 'inventory'].find(i => i.name.toLowerCase() === selectedItemData.name.toLowerCase());
+    if (!entry) return;
+    addItem(trainerData, entry.name, newQuantity - (Number(entry.quantity) || 0), { custom });
+    storeTrainer(trainerData);
 
-    let found = false;
+    document.getElementById('editItemModal').style.display = 'none';
+    refreshInventoryDisplay();
 
-    if (selectedItemData.isCustom) {
-      const ci = customItems.findIndex(i => i.name.toLowerCase() === selectedItemData.name.toLowerCase());
-      if (ci >= 0) {
-        found = true;
-        if (newQuantity === 0) {
-          customItems.splice(ci, 1);
-        } else {
-          customItems[ci].quantity = newQuantity;
-        }
-      }
-      if (found) {
-        trainerData[20] = buildInventoryString(regularStr || 'None', customItems);
-        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-        document.getElementById('editItemModal').style.display = 'none';
-        refreshInventoryDisplay();
-        import('../api.js').then(({ TrainerAPI }) => {
-          TrainerAPI.update(trainerData).catch(error => console.error('Failed to update inventory:', error));
-        });
-      }
-      return;
-    }
-
-    // Regular item path
-    let inventoryItems = regularStr && regularStr !== 'None'
-      ? regularStr.split(',').map(item => item.trim()).filter(item => item)
-      : [];
-
-    inventoryItems = inventoryItems.filter(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const itemName = match ? match[1].trim() : itemStr;
-
-      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
-        found = true;
-        return newQuantity !== 0;
-      }
-      return true;
-    }).map(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const itemName = match ? match[1].trim() : itemStr;
-      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
-        return `${itemName} (x${newQuantity})`;
-      }
-      return itemStr;
-    });
-
-    if (found) {
-      trainerData[20] = buildInventoryString(inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None', customItems);
-      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-
-      document.getElementById('editItemModal').style.display = 'none';
-      refreshInventoryDisplay();
-
-      import('../api.js').then(({ TrainerAPI }) => {
-        TrainerAPI.update(trainerData).catch(error => {
-          console.error('Failed to update inventory in database:', error);
-        });
+    import('../api.js').then(({ TrainerAPI }) => {
+      TrainerAPI.update(trainerData).catch(error => {
+        console.error('Failed to update inventory in database:', error);
       });
-    }
+    });
   });
 
   // Edit Item Modal - Cancel button
@@ -3689,60 +3536,21 @@ export function attachTrainerInfoListeners() {
       return;
     }
 
-    const trainerData = JSON.parse(trainerDataRaw);
-    const fullStr = trainerData[20] || '';
-    const regularStr = getRegularStr(fullStr);
-    const customItems = parseCustomItems(fullStr);
+    const trainerData = loadTrainer();
+    const custom = !!selectedItemData.isCustom;
+    const entry = trainerData[custom ? 'customItems' : 'inventory'].find(i => i.name.toLowerCase() === selectedItemData.name.toLowerCase());
+    if (!entry) return;
+    addItem(trainerData, entry.name, -(Number(entry.quantity) || 0), { custom });
+    storeTrainer(trainerData);
 
-    let found = false;
+    document.getElementById('removeItemModal').style.display = 'none';
+    refreshInventoryDisplay();
 
-    if (selectedItemData.isCustom) {
-      const ci = customItems.findIndex(i => i.name.toLowerCase() === selectedItemData.name.toLowerCase());
-      if (ci >= 0) {
-        found = true;
-        customItems.splice(ci, 1);
-      }
-      if (found) {
-        trainerData[20] = buildInventoryString(regularStr || 'None', customItems);
-        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-        document.getElementById('removeItemModal').style.display = 'none';
-        refreshInventoryDisplay();
-        import('../api.js').then(({ TrainerAPI }) => {
-          TrainerAPI.update(trainerData).catch(error => console.error('Failed to update inventory:', error));
-        });
-      }
-      return;
-    }
-
-    // Regular item path
-    let inventoryItems = regularStr && regularStr !== 'None'
-      ? regularStr.split(',').map(item => item.trim()).filter(item => item)
-      : [];
-
-    inventoryItems = inventoryItems.filter(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const itemName = match ? match[1].trim() : itemStr;
-
-      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
-        found = true;
-        return false;
-      }
-      return true;
-    });
-
-    if (found) {
-      trainerData[20] = buildInventoryString(inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None', customItems);
-      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-
-      document.getElementById('removeItemModal').style.display = 'none';
-      refreshInventoryDisplay();
-
-      import('../api.js').then(({ TrainerAPI }) => {
-        TrainerAPI.update(trainerData).catch(error => {
-          console.error('Failed to update inventory in database:', error);
-        });
+    import('../api.js').then(({ TrainerAPI }) => {
+      TrainerAPI.update(trainerData).catch(error => {
+        console.error('Failed to update inventory in database:', error);
       });
-    }
+    });
   });
 
   // Remove Item Modal - Cancel button
@@ -3849,12 +3657,11 @@ export function attachTrainerInfoListeners() {
   // Specialization button - fixed to show 3 stages with effects
   document.getElementById('specializationButton')?.addEventListener('click', () => {
     // Read fresh data from sessionStorage each time
-    const freshTrainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    const freshTrainerData = loadTrainer();
     if (!freshTrainerData) return;
 
-    const trainerLevel = parseInt(freshTrainerData[2], 10) || 1;
-    const specializationsStr = freshTrainerData[24] || '';
-    const specializationsStored = specializationsStr ? specializationsStr.split(',').map(s => s.trim()) : [];
+    const trainerLevel = parseInt(freshTrainerData.level, 10) || 1;
+    const specializationsStored = freshTrainerData.specializations;
     const specializationsDataStr = sessionStorage.getItem('specializations');
     const content = document.getElementById('specializationContent');
 
@@ -3916,11 +3723,11 @@ export function attachTrainerInfoListeners() {
   // Trainer Path button - fixed to show 4 stages with effects
   document.getElementById('trainerPathButton')?.addEventListener('click', () => {
     // Read fresh data from sessionStorage each time
-    const freshTrainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    const freshTrainerData = loadTrainer();
     if (!freshTrainerData) return;
 
-    const trainerLevel = parseInt(freshTrainerData[2], 10) || 1;
-    const trainerPathName = freshTrainerData[25] || '';
+    const trainerLevel = parseInt(freshTrainerData.level, 10) || 1;
+    const trainerPathName = freshTrainerData.trainerPath || '';
     const trainerPathsDataStr = sessionStorage.getItem('trainerPaths');
     const content = document.getElementById('trainerPathContent');
 
@@ -3955,7 +3762,7 @@ export function attachTrainerInfoListeners() {
               // Unlocked
               // Special handling for Ace Trainer Level 9 (Max Potential)
               if (trainerPathName === 'Ace Trainer' && stage.level === 9) {
-                const maxPotential = freshTrainerData[46] || '';
+                const maxPotential = freshTrainerData.maxPotential || '';
                 const hasChosen = maxPotential && maxPotential !== '' && maxPotential !== 'undefined';
 
                 html += `
@@ -3980,8 +3787,8 @@ export function attachTrainerInfoListeners() {
                 `;
               } else if (trainerPathName === 'Tactician' && stage.level === 3) {
                 // Special handling for Tactician Level 3 - show TP tracker
-                const currentTP = parseInt(freshTrainerData[49], 10) || 0;
-                const maxTP = parseInt(freshTrainerData[2], 10) || 1;
+                const currentTP = parseInt(freshTrainerData.tacticianPoints, 10) || 0;
+                const maxTP = parseInt(freshTrainerData.level, 10) || 1;
                 let tpDotsHtml = '';
                 for (let i = 0; i < maxTP; i++) {
                   tpDotsHtml += `<span style="display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin: 0 3px; border: 2px solid #3d8b37; background: ${i < currentTP ? '#4CAF50' : 'transparent'};"></span>`;
@@ -4044,12 +3851,11 @@ export function attachTrainerInfoListeners() {
   // Affinity button - shows base effect at level 2, improved effect at level 7
   document.getElementById('affinityButton')?.addEventListener('click', () => {
     // Read fresh data from sessionStorage each time
-    const freshTrainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    const freshTrainerData = loadTrainer();
     if (!freshTrainerData) return;
 
-    const trainerLevel = parseInt(freshTrainerData[2], 10) || 1;
-    const affinitiesStr = freshTrainerData[23] || '';
-    const affinitiesStored = affinitiesStr ? affinitiesStr.split(',').map(a => a.trim()).filter(a => a) : [];
+    const trainerLevel = parseInt(freshTrainerData.level, 10) || 1;
+    const affinitiesStored = freshTrainerData.affinities;
     const affinitiesDataStr = sessionStorage.getItem('affinities');
     const content = document.getElementById('affinityContent');
 
@@ -4140,16 +3946,15 @@ export function attachTrainerInfoListeners() {
   document.getElementById('gearButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
-    const gear = trainerData[37] || 'None';
+    const gearList = trainerData.gear;
     const content = document.getElementById('gearContent');
 
-    if (gear === 'None' || !gear) {
+    if (!gearList.length) {
       content.innerHTML = '<p style="text-align: center; color: #999;">No gear equipped.</p>';
       openPopup('gearPopup');
       return;
     }
 
-    const gearList = gear.split(',').map(g => g.trim()).filter(g => g);
     const itemsStr = sessionStorage.getItem('items');
     let html = '';
 
@@ -4192,16 +3997,15 @@ export function attachTrainerInfoListeners() {
   document.getElementById('featsButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
-    const feats = trainerData[33] || 'None';
     const content = document.getElementById('featsContent');
 
-    if (feats === 'None' || !feats) {
+    if (!trainerData.feats.length) {
       content.innerHTML = '<p style="text-align: center; color: #999;">No feats acquired.</p>';
       openPopup('featsPopup');
       return;
     }
 
-    const featsList = parseFeatsFromString(feats);
+    const featsList = featEntries(trainerData);
     const featsDataStr = sessionStorage.getItem('trainerFeats');
     const featsData = featsDataStr ? JSON.parse(featsDataStr) : [];
     let html = '';
@@ -4235,7 +4039,7 @@ export function attachTrainerInfoListeners() {
   // Money button
   document.getElementById('moneyButton')?.addEventListener('click', () => {
     if (!trainerData) return;
-    const currentMoney = parseInt(trainerData[19], 10) || 0;
+    const currentMoney = parseInt(trainerData.money, 10) || 0;
     document.getElementById('moneyPopupAmount').textContent = '₽' + currentMoney;
     document.getElementById('moneyInput').value = '';
     openPopup('moneyPopup');
@@ -4248,23 +4052,23 @@ export function attachTrainerInfoListeners() {
     const amount = parseInt(input.value, 10);
     if (isNaN(amount) || amount <= 0) return;
 
-    const currentMoney = parseInt(trainerData[19], 10) || 0;
+    const currentMoney = parseInt(trainerData.money, 10) || 0;
     const newMoney = currentMoney + amount;
-    trainerData[19] = newMoney;
+    trainerData.money = newMoney;
 
     // Update displays
     document.getElementById('moneyPopupAmount').textContent = '₽' + newMoney;
     document.getElementById('moneyDisplay').textContent = '₽' + newMoney;
 
     // Save to sessionStorage immediately
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    storeTrainer(trainerData);
 
     // Close popup
     closePopup('moneyPopup');
 
     // Write to database in background
     import('../api.js').then(({ TrainerAPI }) => {
-      TrainerAPI.updateMoney(trainerData[1], newMoney).then(() => {
+      TrainerAPI.updateMoney(trainerData.name, newMoney).then(() => {
         console.log('Money saved to backend');
       }).catch(error => {
         console.error('Error saving money to backend:', error);
@@ -4277,23 +4081,23 @@ export function attachTrainerInfoListeners() {
     const amount = parseInt(input.value, 10);
     if (isNaN(amount) || amount <= 0) return;
 
-    const currentMoney = parseInt(trainerData[19], 10) || 0;
+    const currentMoney = parseInt(trainerData.money, 10) || 0;
     const newMoney = Math.max(0, currentMoney - amount);
-    trainerData[19] = newMoney;
+    trainerData.money = newMoney;
 
     // Update displays
     document.getElementById('moneyPopupAmount').textContent = '₽' + newMoney;
     document.getElementById('moneyDisplay').textContent = '₽' + newMoney;
 
     // Save to sessionStorage immediately
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    storeTrainer(trainerData);
 
     // Close popup
     closePopup('moneyPopup');
 
     // Write to database in background
     import('../api.js').then(({ TrainerAPI }) => {
-      TrainerAPI.updateMoney(trainerData[1], newMoney).then(() => {
+      TrainerAPI.updateMoney(trainerData.name, newMoney).then(() => {
         console.log('Money saved to backend');
       }).catch(error => {
         console.error('Error saving money to backend:', error);
@@ -4305,16 +4109,16 @@ export function attachTrainerInfoListeners() {
   const openCombatTracker = () => {
     if (!trainerData) return;
 
-    const currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
-      ? parseInt(trainerData[34], 10)
-      : parseInt(trainerData[11], 10);
+    const currentHP = trainerData.current.hp !== null && trainerData.current.hp !== undefined && trainerData.current.hp !== ''
+      ? parseInt(trainerData.current.hp, 10)
+      : parseInt(trainerData.combat.maxHP, 10);
 
-    const currentVP = trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== ''
-      ? parseInt(trainerData[35], 10)
-      : parseInt(trainerData[12], 10);
+    const currentVP = trainerData.current.vp !== null && trainerData.current.vp !== undefined && trainerData.current.vp !== ''
+      ? parseInt(trainerData.current.vp, 10)
+      : parseInt(trainerData.combat.maxVP, 10);
 
-    document.getElementById('combatCurrentHP').textContent = `${currentHP} / ${trainerData[11]}`;
-    document.getElementById('combatCurrentVP').textContent = `${currentVP} / ${trainerData[12]}`;
+    document.getElementById('combatCurrentHP').textContent = `${currentHP} / ${trainerData.combat.maxHP}`;
+    document.getElementById('combatCurrentVP').textContent = `${currentVP} / ${trainerData.combat.maxVP}`;
     document.getElementById('hpChangeInput').value = '';
     document.getElementById('vpChangeInput').value = '';
 
@@ -4334,32 +4138,32 @@ export function attachTrainerInfoListeners() {
 
     // Add HP if amount provided
     if (!isNaN(hpAmount) && hpAmount > 0) {
-      let currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
-        ? parseInt(trainerData[34], 10)
-        : parseInt(trainerData[11], 10);
+      let currentHP = trainerData.current.hp !== null && trainerData.current.hp !== undefined && trainerData.current.hp !== ''
+        ? parseInt(trainerData.current.hp, 10)
+        : parseInt(trainerData.combat.maxHP, 10);
 
-      const baseHP = parseInt(trainerData[11], 10);
+      const baseHP = parseInt(trainerData.combat.maxHP, 10);
       currentHP = Math.min(currentHP + hpAmount, baseHP);
 
-      trainerData[34] = currentHP;
+      trainerData.current.hp = currentHP;
       updated = true;
     }
 
     // Add VP if amount provided
     if (!isNaN(vpAmount) && vpAmount > 0) {
-      let currentVP = trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== ''
-        ? parseInt(trainerData[35], 10)
-        : parseInt(trainerData[12], 10);
+      let currentVP = trainerData.current.vp !== null && trainerData.current.vp !== undefined && trainerData.current.vp !== ''
+        ? parseInt(trainerData.current.vp, 10)
+        : parseInt(trainerData.combat.maxVP, 10);
 
-      const baseVP = parseInt(trainerData[12], 10);
+      const baseVP = parseInt(trainerData.combat.maxVP, 10);
       currentVP = Math.min(currentVP + vpAmount, baseVP);
 
-      trainerData[35] = currentVP;
+      trainerData.current.vp = currentVP;
       updated = true;
     }
 
     if (updated) {
-      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+      storeTrainer(trainerData);
       window.location.reload();
     }
   });
@@ -4370,13 +4174,13 @@ export function attachTrainerInfoListeners() {
     const vpAmount = parseInt(document.getElementById('vpChangeInput').value, 10);
 
     let updated = false;
-    let currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
-      ? parseInt(trainerData[34], 10)
-      : parseInt(trainerData[11], 10);
+    let currentHP = trainerData.current.hp !== null && trainerData.current.hp !== undefined && trainerData.current.hp !== ''
+      ? parseInt(trainerData.current.hp, 10)
+      : parseInt(trainerData.combat.maxHP, 10);
 
-    let currentVP = trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== ''
-      ? parseInt(trainerData[35], 10)
-      : parseInt(trainerData[12], 10);
+    let currentVP = trainerData.current.vp !== null && trainerData.current.vp !== undefined && trainerData.current.vp !== ''
+      ? parseInt(trainerData.current.vp, 10)
+      : parseInt(trainerData.combat.maxVP, 10);
 
     // Remove HP if amount provided
     if (!isNaN(hpAmount) && hpAmount > 0) {
@@ -4398,9 +4202,9 @@ export function attachTrainerInfoListeners() {
     }
 
     if (updated) {
-      trainerData[34] = currentHP;
-      trainerData[35] = currentVP;
-      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+      trainerData.current.hp = currentHP;
+      trainerData.current.vp = currentVP;
+      storeTrainer(trainerData);
       window.location.reload();
     }
   });
@@ -4409,11 +4213,11 @@ export function attachTrainerInfoListeners() {
   document.getElementById('fullRestore')?.addEventListener('click', async () => {
     if (await showCombatConfirm('Are you sure you want to fully restore HP and VP?')) {
       // Reset current HP to max HP
-      trainerData[34] = trainerData[11];
+      trainerData.current.hp = trainerData.combat.maxHP;
       // Reset current VP to max VP
-      trainerData[35] = trainerData[12];
+      trainerData.current.vp = trainerData.combat.maxVP;
 
-      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+      storeTrainer(trainerData);
       window.location.reload();
     }
   });
@@ -4430,9 +4234,9 @@ window.showSpecializationSelection = showSpecializationSelection;
 window.showTrainerPathSelection = showTrainerPathSelection;
 
 function showAffinitySelection() {
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const trainerData = loadTrainer();
   const affinitiesData = JSON.parse(sessionStorage.getItem('affinities') || '[]');
-  const affinitiesStored = trainerData[23] ? trainerData[23].split(',').map(a => a.trim()).filter(a => a) : [];
+  const affinitiesStored = trainerData.affinities;
 
   const affinityGrid = document.querySelector('.affinity-grid');
   const affinityEffectBox = document.querySelector('.affinity-selection-effect-box');
@@ -4458,11 +4262,11 @@ function showAffinitySelection() {
 }
 
 function selectAffinity(affinity) {
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const trainerData = loadTrainer();
   const affinityEffectBox = document.querySelector('.affinity-selection-effect-box');
   const chooseButton = document.getElementById('chooseAffinityButton');
-  const trainerLevel = parseInt(trainerData[2], 10) || 1;
-  const affinitiesStored = trainerData[23] ? trainerData[23].split(',').map(a => a.trim()).filter(a => a) : [];
+  const trainerLevel = parseInt(trainerData.level, 10) || 1;
+  const affinitiesStored = trainerData.affinities;
   const firstAffinity = affinitiesStored[0] || null;
 
   let effectToShow = affinity.effect;
@@ -4495,9 +4299,9 @@ function selectAffinity(affinity) {
 async function saveAffinity(affinity) {
   if (!affinity) return;
 
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-  const trainerName = trainerData[1];
-  let affinitiesStored = trainerData[23] ? trainerData[23].split(',').map(a => a.trim()).filter(a => a) : [];
+  const trainerData = loadTrainer();
+  const trainerName = trainerData.name;
+  let affinitiesStored = trainerData.affinities;
 
   // A trainer only ever has ONE affinity, chosen once. At level 7 it just
   // upgrades in place (see the affinityButton display logic above) -- there
@@ -4505,10 +4309,10 @@ async function saveAffinity(affinity) {
   affinitiesStored = [affinity.name];
 
   const affinityString = affinitiesStored.join(', ');
-  trainerData[23] = affinityString;
+  trainerData.affinities = affinitiesStored;
 
   // Update session storage immediately
-  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+  storeTrainer(trainerData);
 
   // Close selection popup immediately
   document.getElementById('affinitySelectionPopup')?.classList.remove('active');
@@ -4539,7 +4343,7 @@ async function saveAffinity(affinity) {
 // ============================================================================
 
 function showSpecializationSelection() {
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const trainerData = loadTrainer();
   const specializationsData = JSON.parse(sessionStorage.getItem('specializations') || '[]');
 
   const specializationGrid = document.querySelector('.specialization-grid');
@@ -4592,13 +4396,13 @@ function selectSpecialization(specialization) {
 async function saveSpecialization(specialization) {
   if (!specialization) return;
 
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-  const trainerName = trainerData[1];
+  const trainerData = loadTrainer();
+  const trainerName = trainerData.name;
 
-  trainerData[24] = specialization.name;
+  trainerData.specializations = [specialization.name];
 
   // Update session storage immediately
-  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+  storeTrainer(trainerData);
 
   // Close selection popup immediately
   document.getElementById('specializationSelectionPopup')?.classList.remove('active');
@@ -4690,22 +4494,22 @@ function selectTrainerPath(trainerPath) {
 async function saveTrainerPath(trainerPath) {
   if (!trainerPath) return;
 
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-  const trainerName = trainerData[1];
+  const trainerData = loadTrainer();
+  const trainerName = trainerData.name;
 
-  trainerData[25] = trainerPath.name;
+  trainerData.trainerPath = trainerPath.name;
 
   // Initialize Tactician Points to trainer level
   if (trainerPath.name === 'Tactician') {
-    trainerData[49] = parseInt(trainerData[2], 10) || 1;
+    trainerData.tacticianPoints = parseInt(trainerData.level, 10) || 1;
   }
 
   // Initialize Commander charges and loyalty bonus
   if (trainerPath.name === 'Commander') {
-    trainerData[50] = '1 - 1';  // Surge Command: max 1, current 1
-    const chaModifier = parseInt(trainerData[32]) || 0;
+    trainerData.surgeCommand = { max: 1, current: 1 };
+    const chaModifier = parseInt(trainerData.modifiers.charisma) || 0;
     const rallyMax = Math.max(1, 1 + chaModifier);
-    trainerData[51] = `${rallyMax} - ${rallyMax}`;  // Rally Cry
+    trainerData.rallyCry = { max: rallyMax, current: rallyMax };  // Rally Cry
 
     // +1 loyalty to starter (first pokemon in session)
     const pokemonKeys = Object.keys(sessionStorage).filter(k => k.startsWith('pokemon_'));
@@ -4713,8 +4517,8 @@ async function saveTrainerPath(trainerPath) {
       const starterKey = pokemonKeys[0];
       const starterData = JSON.parse(sessionStorage.getItem(starterKey));
       if (starterData) {
-        const currentLoyalty = parseInt(starterData[33], 10) || 0;
-        starterData[33] = Math.min(currentLoyalty + 1, 10);
+        const currentLoyalty = parseInt(starterData.loyalty, 10) || 0;
+        starterData.loyalty = Math.min(currentLoyalty + 1, 10);
         sessionStorage.setItem(starterKey, JSON.stringify(starterData));
         // Persist starter loyalty in background
         import('../api.js').then(({ PokemonAPI }) => {
@@ -4727,7 +4531,7 @@ async function saveTrainerPath(trainerPath) {
   }
 
   // Update session storage immediately
-  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+  storeTrainer(trainerData);
 
   // Close selection popup immediately
   document.getElementById('trainerPathSelectionPopup')?.classList.remove('active');
@@ -4742,7 +4546,6 @@ async function saveTrainerPath(trainerPath) {
     try {
       const { TrainerAPI } = await import('../api.js');
       // Use full update to persist all trainer data including TP
-      console.log('Saving trainer data, length:', trainerData.length, 'index 49:', trainerData[49]);
       const response = await TrainerAPI.update(trainerData);
       if (response.status === 'success') {
         console.log('Trainer path saved to backend successfully');
@@ -4824,18 +4627,18 @@ async function applyMaxPotentialBoost(stat) {
     return;
   }
 
-  const trainerData = JSON.parse(trainerDataRaw);
-  const trainerName = trainerData[1];
+  const trainerData = loadTrainer();
+  const trainerName = trainerData.name;
 
   // Save the chosen stat in trainer data (index 46)
-  trainerData[46] = stat;
-  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+  trainerData.maxPotential = stat;
+  storeTrainer(trainerData);
 
   // Get all Pokemon for this trainer
   const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
   const trainerPokemon = allPokemonKeys.filter(key => {
     const pokemonData = JSON.parse(sessionStorage.getItem(key));
-    return pokemonData[0] === trainerName; // Check if Pokemon belongs to this trainer
+    return pokemonData.trainer === trainerName; // Check if Pokemon belongs to this trainer
   });
 
   const { PokemonAPI } = await import('../api.js');
@@ -4845,36 +4648,23 @@ async function applyMaxPotentialBoost(stat) {
     const pokemonData = JSON.parse(sessionStorage.getItem(pokemonKey));
 
     if (stat === 'Speed') {
-      // Increase all movement types by 10
-      const movementData = pokemonData[29] || ''; // Movement is at index 29
-      if (movementData) {
-        const movementParts = movementData.split(',').map(part => part.trim());
-        const boostedMovement = movementParts.map(movement => {
-          // Parse movement like "Walk 30 ft" or "Fly 60 ft"
-          const match = movement.match(/^(.+?)\s+(\d+)\s*(.*)$/);
-          if (match) {
-            const type = match[1];
-            const speed = parseInt(match[2], 10);
-            const unit = match[3] || 'ft';
-            return `${type} ${speed + 10} ${unit}`.trim();
-          }
-          return movement;
-        });
-        pokemonData[29] = boostedMovement.join(', ');
-      }
+      // 10ft more on every speed it has (it used to edit the evolution text, the old row's cell 29, by mistake --
+      // fixed with the Pokemon objects, 2026-10-18)
+      pokemonData.movement = Object.fromEntries(Object.entries(pokemonData.movement || {})
+        .map(([kind, ft]) => [kind, ft ? ft + 10 : ft]));
     } else if (stat === 'STR') {
       // Increase STR by 1
-      const currentSTR = parseInt(pokemonData[15], 10) || 10;
-      pokemonData[15] = currentSTR + 1;
+      const currentSTR = parseInt(pokemonData.stats.strength, 10) || 10;
+      pokemonData.stats.strength = currentSTR + 1;
     } else if (stat === 'DEX') {
       // Increase DEX by 1
-      const currentDEX = parseInt(pokemonData[16], 10) || 10;
-      pokemonData[16] = currentDEX + 1;
+      const currentDEX = parseInt(pokemonData.stats.dexterity, 10) || 10;
+      pokemonData.stats.dexterity = currentDEX + 1;
     } else if (stat === 'CON') {
       // Increase CON by 1 and recalculate HP/VP
-      const currentCON = parseInt(pokemonData[17], 10) || 10;
+      const currentCON = parseInt(pokemonData.stats.constitution, 10) || 10;
       const newCON = currentCON + 1;
-      pokemonData[17] = newCON;
+      pokemonData.stats.constitution = newCON;
 
       // Recalculate modifier
       const oldModifier = Math.floor((currentCON - 10) / 2);
@@ -4882,21 +4672,21 @@ async function applyMaxPotentialBoost(stat) {
       const modifierIncrease = newModifier - oldModifier;
 
       // Increase HP and VP by the modifier increase per level
-      const pokemonLevel = parseInt(pokemonData[4], 10) || 1;
+      const pokemonLevel = parseInt(pokemonData.level, 10) || 1;
       const hpIncrease = modifierIncrease * pokemonLevel;
       const vpIncrease = modifierIncrease * pokemonLevel;
 
       // Update max HP and VP
-      const currentMaxHP = parseInt(pokemonData[10], 10) || 0;
-      const currentMaxVP = parseInt(pokemonData[12], 10) || 0;
-      pokemonData[10] = currentMaxHP + hpIncrease;
-      pokemonData[12] = currentMaxVP + vpIncrease;
+      const currentMaxHP = parseInt(pokemonData.combat.maxHP, 10) || 0;
+      const currentMaxVP = parseInt(pokemonData.combat.maxVP, 10) || 0;
+      pokemonData.combat.maxHP = currentMaxHP + hpIncrease;
+      pokemonData.combat.maxVP = currentMaxVP + vpIncrease;
 
       // Also update current HP and VP
-      const currentHP = parseInt(pokemonData[45], 10) || 0;
-      const currentVP = parseInt(pokemonData[46], 10) || 0;
-      pokemonData[45] = currentHP + hpIncrease;
-      pokemonData[46] = currentVP + vpIncrease;
+      const currentHP = parseInt(pokemonData.current.hp, 10) || 0;
+      const currentVP = parseInt(pokemonData.current.vp, 10) || 0;
+      pokemonData.current.hp = currentHP + hpIncrease;
+      pokemonData.current.vp = currentVP + vpIncrease;
     }
 
     // Update in session storage
@@ -4906,7 +4696,7 @@ async function applyMaxPotentialBoost(stat) {
     try {
       await PokemonAPI.update(pokemonData);
     } catch (error) {
-      console.error(`Error updating Pokemon ${pokemonData[2]}:`, error);
+      console.error(`Error updating Pokemon ${pokemonData.name}:`, error);
     }
   }
 

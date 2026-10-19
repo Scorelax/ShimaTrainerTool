@@ -4,6 +4,7 @@ import { TrainerAPI } from '../api.js';
 import { showToast, showSuccess, showError } from '../utils/notifications.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 import { audioManager } from '../utils/audio.js';
+import { loadTrainer, storeTrainer } from '../utils/trainer-data.js';
 
 // Tracks the gear-autocomplete outside-click handler across repeated visits
 // to this page, so attachEditTrainerListeners() doesn't stack a fresh
@@ -17,24 +18,22 @@ export function renderEditTrainer() {
     return '<div class="error">No trainer data found. Please return to the home page.</div>';
   }
 
-  const trainerData = JSON.parse(trainerDataStr);
+  const trainerData = loadTrainer();
   const trainerFeatsData = JSON.parse(sessionStorage.getItem('trainerFeats') || '[]');
 
   // Extract trainer info
-  const trainerName = trainerData[1] || 'Trainer';
-  const trainerLevel = trainerData[2] || 1;
-  const trainerSTR = trainerData[5] || 10;
-  const trainerDEX = trainerData[6] || 10;
-  const trainerCON = trainerData[7] || 10;
-  const trainerINT = trainerData[8] || 10;
-  const trainerWIS = trainerData[9] || 10;
-  const trainerCHA = trainerData[10] || 10;
-  const trainerAC = trainerData[13] || 10;
-  const trainerMoney = trainerData[19] || 0;
-  const trainerLeaguePoints = trainerData[21] || 0;
-  const trainerSkills = trainerData[18] || '';
-  const trainerFeats = trainerData[33] || '';
-  const gear = trainerData[37] || '';
+  const trainerName = trainerData.name || 'Trainer';
+  const trainerLevel = trainerData.level || 1;
+  const trainerSTR = trainerData.stats.strength || 10;
+  const trainerDEX = trainerData.stats.dexterity || 10;
+  const trainerCON = trainerData.stats.constitution || 10;
+  const trainerINT = trainerData.stats.intelligence || 10;
+  const trainerWIS = trainerData.stats.wisdom || 10;
+  const trainerCHA = trainerData.stats.charisma || 10;
+  const trainerAC = trainerData.combat.ac || 10;
+  const trainerMoney = trainerData.money || 0;
+  const trainerLeaguePoints = trainerData.leaguePoints || 0;
+
 
   // Hardcoded D&D skills list (matching reference file)
   const allSkills = [
@@ -44,10 +43,9 @@ export function renderEditTrainer() {
     "Survival (WIS)", "Deception (CHA)", "Intimidation (CHA)", "Performance (CHA)", "Persuasion (CHA)"
   ];
 
-  const selectedSkills = trainerSkills ? trainerSkills.split(',').map(s => s.trim()) : [];
-  // Strip :data suffix (e.g. "Linguist:French|Spanish|German" → "Linguist") for checkbox matching
-  const selectedFeats = trainerFeats ? trainerFeats.split(',').map(s => s.trim().split(':')[0]) : [];
-  const gearArray = gear ? gear.split(',').map(g => g.trim()).filter(g => g && g !== 'None') : [];
+  const selectedSkills = [...trainerData.skills];
+  const selectedFeats = [...trainerData.feats];
+  const gearArray = trainerData.gear.filter(g => g && g !== 'None');
 
   const html = `
     <div class="edit-trainer-page">
@@ -745,10 +743,10 @@ function addGearChip(gearName) {
 async function handleFormSubmit() {
   const form = document.getElementById('editTrainerForm');
   const trainerDataStr = sessionStorage.getItem('trainerData');
-  const trainerData = JSON.parse(trainerDataStr);
+  const trainerData = loadTrainer();
 
-  const originalFeatsStr = trainerData[33] || '';
-  const originalLevel = parseInt(trainerData[2], 10);
+  const originalFeats = [...trainerData.feats];
+  const originalLevel = parseInt(trainerData.level, 10);
 
   try {
     // Gather form data
@@ -766,61 +764,49 @@ async function handleFormSubmit() {
     const selectedSkills = Array.from(form.querySelectorAll('input[name="skills"]:checked'))
       .map(cb => cb.value);
 
-    // Get selected feats — preserve existing feat data (e.g. Linguist languages)
+    // Get selected feats (Linguist's languages stay in trainerData.languages)
     const selectedFeatNames = Array.from(form.querySelectorAll('input[name="feats"]:checked'))
       .map(cb => cb.value);
-    const existingFeatDataMap = {};
-    parseFeatsFromString(originalFeatsStr).forEach(f => { if (f.data) existingFeatDataMap[f.name] = f.data; });
-    const selectedFeatEntries = selectedFeatNames.map(name =>
-      existingFeatDataMap[name] ? `${name}:${existingFeatDataMap[name]}` : name
-    );
 
     // Get gear items
     const gearItems = Array.from(document.querySelectorAll('.gear-chip'))
       .map(chip => chip.textContent.replace('×', '').trim());
 
     // Update trainer data array
-    trainerData[2] = level;
-    trainerData[5] = str;
-    trainerData[6] = dex;
-    trainerData[7] = con;
-    trainerData[8] = int;
-    trainerData[9] = wis;
-    trainerData[10] = cha;
-    trainerData[13] = ac;
-    trainerData[21] = leaguePoints;
-    trainerData[18] = selectedSkills.length > 0 ? selectedSkills.join(', ') : '';
-    trainerData[33] = selectedFeatEntries.length > 0 ? selectedFeatEntries.join(', ') : '';
-    const newFeatNames = selectedFeatNames.filter(
-      name => !parseFeatsFromString(originalFeatsStr).map(f => f.name).includes(name)
-    );
-    trainerData[37] = gearItems.length > 0 ? gearItems.join(', ') : 'None';
+    trainerData.level = level;
+    trainerData.stats.strength = str;
+    trainerData.stats.dexterity = dex;
+    trainerData.stats.constitution = con;
+    trainerData.stats.intelligence = int;
+    trainerData.stats.wisdom = wis;
+    trainerData.stats.charisma = cha;
+    trainerData.combat.ac = ac;
+    trainerData.leaguePoints = leaguePoints;
+    trainerData.skills = selectedSkills;
+    trainerData.feats = selectedFeatNames;
+    if (!selectedFeatNames.includes('Linguist')) trainerData.languages = [];
+    const newFeatNames = selectedFeatNames.filter(name => !originalFeats.includes(name));
+    trainerData.gear = gearItems;
 
     // Calculate modifiers (D&D 5e rules)
-    const oldWisModifier = trainerData[31] || 0;
-    const oldChaModifier = trainerData[32] || 0;
-    trainerData[27] = Math.floor((str - 10) / 2);  // STR modifier
-    trainerData[28] = Math.floor((dex - 10) / 2);  // DEX modifier
-    trainerData[29] = Math.floor((con - 10) / 2);  // CON modifier
-    trainerData[30] = Math.floor((int - 10) / 2);  // INT modifier
-    trainerData[31] = Math.floor((wis - 10) / 2);  // WIS modifier
-    trainerData[32] = Math.floor((cha - 10) / 2);  // CHA modifier
+    const oldWisModifier = trainerData.modifiers.wisdom || 0;
+    const oldChaModifier = trainerData.modifiers.charisma || 0;
+    trainerData.modifiers.strength = Math.floor((str - 10) / 2);  // STR modifier
+    trainerData.modifiers.dexterity = Math.floor((dex - 10) / 2);  // DEX modifier
+    trainerData.modifiers.constitution = Math.floor((con - 10) / 2);  // CON modifier
+    trainerData.modifiers.intelligence = Math.floor((int - 10) / 2);  // INT modifier
+    trainerData.modifiers.wisdom = Math.floor((wis - 10) / 2);  // WIS modifier
+    trainerData.modifiers.charisma = Math.floor((cha - 10) / 2);  // CHA modifier
 
     // Recalculate Battle Dice if WIS modifier changed for Ace Trainer
-    const trainerPath = trainerData[25] || '';
-    const newWisModifier = trainerData[31];
+    const trainerPath = trainerData.trainerPath || '';
+    const newWisModifier = trainerData.modifiers.wisdom;
     if (trainerPath === 'Ace Trainer' && level >= 5 && oldWisModifier !== newWisModifier) {
-      const battleDiceData = trainerData[45] || '';
       let oldMax = 1 + oldWisModifier;
       let oldCurrent = oldMax;
-
-      // Parse existing battle dice format "max - current"
-      if (battleDiceData) {
-        const parts = battleDiceData.split('-').map(p => p.trim());
-        if (parts.length === 2) {
-          oldMax = parseInt(parts[0], 10) || oldMax;
-          oldCurrent = parseInt(parts[1], 10) || oldCurrent;
-        }
+      if (trainerData.battleDice) {
+        oldMax = parseInt(trainerData.battleDice.max, 10) || oldMax;
+        oldCurrent = parseInt(trainerData.battleDice.current, 10) || oldCurrent;
       }
 
       // Calculate how many were used
@@ -831,66 +817,61 @@ async function handleFormSubmit() {
       const newCurrent = Math.max(0, newMax - used); // Ensure not negative
 
       // Update battle dice
-      trainerData[45] = `${newMax} - ${newCurrent}`;
+      trainerData.battleDice = { max: newMax, current: newCurrent };
 
       console.log(`Battle Dice updated: ${oldMax} - ${oldCurrent} -> ${newMax} - ${newCurrent}`);
     }
 
     // Recalculate Rally Cry max if CHA changed for Commander
-    const newChaModifier = trainerData[32];
+    const newChaModifier = trainerData.modifiers.charisma;
     if (trainerPath === 'Commander' && level >= 15 && oldChaModifier !== newChaModifier) {
-      const rallyData = trainerData[51] || '';
       let oldRallyMax = Math.max(1, 1 + oldChaModifier);
       let oldRallyCurrent = oldRallyMax;
-
-      if (rallyData) {
-        const parts = rallyData.split('-').map(p => p.trim());
-        if (parts.length === 2) {
-          oldRallyMax = parseInt(parts[0], 10) || oldRallyMax;
-          oldRallyCurrent = parseInt(parts[1], 10) || oldRallyCurrent;
-        }
+      if (trainerData.rallyCry) {
+        oldRallyMax = parseInt(trainerData.rallyCry.max, 10) || oldRallyMax;
+        oldRallyCurrent = parseInt(trainerData.rallyCry.current, 10) || oldRallyCurrent;
       }
 
       const used = oldRallyMax - oldRallyCurrent;
       const newRallyMax = Math.max(1, 1 + newChaModifier);
       const newRallyCurrent = Math.max(0, newRallyMax - used);
 
-      trainerData[51] = `${newRallyMax} - ${newRallyCurrent}`;
+      trainerData.rallyCry = { max: newRallyMax, current: newRallyCurrent };
       console.log(`Rally Cry updated: ${oldRallyMax} - ${oldRallyCurrent} -> ${newRallyMax} - ${newRallyCurrent}`);
     }
 
     // Update Tactician Points if level changed
     if (trainerPath === 'Tactician' && level !== originalLevel) {
-      const oldTP = parseInt(trainerData[49], 10) || 0;
+      const oldTP = parseInt(trainerData.tacticianPoints, 10) || 0;
       const levelDiff = level - originalLevel;
       const newTP = Math.max(0, oldTP + levelDiff);
-      trainerData[49] = newTP;
+      trainerData.tacticianPoints = newTP;
       console.log(`Tactician TP updated: ${oldTP} -> ${newTP} (level ${originalLevel} -> ${level})`);
     }
 
     // Recalculate max HP and VP based on updated stats/level
-    const hd = parseInt(trainerData[3]) || 8;
-    const vd = parseInt(trainerData[4]) || 6;
+    const hd = parseInt(trainerData.combat.hitDie) || 8;
+    const vd = parseInt(trainerData.combat.vitalityDie) || 6;
     const conModifier = (con - 10) < 0 ? Math.ceil((con - 10) / 2) : Math.floor((con - 10) / 2);
     const totalStats = str + dex + con + int + wis + cha;
     const newMaxHP = hd + (level * ((hd / 2) + 1 + conModifier));
     const newMaxVP = Math.floor(vd + level * ((vd / 2) + 2) + Math.floor((totalStats - 30) / 2));
 
-const oldMaxHP = parseInt(trainerData[11]) || newMaxHP;
-    const oldMaxVP = parseInt(trainerData[12]) || newMaxVP;
+const oldMaxHP = parseInt(trainerData.combat.maxHP) || newMaxHP;
+    const oldMaxVP = parseInt(trainerData.combat.maxVP) || newMaxVP;
     const hpDiff = newMaxHP - oldMaxHP;
     const vpDiff = newMaxVP - oldMaxVP;
 
-    trainerData[11] = newMaxHP;
-    trainerData[12] = newMaxVP;
+    trainerData.combat.maxHP = newMaxHP;
+    trainerData.combat.maxVP = newMaxVP;
 
     // Adjust current HP/VP by the same delta, capped at new max
-    const oldCurrentHP = (trainerData[34] !== '' && trainerData[34] !== undefined && trainerData[34] !== null)
-      ? parseInt(trainerData[34]) : oldMaxHP;
-    const oldCurrentVP = (trainerData[35] !== '' && trainerData[35] !== undefined && trainerData[35] !== null)
-      ? parseInt(trainerData[35]) : oldMaxVP;
-    trainerData[34] = Math.min(newMaxHP, Math.max(0, oldCurrentHP + hpDiff));
-    trainerData[35] = Math.min(newMaxVP, Math.max(0, oldCurrentVP + vpDiff));
+    const oldCurrentHP = (trainerData.current.hp !== '' && trainerData.current.hp !== undefined && trainerData.current.hp !== null)
+      ? parseInt(trainerData.current.hp) : oldMaxHP;
+    const oldCurrentVP = (trainerData.current.vp !== '' && trainerData.current.vp !== undefined && trainerData.current.vp !== null)
+      ? parseInt(trainerData.current.vp) : oldMaxVP;
+    trainerData.current.hp = Math.min(newMaxHP, Math.max(0, oldCurrentHP + hpDiff));
+    trainerData.current.vp = Math.min(newMaxVP, Math.max(0, oldCurrentVP + vpDiff));
 
     // Hide loading before feat choice popups
     hideLoading();
@@ -901,7 +882,7 @@ const oldMaxHP = parseInt(trainerData[11]) || newMaxHP;
     }
 
     // Save to session storage (including any feat choice results)
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    storeTrainer(trainerData);
 
     // Play level up sound if level changed
     if (level !== originalLevel) {
@@ -946,12 +927,12 @@ const oldMaxHP = parseInt(trainerData[11]) || newMaxHP;
 // ============================================================================
 
 const STAT_MAP = {
-  STR: { index: 5, modIndex: 27 },
-  DEX: { index: 6, modIndex: 28 },
-  CON: { index: 7, modIndex: 29 },
-  INT: { index: 8, modIndex: 30 },
-  WIS: { index: 9, modIndex: 31 },
-  CHA: { index: 10, modIndex: 32 },
+  STR: { key: 'strength' },
+  DEX: { key: 'dexterity' },
+  CON: { key: 'constitution' },
+  INT: { key: 'intelligence' },
+  WIS: { key: 'wisdom' },
+  CHA: { key: 'charisma' },
 };
 
 const ALL_SKILL_NAMES = [
@@ -961,47 +942,37 @@ const ALL_SKILL_NAMES = [
   'Deception', 'Intimidation', 'Performance', 'Persuasion',
 ];
 
-function parseFeatsFromString(featsStr) {
-  if (!featsStr || featsStr === 'None') return [];
-  return featsStr.split(',').map(entry => {
-    const colonIdx = entry.trim().indexOf(':');
-    if (colonIdx === -1) return { name: entry.trim(), data: '' };
-    return { name: entry.trim().slice(0, colonIdx), data: entry.trim().slice(colonIdx + 1) };
-  }).filter(f => f.name);
-}
-
 function applyStatIncrease(trainerData, stat) {
   const info = STAT_MAP[stat];
   if (!info) return;
-  const newVal = Math.min(20, (parseInt(trainerData[info.index]) || 10) + 1);
-  trainerData[info.index] = newVal;
-  trainerData[info.modIndex] = Math.floor((newVal - 10) / 2);
+  const newVal = Math.min(20, (parseInt(trainerData.stats[info.key]) || 10) + 1);
+  trainerData.stats[info.key] = newVal;
+  trainerData.modifiers[info.key] = Math.floor((newVal - 10) / 2);
 }
 
 function getUnproficientSkills(trainerData) {
-  const current = (trainerData[18] || '').split(',')
-    .map(s => s.trim().replace('+', '').toLowerCase()).filter(s => s);
+  const current = trainerData.skills.map(s => s.trim().replace('+', '').toLowerCase()).filter(s => s);
   return ALL_SKILL_NAMES.filter(s => !current.includes(s.toLowerCase()));
 }
 
 function addSkillProficiency(trainerData, skillName) {
-  const skills = (trainerData[18] || '').split(',').map(s => s.trim()).filter(s => s);
+  const skills = trainerData.skills.map(s => s.trim()).filter(s => s);
   const already = skills.some(s => s.replace('+', '').trim().toLowerCase() === skillName.toLowerCase());
   if (!already) {
     skills.push(skillName);
-    trainerData[18] = skills.join(', ');
+    trainerData.skills = skills;
   }
 }
 
 function addSkillExpertise(trainerData, skillName) {
-  const skills = (trainerData[18] || '').split(',').map(s => s.trim()).filter(s => s);
+  const skills = trainerData.skills.map(s => s.trim()).filter(s => s);
   const idx = skills.findIndex(s => s.replace('+', '').trim().toLowerCase() === skillName.toLowerCase());
   if (idx !== -1 && !skills[idx].endsWith('+')) {
     skills[idx] = skills[idx].trim() + '+';
   } else if (idx === -1) {
     skills.push(skillName + '+');
   }
-  trainerData[18] = skills.join(', ');
+  trainerData.skills = skills;
 }
 
 function injectFeatModalStyles() {
@@ -1130,7 +1101,7 @@ function showFeatChoiceModal({ title, description, type, options = [], maxSelect
 
 async function processChef(trainerData) {
   const options = ['CON', 'WIS']
-    .filter(s => (parseInt(trainerData[STAT_MAP[s].index]) || 10) < 20)
+    .filter(s => (parseInt(trainerData.stats[STAT_MAP[s].key]) || 10) < 20)
     .map(s => ({ value: s, label: s === 'CON' ? 'Constitution (CON)' : 'Wisdom (WIS)' }));
   if (options.length === 0) return;
   if (options.length === 1) { applyStatIncrease(trainerData, options[0].value); return; }
@@ -1153,19 +1124,13 @@ async function processLinguist(trainerData) {
     ],
   });
   if (result && result.some(l => l)) {
-    const languages = result.filter(l => l).join('|');
-    const entries = (trainerData[33] || '').split(',').map(e => e.trim());
-    const idx = entries.findIndex(e => e === 'Linguist' || e.startsWith('Linguist:'));
-    if (idx !== -1) {
-      entries[idx] = `Linguist:${languages}`;
-      trainerData[33] = entries.join(', ');
-    }
+    trainerData.languages = result.filter(l => l);
   }
 }
 
 async function processObservant(trainerData) {
   const options = ['INT', 'WIS']
-    .filter(s => (parseInt(trainerData[STAT_MAP[s].index]) || 10) < 20)
+    .filter(s => (parseInt(trainerData.stats[STAT_MAP[s].key]) || 10) < 20)
     .map(s => ({ value: s, label: s === 'INT' ? 'Intelligence (INT)' : 'Wisdom (WIS)' }));
   if (options.length === 0) return;
   if (options.length === 1) { applyStatIncrease(trainerData, options[0].value); return; }
@@ -1193,7 +1158,7 @@ async function processSkilled(trainerData) {
 async function processSkillExpert(trainerData) {
   // Step 1: Stat +1
   const statOptions = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
-    .filter(s => (parseInt(trainerData[STAT_MAP[s].index]) || 10) < 20)
+    .filter(s => (parseInt(trainerData.stats[STAT_MAP[s].key]) || 10) < 20)
     .map(s => ({ value: s, label: s }));
   if (statOptions.length > 0) {
     const statChoice = await showFeatChoiceModal({
@@ -1214,7 +1179,7 @@ async function processSkillExpert(trainerData) {
   }
 
   // Step 3: Expertise (from all current proficiencies, excluding those already with expertise)
-  const expertiseCandidates = (trainerData[18] || '').split(',')
+  const expertiseCandidates = trainerData.skills
     .map(s => s.trim()).filter(s => s && !s.endsWith('+'))
     .map(s => s.trim());
   if (expertiseCandidates.length > 0) {
@@ -1229,7 +1194,7 @@ async function processSkillExpert(trainerData) {
 
 async function processTelerpathic(trainerData) {
   const options = ['INT', 'WIS', 'CHA']
-    .filter(s => (parseInt(trainerData[STAT_MAP[s].index]) || 10) < 20)
+    .filter(s => (parseInt(trainerData.stats[STAT_MAP[s].key]) || 10) < 20)
     .map(s => ({ value: s, label: s === 'INT' ? 'Intelligence (INT)' : s === 'WIS' ? 'Wisdom (WIS)' : 'Charisma (CHA)' }));
   if (options.length === 0) return;
   if (options.length === 1) { applyStatIncrease(trainerData, options[0].value); return; }

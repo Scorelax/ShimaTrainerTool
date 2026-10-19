@@ -1,0 +1,419 @@
+{
+ "_about": "What a trainer chooses between and gains: specializations, trainer paths (with what each gives at levels 3 / 5 / 9 / 15), affinities (favoured types, with their improved form), the trainer skills every trainer gets by level, and nationalities (the region a trainer is from). Read by the Pi server (gamedata.py); edit here, commit, git pull on the Pi.",
+ "specializations": [
+  {
+   "name": "Bird Keeper",
+   "shortEffect": "Proficiency: Perception +1 Skill checks for Flying types",
+   "effect": "You gain proficiency in Perception. Add a +1 bonus to all skill checks made by any of your flying Pokémon."
+  },
+  {
+   "name": "Bug Maniac",
+   "shortEffect": "Proficiency: Nature +1 Skill checks for Bug types",
+   "effect": "You gain Proficiency in Nature. Add a +1 bonus to all skill checks made by any of your bug Pokémon."
+  },
+  {
+   "name": "Camper",
+   "shortEffect": "Proficiency: Survival +1 skill checks for Ground types",
+   "effect": "You gain proficiency in Survival. Add a +1 bonus to all skill checks made by any of your ground Pokémon."
+  },
+  {
+   "name": "Dragon Tamer",
+   "shortEffect": "WIS +1 +1 Skill checks for Dragon types",
+   "effect": "Increase your Wis by +1. Add a +1 bonus to all skill checks made by any of your dragon Pokémon."
+  },
+  {
+   "name": "Engineer",
+   "shortEffect": "INT +1 +1 Skill checks for Electric types",
+   "effect": "Increase your Int by +1. Add a +1 bonus to all skill checks made by any of your electric Pokémon."
+  },
+  {
+   "name": "Pyromaniac",
+   "shortEffect": "CON +1 +1 Skill checks for Fire types",
+   "effect": "Increase your Con by +1. Add a +1 bonus to all skill checks made by any of your fire Pokémon."
+  },
+  {
+   "name": "Gardener",
+   "shortEffect": "Proficiency: Nature +1 Skill checks for Grass types",
+   "effect": "You gain proficiency in Nature. Add a +1 bonus to all skill checks made by any of your grass Pokémon."
+  },
+  {
+   "name": "Martial Artist",
+   "shortEffect": "STR / CON / DEX: +1 +1 Skill checks for Fighting types",
+   "effect": "Increase your Str, Con, or Dex by +1. Add a +1 bonus to all skill checks made by any of your fighting Pokémon."
+  },
+  {
+   "name": "Mountaineer",
+   "shortEffect": "STR / CON / DEX: +1 +1 Skill checks for Rock types",
+   "effect": "Increase your Str, Con, or Dex by +1. Add a +1 bonus to all skill checks made by any of your rock Pokémon."
+  },
+  {
+   "name": "Mystic",
+   "shortEffect": "Proficiency: Arcana +1 Skill checks for Ghost types",
+   "effect": "You gain proficiency in Arcana. Add a +1 bonus to all skill checks made by any of your ghost Pokémon."
+  },
+  {
+   "name": "Steel Worker",
+   "shortEffect": "STR / CON: +1 +1 Skill cheks for Steel types",
+   "effect": "Increase your Str or Con by +1. Add a +1 bonus to all skill checks made by any of your steel Pokémon."
+  },
+  {
+   "name": "Psychic",
+   "shortEffect": "Once pr. day: Telepathy with your Pokemon +1 Skill checks for Psychic types",
+   "effect": "You gain the ability to target one of your own Pokémon with the Telepathy spell once per day, ignoring components. Add a +1 bonus to all skill checks made by any of your psychic Pokémon."
+  },
+  {
+   "name": "Swimmer",
+   "shortEffect": "Swim speed = Walk speed +1 Skill checks for Water types",
+   "effect": "Gain a swim speed equal to your movement speed. Add a +1 bonus to all skill checks made by any of your water Pokémon."
+  },
+  {
+   "name": "Charmer",
+   "shortEffect": "CHA: +1 +1 Skill checks for Fairy types",
+   "effect": "Increase your Cha by +1. Add a +1 bonus to all skill checks made by any of your fairy Pokémon."
+  },
+  {
+   "name": "Shadow",
+   "shortEffect": "Proficiency: Deception / Stealth +1 Skill checks for Dark types",
+   "effect": "Gain proficiency in the Deception or Stealth skill. Add a +1 bonus to all skill checks made by any of your dark Pokémon."
+  },
+  {
+   "name": "Alchemist",
+   "shortEffect": "Proficiency: Medicine / Deception +1 Skill checks for Poison types",
+   "effect": "Gain proficiency in the Medicine or Deception skill. Add a +1 bonus to all skill checks made by any of your poison Pokémon."
+  },
+  {
+   "name": "Team Player",
+   "shortEffect": "Any ability score: +1 +1 Skill checks for Normal types",
+   "effect": "Increase any one of your ability scores by 1. Add a +1 bonus to all skill checks made by any of your normal Pokémon."
+  },
+  {
+   "name": "Ice Skater",
+   "shortEffect": "Proficiency: Performance / Persuation +1 Skill checks for Ice types",
+   "effect": "Gain proficiency in the Performance or Persuasion skill. Add a +1 bonus to all skill checks made by any of your ice Pokémon."
+  }
+ ],
+ "trainerPaths": [
+  {
+   "name": "Ace Trainer",
+   "level3": {
+    "name": "Ace Trainer",
+    "shortEffect": "ATK Roll: +1\nDMG Roll: +1",
+    "effect": "Your goal is to become one of the strongest\ntrainers in the world, and so you excel in battle.\nAll of your Pokémon gain a +1 bonus to their\nattack and damage rolls."
+   },
+   "level5": {
+    "name": "Battle \nMaster",
+    "shortEffect": "d6: 1 + WIS\nAdd to any ATK\nor DMG roll.\n - After initial\nroll\nLong rest reset",
+    "effect": "When you reach level 5, you gain a number of\nbattle dice (d6) equal to 1 + your Wisdom\nmodifier (minimum of 1). You may assign one of\nthese to any of your Pokémon to be added to a\nsingle attack or damage roll, after the result of the\ninitial roll. You replenish your pool of battle dice\nat each long rest."
+   },
+   "level9": {
+    "name": "Max\nPotential",
+    "shortEffect": "Perma Boost \nAll Pokemon\n(Choose One)\n - Speed: 10\n - STR: 1\n - DEX: 1\n - CON: 1",
+    "effect": "Certain trainers choose to excel in one area,\nutilizing it to its fullest potential. When you reach\nlevel 9, choose to increase all of your Pokémon’s\nspeed by 10, increase their STR by 1, increase\ntheir DEX by 1, or increase their CON by 1."
+   },
+   "level15": {
+    "name": "Rapid\nSwitching",
+    "shortEffect": "Bonus action:\nSwitching \nPokemon",
+    "effect": "When you reach level 15, you can recall and\nrelease Pokémon as a bonus action instead of a\nstandard action. A Pokémon may not be switched\nout until after the end of its first full turn in\ncombat (Unless by item or move like Volt Switch,\nU-Turn, etc)."
+   }
+  },
+  {
+   "name": "Type Master",
+   "level3": {
+    "name": "Type Master",
+    "shortEffect": "STAB: +1 for\nspecialization\ntype. \n\nNew\nspecialization\nalso applies",
+    "effect": "You feel drawn to the elements, focusing your\nskills into a particular type of Pokémon. When\nyou choose this path, increase the STAB of any\nPokémon that is the same type as your\nspecialization by +1 at all levels. If you select\nmultiple specializations at later levels, the bonus\napplies to the new type as well. If your Pokémon\nis dual-type and you are specialized in both types,\nthe bonus is +2."
+   },
+   "level5": {
+    "name": "Drawing \nPower",
+    "shortEffect": "ATK Roll: +2\nfor specialization types",
+    "effect": "Your Pokémon \nare trained to \ndraw power \nfrom each other. \nWhen you \nreach level 5, Pokémon of \nthat type add 2 to their \nattack rolls."
+   },
+   "level9": {
+    "name": "Storing \nPower",
+    "shortEffect": "All pokemon\ngain resistance\nto one of \nspecialization\ntype",
+    "effect": "Even Pokémon that are not of your specialization\ntypes can feel the effect you have in battle. When\nyou reach level 9, all of your carried Pokémon\nhave resistance to one of your specialization\ntypes, determined at the time of gaining this\nfeature. This type may never change, so choose\nwisely. If a Pokémon was once vulnerable to that\ntype, it now takes the regular amount of damage."
+   },
+   "level15": {
+    "name": "Releasing \nPower",
+    "shortEffect": "Specialization\ntypes get\nSTAB bonus\non all moves",
+    "effect": "Your Pokémon are masters of their own types,\nfocusing their energy in every attack they make.\nWhen you reach level 15, for Pokémon of the\nsame types you are specialized in, their STAB can\nbe added to any damaging move of their\nchoosing, even if it is a different type from their\nown."
+   }
+  },
+  {
+   "name": "Tactician",
+   "level3": {
+    "name": "Tactician",
+    "shortEffect": "Tactical Points:\nTrainer level\n\nLong rest reset",
+    "effect": "You have an eye for detail and a unique set of\nskills to use in battle. When you choose this path,\nyou gain a pool of \"Tactical Points\" equal to your\ntrainer level. Your point pool increases with each\nlevel, and resets after each long rest. At level 2,\nwhen a Pokémon regains hit points from an item\nor move, you may increase the amount by 1d4 for\neach \"Tactical Point\" spent."
+   },
+   "level5": {
+    "name": "Directed \nStrike",
+    "shortEffect": "2 Tactical Points\n = advantage \nroll",
+    "effect": "You know precisely where to hit a Pokémon for\nthe maximum amount of damage. At level 5 and\nhigher, you can spend 2 \"Tactical Points\" to roll\nthe damage for an attack twice, taking the higher\nresult."
+   },
+   "level9": {
+    "name": "Raise Your\nDefences",
+    "shortEffect": "Reaction:\n - Add up to \n3 TP to AC",
+    "effect": "You are quickly able to sense an incoming blow to\nyour Pokémon. At level 9 and higher, you can use\na reaction to expend up to 3 of your \"Tactical\nPoints\" to add to a Pokémon's AC, if it would\ncause an attack to miss."
+   },
+   "level15": {
+    "name": "Not This\nTime",
+    "shortEffect": "Increase\nMove DC on \nsaving throws:\n - Up to 5 TP",
+    "effect": "At level 15, your Pokémon are trained to be\nunrelenting in battle, never holding back. After an\nopponent rolls a saving throw for one of your\nPokémon’s moves, you may increase the DC by up\nto 5 points if it would cause a failure, spending\none \"Tactical Point\" for each increase."
+   }
+  },
+  {
+   "name": "Commander",
+   "level3": {
+    "name": "Commander",
+    "shortEffect": "Starter:\n - Loyalty: +1",
+    "effect": "You rule over your Pokémon with an iron fist,\ndemanding respect and forming an unbreakable\nbond with your team. When you choose this path,\nyour starter’s Loyalty increases to “Loyal”."
+   },
+   "level5": {
+    "name": "Follow Me",
+    "shortEffect": "New Pokemon\n - Loyalty: +1",
+    "effect": "You have a firm hand, but a trusting presence.\nWhen you reach level 5, any new Pokémon you\ncatch get a +1 bonus to Loyalty."
+   },
+   "level9": {
+    "name": "Show Me\nWhat You've\nGot",
+    "shortEffect": "Use a move \nfrom one tier\nabove current.\n\nAt max: \n2x damage dice\none time, \n(pre roll)\n\nShort rest reset",
+    "effect": "Your confidence and leadership inspire your\nPokémon to reach deep inside themselves for\nunknown power. At level 9, once per short rest,\nyou may choose a Pokémon in battle to activate \na single move from one tier above moves that it\ncurrently has learned. In the case of Pokémon\nthat are already at the highest level, you may\ninstead double the damage dice for a single\nknown move. This feature must be activated\nbefore the result of the move is determined."
+   },
+   "level15": {
+    "name": "We're a \nTeam",
+    "shortEffect": "Bonus Action: \n\nAllied Pokemon:\nAdvantage on\nATK Roll\n\nLimit: 1 + CHA\n\nLong rest reset",
+    "effect": "Your commanding presence is felt by all ally\nPokémon on the battlefield. When you reach level\n15, you may use a bonus action to speak a\ncommanding phrase. Until the end of your next\nturn, all allied Pokémon within 60 feet of you\nhave advantage on their attacks. You may use this\nfeature a number of times equal to 1 + your\nCharisma modifier (minimum of 1). This pool\nresets at each long rest."
+   }
+  }
+ ],
+ "affinities": [
+  {
+   "name": "NORMAL",
+   "shortEffect": "Identify Normal Pokemon +10 Capture roll for Normal types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Normal primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "FIGHTING",
+   "shortEffect": "Identify Fighting Pokemon +10 Capture roll for Fighting types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Fighting primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "FLYING",
+   "shortEffect": "Identify Flying Pokemon +10 Capture roll for Flying types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Flying primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "POISON",
+   "shortEffect": "Identify Poison Pokemon +10 Capture roll for Poison types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Poison primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "GROUND",
+   "shortEffect": "Identify GroundPokemon +10 Capture roll for Ground types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Ground primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "ROCK",
+   "shortEffect": "Identify Rock Pokemon +10 Capture roll for Rock types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Rock primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "BUG",
+   "shortEffect": "Identify Bug Pokemon +10 Capture roll for Bug types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Bug primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "GHOST",
+   "shortEffect": "Identify Ghost Pokemon +10 Capture roll for Ghost types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Ghost primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "STEEL",
+   "shortEffect": "Identify Steel Pokemon +10 Capture roll for Steel types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Steel primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "FIRE",
+   "shortEffect": "Identify Fire Pokemon +10 Capture roll for Fire types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Fire primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "WATER",
+   "shortEffect": "Identify Water Pokemon +10 Capture roll for Water types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Water primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "GRASS",
+   "shortEffect": "Identify Grass Pokemon +10 Capture roll for Grass types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Grass primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "ELECTRIC",
+   "shortEffect": "Identify Electric Pokemon +10 Capture roll for Electric types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Electric primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "PSYCHIC",
+   "shortEffect": "Identify Psychic Pokemon +10 Capture roll for Psychic types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Psychic primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "ICE",
+   "shortEffect": "Identify Ice Pokemon +10 Capture roll for Ice types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Ice primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "DRAGON",
+   "shortEffect": "Identify Dragon Pokemon +10 Capture roll for Dragon types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Dragon primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "DARK",
+   "shortEffect": "Identify Dark Pokemon +10 Capture roll for Dark types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Dark primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  },
+  {
+   "name": "FAIRY",
+   "shortEffect": "Identify Fairy Pokemon +10 Capture roll for Fairy types",
+   "effect": "You may choose a favored type. When you encounter new Pokémon of this type, you are always able to identify its typing. When attempting to capture a Pokémon that has your favored type, add +10 to your capture roll.",
+   "improvedShortEffect": "Once pr. battle: Fairy primary types can add your proficiency bonus to attack rolls",
+   "improvedEffect": "Your active Pokémon may add your proficiency bonus to its attack rolls once per battle if its primary type is your favored type."
+  }
+ ],
+ "trainerSkills": [
+  {
+   "level": 3,
+   "name": "Second Wind",
+   "shortEffect": "Twice pr. long rest: Bonus action: restore VP by 2d4 + CHA",
+   "fullEffect": "When you reach level 3, you gain the ability to restore your active Pokémon's VP by 2d4 + your charisma modifier as a bonus action. This ability can be used up to two times per long rest."
+  },
+  {
+   "level": 6,
+   "name": "Rapid Orders",
+   "shortEffect": "Once pr. long rest: One extra battle action",
+   "fullEffect": "When you reach level 6, you may once per long rest grant your active Pokémon one extra action on their turn during a battle."
+  },
+  {
+   "level": 7,
+   "name": "Second Wind",
+   "shortEffect": "Five times pr. long rest: restore 2d8 + CHA VP",
+   "fullEffect": "At level 7, restore VP equal to 2d8 + your charisma modifier and this ability can be used up to five times per long rest."
+  },
+  {
+   "level": 11,
+   "name": "Resolve",
+   "shortEffect": "Immune to fear, new saving throw",
+   "fullEffect": "By the time you reach level 11, you have had your fair share of experience in difficult battles and have emerged victorious and strong. You are now immune to fear, and may choose a second saving throw to become proficient in."
+  },
+  {
+   "level": 13,
+   "name": "Unbreakable Bond",
+   "shortEffect": "One Pokemon at a time with a loyalty of 1+: Add your proficiency bonus to attack rolls while within 10 ft",
+   "fullEffect": "When you reach level 13, you may affirm your bond with a Pokémon in your party that has a loyalty score of 1 or higher. This Pokémon may add your proficiency bonus to their attack rolls while within 10 feet of you. Only one Pokémon may have Unbreakable Bond at a time, and the effect wears off the next day. This ability may be used once per long rest."
+  },
+  {
+   "level": 14,
+   "name": "Second Wind",
+   "shortEffect": "Five times pr. long rest: restore 4d8 + CHA + proficiency VP",
+   "fullEffect": "At level 14, restore 4d8 + your charisma modifier and your proficiency bonus."
+  },
+  {
+   "level": 18,
+   "name": "Elemental Synergy",
+   "shortEffect": "Once pr. long rest: Super effective moves to opponents secondary type does more damage",
+   "fullEffect": "When you reach level 18, you have enough experience with battles and Pokémon that you are able to spot and exploit weaknesses to maximum effect. When your active Pokémon lands a hit that the opponent's secondary type is weak to, it counts as a supereffective hit. If the opponent has double vulnerabilities, the attack deals 4 x damage. This ability can be used once per long rest."
+  },
+  {
+   "level": 20,
+   "name": "Master Trainer",
+   "shortEffect": "Twice pr. long rest: Succeed a failed saving throw",
+   "fullEffect": "At level 20, your Pokémon are at peak fighting performance. When you or your Pokémon fail a saving throw, you may choose to succeed instead. This feature can be used twice per long rest."
+  }
+ ],
+ "nationalities": [
+  {
+   "nationality": "Shima",
+   "regionBuff": "Local Knowledge",
+   "effect": "When entering a new location, you may roll one skill check of any kind that is related to exploration of the location with advantage."
+  },
+  {
+   "nationality": "Kanto",
+   "regionBuff": "Kanto Specialist",
+   "effect": "Gain advantage on capture rolls against Pokémon that are native to Kanto."
+  },
+  {
+   "nationality": "Johto",
+   "regionBuff": "Tradition",
+   "effect": "Gain proficiency on religion and history checks."
+  },
+  {
+   "nationality": "Hoenn",
+   "regionBuff": "Aquaculture",
+   "effect": "Start the game with a fishing rod. Roll a d20: 1: Broken Rod, 2-14: Old Rod, 15-19: Good Rod, 20: Super Rod. Your swim speed is increased by 5ft."
+  },
+  {
+   "nationality": "Orre",
+   "regionBuff": "Wastelander",
+   "effect": "Gain proficiency with medium armor. Start the game with Desert Goggles and Desert Overcoat (medium armor, AC 14). These items protect you from the adverse effects of harsh sunlight and sandstorm."
+  },
+  {
+   "nationality": "Sinnoh",
+   "regionBuff": "Tunnel Explorer",
+   "effect": "Add your proficiency bonus on investigation checks related to exploring subterranean environments."
+  },
+  {
+   "nationality": "Unova",
+   "regionBuff": "High Stakes",
+   "effect": "Add your proficiency bonus to initiative rolls for you and your Pokémon in important battles."
+  },
+  {
+   "nationality": "Kalos",
+   "regionBuff": "Encouraging Words",
+   "effect": "Once per long rest, you may use Encouraging Words as a bonus action to inspire an ally. When inspired, the ally may add 1d4 to one attack or saving throw. At level 10 the inspiration dice becomes 1d8. At level 17 the inspiration dice becomes 1d12."
+  },
+  {
+   "nationality": "Alola",
+   "regionBuff": "Exotic Heritage",
+   "effect": "Local NPCs find you exotic, making most social interactions more amicable."
+  },
+  {
+   "nationality": "Galar",
+   "regionBuff": "Sportsmanship",
+   "effect": "When rolling initiative, you may choose to roll with disadvantage for you and your active Pokémon. All opponents going before you in the initiative order have disadvantage on attack rolls against you and your active Pokémon for 3 rounds."
+  }
+ ]
+}

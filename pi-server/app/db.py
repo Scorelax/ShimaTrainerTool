@@ -1,14 +1,15 @@
-"""SQLite layer. One column per sheet column, in the exact positional order of
-the Apps Script COLUMN_INDICES constants, so positional-array responses are
-reconstructed by selecting columns in order."""
+"""SQLite layer. The players' trainers and Pokemon are JSON objects (trainers.py, owned.py), the DM console's records
+are JSON too (dm_state / dm_npcs / dm_encounters), and the battle is one JSON session. The game's data isn't in here at
+all -- it's the files in docs/ (gamedata.py, species.py). migrations.py moves an older database over, once."""
 import os
 import sqlite3
 
 DEFAULT_DB = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'pokedex.db'))
 DB_PATH = os.environ.get('POKEDEX_DB', DEFAULT_DB)
 
-# Order mirrors TRAINER_COLUMN_INDICES (0..51)
-TRAINER_COLUMNS = [
+# The trainers as they were stored until 2026-10-19 -- one column per cell of the old 52-cell rows. Now they're objects
+# (trainers.py); this order is what trainers.from_row reads (the move over, migrations.py).
+LEGACY_TRAINER_COLUMNS = [
     'image', 'name', 'level', 'hitDice', 'vitalityDice',
     'strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma',
     'hp', 'vp', 'ac', 'walkingSpeed', 'savingThrows', 'initiative', 'proficiency',
@@ -21,8 +22,9 @@ TRAINER_COLUMNS = [
     'currentHD', 'currentVD', 'tacticianPoints', 'commander9', 'commander15',
 ]
 
-# Order mirrors POKEMON_COLUMN_INDICES (0..61)
-POKEMON_COLUMNS = [
+# The players' Pokemon as they were stored until 2026-10-18 -- one column per cell of the old 62-cell rows. Now they're
+# objects in owned_pokemon (owned.py); this order is what owned.from_row reads (the move over, migrations.py).
+LEGACY_POKEMON_COLUMNS = [
     'trainername', 'image', 'name', 'dexentry', 'level',
     'primarytype', 'secondarytype', 'ability', 'ac', 'hitdice', 'hp',
     'vitalitydice', 'vp', 'speed', 'totalstats',
@@ -37,31 +39,13 @@ POKEMON_COLUMNS = [
     'size', 'cry', 'knownmoves', 'statuscondition', 'shiny',
 ]
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS trainers ({trainer_cols});
-CREATE TABLE IF NOT EXISTS pokemon ({pokemon_cols});
-CREATE TABLE IF NOT EXISTS natures (ord INTEGER PRIMARY KEY, name, boostStat, boostAmount, nerfStat, nerfAmount);
-CREATE TABLE IF NOT EXISTS specializations (ord INTEGER PRIMARY KEY, name, shortEffect, effect);
-CREATE TABLE IF NOT EXISTS trainer_paths (
-    ord INTEGER PRIMARY KEY, name,
-    l3name, l3short, l3effect,
-    l5name, l5short, l5effect,
-    l9name, l9short, l9effect,
-    l15name, l15short, l15effect
-);
-CREATE TABLE IF NOT EXISTS affinities (ord INTEGER PRIMARY KEY, name, shortEffect, effect, improvedShortEffect, improvedEffect);
-CREATE TABLE IF NOT EXISTS trainer_skills (ord INTEGER PRIMARY KEY, level, name, shortEffect, fullEffect);
-CREATE TABLE IF NOT EXISTS nationalities (ord INTEGER PRIMARY KEY, nationality, regionBuff, effect);
-CREATE TABLE IF NOT EXISTS trainer_feats (ord INTEGER PRIMARY KEY, name, effect);
-CREATE TABLE IF NOT EXISTS pokemon_feats (ord INTEGER PRIMARY KEY, name, effect);
-CREATE TABLE IF NOT EXISTS conduit_features (ord INTEGER PRIMARY KEY, name, stage1Effect, stage2Effect, stage3Effect);
-CREATE TABLE IF NOT EXISTS conduit_battle_styles (ord INTEGER PRIMARY KEY, name, effect);
-CREATE TABLE IF NOT EXISTS conduit_awakening_rows (ord INTEGER PRIMARY KEY, c1, c2, c3, c4);
-CREATE TABLE IF NOT EXISTS type_chart_attack (ord INTEGER PRIMARY KEY, type);
-CREATE TABLE IF NOT EXISTS type_chart_defend (ord INTEGER PRIMARY KEY, type);
-CREATE TABLE IF NOT EXISTS type_chart_matrix (attack_ord INTEGER, defend_ord INTEGER, value, PRIMARY KEY (attack_ord, defend_ord));
-CREATE TABLE IF NOT EXISTS upstream_cache (key TEXT PRIMARY KEY, json TEXT, fetched_at TEXT);
-CREATE TABLE IF NOT EXISTS image_cache (key TEXT PRIMARY KEY, url TEXT);
+# XP (dm_xp) is only the DM's (routes_dm.change_xp): it's deliberately not in the objects, which are sent to the
+# players' app and written back by it -- so it never leaves the Pi through them, no player save touches it, and since it
+# sits on the record itself, a Pokemon keeps its XP when it evolves.
+TRAINERS_TABLE = 'CREATE TABLE IF NOT EXISTS trainers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, json TEXT, dm_xp INTEGER)'
+
+_SCHEMA = TRAINERS_TABLE + """;
+CREATE TABLE IF NOT EXISTS owned_pokemon (id INTEGER PRIMARY KEY AUTOINCREMENT, trainer TEXT, name TEXT, json TEXT, dm_xp INTEGER);
 CREATE TABLE IF NOT EXISTS music_sync (track TEXT PRIMARY KEY, started_at TEXT, listeners INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS music_listeners (track TEXT, client_id TEXT, last_seen TEXT, PRIMARY KEY (track, client_id));
 CREATE TABLE IF NOT EXISTS combat_session (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT, updated_at TEXT);
@@ -69,13 +53,6 @@ CREATE TABLE IF NOT EXISTS dm_state (key TEXT PRIMARY KEY, json TEXT, updated_at
 CREATE TABLE IF NOT EXISTS dm_npcs (id TEXT PRIMARY KEY, json TEXT, updated_at TEXT);
 CREATE TABLE IF NOT EXISTS dm_encounters (id TEXT PRIMARY KEY, json TEXT, updated_at TEXT);
 """
-
-
-def _schema_sql():
-    return _SCHEMA.format(
-        trainer_cols=', '.join(f'"{c}"' for c in TRAINER_COLUMNS),
-        pokemon_cols=', '.join(f'"{c}"' for c in POKEMON_COLUMNS),
-    )
 
 
 def connect(path=None):
@@ -88,69 +65,20 @@ def init(path=None):
     target = path or DB_PATH
     os.makedirs(os.path.dirname(target), exist_ok=True)
     conn = connect(target)
-    conn.executescript(_schema_sql())
+    conn.executescript(_SCHEMA)
     _migrate(conn)
     conn.commit()
     return conn
 
 
 def _migrate(conn):
-    """One-off column additions for tables CREATE TABLE IF NOT EXISTS won't
-    touch on an already-existing database."""
+    """Column additions CREATE TABLE IF NOT EXISTS won't make on an existing database, then migrations.py's moves."""
     cols = [r[1] for r in conn.execute('PRAGMA table_info(music_sync)')]
     if 'listeners' not in cols:
         conn.execute('ALTER TABLE music_sync ADD COLUMN listeners INTEGER DEFAULT 0')
-    # XP, which only the DM sees (routes_dm.change_xp). Deliberately NOT in TRAINER_COLUMNS / POKEMON_COLUMNS: those are
-    # the rows sent to the players' app and written back by it, so this column never leaves the Pi through them and no
-    # player save touches it -- and since it sits on the row itself, a Pokemon keeps its XP when it evolves.
-    for table in ('trainers', 'pokemon'):
-        if 'dm_xp' not in [r[1] for r in conn.execute(f'PRAGMA table_info({table})')]:
-            conn.execute(f'ALTER TABLE {table} ADD COLUMN dm_xp INTEGER')
-
-
-def fetch_rows(conn, table, columns):
-    """All data rows as (rowid, [values...]) in sheet order. None -> ''
-    to mirror the Apps Script null/undefined -> '' normalization."""
-    sql = f'SELECT rowid, {", ".join(chr(34) + c + chr(34) for c in columns)} FROM {table} ORDER BY rowid'
-    return [(r[0], ['' if v is None else v for v in r[1:]]) for r in conn.execute(sql)]
-
-
-def insert_row(conn, table, columns, values):
-    """Append a row (Sheets appendRow). Pads/truncates to the column count."""
-    vals = list(values)[:len(columns)]
-    vals += [''] * (len(columns) - len(vals))
-    placeholders = ', '.join('?' for _ in columns)
-    cols = ', '.join(f'"{c}"' for c in columns)
-    conn.execute(f'INSERT INTO {table} ({cols}) VALUES ({placeholders})', [_adapt(v) for v in vals])
-    conn.commit()
-
-
-def update_row(conn, table, rowid, columns, values):
-    """Overwrite the first len(values) columns of a row (Sheets setValues)."""
-    vals = list(values)[:len(columns)]
-    cols = columns[:len(vals)]
-    assignments = ', '.join(f'"{c}" = ?' for c in cols)
-    conn.execute(f'UPDATE {table} SET {assignments} WHERE rowid = ?', [_adapt(v) for v in vals] + [rowid])
-    conn.commit()
-
-
-def delete_row(conn, table, rowid):
-    """Remove a row outright (Sheets deleteRow) -- unlike every write above,
-    there's no Sheets-parity reason to keep this soft (no archive table,
-    no tombstone column); a released Pokemon should just be gone."""
-    conn.execute(f'DELETE FROM {table} WHERE rowid = ?', (rowid,))
-    conn.commit()
-
-
-def set_cell(conn, table, rowid, column, value):
-    """Write a single cell (Sheets getRange().setValue())."""
-    conn.execute(f'UPDATE {table} SET "{column}" = ? WHERE rowid = ?', (_adapt(value), rowid))
-    conn.commit()
-
-
-def _adapt(value):
-    """SQLite can't store dicts/lists; anything non-scalar becomes its JSON string."""
-    if isinstance(value, (dict, list)):
-        import json
-        return json.dumps(value)
-    return value
+    # (the old trainer rows got their XP column here; migrations.py carries it over)
+    trainer_cols = [r[1] for r in conn.execute('PRAGMA table_info(trainers)')]
+    if 'pinCode' in trainer_cols and 'dm_xp' not in trainer_cols:
+        conn.execute('ALTER TABLE trainers ADD COLUMN dm_xp INTEGER')
+    from . import migrations
+    migrations.run(conn)

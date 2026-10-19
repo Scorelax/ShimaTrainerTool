@@ -6,7 +6,7 @@
 import { GameDataAPI } from '../api.js';
 import { getMoveTypeColor, getTextColorForBackground } from './pokemon-types.js';
 
-// The chart's own order (type_chart_attack / type_chart_defend). Cosmic has no chart entries, so it isn't offered.
+// The chart's own order (pi-server/docs/DnD_type_chart.json). Cosmic has no chart entries, so it isn't offered.
 const TYPES = ['Normal', 'Fighting', 'Flying', 'Poison', 'Ground', 'Rock', 'Bug', 'Ghost', 'Steel', 'Fire', 'Water', 'Grass',
   'Electric', 'Psychic', 'Ice', 'Dragon', 'Dark', 'Fairy'];
 
@@ -113,12 +113,12 @@ async function _render(overlay) {
     values = null;
   }
   if (request !== _request) return; // a newer pick is on its way
-  if (!Array.isArray(values) || !values.length) {
+  if (!values || typeof values !== 'object' || !Object.keys(values).length) {
     groupsEl.innerHTML = '<div class="tcalc-none" style="text-align:center">Couldn\'t load the type chart -- check the connection and try again.</div>';
     return;
   }
   groupsEl.innerHTML = GROUPS.map((g) => {
-    const types = TYPES.filter((t, i) => g.test(Number.isFinite(Number(values[i])) ? Number(values[i]) : 1));
+    const types = TYPES.filter((t) => g.test(Number.isFinite(Number(values[t])) ? Number(values[t]) : 1));
     return `<div class="tcalc-group tcalc-group--${g.key}">
         <div class="tcalc-group-label">${g.label} (${g.mult})</div>
         <div class="tcalc-group-types">${types.length ? types.map(_badge).join('') : '<span class="tcalc-none">None</span>'}</div>

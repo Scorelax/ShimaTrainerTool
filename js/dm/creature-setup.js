@@ -12,7 +12,7 @@ import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import {
-  escapeHtml, typeBadges, getSpecies, newId, participantFromPokemonRow, participantFromTrainer, trainerHp,
+  escapeHtml, typeBadges, getSpecies, newId, participantFromPokemon, participantFromTrainer, trainerHp,
   natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect, portraitOptionsHtml, toast,
 } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup, onSetupChange } from './setup-store.js';
@@ -379,10 +379,10 @@ async function previewNow() {
     const res = await DmAPI.buildPokemon({ species, ...config, preview: true });
     if (seq !== _previewSeq || !document.body.contains(form)) return;
     const row = res.data;
-    const { participant: p } = participantFromPokemonRow(row);
+    const { participant: p } = participantFromPokemon(row);
     form.querySelectorAll('[data-stat]').forEach(i => { i.placeholder = p[i.dataset.stat] ?? '?'; });
     const sign = n => (n >= 0 ? `+${n}` : `${n}`);
-    document.getElementById('csDerived').textContent = `Initiative ${sign(Number(row[30]) || 0)} · Proficiency +${row[31]} · STAB +${row[34]} · Skills: ${row[22] || '-'}`;
+    document.getElementById('csDerived').textContent = `Initiative ${sign(Number(row.combat.initiative) || 0)} · Proficiency +${row.combat.proficiency} · STAB +${row.combat.stab} · Skills: ${(row.skills || []).join(', ') || '-'}`;
     document.getElementById('csMoves').innerHTML = (p.moves || []).map(mv => `<span>${escapeHtml(mv)}</span>`).join('') || '<span class="dm-hint">None</span>';
   } catch (err) {
     if (seq === _previewSeq) document.getElementById('csDerived').textContent = `Couldn't work the numbers out: ${err.message}`;
@@ -422,7 +422,7 @@ function readPokemonForm() {
  * encounter builder (encounters.js) to load an encounter's Pokemon into the setup. */
 export async function buildPokemonCreature(id, species, name, config, extra) {
   const res = await DmAPI.buildPokemon({ species, nickname: name === species ? '' : name, ...config });
-  const { combatant, participant } = participantFromPokemonRow(res.data);
+  const { combatant, participant } = participantFromPokemon(res.data);
   participant.initiative = config.initiative ?? null;
   const naturalSize = participant.size || '';
   if (config.size) participant.size = config.size; // the DM's size override on the map
@@ -504,7 +504,7 @@ async function removeCreature(c) {
 // ---------------------------------------------------------------------------
 
 function defaultTrainer() {
-  return { name: '', image: '', level: 5, str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, ac: 10, maxHP: 0, maxVP: 10, speed: 30, savingThrows: '', skills: '', initiative: null };
+  return { name: '', image: '', level: 5, str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, ac: 10, maxHP: 0, maxVP: 10, speed: 30, savingThrows: [], skills: [], initiative: null };
 }
 
 function renderTrainerForm(box) {
@@ -595,8 +595,8 @@ function saveTrainer(existing) {
     ...Object.fromEntries(STATS.map(k => [k, stat(k) || 10])),
     ac: stat('ac') || 10, maxHP: stat('maxHP') || 1, maxVP: Number.isNaN(stat('maxVP')) ? 0 : stat('maxVP'),
     speed: parseInt(document.getElementById('ctSpeed').value, 10) || 30,
-    savingThrows: readMultiSelect('ctSaves').join(', '),
-    skills: readMultiSelect('ctSkills').join(', '),
+    savingThrows: readMultiSelect('ctSaves'),
+    skills: readMultiSelect('ctSkills'),
     initiative: init === '' ? null : parseInt(init, 10),
   };
   const { combatant, participant } = participantFromTrainer(config);
@@ -622,7 +622,7 @@ export async function addNpcToSetup(npc) {
     ...Object.fromEntries(STATS.map(k => [k, Number(npc[k]) || 10])),
     ac: Number(npc.ac) || 10, maxHP: Number(npc.maxHP) || trainerHp(level, Number(npc.con) || 10),
     maxVP: Number(npc.maxVP) || 0, speed: Number(npc.speed) || 30,
-    savingThrows: npc.savingThrows || '', skills: npc.skills || '', initiative: null,
+    savingThrows: splitList(npc.savingThrows, SAVING_THROWS), skills: splitList(npc.skills, SKILLS), initiative: null,
   };
   const { combatant, participant } = participantFromTrainer(config);
   participant.initiative = null;

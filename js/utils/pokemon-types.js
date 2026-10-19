@@ -90,7 +90,7 @@ export function nextTierDamageDice(higherLevels, pokemonLevel) {
  */
 export function bestMoveStatModifier(move, stats) {
   const modMap = { STR: stats.strMod, DEX: stats.dexMod, CON: stats.conMod, INT: stats.intMod, WIS: stats.wisMod, CHA: stats.chaMod };
-  const moveModifiers = (move[2] || '').split('/').map(m => m.trim().toUpperCase());
+  const moveModifiers = (move.moveStat || '').split('/').map(m => m.trim().toUpperCase());
   const allowedMods = moveModifiers.map(m => modMap[m]).filter(v => v !== undefined);
   return allowedMods.length > 0 ? Math.max(...allowedMods) : 0;
 }
@@ -115,7 +115,7 @@ export function computeMoveDC(move, stats) {
  * Compute move attack/damage bonuses for a Pokemon using a given move.
  * Shared by combat.js (showCombatMoveDetails) and pokemon-card.js (showMoveDetails).
  *
- * @param {Array} move - Move data array [name, type, modifier, actionType, vpCost, duration, range, desc, higherLevels]
+ * @param {Object} move - The move (game-data moves: {name, type, moveStat, action, vpCost, duration, range, description, scaling})
  * @param {{ types: string[], strMod: number, dexMod: number, conMod: number, intMod: number, wisMod: number, chaMod: number, proficiency: number, stabBonusValue: number, level: number, stabMultiplier?: number, damageRollBonus?: number }} pokemonAttrs
  *   `stabMultiplier` (default 1) -- Calm Mind/Tail Glow's own "double your STAB [bonus/damage]"
  *   for the duration, a WIP-only bridged field (see combat-wip.js's _syncLocalCombatState,
@@ -128,9 +128,9 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
   const { types, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level, hasToughClaws, stabMultiplier = 1, damageRollBonus = 0 } = pokemonAttrs;
   const { path, level: trainerLevel, specializationsStr } = trainerAttrs;
 
-  const moveType = move[1];
+  const moveType = move.type;
   let hasSTAB = types.includes(moveType);
-  const isMelee = /melee\s+attack/i.test(move[7] || '');
+  const isMelee = /melee\s+attack/i.test(move.description || '');
 
   // Type Master Level 15: Universal STAB for Pokemon matching specialization types
   if (!hasSTAB && path === 'Type Master' && trainerLevel >= 15 && specializationsStr) {
@@ -166,7 +166,7 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
 
   // Stat mods — pick highest allowed modifier for the move
   const modMap = { STR: strMod, DEX: dexMod, CON: conMod, INT: intMod, WIS: wisMod, CHA: chaMod };
-  const moveModifiers = (move[2] || '').split('/').map(m => m.trim().toUpperCase());
+  const moveModifiers = (move.moveStat || '').split('/').map(m => m.trim().toUpperCase());
   const allowedMods = moveModifiers.map(m => modMap[m]).filter(v => v !== undefined);
   const highestMod = allowedMods.length > 0 ? Math.max(...allowedMods) : 0;
   const usedStat = moveModifiers.find(m => modMap[m] === highestMod) || '';
@@ -176,7 +176,7 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
   const attackBonus = profBonus + highestMod + aceBonus + typeMasterAttackBonus;
 
   // Damage roll bonus
-  const desc = move[7] || '';
+  const desc = move.description || '';
   const includeStatInDmg = /\+\s*MOVE/i.test(desc);
   // Tough Claws' own doubling and Calm Mind/Tail Glow's own `stabMultiplier`
   // compound multiplicatively (no move text says otherwise, same "several
@@ -228,10 +228,10 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
   heldItemDmgSources.forEach(s => dmgParts.push(s));
   if (damageRollBonus !== 0) dmgParts.push(`Status ${fmt(damageRollBonus)}`);
 
-  const damageDice = parseDamageDice(desc, move[8] || '', level);
+  const damageDice = parseDamageDice(desc, move.scaling || '', level);
   // Electro Ball's own damage_note nextTierDice field -- null once already
   // at/above the highest tier (see nextTierDamageDice's own comment).
-  const nextTierDice = nextTierDamageDice(move[8] || '', level);
+  const nextTierDice = nextTierDamageDice(move.scaling || '', level);
 
   const moveDC = 8 + highestMod + proficiency;
 

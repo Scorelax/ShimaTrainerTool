@@ -4,6 +4,15 @@ import { showError } from '../utils/notifications.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { audioManager } from '../utils/audio.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
+import { loadTrainer, storeTrainer } from '../utils/trainer-data.js';
+
+/** The badges among the trainer's items (the item list's 'Badges, Seals & Sigils') -- [{name, description}]. */
+function earnedBadgesOf(trainerData) {
+  const itemsDb = JSON.parse(sessionStorage.getItem('items') || '[]');
+  return (trainerData.inventory || []).map(({ name }) => itemsDb.find(it => it.name === name))
+    .filter(dbItem => dbItem && dbItem.category === 'Badges, Seals & Sigils')
+    .map(dbItem => ({ name: dbItem.name, description: dbItem.effect || dbItem.description || '' }));
+}
 
 // Helper function to get max charges for a buff based on trainer level
 function getMaxCharges(buffName, trainerLevel) {
@@ -40,29 +49,13 @@ function _parseRechargeTC(actionType) {
   return { maxCharges: chargeMatch ? parseInt(chargeMatch[1]) : 1, type };
 }
 
-function _parseKnownMovesTC(str) {
-  const result = {};
-  if (!str) return result;
-  str.split(',').map(s => s.trim()).filter(Boolean).forEach(part => {
-    const match = part.match(/^(.+?)\((\d+)\)\((\w+)\)$/);
-    if (match) result[match[1]] = { chargesLeft: parseInt(match[2]), type: match[3] };
-  });
-  return result;
-}
-
-function _buildKnownMovesStringTC(map) {
-  return Object.entries(map).map(([n, s]) => `${n}(${s.chargesLeft})(${s.type})`).join(',');
-}
-
 /**
- * Restore move charges in pokemonData[59] on rest.
+ * Restore the Pokemon's move charges (its moveCharges) on rest.
  * restType 'SR' restores SR moves only; 'LR' restores both SR and LR moves.
  * Mutates pokemonData in-place; returns true if anything changed.
  */
 function restoreRechargesForRest(pokemonData, restType) {
-  const knownMovesStr = pokemonData[59] || '';
-  if (!knownMovesStr) return false;
-  const knownMoves = _parseKnownMovesTC(knownMovesStr);
+  const knownMoves = { ...(pokemonData.moveCharges || {}) };
   if (Object.keys(knownMoves).length === 0) return false;
 
   const allMoves = JSON.parse(sessionStorage.getItem('moves') || '[]');
@@ -70,9 +63,9 @@ function restoreRechargesForRest(pokemonData, restType) {
 
   Object.entries(knownMoves).forEach(([moveName, state]) => {
     if (restType === 'SR' && state.type !== 'SR') return;
-    const moveData = allMoves.find(m => m[0] === moveName);
+    const moveData = allMoves.find(m => m.name === moveName);
     const maxCharges = moveData
-      ? scaledMaxCharges(moveName, _parseRechargeTC(moveData[3] || '')?.maxCharges ?? state.chargesLeft, parseInt(pokemonData[4]) || 1)
+      ? scaledMaxCharges(moveName, _parseRechargeTC(moveData.action || '')?.maxCharges ?? state.chargesLeft, parseInt(pokemonData.level) || 1)
       : state.chargesLeft;
     if (state.chargesLeft < maxCharges) {
       knownMoves[moveName] = { ...state, chargesLeft: maxCharges };
@@ -80,7 +73,7 @@ function restoreRechargesForRest(pokemonData, restType) {
     }
   });
 
-  if (changed) pokemonData[59] = _buildKnownMovesStringTC(knownMoves);
+  if (changed) pokemonData.moveCharges = knownMoves;
   return changed;
 }
 
@@ -99,13 +92,13 @@ export function renderTrainerCard() {
     return '<div class="error">No trainer data found. Please return to the home page.</div>';
   }
 
-  const trainerData = JSON.parse(trainerDataStr);
+  const trainerData = loadTrainer();
 
   // Extract trainer info (matching original indices)
-  const trainerImage = trainerData[0] || 'assets/Pokeball.png';
-  const trainerName = trainerData[1] || 'Unknown Trainer';
-  const trainerLevel = parseInt(trainerData[2]) || 1;
-  const trainerClass = trainerData[39] || 'Unknown Class';
+  const trainerImage = trainerData.image || 'assets/Pokeball.png';
+  const trainerName = trainerData.name || 'Unknown Trainer';
+  const trainerLevel = parseInt(trainerData.level) || 1;
+  const trainerClass = trainerData.trainerClass || 'Unknown Class';
 
   // Calculate number of pokeslots based on level (matching original logic)
   let numPokeSlots = 3; // Default
@@ -125,14 +118,14 @@ export function renderTrainerCard() {
   for (const key of allStorageKeys) {
     if (key.startsWith('pokemon_')) {
       const pokemonData = JSON.parse(sessionStorage.getItem(key));
-      const slotNumber = parseInt(pokemonData[38], 10); // inactiveparty field contains slot number (1-6)
+      const slotNumber = parseInt(pokemonData.partySlot, 10); // its slot in the active party (1-6)
 
       if (slotNumber && slotNumber >= 1 && slotNumber <= 6) {
         partyPokemon[slotNumber - 1] = {
-          name: pokemonData[2] || 'Unknown',
-          nickname: pokemonData[36] || null,
-          image: pokemonData[1] || 'assets/Pokeball.png',
-          level: pokemonData[4] || 1,
+          name: pokemonData.name || 'Unknown',
+          nickname: pokemonData.nickname || null,
+          image: pokemonData.image || 'assets/Pokeball.png',
+          level: pokemonData.level || 1,
           data: pokemonData
         };
       }
@@ -144,14 +137,12 @@ export function renderTrainerCard() {
   for (const key of allStorageKeys) {
     if (key.startsWith('pokemon_')) {
       const pokemonData = JSON.parse(sessionStorage.getItem(key));
-      const isUtility = pokemonData[56]; // utilityslot field
-
-      if (isUtility === 1) {
+      if (pokemonData.utilitySlot) {
         utilityPokemon = {
-          name: pokemonData[2] || 'Unknown',
-          nickname: pokemonData[36] || null,
-          image: pokemonData[1] || 'assets/Pokeball.png',
-          level: pokemonData[4] || 1,
+          name: pokemonData.name || 'Unknown',
+          nickname: pokemonData.nickname || null,
+          image: pokemonData.image || 'assets/Pokeball.png',
+          level: pokemonData.level || 1,
           data: pokemonData
         };
         break;
@@ -164,22 +155,7 @@ export function renderTrainerCard() {
   const lockedSlot = 'assets/Grey%20Pokeball.png';
 
   // Extract badges from inventory
-  const earnedBadges = [];
-  const inventoryStr = trainerData[20] || '';
-  const itemsDbStr = sessionStorage.getItem('items');
-  if (inventoryStr && itemsDbStr) {
-    const itemsDb = JSON.parse(itemsDbStr);
-    const inventoryItems = inventoryStr.split(',').map(s => s.trim()).filter(Boolean);
-    for (const itemEntry of inventoryItems) {
-      // Inventory format: "ItemName (xN)" or just "ItemName"
-      const match = itemEntry.match(/^(.+?)\s*\(x\d+\)$/);
-      const itemName = match ? match[1].trim() : itemEntry.trim();
-      const dbItem = itemsDb.find(it => it.name === itemName);
-      if (dbItem && dbItem.type === 'Badges, Seals & Sigils') {
-        earnedBadges.push({ name: dbItem.name, description: dbItem.effect || dbItem.description || '' });
-      }
-    }
-  }
+  const earnedBadges = earnedBadgesOf(trainerData);
 
   const html = `
     <div class="trainer-card-page theme-dark">
@@ -1223,21 +1199,7 @@ export function attachTrainerCardListeners() {
   const badgeSlots = document.querySelectorAll('.badge-slot.earned');
   if (badgeSlots.length > 0) {
     // Rebuild earned badges list for popups
-    const trainerDataForBadges = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-    const inventoryStrForBadges = trainerDataForBadges[20] || '';
-    const itemsDbForBadges = JSON.parse(sessionStorage.getItem('items') || '[]');
-    const badgeList = [];
-    if (inventoryStrForBadges && itemsDbForBadges.length) {
-      const items = inventoryStrForBadges.split(',').map(s => s.trim()).filter(Boolean);
-      for (const entry of items) {
-        const entryMatch = entry.match(/^(.+?)\s*\(x\d+\)$/);
-        const name = entryMatch ? entryMatch[1].trim() : entry.trim();
-        const dbItem = itemsDbForBadges.find(it => it.name === name);
-        if (dbItem && dbItem.type === 'Badges, Seals & Sigils') {
-          badgeList.push({ name: dbItem.name, description: dbItem.effect || dbItem.description || '' });
-        }
-      }
-    }
+    const badgeList = earnedBadgesOf(loadTrainer());
 
     badgeSlots.forEach(slot => {
       slot.addEventListener('click', () => {
@@ -1293,46 +1255,46 @@ export function attachTrainerCardListeners() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) return;
 
-    const trainerData = JSON.parse(trainerDataRaw);
+    const trainerData = loadTrainer();
 
     // Restore trainer HP, VP, HD, VD to max
-    trainerData[34] = parseInt(trainerData[11], 10); // currentHP = maxHP
-    trainerData[35] = parseInt(trainerData[12], 10); // currentVP = maxVP
-    trainerData[47] = parseInt(trainerData[3], 10);  // currentHD = maxHD
-    trainerData[48] = parseInt(trainerData[4], 10);  // currentVD = maxVD
+    trainerData.current.hp = parseInt(trainerData.combat.maxHP, 10); // currentHP = maxHP
+    trainerData.current.vp = parseInt(trainerData.combat.maxVP, 10); // currentVP = maxVP
+    trainerData.current.hitDice = parseInt(trainerData.combat.hitDie, 10);  // currentHD = maxHD
+    trainerData.current.vitalityDice = parseInt(trainerData.combat.vitalityDie, 10);  // currentVD = maxVD
 
     // Refill all buff charges
-    const trainerLevel = parseInt(trainerData[2], 10);
-    trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
-    trainerData[41] = getMaxCharges('Rapid Orders', trainerLevel);
-    trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
-    trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
-    trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
+    const trainerLevel = parseInt(trainerData.level, 10);
+    trainerData.charges.secondWind = getMaxCharges('Second Wind', trainerLevel);
+    trainerData.charges.rapidOrders = getMaxCharges('Rapid Orders', trainerLevel);
+    trainerData.charges.unbreakableBond = getMaxCharges('Unbreakable Bond', trainerLevel);
+    trainerData.charges.elementalSynergy = getMaxCharges('Elemental Synergy', trainerLevel);
+    trainerData.charges.masterTrainer = getMaxCharges('Master Trainer', trainerLevel);
 
     // Refill battle dice for Ace Trainer
-    const trainerPath = trainerData[25] || '';
+    const trainerPath = trainerData.trainerPath || '';
     if (trainerPath === 'Ace Trainer' && trainerLevel >= 5) {
-      const wisModifier = Math.floor((parseInt(trainerData[9], 10) - 10) / 2);
+      const wisModifier = Math.floor((parseInt(trainerData.stats.wisdom, 10) - 10) / 2);
       const maxBattleDice = 1 + wisModifier;
-      trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
+      trainerData.battleDice = { max: maxBattleDice, current: maxBattleDice };
     }
 
     // Refill Tactician Points
     if (trainerPath === 'Tactician') {
-      trainerData[49] = trainerLevel;
+      trainerData.tacticianPoints = trainerLevel;
     }
 
     // Refill Commander charges
     if (trainerPath === 'Commander') {
-      if (trainerLevel >= 9) trainerData[50] = '1 - 1';
+      if (trainerLevel >= 9) trainerData.surgeCommand = { max: 1, current: 1 };
       if (trainerLevel >= 15) {
-        const chaModifier = parseInt(trainerData[32], 10) || 0;
+        const chaModifier = parseInt(trainerData.modifiers.charisma, 10) || 0;
         const rallyMax = Math.max(1, 1 + chaModifier);
-        trainerData[51] = `${rallyMax} - ${rallyMax}`;
+        trainerData.rallyCry = { max: rallyMax, current: rallyMax };
       }
     }
 
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    storeTrainer(trainerData);
 
     // Restore ALL Pokemon (active party and stored)
     const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
@@ -1343,14 +1305,17 @@ export function attachTrainerCardListeners() {
       if (!pokemonData) return;
 
       // Restore HP, VP, HD, VD to max
-      pokemonData[45] = parseInt(pokemonData[10], 10); // currentHP = maxHP
-      pokemonData[46] = parseInt(pokemonData[12], 10); // currentVP = maxVP
-      pokemonData[54] = parseInt(pokemonData[9], 10);  // currentHD = maxHD
-      pokemonData[55] = parseInt(pokemonData[11], 10); // currentVD = maxVD
+      pokemonData.current = {
+        ...(pokemonData.current || {}),
+        hp: parseInt(pokemonData.combat.maxHP, 10),
+        vp: parseInt(pokemonData.combat.maxVP, 10),
+        hitDice: parseInt(pokemonData.combat.hitDie, 10),
+        vitalityDice: parseInt(pokemonData.combat.vitalityDie, 10),
+      };
 
       // Restore all recharge moves (SR and LR) and clear status conditions
       restoreRechargesForRest(pokemonData, 'LR');
-      pokemonData[60] = '';
+      pokemonData.statusConditions = [];
 
       sessionStorage.setItem(key, JSON.stringify(pokemonData));
       pokemonToUpdate.push(pokemonData);
@@ -1365,8 +1330,8 @@ export function attachTrainerCardListeners() {
       }).catch(err => console.error('Pokemon Center: trainer save error:', err)),
       ...pokemonToUpdate.map(pokemon =>
         PokemonAPI.update(pokemon).then(() => {
-          console.log(`Pokemon Center: ${pokemon[2]} saved`);
-        }).catch(err => console.error(`Pokemon Center: ${pokemon[2]} save error:`, err))
+          console.log(`Pokemon Center: ${pokemon.name} saved`);
+        }).catch(err => console.error(`Pokemon Center: ${pokemon.name} save error:`, err))
       ),
     ]));
 
@@ -1420,7 +1385,7 @@ function handleLongRest() {
     return;
   }
 
-  const trainerData = JSON.parse(trainerDataRaw);
+  const trainerData = loadTrainer();
 
   // Get all Pokemon for this trainer from session storage
   const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
@@ -1438,8 +1403,8 @@ function handleLongRest() {
 
     const pokemonData = JSON.parse(pokemonDataStr);
 
-    // Check if this Pokemon is in active party (index 38 is slot number 1-6)
-    const slotNumber = parseInt(pokemonData[38], 10);
+    // Check if this Pokemon is in active party (its slot number 1-6)
+    const slotNumber = parseInt(pokemonData.partySlot, 10);
     if (slotNumber && slotNumber >= 1 && slotNumber <= 6) {
       activePokemon.push(pokemonData);
     }
@@ -1461,8 +1426,8 @@ function showShortRestSelectionPopup() {
     return;
   }
 
-  const trainerData = JSON.parse(trainerDataRaw);
-  const trainerName = trainerData[1];
+  const trainerData = loadTrainer();
+  const trainerName = trainerData.name;
 
   // Get all active party Pokemon
   const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
@@ -1470,7 +1435,7 @@ function showShortRestSelectionPopup() {
 
   allPokemonKeys.forEach(key => {
     const pokemon = JSON.parse(sessionStorage.getItem(key));
-    const slotNumber = parseInt(pokemon[38], 10);
+    const slotNumber = parseInt(pokemon.partySlot, 10);
     if (slotNumber && slotNumber >= 1 && slotNumber <= 6) {
       activePokemon.push(pokemon);
     }
@@ -1481,14 +1446,14 @@ function showShortRestSelectionPopup() {
   selectionList.innerHTML = '';
 
   // Add trainer option
-  const trainerCurrentHP = parseInt(trainerData[34], 10) || parseInt(trainerData[11], 10);
-  const trainerMaxHP = parseInt(trainerData[11], 10);
-  const trainerCurrentVP = parseInt(trainerData[35], 10) || parseInt(trainerData[12], 10);
-  const trainerMaxVP = parseInt(trainerData[12], 10);
-  const trainerMaxHD = parseInt(trainerData[3], 10) || 0;
-  const trainerMaxVD = parseInt(trainerData[4], 10) || 0;
-  const trainerCurrentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? trainerMaxHD : parseInt(trainerData[47], 10);
-  const trainerCurrentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? trainerMaxVD : parseInt(trainerData[48], 10);
+  const trainerCurrentHP = parseInt(trainerData.current.hp, 10) || parseInt(trainerData.combat.maxHP, 10);
+  const trainerMaxHP = parseInt(trainerData.combat.maxHP, 10);
+  const trainerCurrentVP = parseInt(trainerData.current.vp, 10) || parseInt(trainerData.combat.maxVP, 10);
+  const trainerMaxVP = parseInt(trainerData.combat.maxVP, 10);
+  const trainerMaxHD = parseInt(trainerData.combat.hitDie, 10) || 0;
+  const trainerMaxVD = parseInt(trainerData.combat.vitalityDie, 10) || 0;
+  const trainerCurrentHD = (trainerData.current.hitDice === '' || trainerData.current.hitDice === null || trainerData.current.hitDice === undefined) ? trainerMaxHD : parseInt(trainerData.current.hitDice, 10);
+  const trainerCurrentVD = (trainerData.current.vitalityDice === '' || trainerData.current.vitalityDice === null || trainerData.current.vitalityDice === undefined) ? trainerMaxVD : parseInt(trainerData.current.vitalityDice, 10);
 
   const trainerItem = document.createElement('label');
   trainerItem.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; cursor: pointer; color: #333;';
@@ -1503,15 +1468,15 @@ function showShortRestSelectionPopup() {
 
   // Add Pokemon options
   activePokemon.forEach(pokemon => {
-    const pokemonName = pokemon[2];
-    const currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10);
-    const maxHP = parseInt(pokemon[10], 10);
-    const currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
-    const maxVP = parseInt(pokemon[12], 10);
-    const pokemonMaxHD = parseInt(pokemon[9], 10) || 0;
-    const pokemonMaxVD = parseInt(pokemon[11], 10) || 0;
-    const currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? pokemonMaxHD : parseInt(pokemon[54], 10);
-    const currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? pokemonMaxVD : parseInt(pokemon[55], 10);
+    const pokemonName = pokemon.name;
+    const currentHP = parseInt(pokemon.current.hp, 10) || parseInt(pokemon.combat.maxHP, 10);
+    const maxHP = parseInt(pokemon.combat.maxHP, 10);
+    const currentVP = parseInt(pokemon.current.vp, 10) || parseInt(pokemon.combat.maxVP, 10);
+    const maxVP = parseInt(pokemon.combat.maxVP, 10);
+    const pokemonMaxHD = parseInt(pokemon.combat.hitDie, 10) || 0;
+    const pokemonMaxVD = parseInt(pokemon.combat.vitalityDie, 10) || 0;
+    const currentHD = (pokemon.current.hitDice === '' || pokemon.current.hitDice === null || pokemon.current.hitDice === undefined) ? pokemonMaxHD : parseInt(pokemon.current.hitDice, 10);
+    const currentVD = (pokemon.current.vitalityDice === '' || pokemon.current.vitalityDice === null || pokemon.current.vitalityDice === undefined) ? pokemonMaxVD : parseInt(pokemon.current.vitalityDice, 10);
 
     const pokemonItem = document.createElement('label');
     pokemonItem.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; cursor: pointer; color: #333;';
@@ -1542,13 +1507,13 @@ function startShortRestHealing() {
   shortRestQueue = [];
   shortRestCurrentIndex = 0;
 
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const trainerData = loadTrainer();
 
   checkboxes.forEach(checkbox => {
     if (checkbox.value === 'trainer') {
       shortRestQueue.push({
         type: 'trainer',
-        name: trainerData[1],
+        name: trainerData.name,
         storageKey: 'trainerData'
       });
     } else {
@@ -1556,7 +1521,7 @@ function startShortRestHealing() {
       const pokemon = JSON.parse(sessionStorage.getItem(storageKey));
       shortRestQueue.push({
         type: 'pokemon',
-        name: pokemon[2],
+        name: pokemon.name,
         storageKey: storageKey
       });
     }
@@ -1586,25 +1551,25 @@ function showShortRestHealingForm() {
   let currentHD, currentVD, currentHP, maxHP, currentVP, maxVP;
 
   if (isTrainer) {
-    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-    const maxHD = parseInt(trainerData[3], 10) || 0;
-    const maxVD = parseInt(trainerData[4], 10) || 0;
-    currentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? maxHD : parseInt(trainerData[47], 10);
-    currentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? maxVD : parseInt(trainerData[48], 10);
-    currentHP = parseInt(trainerData[34], 10) || parseInt(trainerData[11], 10);
-    maxHP = parseInt(trainerData[11], 10);
-    currentVP = parseInt(trainerData[35], 10) || parseInt(trainerData[12], 10);
-    maxVP = parseInt(trainerData[12], 10);
+    const trainerData = loadTrainer();
+    const maxHD = parseInt(trainerData.combat.hitDie, 10) || 0;
+    const maxVD = parseInt(trainerData.combat.vitalityDie, 10) || 0;
+    currentHD = (trainerData.current.hitDice === '' || trainerData.current.hitDice === null || trainerData.current.hitDice === undefined) ? maxHD : parseInt(trainerData.current.hitDice, 10);
+    currentVD = (trainerData.current.vitalityDice === '' || trainerData.current.vitalityDice === null || trainerData.current.vitalityDice === undefined) ? maxVD : parseInt(trainerData.current.vitalityDice, 10);
+    currentHP = parseInt(trainerData.current.hp, 10) || parseInt(trainerData.combat.maxHP, 10);
+    maxHP = parseInt(trainerData.combat.maxHP, 10);
+    currentVP = parseInt(trainerData.current.vp, 10) || parseInt(trainerData.combat.maxVP, 10);
+    maxVP = parseInt(trainerData.combat.maxVP, 10);
   } else {
     const pokemon = JSON.parse(sessionStorage.getItem(entity.storageKey));
-    const maxHD = parseInt(pokemon[9], 10) || 0;
-    const maxVD = parseInt(pokemon[11], 10) || 0;
-    currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? maxHD : parseInt(pokemon[54], 10);
-    currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? maxVD : parseInt(pokemon[55], 10);
-    currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10);
-    maxHP = parseInt(pokemon[10], 10);
-    currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
-    maxVP = parseInt(pokemon[12], 10);
+    const maxHD = parseInt(pokemon.combat.hitDie, 10) || 0;
+    const maxVD = parseInt(pokemon.combat.vitalityDie, 10) || 0;
+    currentHD = (pokemon.current.hitDice === '' || pokemon.current.hitDice === null || pokemon.current.hitDice === undefined) ? maxHD : parseInt(pokemon.current.hitDice, 10);
+    currentVD = (pokemon.current.vitalityDice === '' || pokemon.current.vitalityDice === null || pokemon.current.vitalityDice === undefined) ? maxVD : parseInt(pokemon.current.vitalityDice, 10);
+    currentHP = parseInt(pokemon.current.hp, 10) || parseInt(pokemon.combat.maxHP, 10);
+    maxHP = parseInt(pokemon.combat.maxHP, 10);
+    currentVP = parseInt(pokemon.current.vp, 10) || parseInt(pokemon.combat.maxVP, 10);
+    maxVP = parseInt(pokemon.combat.maxVP, 10);
   }
 
   // Update display values
@@ -1657,11 +1622,11 @@ async function processShortRestHealing() {
 
   if (isTrainer) {
     // Process trainer healing
-    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-    const trMaxHD = parseInt(trainerData[3], 10) || 0;
-    const trMaxVD = parseInt(trainerData[4], 10) || 0;
-    const currentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? trMaxHD : parseInt(trainerData[47], 10);
-    const currentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? trMaxVD : parseInt(trainerData[48], 10);
+    const trainerData = loadTrainer();
+    const trMaxHD = parseInt(trainerData.combat.hitDie, 10) || 0;
+    const trMaxVD = parseInt(trainerData.combat.vitalityDie, 10) || 0;
+    const currentHD = (trainerData.current.hitDice === '' || trainerData.current.hitDice === null || trainerData.current.hitDice === undefined) ? trMaxHD : parseInt(trainerData.current.hitDice, 10);
+    const currentVD = (trainerData.current.vitalityDice === '' || trainerData.current.vitalityDice === null || trainerData.current.vitalityDice === undefined) ? trMaxVD : parseInt(trainerData.current.vitalityDice, 10);
 
     if (hdToUse > currentHD) {
       showError(`Not enough HD available. You have ${currentHD}.`);
@@ -1672,20 +1637,20 @@ async function processShortRestHealing() {
       return;
     }
 
-    const currentHP = parseInt(trainerData[34], 10) || parseInt(trainerData[11], 10);
-    const currentVP = parseInt(trainerData[35], 10) || parseInt(trainerData[12], 10);
-    const maxHP = parseInt(trainerData[11], 10);
-    const maxVP = parseInt(trainerData[12], 10);
+    const currentHP = parseInt(trainerData.current.hp, 10) || parseInt(trainerData.combat.maxHP, 10);
+    const currentVP = parseInt(trainerData.current.vp, 10) || parseInt(trainerData.combat.maxVP, 10);
+    const maxHP = parseInt(trainerData.combat.maxHP, 10);
+    const maxVP = parseInt(trainerData.combat.maxVP, 10);
 
     const newHP = Math.min(currentHP + hpToHeal, maxHP);
     const newVP = Math.min(currentVP + vpToHeal, maxVP);
 
-    trainerData[47] = currentHD - hdToUse;
-    trainerData[48] = currentVD - vdToUse;
-    trainerData[34] = newHP;
-    trainerData[35] = newVP;
+    trainerData.current.hitDice = currentHD - hdToUse;
+    trainerData.current.vitalityDice = currentVD - vdToUse;
+    trainerData.current.hp = newHP;
+    trainerData.current.vp = newVP;
 
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    storeTrainer(trainerData);
 
     // Update database -- awaited so a Short Rest on the last entity can't
     // reload the page before this save has actually landed.
@@ -1697,10 +1662,10 @@ async function processShortRestHealing() {
   } else {
     // Process Pokemon healing
     const pokemon = JSON.parse(sessionStorage.getItem(entity.storageKey));
-    const pkMaxHD = parseInt(pokemon[9], 10) || 0;
-    const pkMaxVD = parseInt(pokemon[11], 10) || 0;
-    const currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? pkMaxHD : parseInt(pokemon[54], 10);
-    const currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? pkMaxVD : parseInt(pokemon[55], 10);
+    const pkMaxHD = parseInt(pokemon.combat.hitDie, 10) || 0;
+    const pkMaxVD = parseInt(pokemon.combat.vitalityDie, 10) || 0;
+    const currentHD = (pokemon.current.hitDice === '' || pokemon.current.hitDice === null || pokemon.current.hitDice === undefined) ? pkMaxHD : parseInt(pokemon.current.hitDice, 10);
+    const currentVD = (pokemon.current.vitalityDice === '' || pokemon.current.vitalityDice === null || pokemon.current.vitalityDice === undefined) ? pkMaxVD : parseInt(pokemon.current.vitalityDice, 10);
 
     if (hdToUse > currentHD) {
       showError(`Not enough HD available. You have ${currentHD}.`);
@@ -1711,18 +1676,18 @@ async function processShortRestHealing() {
       return;
     }
 
-    const currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10);
-    const currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
-    const maxHP = parseInt(pokemon[10], 10);
-    const maxVP = parseInt(pokemon[12], 10);
+    const currentHP = parseInt(pokemon.current.hp, 10) || parseInt(pokemon.combat.maxHP, 10);
+    const currentVP = parseInt(pokemon.current.vp, 10) || parseInt(pokemon.combat.maxVP, 10);
+    const maxHP = parseInt(pokemon.combat.maxHP, 10);
+    const maxVP = parseInt(pokemon.combat.maxVP, 10);
 
     const newHP = Math.min(currentHP + hpToHeal, maxHP);
     const newVP = Math.min(currentVP + vpToHeal, maxVP);
 
-    pokemon[54] = currentHD - hdToUse;
-    pokemon[55] = currentVD - vdToUse;
-    pokemon[45] = newHP;
-    pokemon[46] = newVP;
+    pokemon.current.hitDice = currentHD - hdToUse;
+    pokemon.current.vitalityDice = currentVD - vdToUse;
+    pokemon.current.hp = newHP;
+    pokemon.current.vp = newVP;
 
     // Restore SR recharge moves
     restoreRechargesForRest(pokemon, 'SR');
@@ -1761,15 +1726,15 @@ function showLongRestPokemonSelection(activePokemon) {
 
   // Create selection row for each active Pokemon (same layout as short rest)
   activePokemon.forEach(pokemon => {
-    const pokemonName = pokemon[2];
-    const currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10);
-    const maxHP = parseInt(pokemon[10], 10);
-    const currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
-    const maxVP = parseInt(pokemon[12], 10);
-    const pokemonMaxHD = parseInt(pokemon[9], 10) || 0;
-    const pokemonMaxVD = parseInt(pokemon[11], 10) || 0;
-    const currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? pokemonMaxHD : parseInt(pokemon[54], 10);
-    const currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? pokemonMaxVD : parseInt(pokemon[55], 10);
+    const pokemonName = pokemon.name;
+    const currentHP = parseInt(pokemon.current.hp, 10) || parseInt(pokemon.combat.maxHP, 10);
+    const maxHP = parseInt(pokemon.combat.maxHP, 10);
+    const currentVP = parseInt(pokemon.current.vp, 10) || parseInt(pokemon.combat.maxVP, 10);
+    const maxVP = parseInt(pokemon.combat.maxVP, 10);
+    const pokemonMaxHD = parseInt(pokemon.combat.hitDie, 10) || 0;
+    const pokemonMaxVD = parseInt(pokemon.combat.vitalityDie, 10) || 0;
+    const currentHD = (pokemon.current.hitDice === '' || pokemon.current.hitDice === null || pokemon.current.hitDice === undefined) ? pokemonMaxHD : parseInt(pokemon.current.hitDice, 10);
+    const currentVD = (pokemon.current.vitalityDice === '' || pokemon.current.vitalityDice === null || pokemon.current.vitalityDice === undefined) ? pokemonMaxVD : parseInt(pokemon.current.vitalityDice, 10);
 
     const item = document.createElement('div');
     item.className = 'long-rest-row';
@@ -1797,7 +1762,7 @@ function selectLongRestPokemon(pokemon) {
   });
 
   // Add selected class to the clicked row
-  const pokemonName = pokemon[2];
+  const pokemonName = pokemon.name;
   document.querySelector(`.pokemon-selection-grid .long-rest-row[data-pokemon-name="${CSS.escape(pokemonName)}"]`)?.classList.add('selected');
 
   // Enable complete button
@@ -1814,58 +1779,58 @@ async function completeLongRest(selectedPokemon) {
     return;
   }
 
-  const trainerData = JSON.parse(trainerDataRaw);
-  const trainerLevel = parseInt(trainerData[2], 10);
+  const trainerData = loadTrainer();
+  const trainerLevel = parseInt(trainerData.level, 10);
 
   // Restore trainer HP and VP to max
-  const maxHP = parseInt(trainerData[11], 10);
-  const maxVP = parseInt(trainerData[12], 10);
-  trainerData[34] = maxHP;
-  trainerData[35] = maxVP;
+  const maxHP = parseInt(trainerData.combat.maxHP, 10);
+  const maxVP = parseInt(trainerData.combat.maxVP, 10);
+  trainerData.current.hp = maxHP;
+  trainerData.current.vp = maxVP;
 
   // Refill all buff charges to max
-  trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
-  trainerData[41] = getMaxCharges('Rapid Orders', trainerLevel);
-  trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
-  trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
-  trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
+  trainerData.charges.secondWind = getMaxCharges('Second Wind', trainerLevel);
+  trainerData.charges.rapidOrders = getMaxCharges('Rapid Orders', trainerLevel);
+  trainerData.charges.unbreakableBond = getMaxCharges('Unbreakable Bond', trainerLevel);
+  trainerData.charges.elementalSynergy = getMaxCharges('Elemental Synergy', trainerLevel);
+  trainerData.charges.masterTrainer = getMaxCharges('Master Trainer', trainerLevel);
 
-  // Refill battle dice for Ace Trainer (index 45)
-  const trainerPath = trainerData[25] || '';
+  // Refill battle dice for Ace Trainer
+  const trainerPath = trainerData.trainerPath || '';
   if (trainerPath === 'Ace Trainer' && trainerLevel >= 5) {
-    const wisModifier = Math.floor((parseInt(trainerData[9], 10) - 10) / 2);
+    const wisModifier = Math.floor((parseInt(trainerData.stats.wisdom, 10) - 10) / 2);
     const maxBattleDice = 1 + wisModifier;
-    trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
+    trainerData.battleDice = { max: maxBattleDice, current: maxBattleDice };
   }
 
   // Refill Tactician Points
   if (trainerPath === 'Tactician') {
-    trainerData[49] = trainerLevel;
+    trainerData.tacticianPoints = trainerLevel;
   }
 
   // Refill Commander charges
   if (trainerPath === 'Commander') {
-    if (trainerLevel >= 9) trainerData[50] = '1 - 1';
+    if (trainerLevel >= 9) trainerData.surgeCommand = { max: 1, current: 1 };
     if (trainerLevel >= 15) {
-      const chaModifier = parseInt(trainerData[32], 10) || 0;
+      const chaModifier = parseInt(trainerData.modifiers.charisma, 10) || 0;
       const rallyMax = Math.max(1, 1 + chaModifier);
-      trainerData[51] = `${rallyMax} - ${rallyMax}`;
+      trainerData.rallyCry = { max: rallyMax, current: rallyMax };
     }
   }
 
   // Restore half of HD dice and VD dice
-  const maxHD = parseInt(trainerData[3], 10) || 0;
-  const maxVD = parseInt(trainerData[4], 10) || 0;
-  const currentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? maxHD : parseInt(trainerData[47], 10);
-  const currentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? maxVD : parseInt(trainerData[48], 10);
+  const maxHD = parseInt(trainerData.combat.hitDie, 10) || 0;
+  const maxVD = parseInt(trainerData.combat.vitalityDie, 10) || 0;
+  const currentHD = (trainerData.current.hitDice === '' || trainerData.current.hitDice === null || trainerData.current.hitDice === undefined) ? maxHD : parseInt(trainerData.current.hitDice, 10);
+  const currentVD = (trainerData.current.vitalityDice === '' || trainerData.current.vitalityDice === null || trainerData.current.vitalityDice === undefined) ? maxVD : parseInt(trainerData.current.vitalityDice, 10);
 
   const hdToRestore = Math.floor(maxHD / 2);
   const vdToRestore = Math.floor(maxVD / 2);
-  trainerData[47] = Math.min(currentHD + hdToRestore, maxHD);
-  trainerData[48] = Math.min(currentVD + vdToRestore, maxVD);
+  trainerData.current.hitDice = Math.min(currentHD + hdToRestore, maxHD);
+  trainerData.current.vitalityDice = Math.min(currentVD + vdToRestore, maxVD);
 
   // Update session storage
-  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+  storeTrainer(trainerData);
 
   // Restore half HD/VD for ALL active party Pokemon, and full HP/VP for the selected one
   const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
@@ -1875,27 +1840,27 @@ async function completeLongRest(selectedPokemon) {
     const pokemonData = JSON.parse(sessionStorage.getItem(key));
     if (!pokemonData) return;
 
-    const slotNumber = parseInt(pokemonData[38], 10);
+    const slotNumber = parseInt(pokemonData.partySlot, 10);
     if (!slotNumber || slotNumber < 1 || slotNumber > 6) return; // Skip non-active Pokemon
 
     // Restore half HD/VD for all active party Pokemon
-    const pkMaxHD = parseInt(pokemonData[9], 10) || 0;
-    const pkMaxVD = parseInt(pokemonData[11], 10) || 0;
-    const pkCurrentHD = (pokemonData[54] === '' || pokemonData[54] === null || pokemonData[54] === undefined) ? pkMaxHD : parseInt(pokemonData[54], 10);
-    const pkCurrentVD = (pokemonData[55] === '' || pokemonData[55] === null || pokemonData[55] === undefined) ? pkMaxVD : parseInt(pokemonData[55], 10);
+    const pkMaxHD = parseInt(pokemonData.combat.hitDie, 10) || 0;
+    const pkMaxVD = parseInt(pokemonData.combat.vitalityDie, 10) || 0;
+    const pkCurrentHD = (pokemonData.current.hitDice === '' || pokemonData.current.hitDice === null || pokemonData.current.hitDice === undefined) ? pkMaxHD : parseInt(pokemonData.current.hitDice, 10);
+    const pkCurrentVD = (pokemonData.current.vitalityDice === '' || pokemonData.current.vitalityDice === null || pokemonData.current.vitalityDice === undefined) ? pkMaxVD : parseInt(pokemonData.current.vitalityDice, 10);
 
-    pokemonData[54] = Math.min(pkCurrentHD + Math.floor(pkMaxHD / 2), pkMaxHD);
-    pokemonData[55] = Math.min(pkCurrentVD + Math.floor(pkMaxVD / 2), pkMaxVD);
+    pokemonData.current.hitDice = Math.min(pkCurrentHD + Math.floor(pkMaxHD / 2), pkMaxHD);
+    pokemonData.current.vitalityDice = Math.min(pkCurrentVD + Math.floor(pkMaxVD / 2), pkMaxVD);
 
     // Restore full HP/VP only for the selected Pokemon
-    if (pokemonData[2] === selectedPokemon[2]) {
-      pokemonData[45] = parseInt(pokemonData[10], 10);
-      pokemonData[46] = parseInt(pokemonData[12], 10);
+    if (pokemonData.name === selectedPokemon.name) {
+      pokemonData.current.hp = parseInt(pokemonData.combat.maxHP, 10);
+      pokemonData.current.vp = parseInt(pokemonData.combat.maxVP, 10);
     }
 
     // Restore all recharge moves (SR and LR) and clear status conditions
     restoreRechargesForRest(pokemonData, 'LR');
-    pokemonData[60] = '';
+    pokemonData.statusConditions = [];
 
     sessionStorage.setItem(key, JSON.stringify(pokemonData));
     pokemonToUpdate.push(pokemonData);
@@ -1916,9 +1881,9 @@ async function completeLongRest(selectedPokemon) {
     }),
     ...pokemonToUpdate.map(pokemon =>
       PokemonAPI.update(pokemon).then(() => {
-        console.log(`Long rest: ${pokemon[2]} saved to backend`);
+        console.log(`Long rest: ${pokemon.name} saved to backend`);
       }).catch(error => {
-        console.error(`Error saving ${pokemon[2]} long rest to backend:`, error);
+        console.error(`Error saving ${pokemon.name} long rest to backend:`, error);
       })
     ),
   ]);

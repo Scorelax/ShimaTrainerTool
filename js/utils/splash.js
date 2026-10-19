@@ -3,7 +3,7 @@
 
 import { spriteMediaHtml } from './sprite-media.js';
 
-// Benjakronk's splashes, copied onto the Pi (pi-server upstream.SPLASH_DIR).
+// The splashes on the Pi (pi-server media.SPLASH_DIR).
 const SPLASH_BASE_URL = '/splashes/';
 
 // Both the splash-list fetch below and the <img> preload need a hard timeout --

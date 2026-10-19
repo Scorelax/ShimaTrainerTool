@@ -2,6 +2,7 @@
 
 import { TrainerAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
+import { storeTrainer } from '../utils/trainer-data.js';
 
 export function renderNewJourney() {
   const html = `
@@ -613,7 +614,7 @@ async function handleFormSubmit() {
 
     if (response.status === 'success') {
       // Store trainer data in session
-      sessionStorage.setItem('trainerData', JSON.stringify(response.rowData));
+      storeTrainer(response.trainer);
 
       showSuccess('Trainer created successfully!');
 

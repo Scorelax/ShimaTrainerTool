@@ -4,11 +4,13 @@ import { selectAndPreloadSplashImage } from '../utils/splash.js';
 import { showTapToContinue } from '../utils/idle-splash.js';
 import { prefetchSprite } from '../utils/sprite-media.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
+import { allCachedPokemon, knownMoveNames, storePokemon } from '../utils/owned-pokemon.js';
+import { loadTrainer, storeTrainer } from '../utils/trainer-data.js';
 
 // ============================================================================
 // KNOWN MOVES SYNC
 // Run once after moves are loaded into sessionStorage on login.
-// Ensures pokemonData[59] (KnownMoves) is up-to-date: new recharge moves are
+// Ensures each Pokemon's moveCharges are up-to-date: new recharge moves are
 // added at full charges, stale moves are pruned, existing charge counts are kept.
 // ============================================================================
 
@@ -21,16 +23,6 @@ function _parseRechargeForSync(actionType) {
   const type = m[1].includes('long') ? 'LR' : 'SR';
   const chargeMatch = actionType.match(/(\d+)\s+charges?/i);
   return { maxCharges: chargeMatch ? parseInt(chargeMatch[1]) : 1, type };
-}
-
-function _parseKnownMovesForSync(str) {
-  const result = {};
-  if (!str) return result;
-  str.split(',').map(s => s.trim()).filter(Boolean).forEach(part => {
-    const match = part.match(/^(.+?)\((\d+)\)\((\w+)\)$/);
-    if (match) result[match[1]] = { chargesLeft: parseInt(match[2]), type: match[3] };
-  });
-  return result;
 }
 
 // ============================================================================
@@ -56,24 +48,14 @@ async function prefetchAnimatedSprites() {
   const priorityUrls = new Set();
   const allUrls = new Set();
 
-  Object.keys(sessionStorage)
-    .filter(k => k.startsWith('pokemon_'))
-    .forEach(key => {
-      let pokemon;
-      try {
-        pokemon = JSON.parse(sessionStorage.getItem(key));
-      } catch (err) {
-        return;
-      }
-      const url = pokemon && pokemon[1];
+  allCachedPokemon().forEach(pokemon => {
+      const url = pokemon.image;
       if (typeof url !== 'string' || !SPRITE_EXTENSIONS.test(url)) return;
 
-      // Matches trainer-card.js's own active-party/utility-slot detection:
-      // pokemon[38] is the active party slot number (1-6), pokemon[56] === 1
-      // marks the utility slot.
-      const slotNumber = parseInt(pokemon[38], 10);
+      // Matches trainer-card.js's own active-party/utility-slot detection.
+      const slotNumber = Number(pokemon.partySlot);
       const isActiveParty = slotNumber >= 1 && slotNumber <= 6;
-      const isUtility = pokemon[56] === 1;
+      const isUtility = !!pokemon.utilitySlot;
 
       allUrls.add(url);
       if (isActiveParty || isUtility) priorityUrls.add(url);
@@ -87,33 +69,20 @@ function syncKnownMovesForAllPokemon() {
   const allMoves = JSON.parse(sessionStorage.getItem('moves') || '[]');
   if (allMoves.length === 0) return;
 
-  const trainerName = JSON.parse(sessionStorage.getItem('trainerData') || '[]')[1] || '';
-  const pokemonKeys = Object.keys(sessionStorage).filter(k => k.startsWith('pokemon_'));
-
-  pokemonKeys.forEach(key => {
-    const pokemonData = JSON.parse(sessionStorage.getItem(key));
-    if (!pokemonData) return;
-
-    const level = parseInt(pokemonData[4]) || 1;
+  const trainerName = loadTrainer().name || '';
+  allCachedPokemon().forEach(pokemonData => {
+    const level = Number(pokemonData.level) || 1;
 
     // Collect all moves this Pokemon currently knows (same logic as buildPokemonCombatant)
-    const moveIndices =   [23, 24, 25, 26, 27, 28, 37];
-    const requiredLevels = [ 1,  2,  6, 10, 14, 18,  0];
-    const currentMoves = [];
-    moveIndices.forEach((idx, i) => {
-      if (level >= requiredLevels[i] || (idx === 37 && pokemonData[idx])) {
-        const raw = pokemonData[idx] || '';
-        if (raw) raw.split(',').map(m => m.trim()).filter(Boolean).forEach(m => currentMoves.push(m));
-      }
-    });
+    const currentMoves = knownMoveNames(pokemonData);
 
-    // Build new KnownMoves map: preserve existing charges, add new recharge moves at full
-    const existing = _parseKnownMovesForSync(pokemonData[59] || '');
+    // Build the new move charges: preserve existing charges, add new recharge moves at full
+    const existing = pokemonData.moveCharges || {};
     const updated = {};
     currentMoves.forEach(moveName => {
-      const moveData = allMoves.find(m => m[0] === moveName);
+      const moveData = allMoves.find(m => m.name === moveName);
       if (!moveData) return;
-      const recharge = _parseRechargeForSync(moveData[3] || '');
+      const recharge = _parseRechargeForSync(moveData.action || '');
       if (!recharge) return;
       // If we already track this move keep its current charge count; otherwise start at max
       updated[moveName] = existing[moveName] !== undefined
@@ -121,30 +90,29 @@ function syncKnownMovesForAllPokemon() {
         : { chargesLeft: scaledMaxCharges(moveName, recharge.maxCharges, level), type: recharge.type };
     });
 
-    const oldStr = pokemonData[59] || '';
-    const newStr = Object.entries(updated)
-      .map(([n, s]) => `${n}(${s.chargesLeft})(${s.type})`).join(',');
+    const oldStr = JSON.stringify(existing);
+    const newStr = JSON.stringify(updated);
 
     if (oldStr !== newStr) {
-      pokemonData[59] = newStr;
-      sessionStorage.setItem(key, JSON.stringify(pokemonData));
+      pokemonData.moveCharges = updated;
+      storePokemon(pokemonData);
 
-      // Persist to database in background (only if there is a value to write)
-      if (trainerName && pokemonData[2]) {
+      // Persist to database in background
+      if (trainerName) {
         import('../api.js').then(({ PokemonAPI }) => {
-          PokemonAPI.updateLiveStats(trainerName, pokemonData[2], 'KnownMoves', newStr)
-            .catch(e => console.error(`KnownMoves sync failed for ${pokemonData[2]}:`, e));
+          PokemonAPI.updateLiveStats(trainerName, pokemonData.name, 'MoveCharges', newStr)
+            .catch(e => console.error(`Move charges sync failed for ${pokemonData.name}:`, e));
         });
       }
 
-      console.log(`[KnownMoves] Synced ${pokemonData[2]}: "${oldStr || '(empty)'}" → "${newStr || '(none)'}"`);
+      console.log(`[KnownMoves] Synced ${pokemonData.name}: ${oldStr} → ${newStr}`);
     }
   });
 }
 
-// Check a game-data bundle for missing pieces (an upstream fetch inside the
-// backend can fail and leave e.g. itemsData as {status:'error'} with no
-// items). Returns an array of missing key names, empty when complete.
+// Check a game-data bundle for missing pieces (a data file the Pi couldn't
+// read leaves e.g. itemsData with no items). Returns an array of missing key
+// names, empty when complete.
 function findMissingGameData(trainerClass, gd) {
   const missing = [];
   if (!gd?.itemsData?.items) missing.push('items');
@@ -713,9 +681,9 @@ export function attachContinueJourneyListeners() {
           if (!bundle || bundle.status !== 'success' || !bundle.trainerData || !bundle.gameData) {
             throw new Error((bundle && bundle.message) || 'incomplete response');
           }
-          // Reject partial bundles (e.g. one upstream fetch failed inside the
-          // backend) so the multi-step fallback can retry the pieces.
-          const missingData = findMissingGameData(bundle.trainerData[39], bundle.gameData);
+          // Reject partial bundles (e.g. a data file the Pi couldn't read) so the
+          // multi-step fallback can retry the pieces.
+          const missingData = findMissingGameData(bundle.trainerData.trainerClass, bundle.gameData);
           if (missingData.length) {
             throw new Error('bundle missing: ' + missingData.join(', '));
           }
@@ -728,9 +696,9 @@ export function attachContinueJourneyListeners() {
         if (bundle) {
           _step = 'storing trainer data';
           updateLoadingProgress(40, 'Processing trainer information...');
-          sessionStorage.setItem('trainerData', JSON.stringify(bundle.trainerData));
+          storeTrainer(bundle.trainerData);
           bundle.pokemonData.forEach((pokemon) => {
-            sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
+            storePokemon(pokemon);
           });
           if (bundle.registeredList) {
             sessionStorage.setItem('registeredSpecies', JSON.stringify(bundle.registeredList));
@@ -741,7 +709,7 @@ export function attachContinueJourneyListeners() {
 
           _step = 'storing game data';
           updateLoadingProgress(70, 'Processing game data...');
-          const bundleClass = bundle.trainerData[39];
+          const bundleClass = bundle.trainerData.trainerClass;
           storeGameDataInSession(bundleClass, bundle.gameData);
           _log('Game data stored in sessionStorage');
 
@@ -783,12 +751,12 @@ export function attachContinueJourneyListeners() {
         updateLoadingProgress(10, 'Loading trainer data...');
         const t1 = Date.now();
         const response = await TrainerAPI.get(selectedTrainer.name);
-        _log(`Trainer data OK in ${Date.now()-t1}ms — Pokemon: ${response.data.pokemonData?.length ?? 0}, trainerData fields: ${response.data.trainerData?.length ?? 0}`);
+        _log(`Trainer data OK in ${Date.now()-t1}ms — Pokemon: ${response.data.pokemonData?.length ?? 0}, trainer: ${response.data.trainerData?.name ?? '?'}`);
 
         _step = 'storing trainer data';
-        sessionStorage.setItem('trainerData', JSON.stringify(response.data.trainerData));
+        storeTrainer(response.data.trainerData);
         response.data.pokemonData.forEach((pokemon) => {
-          sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
+          storePokemon(pokemon);
         });
         _log(`Stored trainerData + ${response.data.pokemonData.length} pokemon_* keys`);
 
@@ -828,7 +796,7 @@ export function attachContinueJourneyListeners() {
         }
 
         // ── Step 4: Game data (critical) ──────────────────────────────────────
-        const trainerClass = response.data.trainerData[39];
+        const trainerClass = response.data.trainerData.trainerClass;
         _log(`Trainer class: "${trainerClass}"`);
 
         if (trainerClass === "Pokemon Trainer") {

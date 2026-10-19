@@ -6,7 +6,7 @@
 // handling per call site.
 
 // Allows a trailing cache-busting query string (e.g. `?t=<mtime>`, see
-// upstream.local_sprite_url) after the extension -- plain `\.mp4$` would stop
+// media.local_sprite_url) after the extension -- plain `\.mp4$` would stop
 // matching the moment one gets appended.
 const IS_VIDEO = /\.mp4(\?|$)/i;
 

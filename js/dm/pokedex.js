@@ -1,9 +1,9 @@
 // DM console -- the Pokedex module: every species with everything the encyclopedia knows about it, and next to each
-// piece a checkbox for whether the PLAYERS get to see it. That's the players' pokedex config (pokedex_config.json --
+// piece a checkbox for whether the PLAYERS get to see it. That's the players' Pokedex settings (pokedexConfig --
 // `registered`: the species in the players' Pokedex at all; `visibility`: per-species switches; `defaults`: the switches
-// for a species without its own), the same file the registration / evolution pages read (js/utils/visibility.js) and
-// Benjakronk's player Pokedex is built from. Saved to the Pi a moment after each change and live-pushed to every
-// device; once saved from here, the Pi's copy is the real one (upstream.store_local_pokedex_config).
+// for a species without its own), the same settings the registration / evolution pages read (js/utils/visibility.js)
+// and the players' Pokedex is built from. Saved to the Pi a moment after each change (gamedata.store_pokedex_config)
+// and live-pushed to every device.
 import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';

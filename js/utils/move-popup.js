@@ -1,6 +1,7 @@
 // Shared move details popup — used by combat.js and pokemon-card.js.
 // Creates the popup DOM once (appended to document.body) and populates it on each call.
 
+import { storePokemon } from './owned-pokemon.js';
 import { getMoveTypeColor, getTextColorForBackground } from './pokemon-types.js';
 import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showToast } from './notifications.js';
@@ -158,7 +159,7 @@ function _createPopupDOM() {
     // ── Shared post-use checks (add new move-effect rules here) ──
     const move = overlay._currentMove;
     if (move) {
-      const fullDesc = (move[7] || '') + ' ' + (move[8] || '');
+      const fullDesc = (move.description || '') + ' ' + (move.scaling || '');
       // Drain: restore half of damage dealt to user
       if (/the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(fullDesc)) {
         if (overlay._onDrainHeal) overlay._onDrainHeal();
@@ -316,14 +317,10 @@ export async function playBattleAnimationFloating(speciesName) {
 function _renderBattleDice(trainerData) {
   const container = document.getElementById('cBattleDiceContainer');
   if (!container) return;
-  if ((trainerData[25] || '') !== 'Ace Trainer') { container.innerHTML = ''; return; }
+  if ((trainerData.trainerPath || '') !== 'Ace Trainer') { container.innerHTML = ''; return; }
 
-  const battleDiceData = trainerData[45] || '';
-  let maxCharges = 0, currentCharges = 0;
-  if (battleDiceData) {
-    const parts = battleDiceData.split('-').map(p => p.trim());
-    if (parts.length === 2) { maxCharges = parseInt(parts[0]) || 0; currentCharges = parseInt(parts[1]) || 0; }
-  }
+  const maxCharges = Number(trainerData.battleDice?.max) || 0;
+  let currentCharges = Number(trainerData.battleDice?.current) || 0;
 
   let dotsHTML = '<div class="charge-dots">';
   for (let i = 0; i < maxCharges; i++) {
@@ -346,7 +343,7 @@ function _renderBattleDice(trainerData) {
   document.getElementById('cUseBattleDiceBtn')?.addEventListener('click', () => {
     if (currentCharges <= 0) return;
     currentCharges--;
-    trainerData[45] = `${maxCharges} - ${currentCharges}`;
+    trainerData.battleDice = { max: maxCharges, current: currentCharges };
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
     TrainerAPI.update(trainerData).catch(e => console.error('Battle dice sync:', e));
     const dots = container.querySelectorAll('.charge-dot');
@@ -362,12 +359,12 @@ function _renderBattleDice(trainerData) {
 function _renderTactician(trainerData) {
   const container = document.getElementById('cTacticianContainer');
   if (!container) return;
-  const trainerPath = trainerData[25] || '';
-  const trainerLevel = parseInt(trainerData[2]) || 1;
+  const trainerPath = trainerData.trainerPath || '';
+  const trainerLevel = parseInt(trainerData.level) || 1;
   if (trainerPath !== 'Tactician' || trainerLevel < 5) { container.innerHTML = ''; return; }
 
-  let currentTP = parseInt(trainerData[49], 10) || 0;
-  const maxTP = parseInt(trainerData[2], 10) || 1;
+  let currentTP = parseInt(trainerData.tacticianPoints, 10) || 0;
+  const maxTP = parseInt(trainerData.level, 10) || 1;
 
   function buildTPDots(tp, max) {
     let html = '<div class="charge-dots" style="display:inline-flex;gap:clamp(0.3rem,0.6vw,0.5rem);">';
@@ -394,7 +391,7 @@ function _renderTactician(trainerData) {
 
   function spendTP(amount) {
     currentTP = Math.max(0, currentTP - amount);
-    trainerData[49] = currentTP;
+    trainerData.tacticianPoints = currentTP;
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
     updateTP();
     TrainerAPI.update(trainerData).catch(e => console.error('Tactician TP sync:', e));
@@ -475,21 +472,19 @@ function _renderTactician(trainerData) {
 function _renderCommander(trainerData) {
   const container = document.getElementById('cCommanderContainer');
   if (!container) return;
-  const trainerPath = trainerData[25] || '';
-  const trainerLevel = parseInt(trainerData[2]) || 1;
+  const trainerPath = trainerData.trainerPath || '';
+  const trainerLevel = parseInt(trainerData.level) || 1;
   if (trainerPath !== 'Commander' || trainerLevel < 9) { container.innerHTML = ''; return; }
 
-  const surgeData = trainerData[50] || '1 - 1';
-  const surgeParts = surgeData.split('-').map(p => p.trim());
-  let surgeMax = parseInt(surgeParts[0], 10) || 1;
-  let surgeCurrent = parseInt(surgeParts[1], 10) || 0;
+  const surge = trainerData.surgeCommand || { max: 1, current: 1 };
+  let surgeMax = Number(surge.max) || 1;
+  let surgeCurrent = Number(surge.current) || 0;
 
-  const chaModifier = parseInt(trainerData[32], 10) || 0;
+  const chaModifier = parseInt(trainerData.modifiers.charisma, 10) || 0;
   const rallyMaxCalc = Math.max(1, 1 + chaModifier);
-  const rallyData = trainerData[51] || `${rallyMaxCalc} - ${rallyMaxCalc}`;
-  const rallyParts = rallyData.split('-').map(p => p.trim());
-  let rallyMax = parseInt(rallyParts[0], 10) || rallyMaxCalc;
-  let rallyCurrent = parseInt(rallyParts[1], 10) || 0;
+  const rally = trainerData.rallyCry || { max: rallyMaxCalc, current: rallyMaxCalc };
+  let rallyMax = Number(rally.max) || rallyMaxCalc;
+  let rallyCurrent = Number(rally.current) || 0;
 
   function buildDots(current, max, cls) {
     let html = `<div class="${cls} charge-dots" style="display:inline-flex;gap:clamp(0.3rem,0.6vw,0.5rem);">`;
@@ -549,7 +544,7 @@ function _renderCommander(trainerData) {
   document.getElementById('cUseSurgeCommand')?.addEventListener('click', () => {
     if (surgeCurrent <= 0) return;
     surgeCurrent--;
-    trainerData[50] = `${surgeMax} - ${surgeCurrent}`;
+    trainerData.surgeCommand = { max: surgeMax, current: surgeCurrent };
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
     TrainerAPI.update(trainerData).catch(e => console.error('Surge sync:', e));
     updateCommanderUI();
@@ -558,7 +553,7 @@ function _renderCommander(trainerData) {
   document.getElementById('cUseRallyCry')?.addEventListener('click', () => {
     if (rallyCurrent <= 0) return;
     rallyCurrent--;
-    trainerData[51] = `${rallyMax} - ${rallyCurrent}`;
+    trainerData.rallyCry = { max: rallyMax, current: rallyCurrent };
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
     TrainerAPI.update(trainerData).catch(e => console.error('Rally sync:', e));
     updateCommanderUI();
@@ -572,12 +567,12 @@ function _renderCommander(trainerData) {
  * Show the shared move details popup.
  *
  * @param {object} params
- * @param {Array}  params.move          - Move data array [name, type, modifier, actionType, vpCost, duration, range, desc, higherLevels]
+ * @param {Object} params.move          - The move (game-data moves: {name, type, moveStat, action, vpCost, duration, range, description, scaling})
  * @param {object} params.computedData  - { attackBonus, damageBonus, attackBreakdown, damageBreakdown, damageDice }
  * @param {string} [params.heldItemsHTML] - HTML string for held items (falsy = hide panel)
  * @param {string} [params.size]        - Pokemon size string
  * @param {number} [params.critMod]     - Critical hit modifier
- * @param {Array}  params.trainerData   - Full trainer data array
+ * @param {Object} params.trainerData   - The logged-in trainer (js/utils/trainer-data.js)
  * @param {function} [params.onUseMove]    - Callback(moveName, vpCost) for platform-specific VP deduction
  * @param {function} [params.onDrainHeal] - Callback() invoked when move matches the drain heal pattern
  * @param {string} [params.spriteUrl]    - This Pokemon's already-resolved sprite URL (mp4 or static image), shown in the confirm popup
@@ -585,7 +580,7 @@ function _renderCommander(trainerData) {
  * @param {string} [params.speciesName]  - Species name used to look up a preloaded battle animation (see utils/battle-animation.js)
  * @param {boolean} [params.deferAnimation] - Skip playing the battle animation here on "Yes" -- for callers (combat-wip.js's onDamageResolved flow) that show it themselves later, once a target is picked and the attack roll is confirmed a hit, instead of the instant "Use Move" is confirmed. Defaults to false (legacy behavior: plays immediately), so every other caller is unaffected.
  * @param {boolean} [params.skipConfirm] - Skip the separate "Use MoveName (N VP)? Yes/No" confirm popup entirely -- clicking Use Move directly uses it (the same VP cost is already shown in this popup's own grid, so that confirm step was just a second click for no new information). Defaults to false (legacy behavior: confirm popup shown), so only callers that opt in (combat-wip.js) are affected -- pokemon-card.js's own semi-permanent VP/HP deduction keeps the confirm step.
- * @param {number} [params.vpCostOverride] - Actual VP cost to show/deduct, in place of move[4]'s base value -- Fury Cutter/Ice Ball/Rollout's own escalating cost per consecutive hit (see combat.js's showCombatMoveDetails). Falls back to move[4] when not given, same as before this existed.
+ * @param {number} [params.vpCostOverride] - Actual VP cost to show/deduct, in place of move.vpCost's base value -- Fury Cutter/Ice Ball/Rollout's own escalating cost per consecutive hit (see combat.js's showCombatMoveDetails). Falls back to move.vpCost when not given, same as before this existed.
  */
 export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, vpCostOverride, spriteUrl, spriteAlt, speciesName, deferAnimation, skipConfirm, noAttackRoll, battleDiceInRolls }) {
   _injectStyles();
@@ -602,7 +597,7 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   popup._onDirectHeal = onDirectHeal || null;
   popup._currentMove = move;
   popup._spriteUrl = spriteUrl || null;
-  popup._spriteAlt = spriteAlt || move[0];
+  popup._spriteAlt = spriteAlt || move.name;
   popup._speciesName = speciesName || null;
   popup._deferAnimation = !!deferAnimation;
   popup._skipConfirm = !!skipConfirm;
@@ -612,7 +607,7 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   const fmtMod = v => v >= 0 ? `+${v}` : `${v}`;
 
   // Header colours
-  const bgColor = getMoveTypeColor(move[1]);
+  const bgColor = getMoveTypeColor(move.type);
   const textColor = getTextColorForBackground(bgColor);
   const header = document.getElementById('combatMovePopupHeader');
   const body = document.getElementById('combatMovePopupBody');
@@ -622,19 +617,19 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   if (closeBtn) closeBtn.style.color = textColor;
 
   // Move fields
-  document.getElementById('combatMoveNamePopup').textContent = move[0];
-  document.getElementById('combatMoveTypePopup').textContent = move[1];
-  document.getElementById('cMoveModifier').textContent = move[2] || '—';
-  document.getElementById('cMoveAction').textContent = move[3] || '—';
-  document.getElementById('cMoveVP').textContent = vpCostOverride ?? (move[4] || '0');
-  document.getElementById('cMoveDuration').textContent = move[5] || '—';
-  document.getElementById('cMoveRange').textContent = move[6] || '—';
+  document.getElementById('combatMoveNamePopup').textContent = move.name;
+  document.getElementById('combatMoveTypePopup').textContent = move.type;
+  document.getElementById('cMoveModifier').textContent = move.moveStat || '—';
+  document.getElementById('cMoveAction').textContent = move.action || '—';
+  document.getElementById('cMoveVP').textContent = vpCostOverride ?? (move.vpCost || '0');
+  document.getElementById('cMoveDuration').textContent = move.duration || '—';
+  document.getElementById('cMoveRange').textContent = move.range || '—';
   document.getElementById('cMoveSize').textContent = size || '—';
 
   const moveDCWrapper = document.getElementById('cMoveDCWrapper');
   const moveDCEl = document.getElementById('cMoveDC');
   if (moveDCWrapper && moveDCEl) {
-    const hasMoveDC = /(?:saving throw|save) against your Move DC/i.test(move[7] || '');
+    const hasMoveDC = /(?:saving throw|save) against your Move DC/i.test(move.description || '');
     if (hasMoveDC) {
       moveDCEl.textContent = computedData.moveDC ?? '—';
       moveDCWrapper.style.display = '';
@@ -648,9 +643,9 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
     critEl.textContent = (critMod ?? 0) > 0 ? `+${critMod}` : (critMod ?? 0) < 0 ? `${critMod}` : '0';
   }
 
-  document.getElementById('cMoveDescription').textContent = move[7] || '';
+  document.getElementById('cMoveDescription').textContent = move.description || '';
   const higherEl = document.getElementById('cMoveHigher');
-  if (higherEl) higherEl.textContent = move[8] ? `Higher Levels: ${move[8]}` : '';
+  if (higherEl) higherEl.textContent = move.scaling ? `Higher Levels: ${move.scaling}` : '';
 
   // Roll bonuses
   const diceLabelEl = document.getElementById('cDiceLabel');
@@ -704,12 +699,12 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   // Use Move button dataset
   const useBtn = document.getElementById('useCombatMoveBtn');
   if (useBtn) {
-    useBtn.dataset.moveName = move[0];
-    useBtn.dataset.vpCost = vpCostOverride ?? (move[4] || 0);
+    useBtn.dataset.moveName = move.name;
+    useBtn.dataset.vpCost = vpCostOverride ?? (move.vpCost || 0);
     const isSpent = chargesLeft !== undefined && chargesLeft === 0;
     useBtn.disabled = isSpent || !!disableUse;
     if (isSpent) {
-      const actionText = (move[3] || '').toLowerCase();
+      const actionText = (move.action || '').toLowerCase();
       const restType = actionText.includes('long rest') ? 'Long Rest' : 'Short Rest';
       useBtn.textContent = `No charges remaining — recharges on ${restType}`;
     } else if (disableUse) {
@@ -730,9 +725,9 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
  *
  * @param {Array}  pokemonData  - Pokemon data array (index 2=name, 45=currentHp)
  * @param {string} moveName
- * @param {Array}  trainerData  - Trainer data array (index 1=trainerName)
+ * @param {Object} trainerData  - The logged-in trainer (js/utils/trainer-data.js)
  * @param {number} currentHp    - Current HP (post VP-deduction), passed by caller
- * @param {number} maxHp        - Max HP (pokemonData[10]), passed by caller
+ * @param {number} maxHp        - Max HP (pokemonData.combat.maxHP), passed by caller
  */
 export function showDrainHealPopupForCard(pokemonData, moveName, trainerData, currentHp, maxHp) {
   let popup = document.getElementById('cardDrainHealPopup');
@@ -763,10 +758,10 @@ export function showDrainHealPopupForCard(pokemonData, moveName, trainerData, cu
     document.body.appendChild(popup);
   }
 
-  // currentHp and maxHp are passed in by the caller (pokemon-card: pokemonData[45] / pokemonData[10])
+  // currentHp and maxHp are passed in by the caller (pokemon-card: its current / max HP)
   document.getElementById('cardDrainHealTitle').textContent = `🌿 ${moveName} — Drain Heal`;
   document.getElementById('cardDrainHealTarget').textContent =
-    `${pokemonData[2]} — ${currentHp}/${maxHp} HP`;
+    `${pokemonData.name} — ${currentHp}/${maxHp} HP`;
   document.getElementById('cardDrainHealTotal').textContent = '—';
 
   // Clone input + buttons to remove stale listeners
@@ -805,8 +800,8 @@ export function showDrainHealPopupForCard(pokemonData, moveName, trainerData, cu
     if (heal <= 0) return;
 
     const newHp = Math.min(currentHp + heal, maxHp);
-    pokemonData[45] = newHp;
-    sessionStorage.setItem(`pokemon_${pokemonData[2].toLowerCase()}`, JSON.stringify(pokemonData));
+    pokemonData.current.hp = newHp;
+    storePokemon(pokemonData);
 
     // Update UI elements on the pokemon-card battle page
     const hpDisplay = document.getElementById('combatCurrentHP');
@@ -814,10 +809,10 @@ export function showDrainHealPopupForCard(pokemonData, moveName, trainerData, cu
     const hpVal = document.getElementById('currentHpValue');
     if (hpVal) hpVal.textContent = newHp;
 
-    PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp)
+    PokemonAPI.updateLiveStats(trainerData.name, pokemonData.name, 'HP', newHp)
       .catch(e => console.error('Drain HP sync:', e));
 
-    showToast(`${pokemonData[2]}: ${moveName} drained ${heal} HP!`, 'success');
+    showToast(`${pokemonData.name}: ${moveName} drained ${heal} HP!`, 'success');
     popup.style.display = 'none';
   });
 

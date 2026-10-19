@@ -596,7 +596,7 @@ function _lineOptions(p) {
   let rows = [];
   try { rows = JSON.parse(sessionStorage.getItem('moves') || '[]'); } catch { /* no move list -- generic line */ }
   const opts = (p?.moves || []).map(name => {
-    const ft = lineFtFromRange(rows.find(r => r[0] === name)?.[6]);
+    const ft = lineFtFromRange(rows.find(r => r.name === name)?.range);
     return ft ? { label: name, ft } : null;
   }).filter(Boolean);
   return opts.length ? opts : [{ label: '', ft: 30 }];
@@ -612,7 +612,7 @@ function _coneOptions(p) {
   let rows = [];
   try { rows = JSON.parse(sessionStorage.getItem('moves') || '[]'); } catch { /* no move list -- generic cone */ }
   const opts = (p?.moves || []).map(name => {
-    const m = /(\d+)\s*ft\.?\s*cone/i.exec(String(rows.find(r => r[0] === name)?.[6] || ''));
+    const m = /(\d+)\s*ft\.?\s*cone/i.exec(String(rows.find(r => r.name === name)?.range || ''));
     return m ? { label: name, ft: Number(m[1]) } : null;
   }).filter(Boolean);
   return opts.length ? opts : [{ label: '', ft: 15 }];

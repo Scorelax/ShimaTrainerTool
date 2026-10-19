@@ -1,9 +1,9 @@
 """Pokemon abilities in the shared battle -- slice 1: the defensive, always-on effects the server applies by itself
 whenever damage, a status or weather damage lands (pi-server/docs/ability-effects-schema.md for the data).
 
-A participant has ONE ability, its `abilities` text ("0:Name;description", the format move-effects.js's
-parseAbilityList reads), with any live `ability_override` status (Skill Swap, Role Play, ...) swapped in, and none at
-all under `abilities_suppressed`. Abilities tagged `unknown` (manual by design) are skipped.
+A participant has ONE ability, its `abilities` list ([{slot, name, description}], battle_lists.py), with any live
+`ability_override` status (Skill Swap, Role Play, ...: value2 = the ability it gets) swapped in, and none at all under
+`abilities_suppressed`. Abilities tagged `unknown` (manual by design) are skipped.
 
 Gates (`while`) are checked against the live battle; a gate the server can't judge on its own (a DM's call on the
 environment, anything about a target) counts as NOT met -- nothing is applied by guesswork.
@@ -12,6 +12,7 @@ import json
 import os
 import re
 
+from .battle_lists import ability_entry, ability_list
 from .conditions import weathers_affecting, terrains_affecting
 
 ABILITIES_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_abilities.json')
@@ -47,22 +48,14 @@ def description(name):
     return (_by_name().get(str(name or '').lower()) or {}).get('description') or ''
 
 
-def _ability_name(entry):
-    """'0:Name;description' / 'Name;description' / 'Name' -> 'Name'."""
-    head = str(entry or '').split(';', 1)[0].strip()
-    if ':' in head and head.split(':', 1)[0].strip().isdigit():
-        head = head.split(':', 1)[1]
-    return head.strip()
-
-
 def ability_names(participant):
     statuses = (participant or {}).get('statuses') or []
     if any(s.get('kind') == 'condition' and s.get('apply') == 'abilities_suppressed' for s in statuses):
         return []
-    names = [_ability_name(e) for e in str((participant or {}).get('abilities') or '').split('|') if e.strip()]
+    names = [a['name'] for a in ability_list((participant or {}).get('abilities'))]
     for s in statuses:
         if s.get('kind') == 'condition' and s.get('apply') == 'ability_override' and s.get('value') and s.get('value2'):
-            old, new = str(s['value']).lower(), _ability_name(s['value2'])
+            old, new = str(s['value']).lower(), ability_entry(s['value2'])['name']
             names = [new if n.lower() == old else n for n in names]
     return [n for n in names if n]
 

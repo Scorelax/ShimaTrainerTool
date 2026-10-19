@@ -1,13 +1,14 @@
 // Live push notifications from the Pi server (see pi-server/app/live.py and
-// main.py's /api/events). Two kinds of event arrive here:
-//  - a fresh pokedex-config push from Benjakronk's admin panel; refresh the
-//    session's copy in the background so any screen that reads it (evolution.js,
-//    new-pokemon.js) reflects it without the player hitting Reload Data.
-//  - a trainer-data event (routes_trainer.py / routes_pokemon.py publish this
-//    on every inventory/gear/money/pokemon write, notably Benjakronk's
-//    external game-write API) -- if it's for the trainer currently loaded in
-//    this tab, refetch that trainer so trainer-info/trainer-card don't need a
-//    trip back through continue-journey to see it.
+// main.py's /api/events). The kinds of event that arrive here:
+//  - the players' Pokedex settings changed (the DM console's Pokedex module, or
+//    a first catch revealing a species); refresh the session's copy in the
+//    background so any screen that reads it (evolution.js, new-pokemon.js)
+//    reflects it without the player hitting Reload Data.
+//  - a trainer-data event (routes_trainer.py / routes_pokemon.py / routes_dm.py
+//    publish this on every money/pokemon write, and when the DM gives an item)
+//    -- if it's for the trainer currently loaded in this tab, refetch that
+//    trainer so trainer-info/trainer-card don't need a trip back through
+//    continue-journey to see it.
 //  - a combat event (routes_combat.py publishes the whole session on every
 //    mutation) -- forwarded as-is via a CustomEvent; pages that care (the WIP
 //    combat tool) listen for it directly instead of this module knowing
@@ -22,6 +23,8 @@
 import { EVENTS_URL, GameDataAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { setPokedexConfig } from './visibility.js';
 import { redactForViewer } from './combat-visibility.js';
+import { storePokemon } from './owned-pokemon.js';
+import { loadTrainer, storeTrainer } from './trainer-data.js';
 
 let source = null;
 
@@ -54,7 +57,7 @@ export function initLiveUpdates() {
     } catch (err) {
       return;
     }
-    if (event.dataset === 'pokedex-config') {
+    if (event.type === 'pokedex-config') {
       // The players' Pokedex page (js/pokedex/player-pokedex.js) fetches its own cut of the data at once.
       window.dispatchEvent(new CustomEvent('app:pokedex-config'));
       refreshPokedexData();
@@ -104,16 +107,15 @@ async function refreshPokedexData() {
  */
 async function refreshActiveTrainerData(trainerName) {
   try {
-    const currentTrainerData = JSON.parse(sessionStorage.getItem('trainerData') || 'null');
-    const currentName = currentTrainerData && currentTrainerData[1];
+    const currentName = loadTrainer().name;
     if (!currentName || currentName.toLowerCase() !== trainerName.toLowerCase()) return;
 
     const bundle = await TrainerAPI.getFull(trainerName);
     if (!bundle || bundle.status !== 'success' || !bundle.trainerData) return;
 
-    sessionStorage.setItem('trainerData', JSON.stringify(bundle.trainerData));
+    storeTrainer(bundle.trainerData);
     (bundle.pokemonData || []).forEach((pokemon) => {
-      sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
+      storePokemon(pokemon);
     });
     if (bundle.registeredList) {
       sessionStorage.setItem('registeredSpecies', JSON.stringify(bundle.registeredList));

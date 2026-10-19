@@ -27,15 +27,15 @@ def _safe(fn):
 
 
 def snapshot(out_path):
-    from app import db, upstream, pokedex, routes_dm, player_pokedex, routes_combat
+    from app import db, gamedata, pokedex, routes_dm, player_pokedex, routes_combat
     conn = db.connect()
     names = [s['name'] for s in routes_dm.species_list(conn)]
 
     all_on = {k: True for k, v in player_pokedex._BASE_VISIBILITY.items() if isinstance(v, bool)}
     all_on.update({'movesMaxLevel': 20, 'extraVisibleMoves': [], 'evoToTargets': {}})
     config = {'registered': names, 'visibility': {}, 'defaults': all_on}
-    upstream.fetch_pokedex_config = lambda conn, force=False: config
-    upstream.registered_pokemon_names = lambda conn: names
+    gamedata.pokedex_config = lambda conn: config
+    gamedata.registered_pokemon_names = lambda conn: names
 
     out = {
         'species_list': routes_dm.species_list(conn),

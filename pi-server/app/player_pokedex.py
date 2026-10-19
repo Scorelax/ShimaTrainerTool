@@ -6,7 +6,7 @@ Benjakronk's old Pokedex site downloaded the whole encyclopedia and hid fields i
 what they hadn't discovered yet. Here the hiding happens on the Pi: a field that's switched off never leaves it. The
 switches mean what they meant on his site (its script.js getVisibility / createPokemonCard / getSearchableMoves), so
 the DM console's Pokedex module (js/dm/pokedex.js) edits exactly what shows up here."""
-from . import upstream, species as species_data
+from . import gamedata, media, species as species_data
 from .calculations import fix_mojibake, sanitize_string
 from .jsutil import js_parse_int
 
@@ -87,7 +87,7 @@ def _species_entry(conn, sp, vis, own):
     combat = sp.get('combat') or {}
     entry = {
         'name': name, 'dex': dex,
-        'image': upstream.local_pokemon_image_url(name, dex) or upstream.local_sprite_url(name) or '',
+        'image': media.local_pokemon_image_url(name, dex) or media.local_sprite_url(name) or '',
         # Whether there IS a second type shows (as a split header colour) even while it's hidden -- as on his site.
         'dualType': bool(secondary),
         'primaryType': primary if vis['primaryType'] else None,
@@ -140,17 +140,17 @@ def _species_entry(conn, sp, vis, own):
 def _move_details(conn):
     """{lowercase name: move} from the move list, in the shape the page shows."""
     out = {}
-    for m in upstream.fetch_moves(conn):
-        name, mtype, power, time, vp, duration, rng, desc, higher = (list(m) + [''] * 9)[:9]
-        out[str(name).lower()] = {
-            'name': name, 'type': mtype, 'power': power, 'time': time, 'vp': vp, 'duration': duration,
-            'range': rng, 'description': fix_mojibake(desc), 'higher': fix_mojibake(str(higher or '').strip()),
+    for m in gamedata.moves():
+        out[str(m['name']).lower()] = {
+            'name': m['name'], 'type': m['type'], 'power': m['moveStat'], 'time': m['action'], 'vp': m['vpCost'],
+            'duration': m['duration'], 'range': m['range'], 'description': fix_mojibake(m['description']),
+            'higher': fix_mojibake(str(m['scaling'] or '').strip()),
         }
     return out
 
 
 def player_pokedex(conn):
-    config = upstream.fetch_pokedex_config(conn) or {}
+    config = gamedata.pokedex_config(conn)
     registered = {str(n).lower() for n in config.get('registered') or []}
     own_settings = {str(k).lower(): v for k, v in (config.get('visibility') or {}).items()}
     defaults = config.get('defaults') or {}

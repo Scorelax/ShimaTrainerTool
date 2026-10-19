@@ -1,13 +1,9 @@
-"""route=trainer — port of handleTrainerRoute and its sheet helpers."""
+"""route=trainer -- the players' trainers (objects, trainers.py) and the batched login bundle."""
 import json
 import time
 
-from . import db, live, routes_gamedata, pokedex, upstream
-from .calculations import calculate_hp_vp
-from .jsutil import js_parse_int, js_number, floor_div2
-
-T = db.TRAINER_COLUMNS
-P = db.POKEMON_COLUMNS
+from . import gamedata, live, owned, routes_gamedata, pokedex, trainers
+from .jsutil import js_parse_int
 
 
 def handle(conn, action, params):
@@ -40,85 +36,53 @@ def handle(conn, action, params):
         return write_trainer_live_stats(
             conn, params.get('trainer'), params.get('stat'), js_parse_int(params.get('value')))
 
-    if action == 'inventory':
-        return _write_trainer_cell(conn, params.get('trainer'), 'inventory', params.get('data'),
-                                   fail='Failed to write items')
-
-    if action == 'gear':
-        return _write_trainer_cell(conn, params.get('trainer'), 'gear', params.get('data'),
-                                   fail='Failed to write gear')
-
     if action == 'money':
-        # .gs stores JSON.stringify(parseInt(amount)) — a bare number string
         amount = js_parse_int(params.get('amount'))
-        result = _write_trainer_cell(conn, params.get('trainer'), 'money', json.dumps(amount),
-                                     fail='Failed to write money')
+        result = _write_field(conn, params.get('trainer'), 'money', amount or 0, fail='Failed to write money')
         if result.get('status') == 'error':
-            raise ValueError('Trainer row not found for ' + str(params.get('trainer')))
+            raise ValueError('Trainer not found: ' + str(params.get('trainer')))
         return {'status': 'success'}
 
     if action == 'affinity':
         if not params.get('trainer') or not params.get('affinity'):
             raise ValueError('Missing trainer name or affinity')
-        return _write_trainer_cell(conn, params['trainer'], 'affinity', params['affinity'],
-                                   success='Affinity saved successfully',
-                                   fail='Failed to write affinity')
+        return _write_field(conn, params['trainer'], 'affinities', _names(params['affinity']),
+                            success='Affinity saved successfully', fail='Failed to write affinity')
 
     if action == 'specialization':
         if not params.get('trainer') or not params.get('specialization'):
             raise ValueError('Missing trainer name or specialization')
-        return _write_trainer_cell(conn, params['trainer'], 'specialization', params['specialization'],
-                                   success='Specialization saved successfully',
-                                   fail='Failed to write specialization')
-
-    if action == 'trainer-path':
-        if not params.get('trainer') or not params.get('path'):
-            raise ValueError('Missing trainer name or path')
-        return _write_trainer_cell(conn, params['trainer'], 'trainerpath', params['path'],
-                                   success='Trainer path saved successfully',
-                                   fail='Failed to write trainer path')
+        return _write_field(conn, params['trainer'], 'specializations', _names(params['specialization']),
+                            success='Specialization saved successfully', fail='Failed to write specialization')
 
     raise ValueError('Unknown trainer action: ' + str(action))
 
 
+def _names(value):
+    """A JSON list of names, or the names as one text ("PSYCHIC, DRAGON")."""
+    try:
+        v = json.loads(value)
+    except ValueError:
+        v = value
+    return [str(n).strip() for n in (v if isinstance(v, list) else str(v).split(',')) if str(n).strip()]
+
+
 def get_trainers(conn):
+    """The login screen's list: every trainer's name, picture and PIN."""
     return [{
         'id': i,
-        'image': upstream.trainer_image_url(row[1], row[0]),
-        'name': row[1],
-        'pinCode': row[22],
-    } for i, (_, row) in enumerate(db.fetch_rows(conn, 'trainers', T), start=1)]
-
-
-def _with_character_image(row):
-    """The trainer row with the picture the app shows in its image field (upstream.trainer_image_url: the self-made
-    portrait, else Benjakronk's original on the Pi) -- the stored value stays in the DB untouched."""
-    row = list(row)
-    row[0] = upstream.trainer_image_url(row[1], row[0])
-    return row
-
-
-def _with_pokemon_image(row, animated=True):
-    """The Pokemon row with the picture the app shows in its image field (upstream.pokemon_image_url: the
-    self-uploaded animated sprite unless Settings > Animated Sprites is off, else the original picture on the Pi) --
-    worked out from the species every time, so the stored value never matters."""
-    row = list(row)
-    row[1] = upstream.pokemon_image_url(row[2], row[3], shiny=(row[61] == 'Y'), animated=animated)
-    return row
+        'image': trainers.with_image(t)['image'],
+        'name': t['name'],
+        'pinCode': t.get('pinCode', ''),
+    } for i, (_, t) in enumerate(trainers.all_trainers(conn), start=1)]
 
 
 def store_trainer_and_pokemon_data(conn, trainer_name, animated=True):
-    trainer_entry = next(
-        (row for _, row in db.fetch_rows(conn, 'trainers', T)
-         if str(row[1]).lower() == trainer_name.lower()), None)
-    if trainer_entry is None:
+    _, trainer = trainers.find(conn, trainer_name)
+    if trainer is None:
         return None
-
-    pokemon_entries = [
-        _with_pokemon_image(row, animated) for _, row in db.fetch_rows(conn, 'pokemon', P)
-        if str(row[0]).lower() == trainer_name.lower()
-    ]
-    return {'trainerData': _with_character_image(trainer_entry), 'pokemonData': pokemon_entries}
+    pokemon_entries = [owned.with_image(p, animated) for _, p in owned.all_owned(conn, trainer['name'])]
+    return {'trainerData': trainers.with_image(trainer), 'pokemonData': pokemon_entries}
 
 
 def load_trainer_full_bundle(conn, trainer_name, animated=True):
@@ -128,7 +92,7 @@ def load_trainer_full_bundle(conn, trainer_name, animated=True):
         if not trainer_pokemon or not trainer_pokemon['trainerData']:
             raise ValueError('Trainer not found: ' + trainer_name)
 
-        trainer_class = trainer_pokemon['trainerData'][39]
+        trainer_class = trainer_pokemon['trainerData'].get('trainerClass', '')
         if trainer_class == 'Pokemon Trainer':
             game_data = routes_gamedata.load_all_game_data(conn)
         else:
@@ -150,117 +114,47 @@ def load_trainer_full_bundle(conn, trainer_name, animated=True):
     except Exception:
         result['registeredList'] = None
     try:
-        result['pokedexConfig'] = upstream.fetch_pokedex_config(conn)
+        result['pokedexConfig'] = gamedata.pokedex_config(conn)
     except Exception:
         result['pokedexConfig'] = None
     return result
 
 
-def create_trainer(conn, trainer):
+def create_trainer(conn, form):
     try:
-        strength = js_number(trainer['strength'])
-        dexterity = js_number(trainer['dexterity'])
-        constitution = js_number(trainer['constitution'])
-        intelligence = js_number(trainer['intelligence'])
-        wisdom = js_number(trainer['wisdom'])
-        charisma = js_number(trainer['charisma'])
-        level = js_number(trainer['level'])
-
-        strmodifier = floor_div2(strength)
-        dexmodifier = floor_div2(dexterity)
-        conmodifier = floor_div2(constitution)
-        intmodifier = floor_div2(intelligence)
-        wismodifier = floor_div2(wisdom)
-        chamodifier = floor_div2(charisma)
-
-        hit_dice = js_parse_int(trainer['hitDice'])
-        vitality_dice = js_parse_int(trainer['vitalityDice'])
-        hp, vp = calculate_hp_vp(strength, dexterity, constitution, intelligence,
-                                 wisdom, charisma, level, hit_dice, vitality_dice, 0)
-
-        initiative = dexmodifier
-        ac = 10 + dexmodifier
-        proficiency = 2 if level <= 4 else 3 if level <= 8 else 4 if level <= 12 else 5 if level <= 16 else 6
-
-        if trainer.get('trainerClass') == 'Pokemon Trainer':
-            if 1 <= level <= 4:
-                pokeslots = 3
-            elif 5 <= level <= 9:
-                pokeslots = 4
-            elif 10 <= level <= 15:
-                pokeslots = 5
-            elif 16 <= level <= 20:
-                pokeslots = 6
-            else:
-                pokeslots = 3
-        else:
-            if 1 <= level <= 4:
-                pokeslots = 0
-            elif 5 <= level <= 15:
-                pokeslots = 1
-            elif 16 <= level <= 20:
-                pokeslots = 2
-            else:
-                pokeslots = 0
-
-        image_url = ''  # the picture is worked out from the name whenever the row is sent (_with_character_image)
-        inventory = json.loads(trainer.get('inventory') or '[]')
-        inventory_str = ', '.join(f"{item['name']} (x{item['quantity']})" for item in inventory)
-        skills = ', '.join(trainer['skills']) if isinstance(trainer.get('skills'), list) else ''
-
-        row_data = [
-            image_url, trainer['name'], trainer['level'], trainer['hitDice'], trainer['vitalityDice'],
-            trainer['strength'], trainer['dexterity'], trainer['constitution'],
-            trainer['intelligence'], trainer['wisdom'], trainer['charisma'],
-            hp, vp, ac, trainer.get('walkingSpeed'), trainer.get('savingThrows'),
-            initiative, proficiency, skills, trainer.get('money'), inventory_str,
-            trainer.get('leaguePoints'), trainer.get('pinCode'),
-            '', '', '',  # affinity, specialization, trainerpath
-            pokeslots,
-            strmodifier, dexmodifier, conmodifier, intmodifier, wismodifier, chamodifier,
-            '', '', '', '', '',  # feats, currentHP, currentVP, currentAC, gear
-            trainer.get('nationality'), trainer.get('trainerClass'),
-            '', '', '', '', '', '', '', '', '', '', '', '',
-        ]
-
-        db.insert_row(conn, 'trainers', T, row_data)
-        return {'status': 'success', 'message': 'Trainer created successfully!', 'rowData': _with_character_image(row_data)}
+        trainer = trainers.create(form)
+        if not trainer['name']:
+            return {'status': 'error', 'message': 'The trainer needs a name.'}
+        if trainers.find(conn, trainer['name'])[0] is not None:
+            return {'status': 'error', 'message': f"There's already a trainer called {trainer['name']}."}
+        trainers.insert(conn, trainer)
+        return {'status': 'success', 'message': 'Trainer created successfully!', 'trainer': trainers.with_image(trainer)}
     except Exception:
         return {'status': 'error', 'message': 'Failed to create trainer. Please try again.'}
 
 
-def update_trainer_data(conn, new_trainer_data):
-    name = str(new_trainer_data[1]).lower()
-    for rowid, row in db.fetch_rows(conn, 'trainers', T):
-        if str(row[1]).lower() == name:
-            # The client sends back the whole row it was given, the picture it was shown included -- the app never
-            # changes a trainer's picture, so keep whatever was stored.
-            new_trainer_data = list(new_trainer_data)
-            new_trainer_data[0] = row[0]
-            db.update_row(conn, 'trainers', rowid, T, new_trainer_data)
-            return {'status': 'success'}
-    return {'status': 'error', 'message': 'Trainer not found.'}
+def update_trainer_data(conn, trainer):
+    """The whole trainer, as the app changed it. The app sends back the picture it was shown -- it never changes a
+    trainer's picture, so the stored one is kept."""
+    if not isinstance(trainer, dict) or not trainer.get('name'):
+        raise ValueError('Not a trainer')
+    tid, old = trainers.find(conn, trainer['name'])
+    if tid is None:
+        return {'status': 'error', 'message': 'Trainer not found.'}
+    trainer = {**trainer, 'name': old['name'], 'image': old.get('image', '')}
+    trainers.save(conn, tid, trainer)
+    return {'status': 'success'}
 
 
-def _find_trainer_rowid(conn, trainer_name):
-    """findTrainerRow — exact (case-sensitive) name match, like the .gs ===."""
-    for rowid, row in db.fetch_rows(conn, 'trainers', T):
-        if row[1] == trainer_name:
-            return rowid
-    return None
-
-
-def _write_trainer_cell(conn, trainer_name, column, value, success=None, fail='Write failed'):
+def _write_field(conn, trainer_name, field, value, success=None, fail='Write failed'):
+    """One field of the trainer, written -- and every open app told this trainer's data changed."""
     try:
-        rowid = _find_trainer_rowid(conn, trainer_name)
-        if rowid is None:
+        tid, trainer = trainers.find(conn, trainer_name)
+        if tid is None:
             return {'status': 'error', 'message': 'Trainer not found'}
-        db.set_cell(conn, 'trainers', rowid, column, value)
-        # Covers every caller of this helper (inventory/gear/money/affinity/
-        # specialization/trainer-path) -- notably including Benjakronk's
-        # external game-write API, which lands here with no other signal to
-        # an already-open client that this trainer's data just changed.
-        live.publish({'type': 'trainer-data', 'trainer': trainer_name})
+        trainer[field] = value
+        trainers.save(conn, tid, trainer)
+        live.publish({'type': 'trainer-data', 'trainer': trainer['name']})
         result = {'status': 'success'}
         if success:
             result['message'] = success
@@ -270,12 +164,14 @@ def _write_trainer_cell(conn, trainer_name, column, value, success=None, fail='W
 
 
 def write_trainer_live_stats(conn, trainer_name, stat, new_value):
+    """The trainer's current HP / VP / AC (stat 'HP' / 'VP' / 'AC')."""
     try:
-        rowid = _find_trainer_rowid(conn, trainer_name)
-        if rowid is None:
+        tid, trainer = trainers.find(conn, trainer_name)
+        if tid is None:
             return {'status': 'error', 'message': 'Trainer not found'}
-        column = 'currentHP' if stat == 'HP' else 'currentVP' if stat == 'VP' else 'currentAC'
-        db.set_cell(conn, 'trainers', rowid, column, new_value)
+        key = 'hp' if stat == 'HP' else 'vp' if stat == 'VP' else 'ac'
+        trainer.setdefault('current', {})[key] = new_value
+        trainers.save(conn, tid, trainer)
         return {'status': 'success'}
     except Exception:
         return {'status': 'error', 'message': 'Failed to write Trainer Live Stats'}

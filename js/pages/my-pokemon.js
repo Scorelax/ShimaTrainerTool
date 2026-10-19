@@ -1,8 +1,10 @@
 // My Pokemon Page - Display trainer's Pokemon grid with pagination
 import { PokemonAPI } from '../api.js';
+import { allCachedPokemon, cachedPokemon, knownMoveNames } from '../utils/owned-pokemon.js';
 import { showError, showSuccess } from '../utils/notifications.js';
 import { getMoveTypeColor, getTextColorForBackground } from '../utils/pokemon-types.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
+import { loadTrainer } from '../utils/trainer-data.js';
 
 // Module state
 let currentPage = 1;
@@ -840,23 +842,15 @@ function loadPokemonList() {
   allPokemons = [];
 
   // Retrieve all Pokemon data from session storage
-  for (let i = 0; i < sessionStorage.length; i++) {
-    const key = sessionStorage.key(i);
-    if (key.startsWith('pokemon_')) {
-      try {
-        const pokemonData = JSON.parse(sessionStorage.getItem(key));
-        allPokemons.push({
-          image: pokemonData[1],
-          name: pokemonData[2],
-          dexentry: pokemonData[3],
-          level: pokemonData[4],
-          nickname: pokemonData[36]
-        });
-      } catch (e) {
-        console.error('Error parsing pokemon data:', key, e);
-      }
-    }
-  }
+  allCachedPokemon().forEach(pokemonData => {
+    allPokemons.push({
+      image: pokemonData.image,
+      name: pokemonData.name,
+      dexentry: pokemonData.dexNumber,
+      level: pokemonData.level,
+      nickname: pokemonData.nickname
+    });
+  });
 
   // Sort by dex entry
   allPokemons.sort((a, b) => a.dexentry - b.dexentry);
@@ -978,13 +972,8 @@ function nextPage() {
 const ALL_TYPES = ['Normal','Fighting','Flying','Poison','Ground','Rock','Bug','Ghost','Steel','Fire','Water','Grass','Electric','Psychic','Ice','Dragon','Dark','Fairy','Cosmic'];
 
 function _getAllPokemonData() {
-  const result = [];
-  for (let i = 0; i < sessionStorage.length; i++) {
-    const key = sessionStorage.key(i);
-    if (!key.startsWith('pokemon_')) continue;
-    try { result.push(JSON.parse(sessionStorage.getItem(key))); } catch (e) {}
-  }
-  result.sort((a, b) => (a[3] || 0) - (b[3] || 0));
+  const result = allCachedPokemon();
+  result.sort((a, b) => (a.dexNumber || 0) - (b.dexNumber || 0));
   return result;
 }
 
@@ -995,27 +984,14 @@ function openTypingsModal() {
   modal.classList.add('open');
 }
 
-const MOVE_INDICES      = [23, 24, 25, 26, 27, 28, 37];
-const MOVE_REQ_LEVELS   = [ 1,  2,  6, 10, 14, 18,  0]; // 0 = custom moves, always available
-
-function _knownMoveNames(data) {
-  const level = parseInt(data[4]) || 1;
-  const names = [];
-  MOVE_INDICES.forEach((idx, i) => {
-    const req = MOVE_REQ_LEVELS[i];
-    if (req === 0 || level >= req) {
-      (data[idx] || '').split(',').map(s => s.trim()).filter(Boolean).forEach(n => names.push(n));
-    }
-  });
-  return names;
-}
+const _knownMoveNames = knownMoveNames;
 const DMG_PATTERN = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit|hit\s+for\s+\d+d\d+/i;
 const DICE_PATTERN = /\d+d\d+/i;
 const _isDamaging = desc => DMG_PATTERN.test(desc) && DICE_PATTERN.test(desc);
 
 function _buildMoveMap() {
   const movesData = JSON.parse(sessionStorage.getItem('moves') || '[]');
-  return new Map(movesData.map(m => [m[0], m]));
+  return new Map(movesData.map(m => [m.name, m]));
 }
 
 function _renderTypingsGrid() {
@@ -1035,8 +1011,8 @@ function _renderTypingsGrid() {
   const typeCounts = {};
   ALL_TYPES.forEach(t => { typeCounts[t] = 0; });
   allPokemon.forEach(data => {
-    const t1 = data[5] || '';
-    const t2 = data[6] || '';
+    const t1 = data.types.primary || '';
+    const t2 = data.types.secondary || '';
     if (t1 && typeCounts.hasOwnProperty(t1)) typeCounts[t1]++;
     if (t2 && typeCounts.hasOwnProperty(t2)) typeCounts[t2]++;
   });
@@ -1050,8 +1026,8 @@ function _renderTypingsGrid() {
     _knownMoveNames(data).forEach(moveName => {
       const move = moveMap.get(moveName);
       if (!move) return;
-      const type = move[1] || '';
-      if (type && ALL_TYPES.includes(type) && !coveredTypes.has(type) && _isDamaging(move[7] || '')) {
+      const type = move.type || '';
+      if (type && ALL_TYPES.includes(type) && !coveredTypes.has(type) && _isDamaging(move.description || '')) {
         coveredTypes.add(type);
         moveCounts[type]++;
       }
@@ -1100,12 +1076,12 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
 
   let matching;
   if (section === 'type') {
-    matching = allPokemon.filter(d => d[5] === type || d[6] === type);
+    matching = allPokemon.filter(d => d.types.primary === type || d.types.secondary === type);
   } else {
     matching = allPokemon.filter(data =>
       _knownMoveNames(data).some(moveName => {
         const move = moveMap.get(moveName);
-        return move && move[1] === type && _isDamaging(move[7] || '');
+        return move && move.type === type && _isDamaging(move.description || '');
       })
     );
   }
@@ -1116,11 +1092,11 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
       ? _knownMoveNames(data)
           .filter(moveName => {
             const move = moveMap.get(moveName);
-            return move && move[1] === type && _isDamaging(move[7] || '');
+            return move && move.type === type && _isDamaging(move.description || '');
           })
           .map(moveName => {
             const move = moveMap.get(moveName);
-            return { name: moveName, vpCost: move[4] || '', range: move[6] || '' };
+            return { name: moveName, vpCost: move.vpCost || '', range: move.range || '' };
           })
       : [];
     return { data, moves };
@@ -1129,18 +1105,18 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
   list.innerHTML = `
     ${matchingWithMoves.length === 0 ? '<div style="padding:1rem 1.5rem;color:#888;">No Pokémon found.</div>' : ''}
     ${matchingWithMoves.map(({ data }) => {
-      const name = data[2] || '';
-      const nickname = data[36] || '';
-      const image = data[1] || 'assets/Pokeball.png';
+      const name = data.name || '';
+      const nickname = data.nickname || '';
+      const image = data.image || 'assets/Pokeball.png';
       const displayName = nickname || name;
-      const t2 = data[6] ? ` / ${data[6]}` : '';
+      const t2 = data.types.secondary ? ` / ${data.types.secondary}` : '';
       const isMove = section === 'move';
       return `
         <div class="party-pokemon-row${isMove ? ' type-detail-expandable' : ''}">
           ${spriteMediaHtml(image, name, 'party-pokemon-avatar', '', { small: true })}
           <div class="party-pokemon-info">
             <div class="party-pokemon-label">${displayName}</div>
-            <div class="party-pokemon-sublabel">Lv. ${data[4] || '?'} &nbsp;·&nbsp; ${data[5] || ''}${t2}</div>
+            <div class="party-pokemon-sublabel">Lv. ${data.level || '?'} &nbsp;·&nbsp; ${data.types.primary || ''}${t2}</div>
           </div>
           ${isMove ? '<span class="type-detail-chevron">▼</span>' : ''}
         </div>
@@ -1187,14 +1163,8 @@ function openPartyModal() {
   const modal = document.getElementById('partyModal');
   if (!modal) return;
 
-  const pokemonFullData = [];
-  for (let i = 0; i < sessionStorage.length; i++) {
-    const key = sessionStorage.key(i);
-    if (key.startsWith('pokemon_')) {
-      try { pokemonFullData.push(JSON.parse(sessionStorage.getItem(key))); } catch (e) {}
-    }
-  }
-  pokemonFullData.sort((a, b) => (a[3] || 0) - (b[3] || 0));
+  const pokemonFullData = allCachedPokemon();
+  pokemonFullData.sort((a, b) => (a.dexNumber || 0) - (b.dexNumber || 0));
 
   renderPartyModalList(pokemonFullData);
   modal.classList.add('open');
@@ -1204,11 +1174,11 @@ function renderPartyModalList(pokemonFullData) {
   const list = document.getElementById('partyModalList');
   if (!list) return;
 
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  const trainerLevel = parseInt(trainerData[2]) || 1;
+  const trainerData = loadTrainer();
+  const trainerLevel = parseInt(trainerData.level) || 1;
   const numPokeSlots = getNumPokeSlots(trainerLevel);
-  // trainerData[26] is the pokeslots count field; party membership is per-pokemon in pokemonData[38]
-  const partyCount = pokemonFullData.filter(d => d[38]).length;
+  // trainerData.pokeslots is the party's size; party membership is per-pokemon (partySlot)
+  const partyCount = pokemonFullData.filter(d => d.partySlot).length;
   const partyFull = partyCount >= numPokeSlots;
 
   const badge = document.getElementById('partyCountBadge');
@@ -1227,22 +1197,22 @@ function renderPartyModalList(pokemonFullData) {
     </div>`;
 
   const rows = pokemonFullData.map(data => {
-    const name = data[2] || '';
-    const nickname = data[36] || '';
-    const image = data[1] || 'assets/Pokeball.png';
-    const inParty = !!(data[38]);
-    const inUtility = data[56] === 1 || data[56] === '1';
+    const name = data.name || '';
+    const nickname = data.nickname || '';
+    const image = data.image || 'assets/Pokeball.png';
+    const inParty = !!(data.partySlot);
+    const inUtility = data.utilitySlot;
     const displayName = nickname || name;
-    const subLabel = `Lv. ${data[4] || '?'}`;
-    const t1 = data[5] || '';
-    const t2 = data[6] || '';
+    const subLabel = `Lv. ${data.level || '?'}`;
+    const t1 = data.types.primary || '';
+    const t2 = data.types.secondary || '';
     const typeBadges = [t1, t2].filter(Boolean).map(t => {
       const bg = getMoveTypeColor(t);
       const col = getTextColorForBackground(bg);
       return `<span class="party-type-badge" style="background:${bg};color:${col};">${t}</span>`;
     }).join('');
     const partyDisabled = partyFull && !inParty;
-    const utilityOccupied = pokemonFullData.some(d => d[56] === 1 || d[56] === '1');
+    const utilityOccupied = pokemonFullData.some(d => d.utilitySlot);
     const utilityDisabled = inParty || (utilityOccupied && !inUtility);
 
     return `
@@ -1280,23 +1250,23 @@ function renderPartyModalList(pokemonFullData) {
 function _updatePartyBadge(pokemonFullData, numPokeSlots) {
   const badge = document.getElementById('partyCountBadge');
   if (!badge) return;
-  badge.textContent = `Party: ${pokemonFullData.filter(d => d[38]).length}/${numPokeSlots}`;
+  badge.textContent = `Party: ${pokemonFullData.filter(d => d.partySlot).length}/${numPokeSlots}`;
 }
 
 function _refreshPartyDisabled(pokemonFullData, numPokeSlots) {
-  const partyFull = pokemonFullData.filter(d => d[38]).length >= numPokeSlots;
+  const partyFull = pokemonFullData.filter(d => d.partySlot).length >= numPokeSlots;
   document.querySelectorAll('input[data-slot-type="party"]').forEach(cb => {
-    const entry = pokemonFullData.find(d => d[2] === cb.dataset.pokemonName);
-    cb.disabled = partyFull && !(entry && entry[38]);
+    const entry = pokemonFullData.find(d => d.name === cb.dataset.pokemonName);
+    cb.disabled = partyFull && !(entry && entry.partySlot);
   });
 }
 
 function _refreshUtilityDisabled(pokemonFullData) {
-  const utilityOccupied = pokemonFullData.some(d => d[56] === 1 || d[56] === '1');
+  const utilityOccupied = pokemonFullData.some(d => d.utilitySlot);
   document.querySelectorAll('input[data-slot-type="utility"]').forEach(cb => {
-    const entry = pokemonFullData.find(d => d[2] === cb.dataset.pokemonName);
-    const hasUtility = entry && (entry[56] === 1 || entry[56] === '1');
-    const inParty = entry && !!entry[38];
+    const entry = pokemonFullData.find(d => d.name === cb.dataset.pokemonName);
+    const hasUtility = entry && (entry.utilitySlot);
+    const inParty = entry && !!entry.partySlot;
     cb.disabled = inParty || (utilityOccupied && !hasUtility);
   });
 }
@@ -1309,11 +1279,11 @@ async function handleSlotToggle(e, pokemonFullData, numPokeSlots) {
   const pokemonName = checkbox.dataset.pokemonName;
   const slotType = checkbox.dataset.slotType;
 
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  const trainerData = loadTrainer();
   const pokemonKey = `pokemon_${pokemonName.toLowerCase()}`;
-  const pokemonData = JSON.parse(sessionStorage.getItem(pokemonKey) || '[]');
+  const pokemonData = cachedPokemon(pokemonName);
 
-  if (!trainerData.length || !pokemonData.length) {
+  if (!trainerData.name || !pokemonData) {
     checkbox.checked = !isChecked;
     showError('Could not load trainer or Pokemon data.');
     return;
@@ -1331,56 +1301,56 @@ async function handleSlotToggle(e, pokemonFullData, numPokeSlots) {
 async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, pokemonData, trainerData, pokemonFullData, numPokeSlots) {
   if (isChecked) {
     // Block if already in utility slot
-    if (pokemonData[56] === 1 || pokemonData[56] === '1') {
+    if (pokemonData.utilitySlot) {
       checkbox.checked = false;
       showError('Remove from utility slot first.');
       return;
     }
     // Block if party is at cap — count from pokemon data, not trainerData
-    if (pokemonFullData.filter(d => d[38]).length >= numPokeSlots) {
+    if (pokemonFullData.filter(d => d.partySlot).length >= numPokeSlots) {
       checkbox.checked = false;
       showError(`Party is full! (${numPokeSlots}/${numPokeSlots})`);
       return;
     }
   }
 
-  const originalSlot = pokemonData[38];
+  const originalSlot = pokemonData.partySlot;
   // Assign the next available slot optimistically so rapid multi-selects don't collide on slot 1
   let optimisticSlot = '1';
   if (isChecked) {
-    const usedSlots = new Set(pokemonFullData.filter(d => d[38]).map(d => String(d[38])));
+    const usedSlots = new Set(pokemonFullData.filter(d => d.partySlot).map(d => String(d.partySlot)));
     for (let i = 1; i <= numPokeSlots; i++) {
       if (!usedSlots.has(String(i))) { optimisticSlot = String(i); break; }
     }
   }
-  pokemonData[38] = isChecked ? optimisticSlot : '';
+  pokemonData.partySlot = isChecked ? optimisticSlot : null;
   sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
 
-  const entry = pokemonFullData.find(d => d[2] === pokemonName);
-  if (entry) entry[38] = pokemonData[38];
+  const entry = pokemonFullData.find(d => d.name === pokemonName);
+  if (entry) entry.partySlot = pokemonData.partySlot;
 
   _updatePartyBadge(pokemonFullData, numPokeSlots);
   _refreshPartyDisabled(pokemonFullData, numPokeSlots);
   _refreshUtilityDisabled(pokemonFullData);
 
   try {
-    // trainerData[26] is the pokeslots count — passed to API as capacity info
+    // trainerData.pokeslots is the party's size — passed to API as capacity info
     const response = await PokemonAPI.updatePartyStatus(
-      trainerData[1], pokemonData[2], trainerData[26], isChecked ? 'add' : 'remove'
+      trainerData.name, pokemonData.name, trainerData.pokeslots, isChecked ? 'add' : 'remove'
     );
 
     if (response.status === 'success') {
       if (isChecked && response.slot) {
-        pokemonData[38] = response.slot;
-        if (entry) entry[38] = response.slot;
+        pokemonData.partySlot = response.slot;
+        if (entry) entry.partySlot = response.slot;
         sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
         _updatePartyBadge(pokemonFullData, numPokeSlots);
         _refreshPartyDisabled(pokemonFullData, numPokeSlots);
         _refreshUtilityDisabled(pokemonFullData);
       }
     } else {
-      pokemonData[38] = originalSlot;
-      if (entry) entry[38] = originalSlot;
+      pokemonData.partySlot = originalSlot;
+      if (entry) entry.partySlot = originalSlot;
       sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
       checkbox.checked = !isChecked;
       _updatePartyBadge(pokemonFullData, numPokeSlots);
@@ -1389,8 +1359,8 @@ async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, po
       showError(response.message || 'Failed to update party status.');
     }
   } catch (err) {
-    pokemonData[38] = originalSlot;
-    if (entry) entry[38] = originalSlot;
+    pokemonData.partySlot = originalSlot;
+    if (entry) entry.partySlot = originalSlot;
     sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
     checkbox.checked = !isChecked;
     _updatePartyBadge(pokemonFullData, numPokeSlots);
@@ -1405,17 +1375,17 @@ async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, po
 async function _toggleUtilitySlot(checkbox, isChecked, pokemonName, pokemonKey, pokemonData, trainerData, pokemonFullData, numPokeSlots) {
   if (isChecked) {
     // Block if already in active party
-    if (pokemonData[38]) {
+    if (pokemonData.partySlot) {
       checkbox.checked = false;
       showError('Remove from active party first.');
       return;
     }
   }
 
-  const originalUtility = pokemonData[56];
+  const originalUtility = pokemonData.utilitySlot;
   const clearedEntries = []; // for rollback
 
-  pokemonData[56] = isChecked ? 1 : '';
+  pokemonData.utilitySlot = isChecked;
   sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
 
   // Auto-clear any other Pokemon currently in utility slot
@@ -1424,13 +1394,13 @@ async function _toggleUtilitySlot(checkbox, isChecked, pokemonName, pokemonKey, 
       const key = sessionStorage.key(i);
       if (key.startsWith('pokemon_') && key !== pokemonKey) {
         const other = JSON.parse(sessionStorage.getItem(key));
-        if (other[56] === 1 || other[56] === '1') {
-          clearedEntries.push({ key, originalValue: other[56], name: other[2] });
-          other[56] = '';
+        if (other.utilitySlot) {
+          clearedEntries.push({ key, originalValue: other.utilitySlot, name: other.name });
+          other.utilitySlot = false;
           sessionStorage.setItem(key, JSON.stringify(other));
-          const otherEntry = pokemonFullData.find(d => d[2] === other[2]);
-          if (otherEntry) otherEntry[56] = '';
-          const otherCb = document.querySelector(`input[data-slot-type="utility"][data-pokemon-name="${other[2]}"]`);
+          const otherEntry = pokemonFullData.find(d => d.name === other.name);
+          if (otherEntry) otherEntry.utilitySlot = false;
+          const otherCb = document.querySelector(`input[data-slot-type="utility"][data-pokemon-name="${other.name}"]`);
           if (otherCb) otherCb.checked = false;
         }
       }
@@ -1438,30 +1408,30 @@ async function _toggleUtilitySlot(checkbox, isChecked, pokemonName, pokemonKey, 
   }
 
   sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-  const entry = pokemonFullData.find(d => d[2] === pokemonName);
-  if (entry) entry[56] = pokemonData[56];
+  const entry = pokemonFullData.find(d => d.name === pokemonName);
+  if (entry) entry.utilitySlot = pokemonData.utilitySlot;
   _refreshUtilityDisabled(pokemonFullData);
 
   const rollback = () => {
-    pokemonData[56] = originalUtility;
+    pokemonData.utilitySlot = originalUtility;
     sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
     clearedEntries.forEach(({ key, originalValue, name }) => {
       const other = JSON.parse(sessionStorage.getItem(key));
-      other[56] = originalValue;
+      other.utilitySlot = originalValue;
       sessionStorage.setItem(key, JSON.stringify(other));
-      const otherEntry = pokemonFullData.find(d => d[2] === name);
-      if (otherEntry) otherEntry[56] = originalValue;
+      const otherEntry = pokemonFullData.find(d => d.name === name);
+      if (otherEntry) otherEntry.utilitySlot = originalValue;
       const otherCb = document.querySelector(`input[data-slot-type="utility"][data-pokemon-name="${name}"]`);
       if (otherCb) otherCb.checked = !!originalValue;
     });
-    if (entry) entry[56] = originalUtility;
+    if (entry) entry.utilitySlot = originalUtility;
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
     checkbox.checked = !isChecked;
     _refreshUtilityDisabled(pokemonFullData);
   };
 
   try {
-    const response = await PokemonAPI.updateUtilitySlot(trainerData[1], pokemonData[2], isChecked ? 'add' : 'remove');
+    const response = await PokemonAPI.updateUtilitySlot(trainerData.name, pokemonData.name, isChecked ? 'add' : 'remove');
     if (response.status !== 'success') {
       rollback();
       showError(response.message || 'Failed to update utility slot.');

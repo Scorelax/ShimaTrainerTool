@@ -1,6 +1,7 @@
 // Edit Pokemon Page - Modern form for editing Pokemon stats with pre-filled data
 
 import { findSpecies } from '../utils/species.js';
+import { abilitiesOf, cachedPokemon, forgetPokemon, storePokemon } from '../utils/owned-pokemon.js';
 import { PokemonAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
@@ -11,37 +12,32 @@ const escAttr = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '
 
 export function renderEditPokemon(pokemonName) {
   // Load Pokemon data from session storage
-  const pokemonDataStr = sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`);
-  if (!pokemonDataStr) {
+  const pokemonData = cachedPokemon(pokemonName);
+  if (!pokemonData) {
     return '<div class="error">Pokemon data not found. Please return to the trainer card.</div>';
   }
 
-  const pokemonData = JSON.parse(pokemonDataStr);
   const natures = JSON.parse(sessionStorage.getItem('natures') || '[]');
   const pokemonFeatsData = JSON.parse(sessionStorage.getItem('pokemonFeats') || '[]');
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
   // Extract Pokemon info
-  const name = pokemonData[2] || '';
-  const nickname = pokemonData[36] || '';
-  const level = pokemonData[4] || 1;
-  const str = pokemonData[15] || 10;
-  const dex = pokemonData[16] || 10;
-  const con = pokemonData[17] || 10;
-  const int = pokemonData[18] || 10;
-  const wis = pokemonData[19] || 10;
-  const cha = pokemonData[20] || 10;
-  const loyalty = pokemonData[33] || 0;
-  const heldItem = pokemonData[35] || '';
-  const currentNature = pokemonData[32] || '';
-  const skills = pokemonData[22] || '';
-  const feats = pokemonData[50] || '';
-  const customMoves = pokemonData[37] || '';
-
-  const selectedSkills = skills ? skills.split(',').map(s => s.trim()).filter(s => s) : [];
-  const selectedFeats = feats ? feats.split(',').map(s => s.trim()).filter(s => s) : [];
-  const existingCustomMoves = customMoves ? customMoves.split(',').map(m => m.trim()).filter(m => m) : [];
+  const name = pokemonData.name || '';
+  const nickname = pokemonData.nickname || '';
+  const level = pokemonData.level || 1;
+  const str = pokemonData.stats.strength || 10;
+  const dex = pokemonData.stats.dexterity || 10;
+  const con = pokemonData.stats.constitution || 10;
+  const int = pokemonData.stats.intelligence || 10;
+  const wis = pokemonData.stats.wisdom || 10;
+  const cha = pokemonData.stats.charisma || 10;
+  const loyalty = pokemonData.loyalty || 0;
+  const heldItem = pokemonData.heldItem || '';
+  const currentNature = pokemonData.nature || '';
+  const selectedSkills = pokemonData.skills || [];
+  const selectedFeats = pokemonData.feats || [];
+  const existingCustomMoves = pokemonData.customMoves || [];
 
   const html = `
     <div class="edit-pokemon-page">
@@ -860,7 +856,7 @@ export function renderEditPokemon(pokemonName) {
 
 export async function attachEditPokemonListeners() {
   const pokemonName = sessionStorage.getItem('selectedPokemonName');
-  const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
+  const pokemonData = cachedPokemon(pokemonName);
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
@@ -927,7 +923,7 @@ export async function attachEditPokemonListeners() {
   setupAutocomplete(
     'customMovesInput',
     'customMovesDropdown',
-    moves.map(move => move[0])
+    moves.map(move => move.name)
   );
 
   // Add move button
@@ -980,13 +976,13 @@ export async function attachEditPokemonListeners() {
 
   document.getElementById('confirmReleasePokemon')?.addEventListener('click', async () => {
     try {
-      const result = await PokemonAPI.release(pokemonData[0], pokemonName);
+      const result = await PokemonAPI.release(pokemonData.trainer, pokemonName);
       if (result.status !== 'success') {
         showError(result.message || 'Failed to release Pokémon.');
         return;
       }
-      sessionStorage.removeItem(`pokemon_${pokemonName.toLowerCase()}`);
-      showSuccess(`${pokemonData[36] || pokemonData[2]} was released.`);
+      forgetPokemon(pokemonName);
+      showSuccess(`${pokemonData.nickname || pokemonData.name} was released.`);
       window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
     } catch (err) {
       showError(err.message || 'Failed to release Pokémon.');
@@ -995,7 +991,7 @@ export async function attachEditPokemonListeners() {
 
   // Nature change listener for stat recalculation
   const natureRadios = document.querySelectorAll('input[name="nature"]');
-  const originalNature = pokemonData[32] || '';
+  const originalNature = pokemonData.nature || '';
   // Tracks whichever nature is currently reflected in the stat inputs, so a
   // second nature change reverses the one just applied, not the DB original.
   let currentAppliedNature = originalNature;
@@ -1291,15 +1287,13 @@ function showFeatChoiceModal({ title, description, type, options = [], maxSelect
 
 async function handleFormSubmit(pokemonName, originalNature) {
   const form = document.getElementById('editPokemonForm');
-  const pokemonDataStr = sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`);
-  const pokemonData = JSON.parse(pokemonDataStr);
+  const pokemonData = cachedPokemon(pokemonName);
 
   // Store ORIGINAL values from database for comparison
-  const originalFeatsFromDb = pokemonData[50] || '';
-  const originalSkills = (pokemonData[22] || '').split(',').map(s => s.trim()).filter(s => s);
-  const originalLevel = parseInt(pokemonData[4], 10);
-  const originalCon = parseInt(pokemonData[17], 10);
-  const originalLoyalty = parseInt(pokemonData[33], 10) || 0;
+  const originalFeats = [...(pokemonData.feats || [])];
+  const originalLevel = parseInt(pokemonData.level, 10);
+  const originalCon = parseInt(pokemonData.stats.constitution, 10);
+  const originalLoyalty = parseInt(pokemonData.loyalty, 10) || 0;
 
   try {
     // Gather form data
@@ -1321,8 +1315,6 @@ async function handleFormSubmit(pokemonName, originalNature) {
     let selectedFeats = Array.from(form.querySelectorAll('input[name="feats"]:checked'))
       .map(cb => cb.value);
 
-    // Parse original feats to detect newly added ones
-    const originalFeats = originalFeatsFromDb.split(',').map(f => f.trim()).filter(f => f);
     // Normalize feat names for comparison (case-insensitive, trimmed)
     const originalFeatsNormalized = originalFeats.map(f => f.toLowerCase().trim());
     const newFeats = selectedFeats.filter(f => {
@@ -1403,15 +1395,15 @@ async function handleFormSubmit(pokemonName, originalNature) {
     }
 
     // Get selected abilities (after potential Hidden Ability auto-selection)
-    const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
-    const abilitiesString = selectedAbilityCheckboxes.map(cb => cb.value).join('|');
+    const selectedAbilities = Array.from(document.querySelectorAll('input[name="abilities"]:checked'))
+      .map(cb => _offeredAbilities.get(Number(cb.value))).filter(Boolean);
 
     // Get held items from chips
     const heldItemChips = Array.from(document.querySelectorAll('#heldItemsContainer .chip'));
     const heldItems = heldItemChips.map(chip =>
       chip.textContent.trim().replace('×', '').trim()
     );
-    const heldItemsString = heldItems.join(', ');
+    const heldItemsString = heldItems.join(', ');  // (a Pokemon's held items: one text, comma-separated)
 
     // Get custom moves from chips
     const customMoveChips = Array.from(document.querySelectorAll('#customMovesContainer .chip'));
@@ -1419,24 +1411,23 @@ async function handleFormSubmit(pokemonName, originalNature) {
       chip.textContent.trim().replace('×', '').trim()
     );
 
-    // Update Pokemon data array
-    pokemonData[36] = (document.getElementById('nickname')?.value || '').trim().slice(0, 30); // empty: no nickname
-    pokemonData[4] = level;
-    pokemonData[7] = abilitiesString;   // Ability (combined with pipes)
-    pokemonData[15] = str;
-    pokemonData[16] = dex;
-    pokemonData[17] = con;
-    pokemonData[18] = int;
-    pokemonData[19] = wis;
-    pokemonData[20] = cha;
-    pokemonData[32] = nature;
-    pokemonData[33] = loyalty;
-    pokemonData[35] = heldItemsString;
-    pokemonData[37] = customMoves.join(', ');
-    pokemonData[50] = selectedFeats.join(', ');
+    // Update the Pokemon
+    pokemonData.nickname = (document.getElementById('nickname')?.value || '').trim().slice(0, 30); // empty: no nickname
+    pokemonData.level = level;
+    pokemonData.abilities = selectedAbilities;
+    pokemonData.stats = { strength: str, dexterity: dex, constitution: con, intelligence: int, wisdom: wis, charisma: cha };
+    pokemonData.nature = nature;
+    pokemonData.loyalty = loyalty;
+    pokemonData.heldItem = heldItemsString;
+    pokemonData.customMoves = customMoves;
+    pokemonData.feats = selectedFeats;
+    // The skills as ticked (with Skilled's / Quick-Fingered's) -- recalculate-stats then adds / takes away the ones
+    // feats give. (They used to be set only when nothing needed recalculating, so a skill ticked -- or Skilled's
+    // pick -- together with a feat change was lost.)
+    pokemonData.skills = selectedSkills;
 
     // Check if any stat affecting HP/VP changed
-    const featsChanged = JSON.stringify(selectedFeats.sort()) !== JSON.stringify(originalFeats.sort());
+    const featsChanged = JSON.stringify([...selectedFeats].sort()) !== JSON.stringify([...originalFeats].sort());
     const levelChanged = level !== originalLevel;
     const conChanged = con !== originalCon;
     const loyaltyChanged = loyalty !== originalLoyalty;
@@ -1449,7 +1440,7 @@ async function handleFormSubmit(pokemonName, originalNature) {
 
       try {
         // Backend will recalculate stats (feats + HP/VP)
-        const response = await PokemonAPI.recalculateStats(pokemonData, originalFeatsFromDb);
+        const response = await PokemonAPI.recalculateStats(pokemonData, originalFeats);
 
         if (response.status === 'success' && response.newPokemonData) {
           // Use the recalculated data (including skills and HP/VP)
@@ -1465,13 +1456,10 @@ async function handleFormSubmit(pokemonName, originalNature) {
         // Hide loading screen
         hideLoading();
       }
-    } else {
-      // No changes affecting calculations, just update skills normally
-      pokemonData[22] = selectedSkills.join(', ');
     }
 
     // Update session storage IMMEDIATELY
-    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+    storePokemon(pokemonData);
 
     // Navigate back to pokemon card
     window.dispatchEvent(new CustomEvent('navigate', {
@@ -1503,7 +1491,7 @@ async function handleFormSubmit(pokemonName, originalNature) {
 }
 
 async function loadAbilities(pokemonData) {
-  const currentPokemonName = pokemonData[2];
+  const currentPokemonName = pokemonData.name;
   const abilitiesContent = document.getElementById('abilitiesContent');
 
   if (abilitiesContent) {
@@ -1518,9 +1506,9 @@ async function loadAbilities(pokemonData) {
         const pokemonInfo = findSpecies(JSON.parse(cachedDataStr), currentPokemonName);
 
         if (pokemonInfo) {
-          // Pokemon found in cache! "slot:Name, Description" for each ability it has (slot 0 / 1 / 2: primary,
-          // secondary, hidden) -- as pokemon/abilities sends them
-          const abilities = (pokemonInfo.abilityList || []).map(a => `${a.slot}:${a.name}, ${a.description}`);
+          // Pokemon found in cache! {slot, name, description} for each ability its species has (slot 0 / 1 / 2:
+          // primary, secondary, hidden)
+          const abilities = pokemonInfo.abilityList || [];
 
           console.log('[Cache HIT] Using cached abilities for', currentPokemonName);
           populateAbilities(abilities, pokemonData);
@@ -1536,7 +1524,7 @@ async function loadAbilities(pokemonData) {
     console.log('[Cache MISS] Fetching abilities from API for', currentPokemonName);
     const response = await PokemonAPI.getAbilities(currentPokemonName);
     if (response.status === 'success') {
-      populateAbilities(response.abilities, pokemonData);
+      populateAbilities(response.abilities || [], pokemonData); // {slot, name, description} each, like the cache's
     } else {
       console.error('Error fetching Pokemon abilities:', response.message);
       if (abilitiesContent) {
@@ -1553,39 +1541,33 @@ async function loadAbilities(pokemonData) {
   }
 }
 
+// The abilities offered on the page, by slot ({slot, name, description}) -- what a ticked box saves.
+const _offeredAbilities = new Map();
+
 function populateAbilities(abilities, pokemonData) {
   const abilitiesContent = document.getElementById('abilitiesContent');
   if (!abilitiesContent) return;
 
   abilitiesContent.innerHTML = '';
+  _offeredAbilities.clear();
 
-  const pokemonName = pokemonData[2] || 'Unknown'; // Pokemon name at index 2
+  const pokemonName = pokemonData.name || 'Unknown';
 
-  // What it has now (pokemonData[7]: "slot:Name;Description" joined by "|", or an older plain name) -- always offered,
-  // so saving never takes an ability away, even one the Pokedex doesn't show.
-  const held = String(pokemonData[7] || '').split('|').map(a => a.trim()).filter(Boolean);
-  const heldSlots = new Set(held.map(a => (/^\d:/.test(a) ? Number(a[0]) : null)).filter(s => s !== null));
-  const heldNames = new Set(held.map(a => a.replace(/^\d:/, '').split(';')[0].trim().toLowerCase()));
+  // What it has now -- always offered, so saving never takes an ability away, even one the Pokedex doesn't show.
+  const held = abilitiesOf(pokemonData);
+  const heldSlots = new Set(held.map(a => a.slot));
+  const heldNames = new Set(held.map(a => a.name.toLowerCase()));
   // The abilities it can take: the ones the DM shows in the Pokedex for this species (primary / secondary / hidden).
   const SLOT_SWITCH = ['primaryAbility', 'secondaryAbility', 'hiddenAbility'];
 
-  abilities.forEach((abilityData, index) => {
-    const colonIndex = abilityData.indexOf(':');
-    let slotIndex = index;
-    let abilityString = abilityData;
-
-    if (colonIndex !== -1 && colonIndex < 3) {
-      slotIndex = parseInt(abilityData.substring(0, colonIndex));
-      abilityString = abilityData.substring(colonIndex + 1);
-    }
-
-    const parts = abilityString.split(',');
-    const abilityName = parts[0].trim();
+  abilities.forEach(ability => {
+    const slotIndex = ability.slot;
+    const abilityName = ability.name;
     const isHeld = heldSlots.has(slotIndex) || heldNames.has(abilityName.toLowerCase());
     if (!isHeld && !isFieldVisible(pokemonName, SLOT_SWITCH[slotIndex])) {
       return; // not in the Pokedex for this species yet
     }
-    const abilityDescription = parts.slice(1).join(',').trim();
+    _offeredAbilities.set(slotIndex, { slot: slotIndex, name: abilityName, description: ability.description || '' });
 
     const div = document.createElement('div');
     div.className = 'checkbox-item';
@@ -1594,7 +1576,8 @@ function populateAbilities(abilities, pokemonData) {
     checkbox.type = 'checkbox';
     checkbox.id = `ability${slotIndex}`;
     checkbox.name = 'abilities';
-    checkbox.value = slotIndex + ':' + abilityName + ';' + abilityDescription;
+    checkbox.value = String(slotIndex);
+    checkbox.checked = heldSlots.has(slotIndex) || heldNames.has(abilityName.toLowerCase());
 
     const label = document.createElement('label');
     label.htmlFor = `ability${slotIndex}`;
@@ -1610,57 +1593,9 @@ function populateAbilities(abilities, pokemonData) {
     return;
   }
 
-  // Check currently selected abilities
-  let currentAbilities = [];
-  const ability7 = pokemonData[7] || '';
-
-  // Ensure ability7 is a string
-  const abilityString = typeof ability7 === 'string' ? ability7 : String(ability7 || '');
-
-  // Split by pipe separator to get individual abilities
-  if (abilityString && abilityString.includes('|')) {
-    currentAbilities = abilityString.split('|').map(a => a.trim()).filter(a => a);
-  } else if (abilityString) {
-    currentAbilities = [abilityString];
-  }
-
   // If no ability saved, default to the first available checkbox
-  if (currentAbilities.length === 0) {
+  if (!held.length) {
     const firstCheckbox = abilitiesContent.querySelector('input[name="abilities"]');
     if (firstCheckbox) firstCheckbox.checked = true;
-    return;
   }
-
-  currentAbilities.forEach(abilityData => {
-    // Ensure abilityData is a string
-    const abilityStr = typeof abilityData === 'string' ? abilityData : String(abilityData);
-    const colonIndex = abilityStr.indexOf(':');
-
-    if (colonIndex !== -1 && colonIndex < 3) {
-      const slotIndex = abilityStr.substring(0, colonIndex);
-      const checkbox = document.getElementById(`ability${slotIndex}`);
-      if (checkbox) {
-        checkbox.checked = true;
-      }
-    } else {
-      // Legacy format - match by name
-      const abilityName = abilityStr.split(';')[0].trim();
-      const checkboxes = document.querySelectorAll('input[name="abilities"]');
-      checkboxes.forEach(checkbox => {
-        const checkboxValue = checkbox.value;
-        const checkboxColonIndex = checkboxValue.indexOf(':');
-        let checkboxAbilityName;
-
-        if (checkboxColonIndex !== -1) {
-          checkboxAbilityName = checkboxValue.substring(checkboxColonIndex + 1).split(';')[0].trim();
-        } else {
-          checkboxAbilityName = checkboxValue.split(';')[0].trim();
-        }
-
-        if (checkboxAbilityName.toLowerCase() === abilityName.toLowerCase()) {
-          checkbox.checked = true;
-        }
-      });
-    }
-  });
 }

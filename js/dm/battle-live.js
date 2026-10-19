@@ -21,10 +21,11 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { renderCombatWip, attachCombatWipListeners, startDmPlacement, setOnDmFocusChange, setDmMapOpener, focusParticipant, forgetLocalCombatant } from '../pages/combat-wip.js';
 import { showBattleMap, hideBattleMap } from '../utils/battle-map-popup.js';
 import { footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
-import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemonRow, natureOptions, openDmModal, abilityMod } from './dm-common.js';
+import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemon, natureOptions, openDmModal, abilityMod } from './dm-common.js';
 import { getClock, WEATHER } from './world-clock.js';
 import { TERRAIN, WEATHER_ROLL_MOD, STATUS_CAPTURE_BONUS, captureDc, accuracyDc } from './encounter-rules.js';
 import { getSetup } from './setup-store.js';
+import { abilityList, nameList } from '../utils/battle-lists.js';
 import { renderMapEditor, editorShownIn } from './map-editor.js';
 import { setLiveSession } from './live-map-store.js';
 import * as liveMapStore from './live-map-store.js';
@@ -583,16 +584,6 @@ const ALL_TYPES = ['Normal', 'Fire', 'Water', 'Grass', 'Electric', 'Ice', 'Fight
 const SIZE_NAMES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic'];
 const SCORE_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
-/** "slot:Name;description|Name;description" -> [{slot, name, description}] (slot null when it has none). */
-function parseAbilities(text) {
-  return String(text || '').split('|').map(a => a.trim()).filter(Boolean).map((a) => {
-    const m = a.match(/^(\d+):(.*)$/s);
-    const body = m ? m[2] : a;
-    const [name, ...rest] = body.split(';');
-    return { slot: m ? Number(m[1]) : null, name: name.trim(), description: rest.join(';').trim() };
-  }).filter(a => a.name);
-}
-
 function speedsText(speeds) {
   return (speeds || []).map(sp => `${sp.type} ${sp.ft}`).join(', ');
 }
@@ -607,7 +598,7 @@ function parseSpeeds(text) {
 async function openEditCreature(p) {
   const isMon = p.combatantType === 'pokemon';
   const sp = isMon ? species.find(s => String(s.name).toLowerCase() === String(p.speciesName).toLowerCase()) : null;
-  const own = parseAbilities(p.abilities);
+  const own = abilityList(p.abilities);
   const speciesAbilities = sp?.abilities || [];
   const custom = own.filter(a => !speciesAbilities.some(s => s.name === a.name));
   const num = (id, label, value, attrs = '') => `<div class="dm-field"><label for="${id}">${label}</label><input class="dm-input" id="${id}" type="number" value="${value ?? ''}" ${attrs}></div>`;
@@ -629,7 +620,7 @@ async function openEditCreature(p) {
       </div>
       <div class="dm-field"><label for="edMoves">Moves <small class="dm-label-note">comma-separated</small></label><textarea class="dm-input" id="edMoves" rows="2">${escapeHtml((p.moves || []).join(', '))}</textarea></div>` : ''}
       <div class="dm-row">${text('edItem', 'Held item', p.item, 'None')}${text('edSpeeds', 'Speeds', speedsText(p.speeds), 'Walking 30, Flying 60')}</div>
-      <div class="dm-row">${text('edSaves', 'Saving throws', p.savingThrows, 'e.g. Dexterity, Wisdom')}${text('edSkills', 'Skills', p.skills, 'e.g. Perception, Stealth')}</div>
+      <div class="dm-row">${text('edSaves', 'Saving throws', nameList(p.savingThrows).join(', '), 'e.g. Dexterity, Wisdom')}${text('edSkills', 'Skills', nameList(p.skills).join(', '), 'e.g. Perception, Stealth')}</div>
       <div class="dm-hint" id="edNote">${isMon ? 'Recalculate works its numbers out again from its species at the level above (abilities and item as ticked; no nature or encounter bonuses) -- check them, then Save.' : ''}</div>
     </div>`;
   const val = (body, id) => body.querySelector(`#${id}`)?.value ?? '';
@@ -641,14 +632,14 @@ async function openEditCreature(p) {
       const slots = [...body.querySelectorAll('input[name="edAbility"]:checked')].map(cb => Number(cb.value));
       try {
         const res = await DmAPI.buildPokemon({ species: p.speciesName, level, abilities: slots.length ? slots : [0], item: val(body, 'edItem').trim(), preview: true });
-        const { participant: np } = participantFromPokemonRow(res.data);
+        const { participant: np } = participantFromPokemon(res.data);
         const set = (id, v) => { const el = body.querySelector(`#${id}`); if (el && v !== undefined && v !== null) el.value = v; };
         // HP / VP lost so far stay lost.
         set('edHp', Math.max(0, np.maxHP - ((p.maxHP || 0) - (p.currentHP || 0))));
         set('edVp', Math.max(0, np.maxVP - ((p.maxVP || 0) - (p.currentVP || 0))));
         set('edMaxHp', np.maxHP); set('edMaxVp', np.maxVP); set('edAc', np.baseAc ?? np.ac); set('edProf', np.proficiency); set('edStab', np.stabBonusValue);
         SCORE_KEYS.forEach(k => set(`ed_${k}`, np[k]));
-        set('edMoves', (np.moves || []).join(', ')); set('edSaves', np.savingThrows); set('edSkills', np.skills); set('edSpeeds', speedsText(np.speeds));
+        set('edMoves', (np.moves || []).join(', ')); set('edSaves', nameList(np.savingThrows).join(', ')); set('edSkills', nameList(np.skills).join(', ')); set('edSpeeds', speedsText(np.speeds));
         set('edType1', np.type1 || ''); set('edType2', np.type2 || '');
         body.querySelector('#edNote').textContent = `Worked out again for a level ${level} ${p.speciesName} -- check the numbers, then Save.`;
       } catch (err) {
@@ -660,7 +651,7 @@ async function openEditCreature(p) {
   buttons.push({ label: 'Save', kind: 'primary', keepOpen: true, onClick: async (body) => {
     const data = {
       name: val(body, 'edName').trim(), item: val(body, 'edItem').trim(),
-      savingThrows: val(body, 'edSaves').trim(), skills: val(body, 'edSkills').trim(), speeds: parseSpeeds(val(body, 'edSpeeds')),
+      savingThrows: nameList(val(body, 'edSaves')), skills: nameList(val(body, 'edSkills')), speeds: parseSpeeds(val(body, 'edSpeeds')),
     };
     const ints = { level: 'edLevel', initiative: 'edInit', currentHP: 'edHp', maxHP: 'edMaxHp', currentVP: 'edVp', maxVP: 'edMaxVp',
       ac: 'edAc', proficiency: 'edProf', critMod: 'edCrit', ...(isMon ? { stabBonusValue: 'edStab' } : {}) };
@@ -680,12 +671,13 @@ async function openEditCreature(p) {
       data.type1 = val(body, 'edType1'); data.type2 = val(body, 'edType2'); data.size = val(body, 'edSize');
       data.moves = val(body, 'edMoves').split(',').map(m => m.trim()).filter(Boolean);
       const picked = [...body.querySelectorAll('input[name="edAbility"]:checked')].map(cb => speciesAbilities.find(a => String(a.slot) === cb.value)).filter(Boolean)
-        .map(a => `${a.slot}:${a.name};${a.description}`);
+        .map(a => ({ slot: a.slot, name: a.name, description: a.description || '' }));
+      // "Name; what it does" per line -- one the DM typed in has no slot.
       const others = val(body, 'edAbilityOther').split('\n').map(l => l.trim()).filter(Boolean).map((l) => {
         const [name, ...rest] = l.split(';');
-        return `${name.trim()};${rest.join(';').trim()}`;
-      });
-      data.abilities = [...picked, ...others].join('|');
+        return { slot: null, name: name.trim(), description: rest.join(';').trim() };
+      }).filter(a => a.name);
+      data.abilities = [...picked, ...others];
     }
     if (!data.name) { showCombatAlert('It needs a name.', { title: 'Edit' }); return false; }
     try {
@@ -792,7 +784,7 @@ async function addSelected() {
     for (const label of labelsFor(s.name, count)) {
       const nature = natureChoice === '__random' ? (natures[Math.floor(Math.random() * natures.length)] || '') : natureChoice;
       const res = await DmAPI.buildPokemon({ species: s.name, level, nature, abilities, item, nickname: label ? `${s.name} ${label}` : '' });
-      const { combatant, participant } = participantFromPokemonRow(res.data);
+      const { combatant, participant } = participantFromPokemon(res.data);
       // No number typed: roll d20 + the Pokemon's initiative bonus for it.
       participant.initiative = initTyped !== '' ? parseInt(initTyped, 10) : rollD20() + (combatant.initiativeTotal || 0);
       participant.status = bench ? 'spectating' : 'participating';

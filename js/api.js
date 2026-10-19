@@ -26,6 +26,16 @@ export const EVENTS_URL = ON_OLD_GITHUB_ADDRESS ? null : `${window.location.orig
 // CACHE MANAGER
 // ============================================================================
 
+/** Drops a trainer's Pokemon from the request cache, under both Settings > Animated Sprites values (see PokemonAPI.get). */
+function forgetCachedPokemon(trainerName, pokemonName) {
+  for (const animated of [0, 1]) cache.remove(`pokemon:${trainerName}:${pokemonName}:${animated}`);
+}
+
+/** The same for a trainer (TrainerAPI.get). */
+function forgetCachedTrainer(trainerName) {
+  for (const animated of [0, 1]) cache.remove(`trainer:${trainerName}:${animated}`);
+}
+
 class CacheManager {
   constructor(duration = 30 * 60 * 1000) { // 30 minutes default
     this.duration = duration;
@@ -74,27 +84,26 @@ class CacheManager {
   }
 }
 
-// Now that the Pi backend is a fast same-origin server rather than
-// rate-limited Apps Script, keep TTLs short -- they're a fallback bound,
+// The Pi is a fast same-origin server, so TTLs stay short -- they're a fallback bound,
 // not the primary invalidation mechanism (that's cache.remove() calls on
 // write, or the X-Data-Version header below).
 const cache = new CacheManager(5 * 60 * 1000); // 5 minutes default
 
 // TTL for static game data (moves, items, feats, natures, pokedex config).
-// The Reset Cache button clears it manually, and on the pi-server backend
-// the X-Data-Version response header clears it automatically whenever the
-// server refreshes its upstream snapshots; the TTL is the fallback bound.
+// The Reset Cache button clears it manually, and the X-Data-Version response
+// header clears it automatically whenever a data file on the Pi changes or the
+// DM saves the Pokedex settings; the TTL is the fallback bound.
 const STATIC_DATA_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
 // TTL for the registered/complete Pokemon lists. These grow every time a
-// player registers a Pokemon, but that write never bumps the server's
-// upstream_cache, so X-Data-Version doesn't cover them -- unlike the truly
+// player registers a Pokemon, but that write doesn't move the server's data
+// version, so X-Data-Version doesn't cover them -- unlike the truly
 // static data above, this TTL is the only thing bounding staleness across
 // devices.
 const LIVE_LIST_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Heavy endpoints (login bundle, full game data) get a longer timeout so a
-// slow Apps Script day degrades to "slow" instead of failing at 30s.
+// slow server day degrades to "slow" instead of failing at 30s.
 const HEAVY_TIMEOUT = 90000;
 
 // ============================================================================
@@ -169,11 +178,10 @@ class API {
         }
 
         // Server-driven cache invalidation: the pi-server tags every response
-        // with the timestamp of its last upstream refresh. When it changes
-        // (someone pressed Reset Cache, or the scheduled refresh ran), drop
-        // the locally cached game data so this device picks up the new
-        // content on its next fetch. Backends without the header (Apps
-        // Script) are unaffected.
+        // with its data version (gamedata.data_version). When it changes (a
+        // data file on the Pi changed, or the DM saved the Pokedex settings),
+        // drop the locally cached game data so this device picks up the new
+        // content on its next fetch.
         const dataVersion = response.headers.get('X-Data-Version');
         if (dataVersion && localStorage.getItem('dataVersion') !== dataVersion) {
           cache.clear();
@@ -277,9 +285,11 @@ export class PokemonAPI {
   }
 
   /**
-   * Register new Pokemon for trainer
+   * Register a newly caught Pokemon for a trainer. `choice` = {species, level, nature, loyalty, abilities: [slots],
+   * heldItem, nickname, shiny}; the server builds the Pokemon (routes_pokemon.build_registered_pokemon).
    */
-  static async register(trainerName, pokemonData) {
+  static async register(trainerName, choice) {
+    const pokemonData = choice;
     const result = await API.request('pokemon', 'register', {
       trainer: trainerName,
       data: JSON.stringify(pokemonData)
@@ -288,7 +298,7 @@ export class PokemonAPI {
     });
 
     // Invalidate relevant caches
-    cache.remove(`trainer:${trainerName}`);
+    forgetCachedTrainer(trainerName);
     cache.remove('pokemon:registered-list');
 
     return result;
@@ -304,8 +314,8 @@ export class PokemonAPI {
       useCache: false
     });
 
-    // Invalidate cache
-    cache.remove(`pokemon:${pokemonData[0]}:${pokemonData[2]}`);
+    // Invalidate cache (both picture settings -- see get)
+    forgetCachedPokemon(pokemonData.trainer, pokemonData.name);
 
     return result;
   }
@@ -325,7 +335,7 @@ export class PokemonAPI {
     });
 
     cache.remove(`pokemon:${trainerName}:${pokemonName}`);
-    cache.remove(`trainer:${trainerName}`);
+    forgetCachedTrainer(trainerName);
     cache.remove('pokemon:registered-list');
 
     return result;
@@ -392,7 +402,7 @@ export class PokemonAPI {
     });
 
     // Invalidate trainer cache
-    cache.remove(`trainer:${trainerName}`);
+    forgetCachedTrainer(trainerName);
 
     return result;
   }
@@ -409,7 +419,7 @@ export class PokemonAPI {
       useCache: false
     });
 
-    cache.remove(`trainer:${trainerName}`);
+    forgetCachedTrainer(trainerName);
     return result;
   }
 
@@ -433,20 +443,21 @@ export class PokemonAPI {
   static async recalculateStats(pokemonData, oldFeats) {
     return API.request('pokemon', 'recalculate-stats', {
       data: JSON.stringify(pokemonData),
-      oldFeats: oldFeats
+      oldFeats: JSON.stringify(oldFeats || [])
     }, {
       useCache: false
     });
   }
 
   /**
-   * Get abilities for a specific Pokemon species
+   * Get abilities for a specific Pokemon species: [{slot, name, description}] (they were "slot:Name, Description" text
+   * before 2026-10-19 -- a new cache key, so an answer cached in that form is never read)
    */
   static async getAbilities(pokemonName) {
     return API.request('pokemon', 'abilities', {
       name: pokemonName
     }, {
-      cacheKey: `pokemon:abilities:${pokemonName}`,
+      cacheKey: `pokemon:species-abilities:${pokemonName}`,
       useCache: true,
       cacheTtl: STATIC_DATA_TTL
     });
@@ -455,18 +466,24 @@ export class PokemonAPI {
   /**
    * Evolve a Pokemon
    */
-  static async evolve(currentPokemonName, trainerName, evolvedPokemonData) {
+  /**
+   * Evolve a Pokemon into `targetSpecies`, with the ability-score points the player spent ({str: 1, ...}) -- the
+   * server builds the evolved Pokemon (owned.evolve) and stores it in its place.
+   */
+  static async evolve(currentPokemonName, trainerName, targetSpecies, points) {
     const result = await API.request('pokemon', 'evolve', {
       currentName: currentPokemonName,
       trainer: trainerName,
-      data: JSON.stringify(evolvedPokemonData)
+      target: targetSpecies,
+      points: JSON.stringify(points || {})
     }, {
       useCache: false
     });
 
     // Invalidate relevant caches
-    cache.remove(`pokemon:${trainerName}:${currentPokemonName}`);
-    cache.remove(`trainer:${trainerName}`);
+    forgetCachedPokemon(trainerName, currentPokemonName);
+    forgetCachedPokemon(trainerName, targetSpecies);
+    forgetCachedTrainer(trainerName);
 
     return result;
   }
@@ -513,7 +530,7 @@ export class TrainerAPI {
   }
 
   /**
-   * Create new trainer
+   * Create a new trainer from the new-journey form's fields -- the answer's `trainer` is the trainer as made.
    */
   static async create(trainerData) {
     const result = await API.request('trainer', 'create', {
@@ -529,7 +546,7 @@ export class TrainerAPI {
   }
 
   /**
-   * Update trainer data
+   * Save the whole trainer (the object in sessionStorage's trainerData -- js/utils/trainer-data.js).
    */
   static async update(trainerData) {
     const result = await API.request('trainer', 'update', {
@@ -538,39 +555,7 @@ export class TrainerAPI {
       useCache: false
     });
 
-    // Invalidate cache
-    cache.remove(`trainer:${trainerData[1]}`);
-
-    return result;
-  }
-
-  /**
-   * Update trainer inventory
-   */
-  static async updateInventory(trainerName, inventory) {
-    const result = await API.request('trainer', 'inventory', {
-      trainer: trainerName,
-      data: JSON.stringify(inventory)
-    }, {
-      useCache: false
-    });
-
-    cache.remove(`trainer:${trainerName}`);
-    return result;
-  }
-
-  /**
-   * Update trainer gear
-   */
-  static async updateGear(trainerName, gear) {
-    const result = await API.request('trainer', 'gear', {
-      trainer: trainerName,
-      data: gear
-    }, {
-      useCache: false
-    });
-
-    cache.remove(`trainer:${trainerName}`);
+    forgetCachedTrainer(trainerData.name);
     return result;
   }
 
@@ -585,7 +570,7 @@ export class TrainerAPI {
       useCache: false
     });
 
-    cache.remove(`trainer:${trainerName}`);
+    forgetCachedTrainer(trainerName);
     return result;
   }
 
@@ -614,7 +599,7 @@ export class TrainerAPI {
     });
 
     // Invalidate trainer cache
-    cache.remove(`trainer:${trainerName}`);
+    forgetCachedTrainer(trainerName);
 
     return result;
   }
@@ -631,24 +616,7 @@ export class TrainerAPI {
     });
 
     // Invalidate trainer cache
-    cache.remove(`trainer:${trainerName}`);
-
-    return result;
-  }
-
-  /**
-   * Update trainer path
-   */
-  static async updateTrainerPath(trainerName, path) {
-    const result = await API.request('trainer', 'trainer-path', {
-      trainer: trainerName,
-      path
-    }, {
-      useCache: false
-    });
-
-    // Invalidate trainer cache
-    cache.remove(`trainer:${trainerName}`);
+    forgetCachedTrainer(trainerName);
 
     return result;
   }
@@ -738,20 +706,6 @@ export class GameDataAPI {
     return API.request('game-data', 'player-pokedex', {}, { useCache: false, timeout: HEAVY_TIMEOUT });
   }
 
-  /**
-   * Refresh the SERVER-side upstream cache in place (pokemon DB, moves,
-   * items, pokedex config are re-fetched and overwritten, so the cache
-   * stays warm). Used by the Reset Cache button. Can take a while when
-   * the upstream scripts are slow, hence the long timeout.
-   * No-op on backends without the route.
-   */
-  static async clearServerCache() {
-    return API.request('game-data', 'clear-cache', {}, {
-      useCache: false,
-      timeout: HEAVY_TIMEOUT,
-      retries: 0
-    });
-  }
 }
 
 // ============================================================================
@@ -776,8 +730,7 @@ export class MusicAPI {
    * looping background track, so every device seeks to the same point in the
    * loop instead of starting from 0. The room is considered empty -- and the
    * epoch resets -- once no listener has synced/heartbeated in a while server-
-   * side; see routes_music.py. No-op / throws on backends without the route
-   * (Apps Script) -- callers should fall back to local playback.
+   * side; see routes_music.py. Throws when the request fails -- callers should fall back to local playback.
    */
   static async sync(trackName) {
     return API.request('music', 'sync', { track: trackName, client: getMusicClientId() }, {
@@ -1173,7 +1126,7 @@ export class CombatAPI {
   }
 
   /** Battle-map background images available on the Pi (see
-   * upstream.BATTLE_IMAGE_DIR) -- {status, backgrounds: [{key, label, url}]}.
+   * media.BATTLE_IMAGE_DIR) -- {status, backgrounds: [{key, label, url}]}.
    * Not session state -- safe to call any time, active session or not. */
   static async listBackgrounds() {
     return API.request('combat', 'list-backgrounds', {}, { useCache: false });
@@ -1381,7 +1334,7 @@ export class DmAPI {
     return API.request('dm', 'species-detail', { name }, { cacheKey: `dm:species:${name}`, useCache: true, cacheTtl: STATIC_DATA_TTL, timeout: HEAVY_TIMEOUT });
   }
 
-  /** The players' pokedex config ({registered, visibility, defaults, ...}) plus `editedHere`. Never cached. */
+  /** The players' Pokedex settings ({registered, visibility, defaults, ...}). Never cached. */
   static async pokedexConfig() {
     return API.request('dm', 'pokedex-config', {}, { useCache: false });
   }

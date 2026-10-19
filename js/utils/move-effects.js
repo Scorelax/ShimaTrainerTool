@@ -7,6 +7,7 @@
 import { CONDITION_RULES } from './condition-rules.js';
 import { abilityStatuses } from './ability-mods.js';
 import { footprintForSize } from './battle-map-grid.js';
+import { abilityEntry, abilityList, nameList } from './battle-lists.js';
 
 /** A participant's live statuses plus its ability's always-on bonuses as virtual statuses (ability-mods.js), for the
  * rules that should count both the same way (stat deltas, attack and save roll modes). `target` adds the abilities
@@ -51,36 +52,26 @@ function _conditionRollMode(s, on, ability) {
   return null;
 }
 
-/** Splits an abilities string ("slot:name;desc|name;desc", slot optional -- see combat.js's
- * renderAbilitiesForCombat) into [{slot, name, desc, raw}]. `raw` is the entry exactly as written. */
-export function parseAbilityList(raw) {
-  return String(raw || '').split('|').map((a) => a.trim()).filter(Boolean).map((entry) => {
-    const colon = entry.indexOf(':');
-    const slot = colon !== -1 ? entry.substring(0, colon) : '';
-    const body = colon !== -1 ? entry.substring(colon + 1) : entry;
-    const parts = body.split(';');
-    return { slot, name: parts[0].trim(), desc: parts.slice(1).join(';').trim(), raw: entry };
-  });
-}
-
-/** A participant's abilities string with every live `ability_override` status applied (Entrainment,
- * Role Play, Skill Swap, Simple Beam): each one replaces the entry named `value` with `value2`
- * ("Name" or "Name;description"), keeping the replaced entry's slot prefix. Computed fresh from the
- * session's BASE abilities every time and never written back anywhere, so ending the status (or the
- * combat, or the participant leaving it) restores the originals with nothing to undo. */
+/** A participant's abilities ([{slot, name, description}], battle-lists.js) with every live `ability_override` status
+ * applied (Entrainment, Role Play, Skill Swap, Simple Beam): each one replaces the ability named `value` with `value2`
+ * ({name, description}), keeping the replaced one's slot. Computed fresh from the session's BASE abilities every time
+ * and never written back anywhere, so ending the status (or the combat, or the participant leaving it) restores the
+ * originals with nothing to undo. */
 export function effectiveAbilities(participant) {
-  const base = participant?.abilities;
-  if (!base) return base;
-  const list = parseAbilityList(base);
-  for (const s of participant.statuses || []) {
+  const list = abilityList(participant?.abilities);
+  for (const s of participant?.statuses || []) {
     if (s.kind !== 'condition' || s.apply !== 'ability_override' || !s.value || !s.value2) continue;
     const i = list.findIndex((a) => a.name.toLowerCase() === String(s.value).toLowerCase());
     if (i === -1) continue;
-    const slot = list[i].slot;
-    const replacement = parseAbilityList(s.value2)[0] || { name: s.value2, desc: '' };
-    list[i] = { ...replacement, slot, raw: `${slot ? `${slot}:` : ''}${replacement.raw || replacement.name}` };
+    list[i] = { ...abilityEntry(s.value2), slot: list[i].slot };
   }
-  return list.map((a) => a.raw).join('|');
+  return list;
+}
+
+/** True when the creature has an ability of this name (swaps applied). */
+export function hasAbilityNamed(participant, name) {
+  const target = String(name || '').toLowerCase();
+  return effectiveAbilities(participant).some((a) => a.name.toLowerCase() === target);
 }
 
 /** Semi-invulnerable states a move can put its user in (Dig -> underground, ...). Each is a plain
@@ -119,8 +110,7 @@ export function saveModifierFor(participant, ability) {
   if (!ABILITY_KEYS.includes(key)) return null;
   const mod = participant[`${key}Mod`];
   if (mod === null || mod === undefined || Number.isNaN(Number(mod))) return null;
-  const proficient = String(participant.savingThrows || '').toLowerCase()
-    .split(/[,;/\s]+/).some(s => s && s.startsWith(key));
+  const proficient = nameList(participant.savingThrows).some(s => s.toLowerCase().startsWith(key));
   return Number(mod) + (proficient ? (Number(participant.proficiency) || 0) : 0);
 }
 
@@ -223,7 +213,7 @@ export function statusLabel(s) {
   if (s.kind === 'condition') {
     if (s.apply === 'type_changed' && s.value) return `Type changed to ${s.value2 ? `${s.value}/${s.value2}` : s.value}`;
     if (s.apply === 'resistance_upgrade') return `Resistance upgraded (${s.value === 'all' ? 'all types' : s.value || ''})`;
-    if (s.apply === 'ability_override') return `${s.value || '?'} → ${parseAbilityList(s.value2)[0]?.name || '?'}`;
+    if (s.apply === 'ability_override') return `${s.value || '?'} → ${abilityEntry(s.value2).name || '?'}`;
     if (s.apply === 'power_up') return `Power-Up x${s.stacks || 1}`;
     if (s.apply === 'guaranteed_hit_type') return `${s.value || ''} moves always hit`;
     if (s.apply === 'vp_cost_halved') return `${s.value || ''} moves cost half VP`;
@@ -1213,7 +1203,7 @@ export function isGrounded(p) {
   if (statuses.some(s => s.kind === 'condition' && s.apply === 'grounded')) return true;
   const speeds = [...(p?.speeds || []), ...statuses.filter(s => s.kind === 'condition' && s.apply === 'granted_flight_speed').map(s => ({ type: 'flying', ft: s.value }))];
   if (speeds.some(sp => ['flying', 'hovering'].includes(String(sp.type).toLowerCase()) && (Number(sp.ft) || 0) > 0)) return false;
-  if (/levitate/i.test(String(effectiveAbilities(p) || ''))) return false;
+  if (hasAbilityNamed(p, 'Levitate')) return false;
   return !statuses.some(s => s.kind === 'condition' && (s.apply === 'airborne' || (s.apply === 'granted_immunity' && String(s.value || '').toLowerCase() === 'ground')));
 }
 
@@ -1223,7 +1213,7 @@ export function isGrounded(p) {
 export function isLevitating(p) {
   const statuses = p?.statuses || [];
   if (statuses.some(s => s.kind === 'condition' && s.apply === 'grounded')) return false;
-  if (/levitate/i.test(String(effectiveAbilities(p) || p?.abilities || ''))) return true;
+  if (hasAbilityNamed(p, 'Levitate')) return true;
   if ((p?.speeds || []).some(sp => String(sp.type).toLowerCase() === 'hovering' && (Number(sp.ft) || 0) > 0)) return true;
   return statuses.some(s => s.kind === 'condition' && (s.apply === 'airborne' || (s.apply === 'granted_immunity' && String(s.value || '').toLowerCase() === 'ground')));
 }
@@ -1436,12 +1426,12 @@ export function altitudeLimits(p) {
 }
 
 
-/** Whether a move row [name, type, mod, action, vp, duration, range, desc, ...] attacks in melee: "melee" in its range ("Melee",
+/** Whether a move ({name, type, ..., range, description}) attacks in melee: "melee" in its range ("Melee",
  * "15ft. melee", "Melee (15ft.)") or a description that makes a melee attack at reach (Fly's dive, Dimension Slash). Mirrors
  * routes_combat.py's _is_melee_move. */
 export function isMeleeMoveRow(row) {
   if (!row) return false;
-  return /melee/i.test(String(row[6] || '')) || /\b(?:makes?|strike out with)\b[^.]{0,40}?\bmelee attack/i.test(String(row[7] || ''));
+  return /melee/i.test(String(row.range || '')) || /\b(?:makes?|strike out with)\b[^.]{0,40}?\bmelee attack/i.test(String(row.description || ''));
 }
 
 /** `requires_self` -- a gate on the user's own state: Limit Break ("requires below 50% HP"), Dawn Burst ("only while your HP

@@ -1,15 +1,14 @@
 // Pokemon Form Page - Register new Pokemon for trainer
 
-import { PokemonAPI, GameDataAPI } from '../api.js';
+import { PokemonAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 import { hideLoading, showLoadingWithSprite } from '../utils/splash.js';
 import { prefetchSprite } from '../utils/sprite-media.js';
-import {
-  abilityInSlot, baseStat, evolutionText, listText, movementLine, movesText, savedAbility,
-  sensesLine, statTotal, MOVE_LEVELS
-} from '../utils/species.js';
+import { abilityInSlot } from '../utils/species.js';
+import { storePokemon } from '../utils/owned-pokemon.js';
+import { loadTrainer } from '../utils/trainer-data.js';
 
 export function renderPokemonForm() {
   // Load selected Pokemon data from session storage
@@ -407,8 +406,8 @@ export async function attachPokemonFormListeners() {
     const revealUrl = shinyChecked && baseImageUrl && baseImageUrl !== 'assets/Pokeball.png'
       ? baseImageUrl.replace(/(\.[a-zA-Z]+)$/, '-shiny$1')
       : baseImageUrl;
-    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-    const captionText = trainerData ? `${trainerData[1]} caught a ${selectedSpecies.name}!` : '';
+    const trainerData = loadTrainer();
+    const captionText = trainerData.name ? `${trainerData.name} caught a ${selectedSpecies.name}!` : '';
     showLoadingWithSprite(revealUrl, selectedSpecies.name, captionText);
 
     await handleFormSubmit();
@@ -473,10 +472,10 @@ async function populateAbilityOptions(selectedSpecies) {
 
 async function handleFormSubmit() {
   const form = document.getElementById('pokemonForm');
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const trainerData = loadTrainer();
   const selectedSpecies = JSON.parse(sessionStorage.getItem('selectedSpecies'));
 
-  if (!trainerData || !selectedSpecies) {
+  if (!trainerData.name || !selectedSpecies) {
     showError('Missing trainer or Pokemon data');
     return;
   }
@@ -488,148 +487,30 @@ async function handleFormSubmit() {
     // Gather basic form data
     const level = parseInt(form.level.value);
     const nature = form.nature.value;
-    let loyalty = parseInt(form.loyalty.value);
+    const loyalty = parseInt(form.loyalty.value);
     const heldItem = form.heldItem.value;
     const nickname = form.nickname.value;
     const shiny = form.shiny.checked;
 
-    // Get selected abilities and format them
-    const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
-    console.log('[Pokemon Form] Selected ability checkboxes:', selectedAbilityCheckboxes.length);
-
-    // Build abilities string: "slotIndex:Name;Description|slotIndex:Name;Description"
-    const selectedAbilities = selectedAbilityCheckboxes
-      .map(cb => abilityInSlot(selectedSpecies, cb.dataset.slotIndex)) // slot 0, 1, or 2
-      .filter(Boolean)
-      .map(savedAbility)
-      .join('|');
-
-    console.log('[Pokemon Form] Selected abilities string:', selectedAbilities);
+    // The ability slots ticked (0, 1 or 2)
+    const abilities = Array.from(document.querySelectorAll('input[name="abilities"]:checked'))
+      .map(cb => Number(cb.dataset.slotIndex));
 
     // NOW show loading (after we've captured all the data)
     document.getElementById('content').innerHTML = '<div class="loading">Registering Pokemon...</div>';
 
-    // Nature adjustments are applied by the backend in registerPokemonForTrainer
-    const stats = Object.fromEntries(['str', 'dex', 'con', 'int', 'wis', 'cha'].map(k => [k, baseStat(selectedSpecies, k)]));
-
-    // Apply Ace Trainer Max Potential bonus (Level 9)
-    const trainerPath = trainerData[25] || '';
-    const maxPotential = trainerData[46] || '';
-    if (trainerPath === 'Ace Trainer' && ['STR', 'DEX', 'CON'].includes(maxPotential)) {
-      const key = maxPotential.toLowerCase();
-      stats[key] = (stats[key] || 10) + 1;
-      // (the Speed bonus goes onto the movement below)
-    }
-
-    // Apply Commander loyalty bonus (Level 5+)
-    const trainerLevel = parseInt(trainerData[2], 10) || 1;
-    if (trainerPath === 'Commander' && trainerLevel >= 5) {
-      loyalty = Math.min(loyalty + 1, 10);
-    }
-
-    // Movement and senses, as a saved Pokemon keeps them ('25ft, -, ...'). Ace Trainer's Max Potential: Speed adds
-    // 10ft to every speed the species has. (It never did with the old rows -- their '25ft' didn't match the
-    // 'Walk 30 ft' this looked for -- fixed with the species objects' plain numbers, 2026-10-18.)
-    const speedBonus = trainerPath === 'Ace Trainer' && maxPotential === 'Speed' ? 10 : 0;
-    const movementDataString = movementLine(selectedSpecies, speedBonus);
-    const sensesDataString = sensesLine(selectedSpecies);
-
-    // Get type effectiveness
-    const primaryType = selectedSpecies.types.primary || '';
-    const secondaryType = selectedSpecies.types.secondary || '';
-    const typeResponse = await GameDataAPI.getTypeEffectiveness(primaryType, secondaryType);
-    const typematchupsString = typeResponse.data ?
-      typeResponse.data.join(', ') : '';
-
-    const pokemonSize = selectedSpecies.size || '';
-    const combat = selectedSpecies.combat || {};
-    const moves = MOVE_LEVELS.map(lvl => movesText(selectedSpecies, lvl));
-
-    // Resolve shiny image URL if needed
-    const baseImageUrl = selectedSpecies.image || '';
-    const pokemonImageUrl = shiny && baseImageUrl && baseImageUrl !== 'assets/Pokeball.png'
-      ? baseImageUrl.replace(/(\.[a-zA-Z]+)$/, '-shiny$1')
-      : baseImageUrl;
-
-    // Build new Pokemon data array matching exact database schema
-    const newPokemonData = [
-      trainerData[1],              // 0: Trainer Name
-      pokemonImageUrl,             // 1: Image
-      selectedSpecies.name,        // 2: Name
-      selectedSpecies.dexNumber,   // 3: Dex Entry
-      level,                       // 4: Level
-      primaryType,                 // 5: Primary Type
-      secondaryType,               // 6: Secondary Type
-      selectedAbilities,           // 7: Ability (combined with pipes)
-      combat.ac,                   // 8: AC
-      combat.hitDie,               // 9: Hit Dice
-      '',                          // 10: HP (to be calculated)
-      combat.vitalityDie,          // 11: Vitality Dice
-      '',                          // 12: VP (to be calculated)
-      movementDataString,          // 13: Speed
-      statTotal(selectedSpecies),  // 14: Total Stats
-      stats.str,                   // 15: Strength
-      stats.dex,                   // 16: Dexterity
-      stats.con,                   // 17: Constitution
-      stats.int,                   // 18: Intelligence
-      stats.wis,                   // 19: Wisdom
-      stats.cha,                   // 20: Charisma
-      listText(selectedSpecies.savingThrows), // 21: Saving Throws
-      listText(selectedSpecies.skills),       // 22: Skills
-      moves[0],                    // 23: Starting Moves
-      moves[1],                    // 24: Level 2 Moves
-      moves[2],                    // 25: Level 6 Moves
-      moves[3],                    // 26: Level 10 Moves
-      moves[4],                    // 27: Level 14 Moves
-      moves[5],                    // 28: Level 18 Moves
-      evolutionText(selectedSpecies), // 29: Evolution Requirement
-      '',                          // 30: Initiative (to be calculated)
-      '',                          // 31: Proficiency Bonus (to be calculated)
-      nature,                      // 32: Nature
-      loyalty,                     // 33: Loyalty
-      '',                          // 34: STAB (to be calculated)
-      heldItem,                    // 35: Held Item
-      nickname,                    // 36: Nickname
-      '',                          // 37: Custom Moves
-      '',                          // 38: In Active Party
-      '',                          // 39: strmodifier (to be calculated by backend)
-      '',                          // 40: dexmodifier (to be calculated by backend)
-      '',                          // 41: conmodifier (to be calculated by backend)
-      '',                          // 42: intmodifier (to be calculated by backend)
-      '',                          // 43: wismodifier (to be calculated by backend)
-      '',                          // 44: chamodifier (to be calculated by backend)
-      '',                          // 45: CurrentHP (to be calculated by backend)
-      '',                          // 46: CurrentVP (to be calculated by backend)
-      '',                          // 47: CurrentAC
-      '',                          // 48: Comment
-      sensesDataString,            // 49: Senses
-      '',                          // 50: Feats
-      '',                          // 51: Gear
-      selectedSpecies.description || '', // 52: Flavor text
-      typematchupsString,          // 53: Type matchups
-      '',                          // 54: Current HD
-      '',                          // 55: Current VD
-      '',                          // 56: Utility Slot
-      pokemonSize,                 // 57: Size
-      '',                          // 58: Cry
-      '',                          // 59: KnownMoves
-      '',                          // 60: StatusCondition
-      shiny ? 'Y' : '',            // 61: Shiny
-    ];
-
-    console.log('[Pokemon Form] newPokemonData array:');
-    console.log('[Pokemon Form] - Index 1 (Image):', newPokemonData[1]);
-    console.log('[Pokemon Form] - Index 7 (Abilities):', newPokemonData[7]);
-    console.log('[Pokemon Form] - Full array:', newPokemonData);
+    // What the player chose -- the server builds the Pokemon from its species (routes_pokemon.build_registered_pokemon:
+    // the nature, an Ace Trainer's Max Potential, a Commander's loyalty and every number that follows).
+    const choice = { species: selectedSpecies.name, level, nature, loyalty, abilities, heldItem, nickname, shiny };
 
     // Register the Pokemon (loading screen already shown)
-    const response = await PokemonAPI.register(trainerData[1], newPokemonData);
+    const response = await PokemonAPI.register(trainerData.name, choice);
 
     console.log('[Pokemon Form] Backend response:', response);
 
     if (response.status === 'success') {
       // Show success message (keep loading screen visible)
-      showSuccess(`${trainerData[1]} caught a ${selectedSpecies.name}!`);
+      showSuccess(`${trainerData.name} caught a ${selectedSpecies.name}!`);
 
       // register_pokemon_for_trainer() deliberately always returns the
       // static image (never a self-uploaded sprite URL -- see its guard
@@ -638,24 +519,20 @@ async function handleFormSubmit() {
       // pick up an MP4 if this species has one, concurrently with the
       // "new pokemon" sound so it doesn't add any wait beyond what the
       // player's already sitting through.
-      const registeredName = (response.newPokemonData || newPokemonData)[2];
+      const registeredName = response.newPokemonData.name;
       audioManager.stopBg();
       const [spriteAwareFetch] = await Promise.all([
-        PokemonAPI.get(trainerData[1], registeredName, true),
+        PokemonAPI.get(trainerData.name, registeredName, true),
         audioManager.playSfxAndWait('NewPokemon')
       ]);
 
-      let finalPokemonData = response.newPokemonData || newPokemonData;
+      let finalPokemonData = response.newPokemonData;
       if (spriteAwareFetch.status === 'success' && spriteAwareFetch.data) {
         finalPokemonData = spriteAwareFetch.data;
       }
-      await prefetchSprite(finalPokemonData[1]);
+      await prefetchSprite(finalPokemonData.image);
 
-      console.log('[Pokemon Form] finalPokemonData:');
-      console.log('[Pokemon Form] - Index 1 (Image):', finalPokemonData[1]);
-      console.log('[Pokemon Form] - Index 7 (Abilities):', finalPokemonData[7]);
-
-      sessionStorage.setItem(`pokemon_${selectedSpecies.name.toLowerCase()}`, JSON.stringify(finalPokemonData));
+      storePokemon(finalPokemonData);
 
       hideLoading();
       window.dispatchEvent(new CustomEvent('navigate', {

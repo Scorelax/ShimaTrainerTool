@@ -27,7 +27,7 @@
 import { DmAPI, CombatAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { escapeHtml, typeBadges, getSpecies, newId, toast, natureOptions, openDmModal, participantFromPokemonRow } from './dm-common.js';
+import { escapeHtml, typeBadges, getSpecies, newId, toast, natureOptions, openDmModal, participantFromPokemon } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup } from './setup-store.js';
 import { buildPokemonCreature, addNpcToSetup } from './creature-setup.js';
 import { getClock, updateClock, advanceMinutes, skipToPhase, rollWeather, formatDate, formatTime, phaseName, PHASES, WEATHER } from './world-clock.js';
@@ -390,7 +390,7 @@ async function loadCalc(p) {
     _calc.set(p.id, c);
     try {
       const res = await DmAPI.buildPokemon({ ...monConfig(p), bonus: null, species: p.species, preview: true });
-      c.values = participantFromPokemonRow(res.data).participant;
+      c.values = participantFromPokemon(res.data).participant;
     } catch (err) {
       c.values = {};
     }
@@ -1238,7 +1238,7 @@ function battleSummary(last) {
 }
 
 function trainerRecord(name) {
-  return _after.party.find(t => lower(t.trainer?.[1]) === lower(name)) || null;
+  return _after.party.find(t => lower(t.trainer?.name) === lower(name)) || null;
 }
 
 function tags(list, cls) {
@@ -1253,7 +1253,7 @@ function drawAftermath(body) {
   }
   const s = battleSummary(last);
   const ended = new Date(last.endedAt);
-  const allTrainers = _after.party.map(t => t.trainer?.[1]).filter(Boolean);
+  const allTrainers = _after.party.map(t => t.trainer?.name).filter(Boolean);
   const trainerOptions = (sel = '') => [...s.trainers, ...allTrainers.filter(t => !s.trainers.some(x => lower(x) === lower(t)))]
     .map(t => `<option ${lower(t) === lower(sel) ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('');
   const minutes = Math.max(1, Math.ceil(((Number(last.round) || 1) * ROUND_SECONDS) / 60));
@@ -1389,9 +1389,9 @@ function drawAftermath(body) {
 /** The DM-only XP that came with the party (DmAPI.party): a trainer's, or one of their Pokemon's (by species name). */
 function xpOf(rec, species = null) {
   if (!rec) return 0;
-  if (!species) return xpOrStart(rec.xp?.trainer, rec.trainer?.[2]);
-  const i = rec.pokemon.findIndex(m => lower(m[2]) === lower(species));
-  return i < 0 ? 0 : xpOrStart(rec.xp?.pokemon?.[i], rec.pokemon[i][4]);
+  if (!species) return xpOrStart(rec.xp?.trainer, rec.trainer?.level);
+  const i = rec.pokemon.findIndex(m => lower(m.name) === lower(species));
+  return i < 0 ? 0 : xpOrStart(rec.xp?.pokemon?.[i], rec.pokemon[i].level);
 }
 
 function xpLine(current, add) {
@@ -1403,7 +1403,7 @@ function xpLine(current, add) {
 
 function xpCardHtml(name, s) {
   const rec = trainerRecord(name);
-  const level = rec?.trainer?.[2] || 1;
+  const level = rec?.trainer?.level || 1;
   const tKey = lower(name);
   const tXp = xpOf(rec);
   const mons = rec?.pokemon || [];
@@ -1416,12 +1416,12 @@ function xpCardHtml(name, s) {
         <span class="dm-after-new">${xpLine(tXp, _xpAdd.trainers[tKey])}</span>
       </div>
       ${mons.map((m) => {
-        const key = monKey(name, m[2]);
-        const xp = xpOf(rec, m[2]);
+        const key = monKey(name, m.name);
+        const xp = xpOf(rec, m.name);
         const fought = s.present.has(key);
         return `
-        <div class="dm-after-xprow${fought ? '' : ' absent'}" data-mon="${escapeHtml(m[2])}">
-          <label><input type="checkbox" data-present ${fought ? 'checked' : ''} title="Fought in this battle (gets the 'every Pokémon' XP)"> ${escapeHtml(m[36] || m[2])} <small>Lv ${m[4]}</small></label>
+        <div class="dm-after-xprow${fought ? '' : ' absent'}" data-mon="${escapeHtml(m.name)}">
+          <label><input type="checkbox" data-present ${fought ? 'checked' : ''} title="Fought in this battle (gets the 'every Pokémon' XP)"> ${escapeHtml(m.nickname || m.name)} <small>Lv ${m.level}</small></label>
           <span>${xp.toLocaleString()}</span>
           <input class="dm-input" type="number" data-xp-p value="${_xpAdd.pokemon[key] ?? ''}" placeholder="+XP">
           <span class="dm-after-new">${xpLine(xp, _xpAdd.pokemon[key])}</span>
@@ -1550,10 +1550,10 @@ function wireAftermath(body, s, minutes) {
         const rec = trainerRecord(t);
         if (!rec) return;
         const add = Number(_xpAdd.trainers[lower(t)]) || 0;
-        if (add) changes.push({ trainer: rec.trainer[1], add });
+        if (add) changes.push({ trainer: rec.trainer.name, add });
         rec.pokemon.forEach((m) => {
-          const addP = Number(_xpAdd.pokemon[monKey(t, m[2])]) || 0;
-          if (addP) changes.push({ trainer: rec.trainer[1], pokemon: m[2], add: addP });
+          const addP = Number(_xpAdd.pokemon[monKey(t, m.name)]) || 0;
+          if (addP) changes.push({ trainer: rec.trainer.name, pokemon: m.name, add: addP });
         });
       });
       if (!changes.length) { toast('No XP typed in yet.'); return; }
@@ -1563,8 +1563,8 @@ function wireAftermath(body, s, minutes) {
       _xpAdd.pokemon = {};
       // Ready for a level it wasn't ready for before this XP.
       const ups = results.filter(r => r.xpLevel > r.level && r.xpLevel > levelFromXp(r.before)).map((r) => {
-        const m = r.pokemon && trainerRecord(r.trainer)?.pokemon.find(x => lower(x[2]) === lower(r.pokemon));
-        return `${r.trainer}${r.pokemon ? `'s ${m?.[36] || r.pokemon}` : ''} → level ${r.xpLevel}`;
+        const m = r.pokemon && trainerRecord(r.trainer)?.pokemon.find(x => lower(x.name) === lower(r.pokemon));
+        return `${r.trainer}${r.pokemon ? `'s ${m?.nickname || r.pokemon}` : ''} → level ${r.xpLevel}`;
       });
       await reloadParty();
       redraw();
@@ -1604,11 +1604,11 @@ function importXp() {
     players.forEach((t) => {
       const rec = trainerRecord(t.name);
       if (!rec) { skipped.push(t.name); return; }
-      if (Number.isFinite(Number(t.xp))) changes.push({ trainer: rec.trainer[1], set: Number(t.xp) });
+      if (Number.isFinite(Number(t.xp))) changes.push({ trainer: rec.trainer.name, set: Number(t.xp) });
       (t.pokemon || []).forEach((p) => {
         if (!p.name || !Number.isFinite(Number(p.xp))) return;
-        const m = rec.pokemon.find(x => lower(x[2]) === lower(p.name));
-        if (m) changes.push({ trainer: rec.trainer[1], pokemon: m[2], set: Number(p.xp) });
+        const m = rec.pokemon.find(x => lower(x.name) === lower(p.name));
+        if (m) changes.push({ trainer: rec.trainer.name, pokemon: m.name, set: Number(p.xp) });
         else skipped.push(`${t.name}'s ${p.name}`);
       });
     });

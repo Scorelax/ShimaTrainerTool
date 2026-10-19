@@ -6,7 +6,7 @@
 // (creature-setup.js's addNpcToSetup), ready to be placed.
 //
 // NPC shape: { id, name, image, role, faction, attitude, location, region, species, age, firstMet, birthday: {month, day}|null,
-//   level, str, dex, con, int, wis, cha, ac, maxHP, maxVP, speed, savingThrows, skills, trainerPath, affinity, specialization,
+//   level, str, dex, con, int, wis, cha, ac, maxHP, maxVP, speed, savingThrows: [names], skills: [names], trainerPath, affinity, specialization,
 //   personality, ideals, bonds, flaws, mannerisms, backstory, notes,
 //   features: [{name, description}], inventory: [{name, quantity, description}],
 //   team: [{id, species, nickname, level, nature, abilities: [slots], item, shiny, notes, stats: {str...}}], createdAt, updatedAt }
@@ -22,6 +22,7 @@ import { addNpcToSetup } from './creature-setup.js';
 import { prepareImage } from './display.js';
 
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+const STAT_NAMES = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
 const NPC_PICTURE_SIDE = 1024; // bigger uploads are scaled down first -- a portrait is never shown bigger
 const ATTITUDES = { friendly: ['Friendly', '#27ae60'], neutral: ['Neutral', '#95a5a6'], wary: ['Wary', '#f39c12'], hostile: ['Hostile', '#e74c3c'], unknown: ['Unknown', '#6c6f8a'] };
 const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
@@ -146,7 +147,7 @@ export function blankNpc() {
   return {
     id: newId('npc'), name: 'New NPC', image: '', role: '', faction: '', attitude: 'neutral', location: '', region: '', species: 'Human',
     age: '', firstMet: '', birthday: null, level: 5, str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, ac: 10, maxHP: 0, maxVP: 10,
-    speed: 30, savingThrows: '', skills: '', trainerPath: '', affinity: '', specialization: '',
+    speed: 30, savingThrows: [], skills: [], trainerPath: '', affinity: '', specialization: '',
     personality: '', ideals: '', bonds: '', flaws: '', mannerisms: '', backstory: '', notes: '',
     features: [], inventory: [], team: [], createdAt: new Date().toISOString(),
   };
@@ -371,10 +372,11 @@ async function refreshPreview(m, i) {
   const el = document.getElementById(`npcMonPreview-${m.id}`);
   if (!el) return;
   const level = Number(m.level) || 1;
-  const moves = [1, 2, 6, 10, 14, 18].flatMap((req, k) => (level >= req ? String(row[23 + k] || '').split(',').map(x => x.trim()).filter(Boolean) : []));
-  el.innerHTML = `<strong>HP ${row[10]} · VP ${row[12]} · AC ${row[8]}</strong> · ${STATS.map((k, j) => `${k.toUpperCase()} ${row[15 + j]}`).join(' · ')} · Skills: ${escapeHtml(row[22] || '-')}
+  const moves = [1, 2, 6, 10, 14, 18].flatMap(req => (level >= req ? (row.moves || {})[String(req)] || [] : []));
+  const score = k => row.stats?.[STAT_NAMES[STATS.indexOf(k)]];
+  el.innerHTML = `<strong>HP ${row.combat.maxHP} · VP ${row.combat.maxVP} · AC ${row.combat.ac}</strong> · ${STATS.map(k => `${k.toUpperCase()} ${score(k)}`).join(' · ')} · Skills: ${escapeHtml((row.skills || []).join(', ') || '-')}
     <div class="dm-move-chips" style="margin-top:0.35rem">${moves.map(mv => `<span>${escapeHtml(mv)}</span>`).join('') || '<span class="dm-hint">No moves</span>'}</div>`;
-  document.querySelectorAll(`[data-team-stat="${i}"]`).forEach(inp => { inp.placeholder = row[15 + STATS.indexOf(inp.dataset.k)] ?? '…'; });
+  document.querySelectorAll(`[data-team-stat="${i}"]`).forEach(inp => { inp.placeholder = score(inp.dataset.k) ?? '…'; });
 }
 
 /** The sheet's typing and ticking, listened to once on the sheet's box (it outlives every redraw of the sheet). */
@@ -427,8 +429,8 @@ function bindSheetFields(box) {
     const el = e.target;
     if (!n) return;
     if (el.closest('.dm-multi')) {
-      n.savingThrows = readMultiSelect('npcSaves').join(', ');
-      n.skills = readMultiSelect('npcSkills').join(', ');
+      n.savingThrows = readMultiSelect('npcSaves');
+      n.skills = readMultiSelect('npcSkills');
       changed(n);
     } else if (el.tagName === 'SELECT' && el.dataset.f) {
       n[el.dataset.f] = el.value;
@@ -705,7 +707,7 @@ function convertOld(t, image) {
     maxVP: Number(t.vp) || blankNpc().maxVP, speed: Number(t.speed) || 30,
     str: Number(t.strength) || 10, dex: Number(t.dexterity) || 10, con: Number(t.constitution) || 10,
     int: Number(t.intelligence) || 10, wis: Number(t.wisdom) || 10, cha: Number(t.charisma) || 10,
-    savingThrows: clean(t.savingThrows), skills: clean(t.skills),
+    savingThrows: splitList(clean(t.savingThrows), SAVING_THROWS), skills: splitList(clean(t.skills), SKILLS),
     trainerPath: matchName(t.trainerPath, gameList('trainerPaths')),
     affinity: [t.affinity, t.secondaryAffinity].filter(v => clean(v)).map(v => matchName(v, gameList('affinities'))).join(' / '),
     specialization: (Array.isArray(t.specializations) ? t.specializations : [t.specializations]).filter(v => clean(v)).map(v => matchName(v, gameList('specializations'))).join(', '),

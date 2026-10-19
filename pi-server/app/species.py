@@ -180,6 +180,52 @@ def evolution_text(s):
     return '; '.join(parts)
 
 
+# What an evolution takes, one criterion each (the user's call, 2026-10-19 -- the Admin module builds them, the players'
+# Pokedex shows one line each): evolvesInto[i]['criteria'] = [{type, value}], `requirement` their text joined (what the
+# rest of the app shows), and `level` set only when a level is all it takes.
+CRITERIA_TYPES = ('level', 'item', 'location', 'happiness', 'time', 'move', 'other')
+TIMES_OF_DAY = ('morning', 'day', 'evening', 'night')
+
+
+def criterion_label(c):
+    """One criterion as the players read it: 'Level 7', 'Item: Water Stone', 'Time of day: Night'..."""
+    t, v = c.get('type'), str(c.get('value') if c.get('value') is not None else '').strip()
+    if t == 'level':
+        return f'Level {v}'
+    if t == 'item':
+        return f'Item: {v}'
+    if t == 'location':
+        return f'Location: {v}'
+    if t == 'happiness':
+        return f'Happiness: {v}'
+    if t == 'time':
+        return f'Time of day: {v[:1].upper() + v[1:]}'
+    if t == 'move':
+        return f'Knows the move {v}'
+    return v
+
+
+def evolution_criteria(e):
+    """An evolution's criteria -- its own, or read from the text of one written before they existed: "Level 7 Near
+    ports" is Level 7 plus "Near ports"; anything else is one free-text criterion."""
+    if isinstance(e.get('criteria'), list):
+        return [c for c in e['criteria'] if isinstance(c, dict) and c.get('type') in CRITERIA_TYPES
+                and str(c.get('value') if c.get('value') is not None else '').strip()]
+    req = str(e.get('requirement') or '').strip()
+    if not req:
+        return []
+    m = re.match(r'^level\s+(\d+)\b[\s,.;:-]*(.*)$', req, re.I | re.S)
+    if m:
+        rest = m.group(2).strip()
+        return [{'type': 'level', 'value': int(m.group(1))}] + ([{'type': 'other', 'value': rest}] if rest else [])
+    return [{'type': 'other', 'value': req}]
+
+
+def requirement_lines(e):
+    """What an evolution takes, one line per criterion."""
+    return [criterion_label(c) for c in evolution_criteria(e)]
+
+
 def evolves_into_names(s):
     return [e['species'] for e in s.get('evolvesInto') or []]
 

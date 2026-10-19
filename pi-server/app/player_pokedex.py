@@ -122,11 +122,11 @@ def _species_entry(conn, sp, vis, own):
     evolves_to = species_data.evolves_into_names(sp)
     targets = vis['evoToTargets'] if own else {t: bool(vis['evoTo']) for t in evolves_to}
     requirements = vis['evoReqTargets'] if own else {t: bool(vis['evoReq']) for t in evolves_to}
-    need = {e['species']: e.get('requirement') for e in sp.get('evolvesInto') or []}
+    need = {e['species']: species_data.requirement_lines(e) for e in sp.get('evolvesInto') or []}
     entry['evolution'] = {
         'from': evolves_from if vis['evoFrom'] else None,
-        # [{name, requirement}] -- the requirement None unless the DM shows it (and the encyclopedia has one)
-        'to': [{'name': t, 'requirement': (_text(need.get(t)) or None) if requirements.get(t) else None}
+        # [{name, requirements}] -- what it takes, one line per criterion; [] unless the DM shows it
+        'to': [{'name': t, 'requirements': [_text(line) for line in need.get(t) or []] if requirements.get(t) else []}
                for t in evolves_to if targets.get(t)],
     }
 

@@ -1,5 +1,6 @@
 // DM console -- the Admin module (the user's call, 2026-10-19): the game's data the DM adds to or changes himself, with
-// their pictures -- the items, the Pokedex entries (species, and the abilities they name) and the loading-screen splashes.
+// their pictures -- the items, the Pokedex entries (species, and the abilities they name), the loading-screen splashes and
+// the battle maps' pictures (objects and backgrounds, moved here from the map editor) -- and every battle's log.
 // Everything is saved on the Pi (pi-server/app/admin.py): items and Pokedex entries in the data folder, laid over the files
 // the code comes with (so a `git pull` on the Pi never clashes with them); the pictures where the app already looks for
 // them -- an item's named after the item ("Frost Ball.png"), a Pokemon's still picture with the other Pokemon pictures,
@@ -8,10 +9,13 @@ import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { POKEMON_TYPES } from '../utils/pokemon-types.js';
-import { escapeHtml, toast, getSpecies, forgetSpecies, typeBadges, multiSelectHtml, bindMultiSelects, readMultiSelect, SAVING_THROWS, SKILLS } from './dm-common.js';
+import { escapeHtml, toast, getSpecies, forgetSpecies, typeBadges, multiSelectHtml, bindMultiSelects, readMultiSelect, attachSuggest, SAVING_THROWS, SKILLS } from './dm-common.js';
 import { prepareImage } from './display.js';
+import { openPicker } from './picker.js';
+import { forgetMapAssets } from './map-editor.js';
 
 const TAB_KEY = 'dmAdminTab';
+const TABS = ['items', 'species', 'pictures', 'splashes', 'logs'];
 const MOVE_LEVELS = ['1', '2', '6', '10', '14', '18'];
 const MOVEMENT = ['walking', 'climbing', 'flying', 'hovering', 'swimming', 'burrowing'];
 const SENSES = ['sight', 'hearing', 'smell', 'tremorsense', 'echolocation', 'telepathy', 'blindsight', 'darkvision', 'truesight'];
@@ -30,13 +34,15 @@ let _splashes = null;
 export function renderAdmin(section) {
   if (_root === section) return;
   _root = section;
-  try { _tab = ['items', 'species', 'splashes'].includes(localStorage.getItem(TAB_KEY)) ? localStorage.getItem(TAB_KEY) : 'items'; } catch (e) { /* default */ }
+  try { _tab = TABS.includes(localStorage.getItem(TAB_KEY)) ? localStorage.getItem(TAB_KEY) : 'items'; } catch (e) { /* default */ }
   section.innerHTML = `
     <div class="dm-admin">
       <div class="dm-enc-tabs" id="admTabs">
         <button data-atab="items">🎒 Items</button>
         <button data-atab="species">📕 Pokédex entries</button>
+        <button data-atab="pictures">🌲 Map pictures</button>
         <button data-atab="splashes">🖼️ Splash screens</button>
+        <button data-atab="logs">📜 Battle logs</button>
       </div>
       <div class="dm-admin-body" id="admBody"></div>
     </div>`;
@@ -55,6 +61,8 @@ function showTab(name) {
   body.innerHTML = '<div class="dm-loading">Loading…</div>';
   if (name === 'items') drawItems(body);
   else if (name === 'species') drawSpecies(body);
+  else if (name === 'pictures') drawMapPictures(body);
+  else if (name === 'logs') drawBattleLogs(body);
   else drawSplashes(body);
 }
 
@@ -379,11 +387,11 @@ function drawSpeciesForm(species, redrawList) {
           <div class="dm-card-title" style="margin-top:0.4rem">Senses (empty = none)</div>
           <div class="dm-adm-senses">${SENSES.map(k => field(`admSpSense_${k}`, k[0].toUpperCase() + k.slice(1), sp.senses?.[k], 'list="admSpSenseLevels" placeholder="—"')).join('')}</div>
         </div>
-        <div class="dm-card">
+        <div class="dm-card dm-adm-evocard">
           <div class="dm-card-title">Evolves into</div>
           <div id="admSpEvos">${(sp.evolvesInto || []).map(evoRowHtml).join('')}</div>
           <button class="dm-btn small" id="admSpEvoAdd">＋ Add an evolution</button>
-          <div class="dm-hint" style="margin-top:0.3rem">The requirement is what the players can be shown in their Pokédex ("Level 7", "Level 7 near a port").</div>
+          <div class="dm-hint" style="margin-top:0.3rem">Each criterion is one line in the players' Pokédex (when you show it there) -- a level, an item, a place, a time of day...</div>
         </div>
         <div class="dm-card">
           <div class="dm-card-title">Pictures</div>
@@ -404,7 +412,7 @@ function drawSpeciesForm(species, redrawList) {
     <datalist id="admSpActives">${pick('activity').map(v => `<option value="${escapeHtml(v)}">`).join('')}</datalist>
     <datalist id="admSpSenseLevels">${['Poor', 'Average', 'Good', 'Excellent'].map(v => `<option value="${v}">`).join('')}</datalist>
     <datalist id="admSpAbilities">${abilityNames.map(v => `<option value="${escapeHtml(v)}">`).join('')}</datalist>
-    <datalist id="admSpNames">${species.map(s => `<option value="${escapeHtml(s.name)}">`).join('')}</datalist>`;
+`;
   bindMultiSelects(box);
   const pic = document.getElementById('admSpPic');
   const shown = pictures.animated || pictures.still;
@@ -427,22 +435,120 @@ function drawSpeciesForm(species, redrawList) {
   };
   MOVE_LEVELS.forEach(l => document.getElementById(`admSpMoves_${l}`).addEventListener('input', checkMoves));
   checkMoves();
+  const evos = document.getElementById('admSpEvos');
+  evos.querySelectorAll('.dm-adm-evo').forEach(row => wireEvoRow(row, species));
   document.getElementById('admSpEvoAdd').addEventListener('click', () => {
-    document.getElementById('admSpEvos').insertAdjacentHTML('beforeend', evoRowHtml({ species: '', requirement: '' }));
+    evos.insertAdjacentHTML('beforeend', evoRowHtml({ species: '', criteria: [] }));
+    const row = evos.lastElementChild;
+    wireEvoRow(row, species);
+    row.querySelector('[data-evo-species]').focus();
   });
-  document.getElementById('admSpEvos').addEventListener('click', (e) => {
-    if (e.target.closest('[data-evo-remove]')) e.target.closest('.dm-adm-evo').remove();
+  evos.addEventListener('click', (e) => {
+    if (e.target.closest('[data-evo-remove]')) { e.target.closest('.dm-adm-evo').remove(); return; }
+    if (e.target.closest('[data-crit-remove]')) { e.target.closest('.dm-adm-crit').remove(); return; }
+    const add = e.target.closest('[data-crit-add]');
+    if (add) { openCriteriaMenu(add); return; }
+    const change = e.target.closest('[data-crit-pick]');
+    if (change) pickCriterionValue(change.closest('.dm-adm-crit').dataset.type).then((v) => { if (v) setCriterionValue(change.closest('.dm-adm-crit'), v); });
   });
   box.querySelectorAll('[data-upload]').forEach(b => b.addEventListener('click', () => uploadPicture(b.dataset.upload, species, redrawList)));
   document.getElementById('admSpSave').addEventListener('click', (e) => saveSpecies(e.currentTarget, species, redrawList));
 }
 
+// ---------------------------------------------------------------------------
+// Evolutions: the Pokemon it evolves into, then its criteria one by one (the user's call, 2026-10-19) -- a level, an
+// item (picked from the item list), a location, happiness, a time of day, a move (picked from the move list) or anything
+// else. Saved as evolvesInto[i].criteria = [{type, value}] (pi-server/app/species.py).
+// ---------------------------------------------------------------------------
+
+const CRITERIA = [
+  ['level', '📈 Level', 'The level it evolves at'], ['item', '💎 Item', 'An item, from the item list'],
+  ['location', '📍 Location', 'Where it has to be'], ['happiness', '💛 Happiness', 'How happy it has to be'],
+  ['time', '🌗 Day / Night', 'A time of day'], ['move', '✨ Move', 'A move it has to know'], ['other', '📝 Other', 'Anything else'],
+];
+const TIMES = ['morning', 'day', 'evening', 'night'];
+
 function evoRowHtml(e) {
   return `<div class="dm-adm-evo">
-    <input class="dm-input" data-evo-species list="admSpNames" value="${escapeHtml(e.species || '')}" placeholder="Pokémon">
-    <input class="dm-input" data-evo-req value="${escapeHtml(e.requirement || '')}" placeholder="Requirement, e.g. Level 7">
-    <button class="dm-icon-btn danger" data-evo-remove title="Remove this evolution">✕</button>
+    <div class="dm-adm-evo-head">
+      <div class="dm-adm-evo-target"><input class="dm-input" data-evo-species value="${escapeHtml(e.species || '')}" placeholder="Evolves into… (search a Pokémon)" autocomplete="off"></div>
+      <button class="dm-btn small" data-crit-add>＋ Add evolution criteria</button>
+      <button class="dm-icon-btn danger" data-evo-remove title="Remove this evolution">✕</button>
+    </div>
+    <div class="dm-adm-crits">${(e.criteria || []).map(criterionHtml).join('')}</div>
   </div>`;
+}
+
+function criterionHtml(c) {
+  const label = (CRITERIA.find(x => x[0] === c.type) || CRITERIA[CRITERIA.length - 1])[1];
+  const v = c.value ?? '';
+  let input;
+  if (c.type === 'level') input = `<input class="dm-input dm-adm-crit-num" type="number" min="1" max="100" data-crit-value value="${escapeHtml(v)}" placeholder="Level">`;
+  else if (c.type === 'time') input = `<select class="dm-select" data-crit-value>${TIMES.map(t => `<option value="${t}" ${t === String(v).toLowerCase() ? 'selected' : ''}>${t[0].toUpperCase() + t.slice(1)}</option>`).join('')}</select>`;
+  else if (c.type === 'item' || c.type === 'move') {
+    input = `<span class="dm-adm-crit-pick"><span data-crit-shown>${escapeHtml(v)}</span><input type="hidden" data-crit-value value="${escapeHtml(v)}">
+      <button class="dm-btn small" data-crit-pick>Change…</button></span>`;
+  } else input = `<input class="dm-input" data-crit-value value="${escapeHtml(v)}" placeholder="${{ location: 'e.g. near a port', happiness: 'e.g. very happy -- loyalty 8+' }[c.type] || 'What it takes'}">`;
+  return `<div class="dm-adm-crit" data-type="${escapeHtml(c.type)}"><span class="dm-adm-crit-type">${label}</span>${input}
+    <button class="dm-icon-btn danger" data-crit-remove title="Remove this criterion">✕</button></div>`;
+}
+
+/** The evolution's Pokemon search: the console's own suggestion list, with the Pokemon's pictures. */
+function wireEvoRow(row, species) {
+  const input = row.querySelector('[data-evo-species]');
+  attachSuggest(input, () => species.map(s => ({ value: s.name, label: s.name, sub: `#${s.dex ?? '?'} ${[s.type1, s.type2].filter(Boolean).join('/')}`, image: s.picture || s.image || '' })),
+    { imageFallback: 'assets/Pokeball.png', max: 30 });
+}
+
+/** "Add evolution criteria": a small menu of the kinds, under the button. */
+function openCriteriaMenu(btn) {
+  document.querySelector('.dm-adm-critmenu')?.remove();
+  const menu = document.createElement('div');
+  menu.className = 'dm-adm-critmenu';
+  menu.innerHTML = CRITERIA.map(([type, label, sub]) => `<button type="button" data-crit-type="${type}"><b>${label}</b><small>${sub}</small></button>`).join('');
+  btn.insertAdjacentElement('afterend', menu);
+  const away = (e) => { if (!menu.contains(e.target) && e.target !== btn) { menu.remove(); document.removeEventListener('mousedown', away); } };
+  setTimeout(() => document.addEventListener('mousedown', away), 0);
+  menu.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-crit-type]');
+    if (!b) return;
+    menu.remove();
+    document.removeEventListener('mousedown', away);
+    const type = b.dataset.critType;
+    let value = '';
+    if (type === 'item' || type === 'move') {
+      value = await pickCriterionValue(type);
+      if (!value) return;
+    } else if (type === 'time') value = 'night';
+    const list = btn.closest('.dm-adm-evo').querySelector('.dm-adm-crits');
+    list.insertAdjacentHTML('beforeend', criterionHtml({ type, value }));
+    list.lastElementChild.querySelector('input:not([type="hidden"]), select')?.focus();
+  });
+}
+
+/** An item or a move, picked from the whole list. */
+async function pickCriterionValue(type) {
+  if (type === 'item') {
+    const items = await DmAPI.adminItems().catch(() => []);
+    const res = await openPicker({
+      title: '💎 Pick the item', imageFallback: 'assets/Bag.png',
+      items: items.map(i => ({ key: i.name, label: i.name, sub: i.category, image: i.image || '' })),
+    });
+    return res?.keys[0] || '';
+  }
+  let moves = [];
+  try { moves = JSON.parse(sessionStorage.getItem('moves') || '[]'); } catch (e) { /* none */ }
+  const res = await openPicker({
+    title: '✨ Pick the move', compact: true, emptyText: 'No move list loaded.',
+    items: moves.map(m => ({ key: m.name, label: m.name, sub: `${m.type || ''}${m.vpCost ? ` · ${m.vpCost} VP` : ''}` })),
+  });
+  return res?.keys[0] || '';
+}
+
+function setCriterionValue(row, value) {
+  row.querySelector('[data-crit-value]').value = value;
+  const shown = row.querySelector('[data-crit-shown]');
+  if (shown) shown.textContent = value;
 }
 
 function pictureSlotHtml(kind, label, url, shinyUrl) {
@@ -490,7 +596,9 @@ async function saveSpecies(btn, species, redrawList) {
     movement: Object.fromEntries(MOVEMENT.map(k => [k, n(`admSpMove_${k}`) || 0])),
     senses: Object.fromEntries(SENSES.map(k => [k, val(`admSpSense_${k}`).trim() || null])),
     evolvesInto: [...document.querySelectorAll('#admSpEvos .dm-adm-evo')].map(row => ({
-      species: row.querySelector('[data-evo-species]').value.trim(), requirement: row.querySelector('[data-evo-req]').value.trim() || null,
+      species: row.querySelector('[data-evo-species]').value.trim(),
+      criteria: [...row.querySelectorAll('.dm-adm-crit')].map(c => ({ type: c.dataset.type, value: c.querySelector('[data-crit-value]').value.trim() }))
+        .filter(c => c.value !== ''),
     })).filter(e => e.species),
   };
   // A description written for an ability -- kept for that ability (a new one needs it)
@@ -537,7 +645,7 @@ async function drawSplashes(body) {
       <div class="dm-adm-splashgrid">
         ${_splashes.map(s => `
           <div class="dm-adm-splash${s.session ? ' session' : ''}">
-            <img src="${escapeHtml(s.url)}" alt="" loading="lazy">
+            <img src="${escapeHtml(s.url)}" alt="" loading="lazy" data-view="${escapeHtml(s.url)}" title="Click to see it whole">
             <div class="dm-adm-splash-bar"><span>${s.session ? '<span class="dm-pill todo">Session splash</span>' : escapeHtml(s.file)}</span>
               <span><button class="dm-btn small" data-replace="${escapeHtml(s.file)}">Replace…</button>
               <button class="dm-btn small danger" data-delete="${escapeHtml(s.file)}">Delete</button></span></div>
@@ -560,6 +668,7 @@ async function drawSplashes(body) {
     }
     drawSplashes(body);
   });
+  body.querySelectorAll('[data-view]').forEach(img => img.addEventListener('click', () => viewPicture(img.dataset.view)));
   body.querySelectorAll('[data-replace]').forEach(b => b.addEventListener('click', async () => {
     const file = await pickFile('image/png,image/jpeg,image/webp');
     if (!file) return;
@@ -584,4 +693,196 @@ async function drawSplashes(body) {
     }
     drawSplashes(body);
   }));
+}
+
+/** A picture shown whole, over everything -- a click or Escape closes it. */
+function viewPicture(url) {
+  const overlay = document.createElement('div');
+  overlay.className = 'dm-adm-lightbox';
+  overlay.innerHTML = `<img src="${escapeHtml(url)}" alt=""><button class="dm-icon-btn" title="Close">✕</button>`;
+  const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  overlay.addEventListener('click', close);
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(overlay);
+}
+
+// ---------------------------------------------------------------------------
+// Map pictures: the battle maps' objects (object-<name>.png, see-through PNGs) and backgrounds (battle-<name>) -- uploaded
+// and deleted here (until 2026-10-19 in the map editor's Pictures card). A background is portrait, like the board: one
+// uploaded landscape is turned a quarter left first, so it looks the same on the table TV (which turns the board right).
+// ---------------------------------------------------------------------------
+
+async function drawMapPictures(body) {
+  let assets;
+  try {
+    assets = (await DmAPI.mapAssets()).data || { objects: [], backgrounds: [] };
+  } catch (err) {
+    body.innerHTML = `<div class="dm-loading">Couldn't load the map pictures: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  const card = (a) => `
+    <div class="dm-adm-mappic">
+      <span class="dm-adm-mappic-img" data-view="${escapeHtml(a.url)}" title="Click to see it whole"><img src="${escapeHtml(a.url)}" alt="" loading="lazy"></span>
+      <span class="dm-adm-mappic-name">${escapeHtml(a.label)}</span>
+      <button class="dm-icon-btn danger" data-del-pic="${escapeHtml(a.url)}" data-label="${escapeHtml(a.label)}" title="Delete it from the Pi">🗑</button>
+    </div>`;
+  body.innerHTML = `
+    <div class="dm-adm-splashes">
+      <div class="dm-adv-bar">
+        <h2>🌲 Map pictures</h2>
+        <span class="dm-hint">The pictures the battle maps are built from. Objects: a PNG with a see-through background. Backgrounds: JPG, PNG or WebP, portrait like the board (a landscape one is turned for you).</span>
+        <span class="dm-adv-btns">
+          <input class="dm-input" id="admPicName" placeholder="Name (else the file's)" maxlength="50" autocomplete="off" style="width:13rem">
+          <button class="dm-btn primary" id="admPicObject">⬆ Upload an object</button>
+          <button class="dm-btn primary" id="admPicBackground">⬆ Upload a background</button>
+        </span>
+      </div>
+      <div class="dm-adm-mappics">
+        <div class="dm-card-title">Objects (${assets.objects.length})</div>
+        <div class="dm-adm-mapgrid">${assets.objects.map(card).join('') || '<div class="dm-hint">None yet.</div>'}</div>
+        <div class="dm-card-title" style="margin-top:0.8rem">Backgrounds (${assets.backgrounds.length})</div>
+        <div class="dm-adm-mapgrid wide">${assets.backgrounds.map(card).join('') || '<div class="dm-hint">None yet.</div>'}</div>
+      </div>
+    </div>`;
+  const upload = async (kind, btn) => {
+    const file = await pickFile(kind === 'object' ? 'image/png' : 'image/png,image/jpeg,image/webp');
+    if (!file) return;
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    try {
+      let data = await readAsDataUrl(file);
+      if (kind === 'background') data = await portrait(data);
+      const pic = await DmAPI.uploadBattleImage({ kind, name: val('admPicName').trim() || file.name.replace(/\.[^.]+$/, ''), data });
+      forgetMapAssets();
+      toast(`${kind === 'object' ? 'Object' : 'Background'} "${pic.label}" is on the Pi.`);
+      drawMapPictures(body);
+    } catch (err) {
+      showCombatAlert(err.message, { title: kind === 'object' ? 'Upload an object' : 'Upload a background' });
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  };
+  document.getElementById('admPicObject').addEventListener('click', (e) => upload('object', e.currentTarget));
+  document.getElementById('admPicBackground').addEventListener('click', (e) => upload('background', e.currentTarget));
+  body.querySelectorAll('[data-view]').forEach(el => el.addEventListener('click', () => viewPicture(el.dataset.view)));
+  body.querySelectorAll('[data-del-pic]').forEach(b => b.addEventListener('click', async () => {
+    if (!await showCombatConfirm(`Delete "${b.dataset.label}" from the Pi? Maps that use it lose it.`, { title: 'Delete picture', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+    try {
+      await DmAPI.deleteBattleImage(b.dataset.delPic);
+      forgetMapAssets();
+      drawMapPictures(body);
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Delete picture' });
+    }
+  }));
+}
+
+/** A landscape picture turned a quarter left (counter-clockwise) into a portrait one; a portrait one as it is. */
+async function portrait(dataUrl) {
+  const img = await new Promise((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("That picture can't be read"));
+    el.src = dataUrl;
+  });
+  if (img.naturalWidth <= img.naturalHeight) return dataUrl;
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalHeight;
+  canvas.height = img.naturalWidth;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(0, canvas.height);
+  ctx.rotate(-Math.PI / 2);
+  ctx.drawImage(img, 0, 0);
+  const type = /^data:image\/(png|webp)/.test(dataUrl) ? dataUrl.slice(5, dataUrl.indexOf(';')) : 'image/jpeg';
+  return canvas.toDataURL(type, 0.92);
+}
+
+// ---------------------------------------------------------------------------
+// Battle logs: every battle on the Pi (PvE, PvP and adventures), newest first, and what happened in one -- round by
+// round, the DM-only lines too (pi-server/app/admin.py's battle_logs / battle_log).
+// ---------------------------------------------------------------------------
+
+const KIND_LABEL = { pve: 'PvE', pvp: 'PvP', adventure: 'Adventure' };
+let _logFile = null;
+
+async function drawBattleLogs(body) {
+  let logs;
+  try {
+    logs = await DmAPI.adminBattleLogs();
+  } catch (err) {
+    body.innerHTML = `<div class="dm-loading">Couldn't load the battle logs: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  const when = (ts) => (ts ? new Date(ts).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—');
+  body.innerHTML = `
+    <div class="dm-editor">
+      <aside class="dm-editor-tools">
+        <div class="dm-editor-head"><h2>📜 Battle logs</h2><span class="dm-pill ok">${logs.length}</span></div>
+        <input class="dm-input" id="admLogFilter" placeholder="Find a battle (who was in it)…" autocomplete="off">
+        <div class="dm-pdx-list" id="admLogList">
+          ${logs.map(l => `
+            <button class="dm-pdx-row dm-adm-logrow${l.file === _logFile ? ' selected' : ''}" data-log="${escapeHtml(l.file)}" data-search="${escapeHtml(`${l.who.join(' ')} ${l.kind}`.toLowerCase())}">
+              <span class="dm-adm-logkind ${escapeHtml(l.kind)}">${escapeHtml(KIND_LABEL[l.kind] || l.kind)}</span>
+              <span class="dm-pdx-main"><strong>${escapeHtml(when(l.started))}</strong>
+                <small>${escapeHtml(l.who.slice(0, 6).join(', ') || 'Nobody joined')}${l.who.length > 6 ? ` +${l.who.length - 6}` : ''}</small>
+                <small>${l.rounds ? `${l.rounds} round${l.rounds === 1 ? '' : 's'} · ` : ''}${l.entries} lines${l.caught ? ` · ${l.caught} caught` : ''}${l.ended ? '' : ' · not ended'}</small></span><span></span>
+            </button>`).join('') || '<div class="dm-hint" style="padding:0.4rem">No battles yet.</div>'}
+        </div>
+      </aside>
+      <section class="dm-editor-canvas" id="admLogView"><div class="dm-cs-empty">Pick a battle on the left.</div></section>
+    </div>`;
+  document.getElementById('admLogFilter').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    body.querySelectorAll('[data-log]').forEach(r => { r.hidden = !!q && !r.dataset.search.includes(q); });
+  });
+  document.getElementById('admLogList').addEventListener('click', (e) => {
+    const row = e.target.closest('[data-log]');
+    if (!row) return;
+    _logFile = row.dataset.log;
+    body.querySelectorAll('[data-log]').forEach(r => r.classList.toggle('selected', r === row));
+    showBattleLog(logs.find(l => l.file === _logFile));
+  });
+  if (_logFile && logs.some(l => l.file === _logFile)) showBattleLog(logs.find(l => l.file === _logFile));
+}
+
+async function showBattleLog(meta) {
+  const view = document.getElementById('admLogView');
+  view.innerHTML = '<div class="dm-loading">Loading…</div>';
+  let entries;
+  try {
+    entries = await DmAPI.adminBattleLog(meta.file);
+  } catch (err) {
+    view.innerHTML = `<div class="dm-loading">${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  const time = (ts) => (ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '');
+  const rounds = new Map();
+  entries.forEach((e) => {
+    const r = Number(e.round) || 0;
+    if (!rounds.has(r)) rounds.set(r, []);
+    rounds.get(r).push(e);
+  });
+  const draw = (q) => {
+    const show = (e) => !q || `${e.text} ${e.actorName || ''} ${e.targetName || ''} ${e.type}`.toLowerCase().includes(q);
+    document.getElementById('admLogLines').innerHTML = [...rounds.entries()].map(([r, list]) => {
+      const lines = list.filter(show);
+      if (!lines.length) return '';
+      return `<div class="dm-adm-loground"><div class="dm-card-title">${meta.kind === 'adventure' ? 'Adventure' : `Round ${r || 1}`}</div>
+        ${lines.map(e => `<div class="dm-adm-logline${e.hidden ? ' hidden-line' : ''} t-${escapeHtml(String(e.type || '').replace(/[^\w-]/g, ''))}">
+          <span class="dm-adm-logtime">${escapeHtml(time(e.ts))}</span>
+          <span>${e.hidden ? '<span title="Kept from the players\' log">🙈</span> ' : ''}${escapeHtml(e.text || e.type || '')}</span></div>`).join('')}</div>`;
+    }).join('') || '<div class="dm-hint">Nothing matches that.</div>';
+  };
+  view.innerHTML = `
+    <div class="dm-adm-loghead">
+      <h3 class="dm-cs-title"><span class="dm-adm-logkind ${escapeHtml(meta.kind)}">${escapeHtml(KIND_LABEL[meta.kind] || meta.kind)}</span>
+        ${escapeHtml(meta.started ? new Date(meta.started).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' }) : meta.file)}</h3>
+      <div class="dm-hint">${escapeHtml(meta.who.join(', ') || 'Nobody joined')}</div>
+      <input class="dm-input" id="admLogSearch" placeholder="Search this battle (a name, a move…)" autocomplete="off">
+    </div>
+    <div id="admLogLines"></div>`;
+  draw('');
+  document.getElementById('admLogSearch').addEventListener('input', (e) => draw(e.target.value.trim().toLowerCase()));
 }

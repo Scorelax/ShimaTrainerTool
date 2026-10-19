@@ -804,9 +804,15 @@ export class CombatAPI {
     return API.request('combat', 'set-status', { id, status }, { useCache: false });
   }
 
-  /** The DM console: a wild Pokemon the players caught leaves the battle, remembered as caught for the aftermath. */
-  static async capture(id) {
-    return API.request('combat', 'capture', { id }, { useCache: false });
+  /** The DM console: a wild Pokemon the players caught leaves the battle, remembered as caught for the aftermath --
+   * `givenTo`: the trainer it was already given to (the catch popup's "Caught by"). */
+  static async capture(id, givenTo = '') {
+    return API.request('combat', 'capture', { id, ...(givenTo ? { givenTo } : {}) }, { useCache: false });
+  }
+
+  /** The DM console: one of the DM's Pokemon marked catchable (a Poke Ball on its card, the DM's screens only) or not. */
+  static async setCatchable(id, catchable) {
+    return API.request('combat', 'set-catchable', { id, catchable: catchable ? '1' : '0' }, { useCache: false });
   }
 
   static async setVisibility(id, field, visible) {
@@ -1555,6 +1561,16 @@ export class DmAPI {
 
   static async adminDeleteSplash(file) {
     return (await DmAPI._post('admin-splash-delete', { file }, 'Deleting the splash')).data;
+  }
+
+  /** Every battle's log on the Pi, newest first -> [{file, kind, started, ended, rounds, entries, who, caught}]. */
+  static async adminBattleLogs() {
+    return (await API.request('dm', 'admin-battle-logs', {}, { useCache: false })).data || [];
+  }
+
+  /** One battle's log, every line. */
+  static async adminBattleLog(file) {
+    return (await API.request('dm', 'admin-battle-log', { file }, { useCache: false })).data || [];
   }
 
   /** The game data this device keeps (species lists, details...) dropped -- after the Admin module changed some. */

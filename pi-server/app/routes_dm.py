@@ -24,7 +24,8 @@ _CLOCK_KEY = 'world-clock'
 # region map on the board screen is looking (js/dm/pokenav.js).
 _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'display-scene', 'region-map-view',
                'pokedex-caught', 'saved-maps',  # saved-maps: the DM's battle maps kept for reuse (js/dm/map-editor.js)
-               'adventure-map'}  # the Adventure module's map (js/dm/adventure.js), until the adventure starts
+               'adventure-map',  # the Adventure module's map (js/dm/adventure.js), until the adventure starts
+               'display-folders'}  # the Display module's folders for its pictures: [{id, name, parent}] (js/dm/display.js)
 # The species the players have ever caught (lowercase names) -- see caught_species.
 _CAUGHT_KEY = 'pokedex-caught'
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and
@@ -65,6 +66,14 @@ def handle(conn, action, params):
         if not params.get('name'):
             raise ValueError('Missing species name')
         return {'status': 'success', 'data': admin.species_record(params['name'])}
+
+    if action == 'admin-battle-logs':
+        from . import admin
+        return {'status': 'success', 'data': admin.battle_logs()}
+
+    if action == 'admin-battle-log':
+        from . import admin
+        return {'status': 'success', 'data': admin.battle_log(params.get('file'))}
 
     if action == 'admin-splashes':
         from . import admin
@@ -526,8 +535,9 @@ def list_display_images(conn):
 
 
 def save_display_image(conn, payload):
-    """POST /api/dm/display-image: a new picture ({name, data: "data:image/...;base64,..."}) is written to
-    media.DISPLAY_IMAGE_DIR under a new random name; one already there ({id, name}) is renamed. Returns it."""
+    """POST /api/dm/display-image: a new picture ({name, data: "data:image/...;base64,...", folder}) is written to
+    media.DISPLAY_IMAGE_DIR under a new random name; one already there ({id, name} / {id, folder}) is renamed or moved to
+    another folder ('' = the top). Returns it."""
     import base64
     import re
     import secrets
@@ -537,7 +547,10 @@ def save_display_image(conn, payload):
         img = next((i for i in images if i.get('id') == payload['id']), None)
         if not img:
             raise ValueError('No such picture')
-        img['name'] = name
+        if 'name' in payload:
+            img['name'] = name
+        if 'folder' in payload:
+            img['folder'] = str(payload.get('folder') or '')
     else:
         m = re.match(r'^data:(image/[a-z+.-]+);base64,(.+)$', str(payload.get('data') or ''), re.S)
         if not m or m.group(1) not in _IMAGE_TYPES:
@@ -547,7 +560,7 @@ def save_display_image(conn, payload):
             raise ValueError('That picture is too big (15 MB at most)')
         os.makedirs(media.DISPLAY_IMAGE_DIR, exist_ok=True)
         img_id = secrets.token_hex(8)
-        img = {'id': img_id, 'name': name, 'file': img_id + _IMAGE_TYPES[m.group(1)],
+        img = {'id': img_id, 'name': name, 'file': img_id + _IMAGE_TYPES[m.group(1)], 'folder': str(payload.get('folder') or ''),
                'createdAt': datetime.now(timezone.utc).isoformat()}
         with open(os.path.join(media.DISPLAY_IMAGE_DIR, img['file']), 'wb') as f:
             f.write(raw)

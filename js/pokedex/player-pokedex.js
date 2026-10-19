@@ -250,7 +250,7 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
       tabs.push({ id: 'evo', label: 'Evolution', icon: '🔄', html: `<div class="pdx-evo-chain">
         ${evo.from ? `<div class="pdx-evo-item evo-from"><span class="pdx-evo-label">${evo.from.fusion ? 'Fusion from' : 'Evolves from'}</span><span class="pdx-evo-name">${esc(evo.from.name)}</span></div>` : ''}
         ${evo.to.map(t => `<div class="pdx-evo-item evo-to"><span class="pdx-evo-label">Evolves to</span><span class="pdx-evo-name">${esc(t.name)}</span>
-          ${t.requirement ? `<span class="pdx-evo-req"><span class="pdx-evo-req-label">Requirement</span>${esc(t.requirement)}</span>` : ''}</div>`).join('')}
+          ${(t.requirements || []).length ? `<span class="pdx-evo-req"><span class="pdx-evo-req-label">${t.requirements.length > 1 ? 'Requirements' : 'Requirement'}</span>${t.requirements.map(line => `<span class="pdx-evo-req-line">${esc(line)}</span>`).join('')}</span>` : ''}</div>`).join('')}
       </div>` });
     }
     const movesHtml = s.movesShown ? cardMovesHtml(s) : '';

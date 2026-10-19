@@ -30,6 +30,10 @@ let _source = 'pokemon';
 const _queries = {}; // what's typed in the search, per tab
 let _addHidden = false;
 const _data = { pokemon: null, npcs: null, trainers: null, backgrounds: null };
+// The backgrounds' folders (the user's call, 2026-10-19): [{id, name, parent}] in dm_state 'display-folders' -- a picture
+// keeps its folder's id (`folder`, '' = the top). Pictures and folders are dragged onto a folder (or the path) to move.
+let _folders = [];
+let _folder = ''; // the folder open
 let _listening = false;
 let _dragging = false;
 let _editor = null; // the big editor while it's open: {overlay, stage, area, selectedId, observer}
@@ -280,7 +284,10 @@ async function loadSource(name) {
       key: t.name, kind: 'trainer', label: t.name, sub: `Lv ${t.level}`, still: t.image || '', animated: '', search: String(t.name).toLowerCase(),
     }));
   } else if (name === 'backgrounds') {
-    _data.backgrounds = (await DmAPI.displayImages()).data || [];
+    const [images, folders] = await Promise.all([DmAPI.displayImages(), DmAPI.getState('display-folders').catch(() => null)]);
+    _data.backgrounds = images.data || [];
+    _folders = Array.isArray(folders) ? folders : [];
+    if (_folder && !_folders.some(f => f.id === _folder)) _folder = '';
   }
   return _data[name];
 }
@@ -320,17 +327,20 @@ function drawGrid() {
   const q = (_queries[_source] || '').trim().toLowerCase();
   if (_source === 'backgrounds') {
     const current = getScene().background?.url;
-    const shown = list.filter(b => !q || b.name.toLowerCase().includes(q));
-    grid.innerHTML = shown.length ? shown.map(b => `
-      <div class="dm-disp-bg${b.url === current ? ' current' : ''}" data-bg="${escapeHtml(b.id)}" role="button" tabindex="0" title="Put it on the display as the background">
+    // Searching looks in every folder; otherwise the folder open: its folders, then its pictures
+    const shown = list.filter(b => (q ? b.name.toLowerCase().includes(q) : (b.folder || '') === _folder));
+    const folders = q ? [] : _folders.filter(f => (f.parent || '') === _folder).sort((a, b) => a.name.localeCompare(b.name));
+    grid.innerHTML = `${foldersBarHtml(q)}${folders.map(folderCardHtml).join('')}` + (shown.length ? shown.map(b => `
+      <div class="dm-disp-bg${b.url === current ? ' current' : ''}" data-bg="${escapeHtml(b.id)}" draggable="true" role="button" tabindex="0" title="Put it on the display as the background -- or drag it into a folder">
         <span class="dm-disp-bg-img"><img src="${escapeHtml(b.url)}" alt="" loading="lazy" draggable="false"></span>
-        <span class="dm-disp-bg-name">${b.url === current ? '✓ ' : ''}${escapeHtml(b.name)}</span>
+        <span class="dm-disp-bg-name">${b.url === current ? '✓ ' : ''}${escapeHtml(b.name)}${q && b.folder ? `<small> · 📁 ${escapeHtml(folderPath(b.folder).map(f => f.name).join(' › '))}</small>` : ''}</span>
         <span class="dm-disp-bg-tools">
           <button class="dm-icon-btn" data-bgact="pic" title="Put it on as a picture instead (to move and resize)">＋</button>
           <button class="dm-icon-btn" data-bgact="rename" title="Rename">✎</button>
           <button class="dm-icon-btn danger" data-bgact="delete" title="Delete it from the Pi">✕</button>
         </span>
-      </div>`).join('') : `<div class="dm-hint">${list.length ? 'No picture matches that.' : 'No pictures uploaded yet -- upload a few backgrounds (a route, a forest, a city…) and they stay here for next time.'}</div>`;
+      </div>`).join('') : folders.length ? '' : `<div class="dm-hint dm-disp-empty">${q ? 'No picture matches that.' : _folder ? 'This folder is empty -- drag pictures here, or upload them while it\'s open.' : list.length ? 'No pictures out here -- they\'re all in folders.' : 'No pictures uploaded yet -- upload a few backgrounds (a route, a forest, a city…) and they stay here for next time.'}</div>`);
+    wireFolderDrag(grid);
     return;
   }
   const shown = list.filter(e => !q || e.search.includes(q));
@@ -369,6 +379,7 @@ function addPicture({ kind, label, still = '', animated = '' }) {
 }
 
 async function onGridClick(e) {
+  if (_source === 'backgrounds' && onFolderClick(e)) return;
   const bgTool = e.target.closest('[data-bgact]');
   const bgCard = e.target.closest('[data-bg]');
   if (bgCard) {
@@ -476,7 +487,7 @@ async function uploadFiles(files) {
   for (const [i, file] of files.entries()) {
     if (btn) { btn.disabled = true; btn.textContent = `Uploading ${i + 1} of ${files.length}…`; }
     try {
-      const img = await DmAPI.saveDisplayImage({ name: file.name.replace(/\.[^.]+$/, ''), data: await prepareImage(file) });
+      const img = await DmAPI.saveDisplayImage({ name: file.name.replace(/\.[^.]+$/, ''), data: await prepareImage(file), folder: _folder });
       _data.backgrounds.unshift(img);
       drawGrid();
     } catch (err) {
@@ -686,4 +697,166 @@ function onStagePointerDown(e) {
   target.addEventListener('pointermove', onMove);
   target.addEventListener('pointerup', onUp);
   target.addEventListener('pointercancel', onUp);
+}
+
+// ---------------------------------------------------------------------------
+// Folders for the backgrounds: the path to the folder open (each step a place to drop on), New folder, and the folders in
+// the one open -- open one by clicking it, drag pictures and folders onto it (or onto a step of the path) to move them.
+// ---------------------------------------------------------------------------
+
+/** The folder `id` and the ones above it, top first. */
+function folderPath(id) {
+  const out = [];
+  const seen = new Set();
+  for (let f = _folders.find(x => x.id === id); f && !seen.has(f.id); f = _folders.find(x => x.id === f.parent)) {
+    seen.add(f.id);
+    out.unshift(f);
+  }
+  return out;
+}
+
+function foldersBarHtml(q) {
+  if (q) return '<div class="dm-disp-crumbs"><span class="dm-hint">Searching every folder</span></div>';
+  return `<div class="dm-disp-crumbs">
+    <button class="dm-disp-crumb${_folder ? '' : ' here'}" data-open-folder="" data-drop-folder="">🖼️ All pictures</button>
+    ${folderPath(_folder).map(f => `<span>›</span><button class="dm-disp-crumb${f.id === _folder ? ' here' : ''}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}">📁 ${escapeHtml(f.name)}</button>`).join('')}
+    <button class="dm-btn small dm-disp-newfolder" data-new-folder>＋ New folder</button>
+  </div>`;
+}
+
+function folderCardHtml(f) {
+  const inside = (_data.backgrounds || []).filter(b => b.folder === f.id).length + _folders.filter(x => x.parent === f.id).length;
+  return `<div class="dm-disp-folder" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}" data-drag-folder="${escapeHtml(f.id)}" draggable="true" role="button" tabindex="0" title="Open it -- or drop pictures on it">
+    <span class="dm-disp-folder-icon">📁</span>
+    <span class="dm-disp-bg-name">${escapeHtml(f.name)}<small>${inside} inside</small></span>
+    <span class="dm-disp-bg-tools">
+      <button class="dm-icon-btn" data-folder-act="rename" title="Rename">✎</button>
+      <button class="dm-icon-btn danger" data-folder-act="delete" title="Delete the folder (what's in it moves up)">✕</button>
+    </span>
+  </div>`;
+}
+
+function saveFolders() {
+  return DmAPI.saveState('display-folders', _folders).catch(err => showCombatAlert(err.message, { title: 'Folders' }));
+}
+
+/** A click on a folder, a step of the path or New folder -- true when it was one of those. */
+function onFolderClick(e) {
+  if (e.target.closest('[data-new-folder]')) { newFolder(); return true; }
+  const act = e.target.closest('[data-folder-act]');
+  if (act) {
+    const f = _folders.find(x => x.id === act.closest('[data-drag-folder]').dataset.dragFolder);
+    if (f && act.dataset.folderAct === 'rename') renameFolder(f);
+    else if (f) deleteFolder(f);
+    return true;
+  }
+  const open = e.target.closest('[data-open-folder]');
+  if (open) { _folder = open.dataset.openFolder; drawGrid(); return true; }
+  return false;
+}
+
+async function askName(title, start = '') {
+  let typed = start;
+  const answer = await openDmModal({
+    title,
+    html: `<input class="dm-input" id="folderName" value="${escapeHtml(start)}" maxlength="60" placeholder="Name">`,
+    buttons: [{ label: 'Cancel', value: null }, { label: 'Save', kind: 'primary', value: 'save' }],
+    onOpen: (body, close) => {
+      const input = body.querySelector('#folderName');
+      setTimeout(() => input.select(), 0);
+      input.addEventListener('input', () => { typed = input.value.trim(); });
+      input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') close('save'); });
+    },
+  });
+  return answer === 'save' && typed ? typed : null;
+}
+
+async function newFolder() {
+  const name = await askName('New folder');
+  if (!name) return;
+  _folders.push({ id: newId('fold'), name, parent: _folder });
+  await saveFolders();
+  drawGrid();
+}
+
+async function renameFolder(f) {
+  const name = await askName('Rename the folder', f.name);
+  if (!name || name === f.name) return;
+  f.name = name;
+  await saveFolders();
+  drawGrid();
+}
+
+/** A folder deleted: what's in it -- pictures and folders -- moves up into the folder it was in. */
+async function deleteFolder(f) {
+  const pics = (_data.backgrounds || []).filter(b => b.folder === f.id);
+  const subs = _folders.filter(x => x.parent === f.id);
+  const what = pics.length || subs.length ? ` Its ${[pics.length && `${pics.length} picture${pics.length === 1 ? '' : 's'}`, subs.length && `${subs.length} folder${subs.length === 1 ? '' : 's'}`].filter(Boolean).join(' and ')} move up a level -- nothing is deleted.` : '';
+  if (!await showCombatConfirm(`Delete the folder "${f.name}"?${what}`, { title: 'Delete folder', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+  try {
+    for (const b of pics) await movePicture(b, f.parent || '');
+  } catch (err) { showCombatAlert(err.message, { title: 'Delete folder' }); return; }
+  subs.forEach((x) => { x.parent = f.parent || ''; });
+  _folders = _folders.filter(x => x.id !== f.id);
+  if (_folder === f.id) _folder = f.parent || '';
+  await saveFolders();
+  drawGrid();
+}
+
+async function movePicture(b, folder) {
+  if ((b.folder || '') === folder) return;
+  await DmAPI.saveDisplayImage({ id: b.id, folder });
+  b.folder = folder;
+}
+
+/** Drag a picture or a folder onto a folder (or a step of the path) to move it there. */
+function wireFolderDrag(grid) {
+  if (grid._folderDrag) return;
+  grid._folderDrag = true;
+  const TYPE = 'application/x-dm-display';
+  grid.addEventListener('dragstart', (e) => {
+    const pic = e.target.closest?.('[data-bg]');
+    const folder = e.target.closest?.('[data-drag-folder]');
+    if (!pic && !folder) return;
+    e.dataTransfer.setData(TYPE, JSON.stringify(pic ? { kind: 'picture', id: pic.dataset.bg } : { kind: 'folder', id: folder.dataset.dragFolder }));
+    e.dataTransfer.effectAllowed = 'move';
+    (pic || folder).classList.add('dragging');
+  });
+  grid.addEventListener('dragend', () => grid.querySelectorAll('.dragging, .drop-here').forEach(el => el.classList.remove('dragging', 'drop-here')));
+  grid.addEventListener('dragover', (e) => {
+    const target = e.target.closest?.('[data-drop-folder]');
+    if (!target || ![...e.dataTransfer.types].includes(TYPE)) return;
+    e.preventDefault();
+    grid.querySelectorAll('.drop-here').forEach(el => { if (el !== target) el.classList.remove('drop-here'); });
+    target.classList.add('drop-here');
+  });
+  grid.addEventListener('dragleave', (e) => {
+    const target = e.target.closest?.('[data-drop-folder]');
+    if (target && !target.contains(e.relatedTarget)) target.classList.remove('drop-here');
+  });
+  grid.addEventListener('drop', async (e) => {
+    const target = e.target.closest?.('[data-drop-folder]');
+    const raw = e.dataTransfer.getData(TYPE);
+    if (!target || !raw) return;
+    e.preventDefault();
+    e.stopPropagation();
+    target.classList.remove('drop-here');
+    const into = target.dataset.dropFolder;
+    const what = JSON.parse(raw);
+    try {
+      if (what.kind === 'picture') {
+        const b = (_data.backgrounds || []).find(x => x.id === what.id);
+        if (b) await movePicture(b, into);
+      } else {
+        const f = _folders.find(x => x.id === what.id);
+        // never into itself or one of its own folders
+        if (!f || f.id === into || folderPath(into).some(x => x.id === f.id)) return;
+        f.parent = into;
+        await saveFolders();
+      }
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Move' });
+    }
+    drawGrid();
+  });
 }

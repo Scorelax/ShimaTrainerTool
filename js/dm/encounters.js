@@ -949,7 +949,7 @@ async function randomTrainerDialog(enc) {
 
 // ---- Putting in play (the next battle) ----
 
-function monConfig(p) {
+export function monConfig(p) {
   return {
     level: Math.max(1, Math.min(20, Number(p.level) || 1)), nature: p.nature || '', abilities: p.abilities?.length ? p.abilities : [0],
     item: p.item || '', shiny: !!p.shiny, initiative: null, stats: p.stats || {}, overrides: {}, extraSkills: p.extraSkills || [],
@@ -1259,6 +1259,8 @@ function drawAftermath(body) {
   const minutes = Math.max(1, Math.ceil(((Number(last.round) || 1) * ROUND_SECONDS) / 60));
   const clock = getClock();
   last.given = last.given || {};
+  // Given to its trainer already from the catch popup (battle-live.js), during the battle
+  (last.participants || []).forEach((p) => { if (p.givenTo && !last.given[p.id]) last.given[p.id] = p.givenTo; });
   last.lootGiven = last.lootGiven || {};
 
   // Loot: held items of the defeated wild Pokemon, and the items of defeated NPC trainers (from the NPC library).
@@ -1450,7 +1452,7 @@ function wireAftermath(body, s, minutes) {
       const trainer = row.querySelector('[data-k="trainer"]').value;
       const nickname = row.querySelector('[data-k="nickname"]').value.trim();
       const c = getSetup()?.creatures.find(x => x.id === p.id);
-      const cfg = c ? { species: c.config.species, ...monConfig(c.config) } : { species: p.speciesName || p.name, level: p.level, abilities: [0] };
+      const cfg = c ? { species: c.config.species, ...monConfig(c.config) } : { species: p.speciesName || p.name, level: p.level, nature: p.nature || '', abilities: [0] };
       e.target.disabled = true;
       try {
         await DmAPI.givePokemon(trainer, { ...cfg, nickname: nickname || (p.name !== cfg.species && !/ [A-Z]$/.test(p.name) ? p.name : '') });

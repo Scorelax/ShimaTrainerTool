@@ -255,7 +255,8 @@ function renderStatus() {
     return;
   }
   if (session.battleType === 'adventure') {
-    const players = new Set(Object.values(session.participants || {}).map(p => p.owner).filter(Boolean));
+    // (the DM's own creatures on the map aren't a player)
+    const players = new Set(Object.values(session.participants || {}).map(p => p.owner).filter(o => o && o !== 'DM'));
     el.innerHTML = `<strong>🧭 Adventure</strong> · ${players.size} player${players.size === 1 ? '' : 's'} on the map`;
     return;
   }

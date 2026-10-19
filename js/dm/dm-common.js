@@ -234,7 +234,8 @@ export function participantFromPokemon(pokemon) {
   sessionStorage.setItem(key, JSON.stringify(pokemon));
   let combatant;
   try { combatant = buildPokemonCombatant(key); } finally { sessionStorage.removeItem(key); }
-  return { combatant, participant: dmEnemyParticipant(combatant) };
+  // its nature kept on the participant: a caught one is registered with it (battle-live.js's catch popup, the post battle)
+  return { combatant, participant: { ...dmEnemyParticipant(combatant), nature: pokemon.nature || '' } };
 }
 
 export function abilityMod(score) {
@@ -249,6 +250,19 @@ export function trainerHp(level, con) {
 
 export function proficiencyForLevel(level) {
   return 2 + Math.floor((Math.max(1, Number(level) || 1) - 1) / 4);
+}
+
+/** An NPC from the NPC library as the trainer config participantFromTrainer takes (its level, scores, AC, HP / VP,
+ * speed, saving throws and skills) -- for a battle setup (creature-setup.js) or the adventure's map (map-editor.js). */
+export function npcTrainerConfig(npc) {
+  const level = Math.max(1, Math.min(20, Number(npc.level) || 1));
+  return {
+    name: npc.name || 'Trainer', image: npc.image || '', level,
+    ...Object.fromEntries(['str', 'dex', 'con', 'int', 'wis', 'cha'].map(k => [k, Number(npc[k]) || 10])),
+    ac: Number(npc.ac) || 10, maxHP: Number(npc.maxHP) || trainerHp(level, Number(npc.con) || 10),
+    maxVP: Number(npc.maxVP) || 0, speed: Number(npc.speed) || 30,
+    savingThrows: splitList(npc.savingThrows, SAVING_THROWS), skills: splitList(npc.skills, SKILLS), initiative: null,
+  };
 }
 
 /** An NPC trainer the DM typed in, in combat.js's buildTrainerCombatant shape, as an enemy participant. */

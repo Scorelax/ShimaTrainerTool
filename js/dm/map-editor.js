@@ -18,11 +18,16 @@
 // Objects (the user's ask, 2026-10-15): press a square to place one there and, still holding, move the pointer around
 // it to turn it -- it's placed on release. Click a placed object to edit it (the panel shows its settings, changes apply
 // at once, arrows move it); press and hold a placed object to turn it the same way.
-import { DmAPI } from '../api.js';
+//
+// Add to the map (the user's call, 2026-10-19): Objects and Items -- and on the adventure, Pokémon and NPCs -- are picked
+// in a popup like a file explorer (picker.js: search, several at once, "Add hidden"), then placed one after another, a
+// click each. An item goes on as an object showing the item's picture. Uploading the pictures moved to the Admin module.
+import { CombatAPI, DmAPI } from '../api.js';
 import { mapObjectHtml, objectScreenRect, objectCells, footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { escapeHtml, newId, toast } from './dm-common.js';
+import { escapeHtml, newId, toast, getSpecies, participantFromPokemon, participantFromTrainer, npcTrainerConfig } from './dm-common.js';
+import { openPicker } from './picker.js';
 import * as setupStore from './setup-store.js';
 import * as liveStore from './live-map-store.js';
 
@@ -57,7 +62,10 @@ const ed = {
   objHidden: false, // the next object placed (or the one being edited) is hidden from the players
   trapId: null, // the Traps tool's trap being drawn
   draftTrap: null, // a new trap with no squares yet -- it joins the map with its first square
-  picKind: 'object', // the Pictures card's upload kind
+  queue: [], // objects / items picked to place, the first one next: [{asset: {key, label, url}, hidden, item}]
+  creatureQueue: [], // the adventure's Pokemon / NPCs picked to place: [{kind: 'pokemon' | 'npc', key, label, hidden, level, npc}]
+  extraAssets: new Map(), // the items' pictures as object pictures, by key ('item:<name>')
+  placingCreature: false,
 };
 
 const SIZES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic'];
@@ -66,6 +74,11 @@ let _root = null;
 let _onDone = null;
 let _opts = {}; // renderMapEditor's options, kept for redrawing it
 let _unsub = null;
+
+/** The object / background lists read again next time (the Admin module uploaded or deleted one). */
+export function forgetMapAssets() {
+  _assets = null;
+}
 
 /** Loads the object / background lists once per page (they're files on the Pi). */
 async function loadAssets() {
@@ -132,7 +145,8 @@ function objectAt(m, col, row, id = null) {
 /** The picture the Objects tool uses: the chosen kind, or -- editing an object whose picture is no longer on the Pi --
  * that object's own. */
 function currentAsset() {
-  return _assets?.objects.find(o => o.key === ed.objectKey) || (ed.selectedId ? ed.editAsset : null) || null;
+  return _assets?.objects.find(o => o.key === ed.objectKey) || ed.extraAssets.get(ed.objectKey)
+    || (ed.selectedId ? ed.editAsset : null) || null;
 }
 
 /** A placed object's box on screen, in squares: top-left (sx, sy) and size (sw, sh). */
@@ -235,8 +249,8 @@ function applyEdit() {
 // ---------------------------------------------------------------------------
 
 /** `store`: another map than Map setup's (map-store.js -- an encounter's, the adventure's); `backLabel` / `title` name it. */
-export async function renderMapEditor(root, { onDone, live = false, store = null, backLabel = null, title = null }) {
-  _opts = { onDone, live, store, backLabel, title };
+export async function renderMapEditor(root, { onDone, live = false, store = null, backLabel = null, title = null, adventure = false }) {
+  _opts = { onDone, live, store, backLabel, title, adventure };
   // One editor at a time: it finds its parts by id, so one still drawn somewhere else (another module, a hidden tab)
   // would be the one it changes. That one is emptied -- its owner draws it again when it's shown (editorShownIn).
   if (_root && _root !== root && document.body.contains(_root)) { _unsub?.(); _unsub = null; _root.innerHTML = ''; }
@@ -296,6 +310,17 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
         </div>`}
 
         <div class="dm-card">
+          <div class="dm-card-title">Add to the map</div>
+          <div class="dm-add-grid" id="mapAdd">
+            ${adventure ? `<button class="dm-btn" data-add="pokemon" ${_live ? '' : 'disabled'}>🐾 Pokémon</button>
+            <button class="dm-btn" data-add="npc" ${_live ? '' : 'disabled'}>👤 NPCs</button>` : ''}
+            <button class="dm-btn" data-add="object">🌲 Objects</button>
+            <button class="dm-btn" data-add="item">🎒 Items</button>
+          </div>
+          ${adventure && !_live ? '<div class="dm-hint" style="margin-top:0.35rem">Pokémon and NPCs go on once the adventure is running.</div>' : ''}
+        </div>
+
+        <div class="dm-card">
           <div class="dm-tool-tabs" id="mapTools">
             ${_live ? '<button data-tool="creatures">🧍 Creatures</button>' : ''}
             <button data-tool="objects">🌲 Objects</button>
@@ -304,27 +329,6 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
             <button data-tool="erase">🧽 Eraser</button>
           </div>
           <div id="mapToolPanel"></div>
-        </div>
-
-        <div class="dm-card">
-          <div class="dm-card-title">Pictures</div>
-          <div class="dm-row">
-            <select class="dm-select" id="picKind" title="What the picture is for">
-              <option value="object" ${ed.picKind === 'object' ? 'selected' : ''}>Object</option>
-              <option value="background" ${ed.picKind === 'background' ? 'selected' : ''}>Background</option>
-            </select>
-            <input class="dm-input" id="picName" placeholder="Name (else the file's)" maxlength="50" autocomplete="off">
-          </div>
-          <button class="dm-btn small wide" id="picUpload" style="margin-top:0.5rem" title="A picture from this computer">⬆ Upload ${ed.picKind === 'object' ? 'an object' : 'a background'}</button>
-          <input type="file" id="picFile" hidden>
-          <div class="dm-hint" style="margin-top:0.35rem">Saved on the Pi as <b>object-&lt;name&gt;.png</b> (a PNG with a see-through background) or <b>battle-&lt;name&gt;</b> (JPG, PNG or WebP).</div>
-          <details class="dm-pic-manage">
-            <summary>Manage pictures (${_assets.objects.length + _assets.backgrounds.length})</summary>
-            ${[['Objects', _assets.objects], ['Backgrounds', _assets.backgrounds]].map(([label, list]) => `
-              <div class="dm-pic-group">${label}</div>
-              ${list.map(a => `<div class="dm-pic-row"><img src="${escapeHtml(a.url)}" alt="" loading="lazy"><span>${escapeHtml(a.label)}</span>
-                <button class="dm-icon-btn danger" data-del-pic="${escapeHtml(a.url)}" data-label="${escapeHtml(a.label)}" title="Delete it from the Pi">🗑</button></div>`).join('') || '<div class="dm-hint">None</div>'}`).join('')}
-          </details>
         </div>
 
         <div class="dm-editor-foot">
@@ -470,23 +474,9 @@ function wireStatic() {
     document.getElementById('mapApplySize').addEventListener('click', () => applySize(Number(across.value), Number(down.value)));
   }
   document.getElementById('mapBackground').addEventListener('change', (e) => updateSetup(s => { s.map.background = e.target.value; }));
-  document.getElementById('picKind').addEventListener('change', (e) => {
-    ed.picKind = e.target.value;
-    document.getElementById('picUpload').textContent = `⬆ Upload ${ed.picKind === 'object' ? 'an object' : 'a background'}`;
-  });
-  document.getElementById('picUpload').addEventListener('click', () => {
-    const input = document.getElementById('picFile');
-    input.accept = ed.picKind === 'object' ? 'image/png' : 'image/jpeg,image/png,image/webp';
-    input.click();
-  });
-  document.getElementById('picFile').addEventListener('change', (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (file) uploadPicture(file, ed.picKind, document.getElementById('picName').value.trim());
-  });
-  _root.querySelector('.dm-pic-manage')?.addEventListener('click', (e) => {
-    const del = e.target.closest('[data-del-pic]');
-    if (del) deletePicture(del.dataset.delPic, del.dataset.label);
+  document.getElementById('mapAdd').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-add]');
+    if (b && !b.disabled) addToMap(b.dataset.add);
   });
   document.getElementById('mapTools').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tool]');
@@ -528,58 +518,6 @@ function wireStatic() {
     document.addEventListener('pointercancel', () => { ed.painting = false; });
     wireStatic.mouseUpBound = true;
   }
-}
-
-/** A picture from the DM's computer, saved on the Pi with the others under the name the lists go by (object-<name>.png /
- * battle-<name>.<ext>, routes_dm.py's save_battle_image -- named after the file unless a name is typed). A background is
- * used for this map at once (and listed for the players' placement screen too); an object is picked in the Objects tool. */
-function uploadPicture(file, kind, name) {
-  const reader = new FileReader();
-  reader.onload = async () => {
-    const btn = document.getElementById('picUpload');
-    if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
-    try {
-      const pic = await DmAPI.uploadBattleImage({ kind, name: name || file.name.replace(/\.[^.]+$/, ''), data: reader.result });
-      _assets = null;
-      await loadAssets();
-      if (kind === 'background') {
-        updateSetup(s => { s.map.background = pic.url; });
-        toast(`Background "${pic.label}" uploaded and used for this map.`);
-      } else {
-        ed.tool = 'objects';
-        ed.selectedId = null; ed.editAsset = null;
-        selectObjectKind(pic.key);
-        toast(`Object "${pic.label}" uploaded -- click the map to place it.`);
-      }
-      renderMapEditor(_root, _opts);
-    } catch (err) {
-      showCombatAlert(err.message, { title: kind === 'object' ? 'Upload an object' : 'Upload a background' });
-      if (btn) { btn.disabled = false; btn.textContent = `⬆ Upload ${kind === 'object' ? 'an object' : 'a background'}`; }
-    }
-  };
-  reader.readAsDataURL(file);
-}
-
-/** Deletes one of the pictures from the Pi. A map already using it keeps the spot, the picture just stops showing. */
-async function deletePicture(url, label) {
-  const inUse = getSetup().map.background === url || (getSetup().map.objects || []).some(o => o.url === url);
-  const msg = `Delete "${label}" from the Pi?${inUse ? ' This map is using it -- it disappears from the map too.' : ''} Saved maps and setups that use it lose it as well.`;
-  if (!await showCombatConfirm(msg, { title: 'Delete picture', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
-  try {
-    await DmAPI.deleteBattleImage(url);
-  } catch (err) {
-    showCombatAlert(err.message, { title: 'Delete picture' });
-    return;
-  }
-  if (inUse) updateSetup(s => {
-    if (s.map.background === url) s.map.background = '';
-    s.map.objects = (s.map.objects || []).filter(o => o.url !== url);
-  });
-  _assets = null;
-  await loadAssets();
-  if (_assets.objects.every(o => o.key !== ed.objectKey)) ed.objectKey = _assets.objects[0]?.key || '';
-  toast(`"${label}" deleted.`);
-  renderMapEditor(_root, _opts);
 }
 
 async function leave() {
@@ -635,10 +573,14 @@ function renderToolPanel() {
     const missing = editing && !ed.objectKey; // its picture is no longer on the Pi
     panel.innerHTML = _assets.objects.length || editing ? `
       ${editing ? `<div class="dm-edit-head"><b>Editing: ${escapeHtml(asset?.label || 'object')}</b><small>Changes apply at once.</small></div>` : ''}
-      <div class="dm-field"><label for="objKind">Object</label>
-        <select class="dm-select" id="objKind">${missing ? `<option value="" selected>${escapeHtml(asset?.label || '?')}</option>` : ''}${_assets.objects.map(o => `<option value="${escapeHtml(o.key)}" ${o.key === ed.objectKey ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select>
+      ${!editing && ed.queue.length ? `<div class="dm-place-queue"><b>Placing ${escapeHtml(asset?.label || '')}</b>
+        <small>${ed.queue.length > 1 ? `Then: ${escapeHtml(ed.queue.slice(1).map(q => q.asset.label).join(', '))}` : 'The last one picked'}${ed.objHidden ? ' · 🙈 hidden' : ''}</small>
+        <span><button class="dm-btn small" id="queueSkip">Skip</button><button class="dm-btn small" id="queueStop">Stop</button></span></div>` : ''}
+      <div class="dm-object-pick">
+        <div class="dm-object-preview">${asset ? `<img src="${escapeHtml(asset.url)}" alt="" style="transform:rotate(${ed.objRot}deg)">` : ''}</div>
+        <div><b>${escapeHtml(missing ? `${asset?.label || '?'} (no longer on the Pi)` : asset?.label || 'Nothing picked')}</b>
+          <button class="dm-btn small" id="objPick">${editing ? '↺ Another picture…' : '🌲 Pick objects…'}</button></div>
       </div>
-      <div class="dm-object-preview">${asset ? `<img src="${escapeHtml(asset.url)}" alt="" style="transform:rotate(${ed.objRot}deg)">` : ''}</div>
       <div class="dm-row">
         <div class="dm-field"><label for="objW">Width (squares)</label><input class="dm-input" id="objW" type="number" min="1" max="20" value="${ed.objW}"></div>
         <div class="dm-field"><label for="objH">Height (squares)</label><input class="dm-input" id="objH" type="number" min="1" max="20" value="${ed.objH}"></div>
@@ -669,18 +611,15 @@ function renderToolPanel() {
       <div class="dm-row">
         <button class="dm-btn" id="objRemove">🗑 Remove</button>
         <button class="dm-btn primary" id="objDoneEdit">✓ Done</button>
-      </div>` : ''}` : '<div class="dm-hint">No object pictures found -- add object-&lt;name&gt;.png files to the battle-images folder on the Pi.</div>';
+      </div>` : ''}` : '<div class="dm-hint">No object pictures yet -- upload them in the Admin module (Map pictures).</div>';
     hint.textContent = editing
       ? 'Editing the outlined object -- hold it and move the pointer around it to turn it. Click an empty square (or Done) to finish.'
       : 'Click a square to place the object there (its top-left corner) -- or hold and move the pointer around to turn it, then let go. Click a placed object to edit it.';
     // Editing: every change goes straight onto the object (applyEdit). Placing: it only changes what the next one looks like.
     const changed = () => { if (ed.selectedId) applyEdit(); else renderGhost(); };
-    document.getElementById('objKind')?.addEventListener('change', (e) => {
-      if (!e.target.value) return;
-      selectObjectKind(e.target.value);
-      if (ed.selectedId) applyEdit();
-      renderToolPanel();
-    });
+    document.getElementById('objPick')?.addEventListener('click', () => (ed.selectedId ? changeObjectPicture() : addToMap('object')));
+    document.getElementById('queueSkip')?.addEventListener('click', () => nextQueued());
+    document.getElementById('queueStop')?.addEventListener('click', () => { ed.queue = []; renderToolPanel(); });
     document.getElementById('objW')?.addEventListener('change', (e) => { ed.objW = clampInt(e.target.value, 1, 20); changed(); });
     document.getElementById('objH')?.addEventListener('change', (e) => { ed.objH = clampInt(e.target.value, 1, 20); changed(); });
     if (!editing) {
@@ -706,6 +645,18 @@ function renderToolPanel() {
       renderToolPanel();
     });
     document.getElementById('objDoneEdit')?.addEventListener('click', deselectObject);
+  } else if (ed.tool === 'creatures' && ed.creatureQueue.length) {
+    const q = ed.creatureQueue[0];
+    panel.innerHTML = `
+      <div class="dm-place-queue"><b>Placing ${escapeHtml(q.label)}${q.hidden ? ' 🙈' : ''}</b>
+        <small>${ed.creatureQueue.length > 1 ? `Then: ${escapeHtml(ed.creatureQueue.slice(1).map(x => x.label).join(', '))}` : 'The last one picked'}</small>
+        <span><button class="dm-btn small" id="queueSkip">Skip</button><button class="dm-btn small" id="queueStop">Stop</button></span></div>
+      ${q.kind === 'pokemon' ? `<div class="dm-field"><label for="queueLevel">Its level</label><input class="dm-input" id="queueLevel" type="number" min="1" max="20" value="${q.level}"></div>` : ''}
+      <div class="dm-hint">${q.hidden ? 'Hidden: only you see it until you show it (the Battle module\'s creatures list).' : 'The players see it as soon as it\'s on the map.'}</div>`;
+    hint.textContent = ed.placingCreature ? `Putting ${q.label} on the map…` : `Click a square to put ${q.label} there.`;
+    document.getElementById('queueLevel')?.addEventListener('change', (e) => { q.level = Math.max(1, Math.min(20, Number(e.target.value) || q.level)); });
+    document.getElementById('queueSkip').addEventListener('click', () => { ed.creatureQueue.shift(); renderToolPanel(); });
+    document.getElementById('queueStop').addEventListener('click', () => { ed.creatureQueue = []; renderToolPanel(); });
   } else if (ed.tool === 'creatures') {
     const c = getSetup().creatures.find(x => x.id === ed.creatureId);
     panel.innerHTML = c ? `
@@ -791,7 +742,7 @@ function renderStage() {
     if (ed.tool === 'terrain') { startPainting(e); paint(col, row); }
     else if (ed.tool === 'traps') startTrapStroke(e, col, row);
     else if (ed.tool === 'objects') startObjectPress(e, col, row);
-    else if (ed.tool === 'creatures') onCreaturePress(col, row);
+    else if (ed.tool === 'creatures') (ed.creatureQueue.length ? placeQueuedCreature(col, row) : onCreaturePress(col, row));
     else onCellClick(col, row);
   });
   stage.addEventListener('pointermove', (e) => {
@@ -923,6 +874,143 @@ async function finishObjectPress(cancelled) {
   }
   o.crop = await cropFor(o.url);
   commitObject(o);
+  if (ed.queue.length) nextQueued();
+}
+
+// ---------------------------------------------------------------------------
+// Add to the map: Objects, Items -- and on a running adventure Pokemon and NPCs -- picked in the picker, then placed one
+// after another with a click each (the queue; Skip / Stop on the tool panel).
+// ---------------------------------------------------------------------------
+
+async function addToMap(kind) {
+  if (kind === 'object') {
+    const res = await openPicker({
+      title: '🌲 Objects', multi: true, hiddenOption: true, confirmLabel: 'Place', emptyText: 'No object pictures yet -- upload them in the Admin module.',
+      hint: 'Pick one or several -- then click the map to place each one (hold and move the pointer to turn it).',
+      items: _assets.objects.map(o => ({ key: o.key, label: o.label, image: o.url })),
+    });
+    if (!res?.keys.length) return;
+    queueObjects(res.keys.map(k => ({ asset: _assets.objects.find(o => o.key === k), hidden: res.hidden })).filter(q => q.asset));
+  } else if (kind === 'item') {
+    const items = await DmAPI.adminItems().catch(() => []);
+    const res = await openPicker({
+      title: '🎒 Items', multi: true, hiddenOption: true, confirmLabel: 'Place', imageFallback: 'assets/Bag.png',
+      hint: 'Things lying on the map -- each one shows the item\'s picture (the bag when it has none). Click the map to place each one.',
+      items: items.map(i => ({ key: i.name, label: i.name, sub: i.category, image: i.image || '' })),
+    });
+    if (!res?.keys.length) return;
+    queueObjects(res.keys.map((name) => {
+      const it = items.find(i => i.name === name);
+      return { asset: { key: `item:${name}`, label: name, url: (it?.image || '/assets/Bag.png').split('?')[0] }, hidden: res.hidden, item: true };
+    }));
+  } else if (kind === 'pokemon') {
+    const species = await getSpecies().catch(() => []);
+    const res = await openPicker({
+      title: '🐾 Pokémon', multi: true, hiddenOption: true, confirmLabel: 'Place',
+      hint: 'Wild Pokémon on the adventure, at their lowest level met (change it before placing each one).',
+      items: species.map(sp => ({ key: sp.name, label: sp.name, sub: `#${sp.dex ?? '?'} ${[sp.type1, sp.type2].filter(Boolean).join('/')}`, image: sp.image || sp.picture || '', search: `${sp.habitat || ''} ${sp.dex}` })),
+    });
+    if (!res?.keys.length) return;
+    ed.creatureQueue = res.keys.map(k => ({ kind: 'pokemon', key: k, label: k, hidden: res.hidden, level: species.find(sp => sp.name === k)?.level || 1 }));
+    startCreatureQueue();
+  } else if (kind === 'npc') {
+    const npcs = (await DmAPI.npcs().catch(() => null))?.data || [];
+    const res = await openPicker({
+      title: '👤 NPCs', multi: true, hiddenOption: true, confirmLabel: 'Place', emptyText: 'No NPCs in the NPC library yet.', imageFallback: 'assets/Pokeball.png',
+      items: npcs.map(n => ({ key: n.id, label: n.name || 'NPC', sub: n.role || n.location || '', image: n.image || '' })),
+    });
+    if (!res?.keys.length) return;
+    ed.creatureQueue = res.keys.map((id) => { const n = npcs.find(x => x.id === id); return { kind: 'npc', key: id, label: n?.name || 'NPC', hidden: res.hidden, npc: n }; });
+    startCreatureQueue();
+  }
+}
+
+function queueObjects(list) {
+  if (!list.length) return;
+  ed.queue = list;
+  ed.tool = 'objects';
+  ed.selectedId = null; ed.editAsset = null;
+  useQueued(ed.queue[0]);
+  renderToolPanel();
+  renderStage();
+}
+
+/** The next object of the queue is what a click places (an item: a picture one square big, flat on the ground). */
+function useQueued(q) {
+  if (q.item) {
+    ed.extraAssets.set(q.asset.key, q.asset);
+    ed.objW = 1; ed.objH = 1; ed.objMark = '';
+  }
+  selectObjectKind(q.asset.key);
+  if (q.item) ed.objHeight = 0;
+  ed.objHidden = !!q.hidden;
+}
+
+function nextQueued() {
+  ed.queue.shift();
+  if (ed.queue.length) useQueued(ed.queue[0]);
+  renderToolPanel();
+  renderGhost();
+}
+
+/** Editing a placed object: another picture for it (one of the object pictures). */
+async function changeObjectPicture() {
+  const res = await openPicker({ title: '🌲 Another picture', items: _assets.objects.map(o => ({ key: o.key, label: o.label, image: o.url })) });
+  if (!res?.keys.length) return;
+  selectObjectKind(res.keys[0]);
+  applyEdit();
+  renderToolPanel();
+}
+
+function startCreatureQueue() {
+  ed.tool = 'creatures';
+  ed.creatureId = null;
+  renderToolPanel();
+  renderStage();
+}
+
+/** A name nobody on the map has yet: "Pidgey", then "Pidgey B", "Pidgey C"... */
+function freeName(base) {
+  const taken = new Set(Object.values(liveStore.session()?.participants || {}).map(p => p.name));
+  if (!taken.has(base)) return base;
+  for (let i = 1; i < 26; i++) {
+    const name = `${base} ${String.fromCharCode(65 + i)}`;
+    if (!taken.has(name)) return name;
+  }
+  return `${base} ${newId('').slice(-3)}`;
+}
+
+/** The adventure: the queue's next Pokemon / NPC joins as one of the DM's creatures (hidden: on no screen but the DM's)
+ * and stands on the square clicked. */
+async function placeQueuedCreature(col, row) {
+  const q = ed.creatureQueue[0];
+  if (!q || ed.placingCreature) return;
+  ed.placingCreature = true;
+  renderToolPanel();
+  try {
+    let participant;
+    if (q.kind === 'pokemon') {
+      const natures = JSON.parse(sessionStorage.getItem('natures') || '[]').map(n => n.name);
+      const name = freeName(q.label);
+      const res = await DmAPI.buildPokemon({ species: q.key, level: q.level, nature: natures[Math.floor(Math.random() * natures.length)] || '',
+        nickname: name !== q.label ? name : '' });
+      ({ participant } = participantFromPokemon(res.data));
+    } else {
+      ({ participant } = participantFromTrainer({ ...npcTrainerConfig(q.npc || {}), name: freeName(q.label) }));
+    }
+    participant.id = newId('adv');
+    participant.owner = participant.owner || 'DM';
+    participant.initiative = 0;
+    participant.status = q.hidden ? 'spectating' : 'participating';
+    await CombatAPI.addParticipant(participant);
+    await CombatAPI.dmPlaceToken(participant.id, { col, row, facing: 0, z: 0 });
+    ed.creatureQueue.shift();
+  } catch (err) {
+    showCombatAlert(err.message, { title: `Couldn't put ${q.label} on the map` });
+  } finally {
+    ed.placingCreature = false;
+    renderToolPanel();
+  }
 }
 
 /** The outline of the object a click would place here (red when it doesn't fit). */

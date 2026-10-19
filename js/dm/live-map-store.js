@@ -19,6 +19,11 @@ export function setLiveSession(session) {
   _subs.forEach(fn => fn());
 }
 
+/** The session the live map shows (who's in it -- the map editor names a new creature so it's told apart). */
+export function session() {
+  return _session;
+}
+
 function _board() {
   const b = _session?.board || {};
   const keep = _local && Date.now() < _localUntil; // a push from before the DM's last edit mustn't undo it on screen

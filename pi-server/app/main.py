@@ -128,7 +128,7 @@ def _dispatch(params):
                                'remove-participant', 'set-status', 'set-visibility',
                                'advance-turn', 'reaction-start', 'use-bonus-action', 'disengage', 'hold-action', 'use-held-action', 'rapid-orders', 'rotate-token', 'clear-terrain-zones', 'remove-field-zone', 'trick-room', 'resolve-hazard', 'grant-extra-turn', 'quash', 'switch-pokemon', 'cancel-pending-switch', 'queue-switch-heal', 'reaction-end', 'play-animation',
                                'use-move', 'apply-damage', 'update-stats', 'set-board-template', 'set-cell-terrain',
-                               'set-token-position', 'move-token', 'adventure-settings', 'clear-token-position',
+                               'set-token-position', 'move-token', 'adventure-settings', 'set-catchable', 'clear-token-position',
                                'confirm-placement', 'hover-token', 'list-backgrounds', 'set-board-background'],
                 },
             }

@@ -260,18 +260,34 @@ def _handle(conn, action, params):
 
     if action == 'capture':
         # The DM console's capture helper: a wild Pokemon the players caught leaves the battle (and the turn order),
-        # remembered as caught for the aftermath, where the DM hands it to the trainer who caught it.
+        # remembered as caught for the aftermath, where the DM hands it to the trainer who caught it -- or `givenTo`: the
+        # trainer it was already given to from the catch popup (the aftermath then shows it given).
         if not params.get('id'):
             raise ValueError('Missing participant id')
+        given_to = str(params.get('givenTo') or '').strip()
 
         def _capture(s):
             p = s['participants'].get(params['id'])
             if not p:
                 raise ValueError('Unknown participant: ' + params['id'])
-            s.setdefault('departed', {})[p['id']] = _battle_memory(p, captured=True)
+            s.setdefault('departed', {})[p['id']] = _battle_memory(p, captured=True, **({'givenTo': given_to} if given_to else {}))
             _remove_participant(s, p['id'])
-            _log_event(s, 'capture', text=f"{p.get('name', 'The Pokémon')} was caught!", targetId=p['id'], targetName=p.get('name'))
+            who = f" by {given_to}" if given_to else ''
+            _log_event(s, 'capture', text=f"{p.get('name', 'The Pokémon')} was caught{who}!", targetId=p['id'], targetName=p.get('name'))
         return _mutate(conn, _capture)
+
+    if action == 'set-catchable':
+        # The DM marks one of their Pokemon catchable (or not): a Poke Ball on its card in the DM console opens the catch
+        # popup. Only the DM's screens show it.
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+
+        def _set(s):
+            p = s['participants'].get(params['id'])
+            if not p:
+                raise ValueError('Unknown participant: ' + params['id'])
+            p['catchable'] = params.get('catchable') in ('1', 'true')
+        return _mutate(conn, _set)
 
     if action == 'leave-session':
         return _leave_session(conn, params.get('owner', ''))
@@ -742,7 +758,10 @@ def _handle(conn, action, params):
     raise ValueError('Unknown combat action: ' + str(action))
 
 
-_OBJECT_URL_RE = re.compile(r'^/battle-images/object-[\w.-]+\.png$', re.IGNORECASE)  # see list_map_objects
+# A map object's picture: one of the object pictures (see list_map_objects), an item's picture (the map editor's Items --
+# media.ITEM_IMAGE_DIR) or, for an item without one, the bag
+_OBJECT_URL_RE = re.compile(r'^(/battle-images/object-[\w.-]+\.png|/item-images/[^/?#]+\.(png|jpe?g|webp|gif)|/assets/Bag\.png)$',
+                            re.IGNORECASE)
 
 
 def start_prepared_session(conn, setup):
@@ -1381,6 +1400,7 @@ def _add_participant(state, data):
         # _syncLocalCombatState for how a missing block degrades.
         'combatantType': data.get('combatantType'),
         'speciesName': data.get('speciesName', ''),
+        'nature': str(data.get('nature') or ''),  # a DM Pokemon's -- registered with it when it's caught
         'ac': data.get('ac'), 'baseAc': data.get('baseAc'), 'critMod': data.get('critMod', 0),
         'proficiency': data.get('proficiency'), 'stabBonusValue': data.get('stabBonusValue'),
         'str': data.get('str'), 'dex': data.get('dex'), 'con': data.get('con'),
@@ -1451,7 +1471,7 @@ def _entered_battle(state, participant):
 
 
 # What the DM console's aftermath needs to know of everyone who was in a PvE battle (see _remember_battle).
-_MEMORY_FIELDS = ('id', 'name', 'owner', 'side', 'combatantType', 'speciesName', 'level', 'image', 'item', 'size',
+_MEMORY_FIELDS = ('id', 'name', 'owner', 'side', 'combatantType', 'speciesName', 'nature', 'level', 'image', 'item', 'size',
                   'type1', 'type2', 'dex', 'currentHP', 'maxHP', 'currentVP', 'maxVP', 'status')
 
 

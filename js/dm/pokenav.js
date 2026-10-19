@@ -78,10 +78,11 @@ export async function renderPokenav(section, { session } = {}) {
       slow.textContent = 'Slow: this browser isn\'t using the graphics card';
       slow.title = 'Turn on hardware acceleration in the browser\'s settings (System), then restart it';
     }
-    if (saved) _map.setView(saved);
+    if (saved) _map.setView(saved); // (for the map style it was left in)
     await _map.ready;
-    // Never steered yet: the whole island lying along the screen, north to the right
-    if (!saved) _map.home({ ms: 0, azimuth: HOME_AZIMUTH, fill: true });
+    // Every start opens on the default view -- the compass's: straight down, north to the right, filling the screen
+    // (the user's call, 2026-10-19) -- and the board screen follows (the move is sent like any other).
+    _map.home({ ms: 0, azimuth: HOME_AZIMUTH, fill: true });
   } catch (err) {
     document.getElementById('navMap').innerHTML = `<div class="dm-loading">Couldn't load the map: ${escapeHtml(err.message)}</div>`;
   }

@@ -30,7 +30,7 @@ import { renderMapEditor, editorShownIn } from './map-editor.js';
 import { setLiveSession } from './live-map-store.js';
 import * as liveMapStore from './live-map-store.js';
 import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
-import { renderEncounters } from './encounters.js';
+import { renderEncounters, monConfig } from './encounters.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
 let species = [];
@@ -199,18 +199,30 @@ function renderEncounterCard() {
 
 async function openCapture(p) {
   const sp = species.find(s => s.name === p.speciesName) || {};
+  const detail = await DmAPI.speciesDetail(p.speciesName || p.name).then(r => r.data).catch(() => null);
   const { terrain: terrainKey, weather: weatherKey } = battleSetting();
   const cdc = captureDc(p, sp);
   const acc = accuracyDc(p, terrainKey);
   const wmod = WEATHER_ROLL_MOD[weatherKey] || 0;
-  const conditions = (p.statuses || []).filter(s => s.kind === 'condition').map(s => String(s.apply || '').toLowerCase());
+  const statuses = (p.statuses || []).filter(s => s.kind === 'condition');
+  const conditions = statuses.map(s => String(s.apply || '').toLowerCase());
   const bonuses = Object.entries(STATUS_CAPTURE_BONUS).map(([name, bonus]) => ({ name, bonus, on: conditions.includes(name.toLowerCase()) }));
+  const statusBonus = bonuses.filter(b => b.on).reduce((n, b) => n + b.bonus, 0);
   const sign = n => (n >= 0 ? `+${n}` : `${n}`);
   const row = (label, value, cls = '') => `<div class="dm-cap-row ${cls}"><span>${label}</span><span>${value}</span></div>`;
+  const pct = (cur, max) => (max > 0 ? Math.round((cur / max) * 100) : 0);
   const choice = await openDmModal({
     title: `🔴 Catching ${p.name}`,
+    wide: true,
     html: `
-      <div class="dm-cap-who">${typeBadges(p.type1, p.type2)} Lv ${p.level ?? '?'} · HP ${p.currentHP}/${p.maxHP} (${cdc.hpPct}%) · ${escapeHtml(p.size || sp.size || 'Medium')} · ${escapeHtml(sp.rarity || '?')} · ${escapeHtml(sp.behavior || '?')}</div>
+      <div class="dm-cap-who">${typeBadges(p.type1, p.type2)} Lv ${p.level ?? '?'} · ${escapeHtml(p.size || sp.size || 'Medium')} · ${escapeHtml(sp.rarity || '?')} · ${escapeHtml(sp.behavior || '?')}</div>
+      <div class="dm-cap-state">
+        <span><b>HP</b> ${p.currentHP}/${p.maxHP} <small>(${pct(p.currentHP, p.maxHP)}%)</small></span>
+        <span><b>VP</b> ${p.currentVP}/${p.maxVP} <small>(${pct(p.currentVP, p.maxVP)}%)</small></span>
+        <span><b>Conditions</b> ${statuses.length ? statuses.map(s => escapeHtml(s.apply || s.name || '?')).join(', ') : 'none'}</span>
+        <span><b>Catch difficulty</b> ${escapeHtml(detail?.catchDifficulty ?? '—')} <small>(its Pokédex entry)</small></span>
+        <span><b>Here</b> ${escapeHtml(TERRAIN[terrainKey]?.name || terrainKey)} · ${escapeHtml(WEATHER[weatherKey]?.name || weatherKey)}${detail?.habitat ? ` <small>· it lives in: ${escapeHtml(detail.habitat)}</small>` : ''}</span>
+      </div>
       <div class="dm-cap-cols">
         <div>
           <div class="dm-card-title">1 · The throw</div>
@@ -224,21 +236,65 @@ async function openCapture(p) {
           ${row('Base', 50)}${row(`Type (${escapeHtml([p.type1, p.type2].filter(Boolean).join('/'))})`, sign(cdc.types))}${row(`Size`, sign(cdc.size))}
           ${row(`Rarity (${escapeHtml(sp.rarity || '?')})`, sign(cdc.rarity))}${row(`Behaviour (${escapeHtml(sp.behavior || '?')})`, sign(cdc.behavior))}
           ${row(`Health (${cdc.hpPct}% HP)`, sign(cdc.health))}
-          ${row('Capture DC', cdc.total, 'total')}
-          <div class="dm-hint" style="margin-top:0.4rem">Your call on top: in its lair +10 to +20; weather it likes +10, weather it hates −10.</div>
+          <div class="dm-cap-row adjust"><span>Your call <small>(its lair +10 to +20, weather it likes / hates ±10, anything else)</small></span>
+            <span><button class="dm-btn small" data-cap-adj="-5">−5</button><input class="dm-input" id="capAdjust" type="number" value="0" step="1"><button class="dm-btn small" data-cap-adj="5">+5</button></span></div>
+          <div class="dm-cap-row total"><span>Capture DC</span><span id="capTotal">${cdc.total}</span></div>
         </div>
       </div>
       <div class="dm-card-title" style="margin-top:0.8rem">Bonuses to the capture roll</div>
-      <div class="dm-cap-bonus">${bonuses.map(b => `<span class="${b.on ? 'on' : ''}">${b.name} +${b.bonus}${b.on ? ' ✓' : ''}</span>`).join('')}</div>`,
-    buttons: [{ label: 'Close', value: null }, { label: '🔴 Mark as caught', value: 'catch', kind: 'primary' }],
+      <div class="dm-cap-bonus">${bonuses.map(b => `<span class="${b.on ? 'on' : ''}">${b.name} +${b.bonus}${b.on ? ' ✓' : ''}</span>`).join('')}</div>
+      ${statusBonus ? `<div class="dm-hint" style="margin-top:0.3rem">Its condition adds <b>+${statusBonus}</b> to the roll right now.</div>` : ''}`,
+    buttons: [{ label: 'Close', value: null }, { label: '🔴 Caught!', value: 'catch', kind: 'primary' }],
+    onOpen: (body) => {
+      const input = body.querySelector('#capAdjust');
+      const total = () => { body.querySelector('#capTotal').textContent = cdc.total + (Number(input.value) || 0); };
+      input.addEventListener('input', total);
+      body.querySelectorAll('[data-cap-adj]').forEach(b => b.addEventListener('click', () => { input.value = (Number(input.value) || 0) + Number(b.dataset.capAdj); total(); }));
+    },
   });
   if (choice !== 'catch') return;
+  await registerCatch(p);
+}
+
+/** "Caught!": which trainer caught it (and a nickname) -- it goes straight into that trainer's team (with the same
+ * numbers the post battle would give it) and leaves the battle. */
+async function registerCatch(p) {
+  let trainers = [...new Set(Object.values(session.participants || {})
+    .filter(x => x.combatantType === 'trainer' && x.owner && x.owner !== DM).map(x => x.owner))];
+  if (!trainers.length) trainers = ((await DmAPI.party().catch(() => null))?.data || []).map(r => r.trainer?.name).filter(Boolean);
+  if (!trainers.length) { showCombatAlert('No trainer to give it to.', { title: `Catch ${p.name}` }); return; }
+  let picked = null;
+  const answer = await openDmModal({
+    title: `🔴 ${p.name} was caught`,
+    html: `
+      <div class="dm-field"><label for="capTrainer">Caught by</label>
+        <select class="dm-select" id="capTrainer">${trainers.map(t => `<option>${escapeHtml(t)}</option>`).join('')}</select></div>
+      <div class="dm-field"><label for="capNick">Nickname <small>(optional)</small></label>
+        <input class="dm-input" id="capNick" maxlength="30" placeholder="${escapeHtml(p.speciesName || p.name)}"></div>
+      <div class="dm-hint">It goes into the trainer's team now -- at its level, its abilities and the numbers it was set up with -- and leaves the battle.</div>`,
+    buttons: [{ label: 'Cancel', value: null }, { label: 'Register it', kind: 'primary', value: 'ok', keepOpen: true,
+      onClick: (body) => { picked = { trainer: body.querySelector('#capTrainer').value, nickname: body.querySelector('#capNick').value.trim() }; return true; } }],
+  });
+  if (answer !== 'ok' || !picked) return;
+  const c = getSetup()?.creatures.find(x => x.id === p.id);
+  const speciesName = c?.config?.species || p.speciesName || p.name;
+  const cfg = c ? { species: speciesName, ...monConfig(c.config) }
+    : { species: speciesName, level: p.level, nature: p.nature || '', abilities: abilityList(p.abilities).map(a => a.slot).filter(n => n !== null && n !== undefined) };
+  if (!cfg.abilities?.length) cfg.abilities = [0];
+  const autoName = p.name !== speciesName && !/ [A-Z]$/.test(p.name) ? p.name : '';
   try {
-    await CombatAPI.capture(p.id);
-    toast(`${p.name} was caught -- hand it to its trainer in Post battle after the battle.`);
+    await DmAPI.givePokemon(picked.trainer, { ...cfg, nickname: picked.nickname || autoName });
   } catch (err) {
-    showCombatAlert(err.message, { title: `Catch ${p.name}` });
+    showCombatAlert(err.message, { title: `Give ${p.name} to ${picked.trainer}` });
+    return;
   }
+  try {
+    await CombatAPI.capture(p.id, picked.trainer);
+  } catch (err) {
+    showCombatAlert(`${p.name} is in ${picked.trainer}'s team, but couldn't leave the battle: ${err.message}`, { title: 'Catch' });
+    return;
+  }
+  toast(`${picked.nickname || p.name} is in ${picked.trainer}'s team now.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +310,24 @@ const VISIBILITY_FIELDS = [
   ['name', 'Name'], ['type', 'Type'], ['level', 'Level'], ['abilities', 'Abilities'], ['size', 'Size'],
 ];
 
+/** A catchable Pokemon's card gets a Poke Ball at its picture's corner (the DM's screens only) -- the catch popup. */
+function decorateCatchable(p) {
+  const col = document.querySelector(`#card_${CSS.escape(p.id)} .combat-card-portrait-col`);
+  if (!col) return;
+  const want = p.combatantType === 'pokemon' && !!p.catchable;
+  let ball = col.querySelector('.dm-catch-ball');
+  if (!want) { ball?.remove(); return; }
+  if (!ball) {
+    ball = document.createElement('button');
+    ball.type = 'button';
+    ball.className = 'dm-catch-ball';
+    ball.title = 'Catchable -- the catch details';
+    ball.innerHTML = '<img src="assets/Pokeball.png" alt="Catch">';
+    col.prepend(ball);
+  }
+  ball.onclick = (e) => { e.stopPropagation(); openCapture(session.participants?.[p.id] || p); };
+}
+
 function renderVisibilityColumn(focusId, currentSession) {
   const el = document.getElementById('dmFocusSide');
   if (!el) return;
@@ -264,6 +338,7 @@ function renderVisibilityColumn(focusId, currentSession) {
     return;
   }
   el.hidden = false;
+  decorateCatchable(p);
   const vis = { ...VISIBILITY_DEFAULTS, ...(p.visibility || {}) };
   el.innerHTML = `
     <div class="dm-vis" data-id="${p.id}">
@@ -273,6 +348,8 @@ function renderVisibilityColumn(focusId, currentSession) {
         <button class="dm-btn small" data-vis-act="none" title="Untick everything -- only its picture shows">Only picture</button>
         <button class="dm-btn small" data-vis-act="edit" title="Change its level, stats, abilities, moves...">✏️ Edit</button>
       </div>
+      ${p.combatantType === 'pokemon' ? `<label class="dm-vis-row dm-vis-catch" title="A Poké Ball on its card -- click it when a player throws one: the capture DC, and register it to the trainer">
+        <input type="checkbox" data-catchable ${p.catchable ? 'checked' : ''}><span>🔴 Catchable<small>Only you see this</small></span></label>` : ''}
       ${VISIBILITY_FIELDS.map(([field, label, sub]) => `
         <label class="dm-vis-row" ${sub ? `title="${sub}"` : ''}>
           <input type="checkbox" data-vis="${field}" ${vis[field] ? 'checked' : ''}>
@@ -281,6 +358,14 @@ function renderVisibilityColumn(focusId, currentSession) {
       <div class="dm-vis-note">Its picture always shows. Moves it uses are shown to the players as it uses them.</div>
     </div>`;
   el.querySelector('[data-vis-act="pokedex"]')?.addEventListener('click', () => showPokedexKnowledge(p));
+  el.querySelector('[data-catchable]')?.addEventListener('change', async (e) => {
+    try {
+      await CombatAPI.setCatchable(p.id, e.target.checked);
+    } catch (err) {
+      e.target.checked = !e.target.checked;
+      showCombatAlert(err.message, { title: p.name });
+    }
+  });
   el.querySelector('[data-vis-act="none"]').addEventListener('click', () => {
     CombatAPI.setVisibilityMany(p.id, Object.fromEntries(Object.keys(VISIBILITY_DEFAULTS).map(f => [f, false])))
       .catch(err => showCombatAlert(err.message, { title: p.name }));

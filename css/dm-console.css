@@ -1190,7 +1190,26 @@ span.dm-trap-pick { cursor: default; }
 .dm-adm-scores { flex-wrap: wrap; }
 .dm-adm-scores > .dm-field { flex: 1 1 70px; }
 .dm-adm-senses { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 0.5rem; }
-.dm-adm-evo { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 0.4rem; margin-bottom: 0.4rem; }
+/* Evolutions: the target, then its criteria one per row */
+.dm-adm-evocard { grid-column: 1 / -1; }
+.dm-adm-evo { border: 1px solid var(--dm-line); border-radius: 10px; padding: 0.55rem; margin-bottom: 0.5rem; background: rgba(255, 255, 255, 0.02); }
+.dm-adm-evo-head { display: flex; gap: 0.45rem; align-items: flex-start; position: relative; }
+.dm-adm-evo-target { flex: 1; min-width: 0; }
+.dm-adm-evo-head > .dm-btn { flex: none; white-space: nowrap; }
+.dm-adm-crits { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.45rem; }
+.dm-adm-crits:empty { display: none; }
+.dm-adm-crit { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr) auto; gap: 0.45rem; align-items: center; padding-left: 0.4rem; border-left: 3px solid rgba(255, 215, 0, 0.45); }
+.dm-adm-crit-type { font-size: 0.82rem; font-weight: 800; }
+.dm-adm-crit-num { max-width: 7rem; }
+.dm-adm-crit-pick { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; }
+.dm-adm-crit .dm-select { max-width: 12rem; }
+.dm-adm-critmenu { position: absolute; right: 2.4rem; top: 100%; z-index: 20; margin-top: 4px; width: 15rem; display: flex; flex-direction: column; gap: 1px;
+  background: #1b1c33; border: 1px solid rgba(255, 215, 0, 0.35); border-radius: 10px; padding: 0.3rem; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55); }
+.dm-adm-critmenu button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 0.4rem 0.55rem; border: none; border-radius: 7px;
+  background: none; color: var(--dm-text); font: inherit; text-align: left; cursor: pointer; }
+.dm-adm-critmenu button:hover { background: rgba(255, 215, 0, 0.12); }
+.dm-adm-critmenu b { font-size: 0.86rem; }
+.dm-adm-critmenu small { font-size: 0.7rem; color: var(--dm-muted); }
 .dm-adm-pics { display: flex; flex-direction: column; gap: 0.6rem; }
 .dm-adm-picslot { display: flex; gap: 0.7rem; align-items: center; }
 .dm-adm-picslot .dm-btn { margin-top: 0.3rem; }
@@ -1205,3 +1224,107 @@ span.dm-trap-pick { cursor: default; }
 .dm-adm-splash img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #000; }
 .dm-adm-splash-bar { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; padding: 0.45rem 0.55rem; font-size: 0.8rem; }
 .dm-adm-splash-bar > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- The picker (picker.js): a search bar, then the choices as a grid of cards ---- */
+.dm-picker { display: flex; flex-direction: column; gap: 0.6rem; min-height: 60vh; }
+.dm-picker-bar { display: flex; gap: 0.8rem; align-items: center; }
+.dm-picker-bar .dm-input { flex: 1; }
+.dm-picker-hidden { flex: none; margin: 0; }
+.dm-picker-grid { flex: 1; min-height: 0; max-height: 62vh; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 0.5rem; align-content: start; padding: 2px; }
+.dm-picker.compact .dm-picker-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.dm-picker-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.5rem 0.4rem 0.45rem;
+  border-radius: 10px; border: 1px solid var(--dm-line); background: rgba(255, 255, 255, 0.03); color: inherit; font: inherit; cursor: pointer; text-align: center; min-width: 0; }
+.dm-picker.compact .dm-picker-card { align-items: flex-start; text-align: left; padding: 0.45rem 0.6rem; }
+.dm-picker-card:hover { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 215, 0, 0.35); }
+.dm-picker-card.picked { background: rgba(39, 174, 96, 0.16); border-color: rgba(46, 204, 113, 0.75); }
+.dm-picker-img { width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; border-radius: 8px; overflow: hidden; }
+.dm-picker-img img, .dm-picker-img video { width: 100%; height: 100%; object-fit: contain; }
+.dm-picker-name { font-size: 0.8rem; font-weight: 700; line-height: 1.2; max-width: 100%; overflow-wrap: anywhere; }
+.dm-picker-card small { font-size: 0.68rem; color: var(--dm-muted); line-height: 1.2; }
+.dm-picker-tick { position: absolute; top: 4px; right: 6px; width: 18px; height: 18px; border-radius: 50%; display: none; align-items: center; justify-content: center;
+  background: #27ae60; color: #fff; font-size: 0.7rem; font-weight: 900; }
+.dm-picker-card.picked .dm-picker-tick { display: flex; }
+.dm-picker-more { grid-column: 1 / -1; padding: 0.5rem; text-align: center; }
+.dm-picker-foot { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; }
+.dm-picker-foot .dm-btn + .dm-btn { margin-left: 0.4rem; }
+
+/* Admin: a picture shown whole */
+.dm-adm-splash img, .dm-adm-mappic-img { cursor: zoom-in; }
+.dm-adm-lightbox { position: fixed; inset: 0; z-index: 10060; display: flex; align-items: center; justify-content: center; padding: 2rem;
+  background: rgba(3, 4, 12, 0.88); cursor: zoom-out; }
+.dm-adm-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; box-shadow: 0 16px 50px rgba(0, 0, 0, 0.7); }
+.dm-adm-lightbox .dm-icon-btn { position: absolute; top: 1rem; right: 1rem; }
+/* Admin: map pictures */
+.dm-adm-mappics { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; }
+.dm-adm-mapgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.6rem; margin-top: 0.4rem; }
+.dm-adm-mapgrid.wide { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+.dm-adm-mappic { position: relative; display: flex; flex-direction: column; gap: 0.3rem; padding: 0.45rem; border: 1px solid var(--dm-line); border-radius: 10px; background: rgba(255, 255, 255, 0.03); }
+.dm-adm-mappic-img { display: flex; align-items: center; justify-content: center; aspect-ratio: 1; border-radius: 7px; overflow: hidden;
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.06) 0 25%, transparent 0 50%) 50% / 16px 16px; }
+.dm-adm-mapgrid.wide .dm-adm-mappic-img { aspect-ratio: 941 / 1672; }
+.dm-adm-mappic-img img { width: 100%; height: 100%; object-fit: contain; }
+.dm-adm-mapgrid.wide .dm-adm-mappic-img img { object-fit: cover; }
+.dm-adm-mappic-name { font-size: 0.76rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 1.6rem; }
+.dm-adm-mappic .dm-icon-btn { position: absolute; right: 0.3rem; bottom: 0.25rem; }
+/* Admin: battle logs */
+.dm-adm-logrow { grid-template-columns: 4.4rem 1fr auto; }
+.dm-adm-logrow small + small { margin-top: 1px; }
+.dm-adm-logkind { display: inline-block; padding: 0.15rem 0.45rem; border-radius: 999px; font-size: 0.68rem; font-weight: 900; text-align: center;
+  background: rgba(231, 76, 60, 0.25); color: #ff9b8f; }
+.dm-adm-logkind.pvp { background: rgba(52, 152, 219, 0.25); color: #8ccaf5; }
+.dm-adm-logkind.adventure { background: rgba(46, 204, 113, 0.22); color: #8ee6ae; }
+.dm-adm-loghead { display: flex; flex-direction: column; gap: 0.35rem; }
+.dm-adm-loghead .dm-cs-title { display: flex; align-items: center; gap: 0.5rem; }
+.dm-adm-loground { margin-top: 0.6rem; }
+.dm-adm-logline { display: grid; grid-template-columns: 5.2rem 1fr; gap: 0.5rem; padding: 0.25rem 0.4rem; border-radius: 6px; font-size: 0.86rem; line-height: 1.35; }
+.dm-adm-logline:nth-child(even) { background: rgba(255, 255, 255, 0.03); }
+.dm-adm-logline.hidden-line { opacity: 0.7; font-style: italic; }
+.dm-adm-logline.t-capture { color: #ff8a80; font-weight: 700; }
+.dm-adm-logline.t-session-start, .dm-adm-logline.t-session-end { color: var(--dm-gold); font-weight: 700; }
+.dm-adm-logtime { color: var(--dm-muted); font-variant-numeric: tabular-nums; font-size: 0.78rem; padding-top: 1px; }
+
+/* Map editor: Add to the map, and the queue of picked things being placed */
+.dm-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.dm-add-grid .dm-btn { padding: 0.55rem 0.4rem; font-weight: 800; }
+.dm-add-grid .dm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.dm-place-queue { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem 0.6rem; margin-bottom: 0.55rem; border-radius: 9px;
+  background: rgba(39, 174, 96, 0.12); border: 1px solid rgba(46, 204, 113, 0.5); }
+.dm-place-queue small { color: var(--dm-muted); font-size: 0.74rem; line-height: 1.3; }
+.dm-place-queue span { display: flex; gap: 0.35rem; margin-top: 0.15rem; }
+.dm-object-pick { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.5rem; }
+.dm-object-pick .dm-object-preview { width: 64px; height: 64px; flex: none; margin: 0; }
+.dm-object-pick > div:last-child { display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-start; min-width: 0; font-size: 0.86rem; }
+.dm-object-pick .dm-object-preview img { max-width: 56px; max-height: 56px; }
+/* Display: the backgrounds' folders -- the path, folder cards, and dragging onto them */
+.dm-disp-crumbs { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; padding-bottom: 0.2rem; }
+.dm-disp-crumbs > span { color: var(--dm-muted); }
+.dm-disp-crumb { padding: 0.3rem 0.6rem; border-radius: 8px; border: 1px dashed transparent; background: rgba(255, 255, 255, 0.05); color: var(--dm-text);
+  font: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.dm-disp-crumb.here { color: var(--dm-gold); background: rgba(255, 215, 0, 0.1); }
+.dm-disp-newfolder { margin-left: auto; }
+.dm-disp-folder { position: relative; display: flex; flex-direction: column; border: 2px solid var(--dm-line); border-radius: 10px; overflow: hidden;
+  background: linear-gradient(160deg, rgba(255, 215, 0, 0.08), var(--dm-panel-2)); cursor: pointer; }
+.dm-disp-folder:hover { border-color: rgba(255, 215, 0, 0.6); }
+.dm-disp-folder-icon { display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; font-size: 2.6rem; }
+.dm-disp-folder .dm-disp-bg-name small { display: block; font-weight: 600; color: var(--dm-muted); font-size: 0.7rem; }
+.dm-disp-bg-name small { font-weight: 600; color: var(--dm-muted); }
+.dm-disp-folder:hover .dm-disp-bg-tools, .dm-disp-folder:focus-within .dm-disp-bg-tools { opacity: 1; }
+.dm-disp-bg.dragging, .dm-disp-folder.dragging { opacity: 0.45; }
+.dm-disp-folder.drop-here, .dm-disp-crumb.drop-here { border: 2px dashed #2ecc71; background: rgba(46, 204, 113, 0.16); }
+.dm-disp-empty { grid-column: 1 / -1; }
+/* The catch popup: where it stands right now, and the DM's own adjustment */
+.dm-cap-state { display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; padding: 0.55rem 0.7rem; margin-bottom: 0.7rem; border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--dm-line); font-size: 0.85rem; }
+.dm-cap-state small { color: var(--dm-muted); }
+.dm-cap-row.adjust { align-items: center; gap: 0.5rem; }
+.dm-cap-row.adjust > span:first-child small { display: block; color: var(--dm-muted); font-size: 0.72rem; }
+.dm-cap-row.adjust > span:last-child { display: flex; gap: 0.25rem; align-items: center; flex: none; }
+.dm-cap-row.adjust .dm-input { width: 4.2rem; text-align: center; padding: 0.25rem; }
+.dm-vis-catch { margin-bottom: 0.35rem; background: rgba(231, 76, 60, 0.12); }
+/* A catchable Pokemon's card: a Poke Ball at its picture's corner (the DM's screens only) */
+.combat-card-portrait-col { position: relative; }
+.dm-catch-ball { position: absolute; top: -4px; left: -4px; z-index: 5; width: 34px; height: 34px; padding: 0; border: 2px solid #fff; border-radius: 50%;
+  background: #c0392b; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 0 12px rgba(231, 76, 60, 0.6); cursor: pointer; animation: dm-ball-pulse 2.2s ease-in-out infinite; }
+.dm-catch-ball img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.dm-catch-ball:hover { transform: scale(1.12); }
+@keyframes dm-ball-pulse { 50% { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 0 20px rgba(231, 76, 60, 0.95); } }

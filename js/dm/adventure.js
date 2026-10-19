@@ -91,7 +91,7 @@ async function drawSetup() {
   const body = document.getElementById('advBody');
   body.innerHTML = '<div class="dm-adv-editor" id="advEditor"></div>';
   renderMapEditor(document.getElementById('advEditor'), {
-    store: _store, backLabel: '💾 Save', title: 'Adventure map', onDone: () => toast('The adventure map is saved.'),
+    store: _store, backLabel: '💾 Save', title: 'Adventure map', adventure: true, onDone: () => toast('The adventure map is saved.'),
   });
   document.getElementById('advStart').addEventListener('click', startFromButton);
   document.getElementById('advLoad').addEventListener('click', loadOtherMap);
@@ -177,7 +177,7 @@ function drawRunning() {
   body.innerHTML = '<div class="dm-adv-editor" id="advEditor"></div>';
   setLiveSession(_session);
   renderMapEditor(document.getElementById('advEditor'), {
-    live: true, backLabel: '💾 Save', title: 'The adventure, live', onDone: () => toast('Everything here goes to the table at once -- nothing to save.'),
+    live: true, adventure: true, backLabel: '💾 Save', title: 'The adventure, live', onDone: () => toast('Everything here goes to the table at once -- nothing to save.'),
   });
   document.getElementById('advGuide').addEventListener('click', () => captureGuide(_store?.getSetup().map.terrain));
   document.getElementById('advToEnc').addEventListener('click', () => encounterOnMap(boardAsMap(_session)));

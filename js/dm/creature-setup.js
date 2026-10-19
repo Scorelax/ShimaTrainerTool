@@ -12,7 +12,7 @@ import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import {
-  escapeHtml, typeBadges, getSpecies, newId, participantFromPokemon, participantFromTrainer, trainerHp,
+  escapeHtml, typeBadges, getSpecies, newId, participantFromPokemon, participantFromTrainer, trainerHp, npcTrainerConfig,
   natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect, portraitOptionsHtml, toast,
 } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup, onSetupChange } from './setup-store.js';
@@ -616,14 +616,7 @@ function saveTrainer(existing) {
 /** Adds an NPC from the library to the battle setup: the NPC as an NPC trainer, each Pokemon of their team built at
  * its level, nature and abilities (with any stats the DM gave it) and belonging to them. Nobody is placed yet. */
 export async function addNpcToSetup(npc) {
-  const level = Math.max(1, Math.min(20, Number(npc.level) || 1));
-  const config = {
-    name: npc.name || 'Trainer', image: npc.image || '', level,
-    ...Object.fromEntries(STATS.map(k => [k, Number(npc[k]) || 10])),
-    ac: Number(npc.ac) || 10, maxHP: Number(npc.maxHP) || trainerHp(level, Number(npc.con) || 10),
-    maxVP: Number(npc.maxVP) || 0, speed: Number(npc.speed) || 30,
-    savingThrows: splitList(npc.savingThrows, SAVING_THROWS), skills: splitList(npc.skills, SKILLS), initiative: null,
-  };
+  const config = npcTrainerConfig(npc);
   const { combatant, participant } = participantFromTrainer(config);
   participant.initiative = null;
   const trainer = {

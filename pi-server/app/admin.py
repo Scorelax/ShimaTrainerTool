@@ -128,6 +128,8 @@ def species_record(name):
     edited here."""
     sp = species_data.require(name)
     out = {k: v for k, v in sp.items() if k != 'evolvesFrom'}  # evolvesFrom is worked out, never kept
+    # every evolution with its criteria -- read from the text for one written before they existed
+    out['evolvesInto'] = [{**e, 'criteria': species_data.evolution_criteria(e)} for e in sp.get('evolvesInto') or []]
     edited = sp['name'].lower() in species_data.read_overlay(species_data.OVERLAY_FILE)
     return {'species': out, 'edited': edited, 'pictures': species_pictures(sp),
             'abilityDescriptions': {a['name']: a['description'] for a in species_data.abilities(sp)},
@@ -183,9 +185,20 @@ def save_species(sp, is_new=False, ability_descriptions=None):
         target = _text((e or {}).get('species'))
         if not target:
             continue
-        req = _text(e.get('requirement')) or None
-        m = re.fullmatch(r'level\s+(\d+)', req or '', re.I)
-        evolutions.append({'species': target, 'requirement': req, **({'level': int(m.group(1))} if m else {})})
+        criteria = []
+        for c in species_data.evolution_criteria(e):
+            t, v = c['type'], _text(c.get('value'))
+            if t == 'level':
+                v = js_parse_int(v)
+                if not v or not 1 <= v <= 100:
+                    raise ValueError(f'{target}: the level has to be a number')
+            elif t == 'time' and v.lower() not in species_data.TIMES_OF_DAY:
+                raise ValueError(f'{target}: the time of day is one of {", ".join(species_data.TIMES_OF_DAY)}')
+            criteria.append({'type': t, 'value': v.lower() if t == 'time' else v})
+        lines = [species_data.criterion_label(c) for c in criteria]
+        only_level = len(criteria) == 1 and criteria[0]['type'] == 'level'
+        evolutions.append({'species': target, 'requirement': ', '.join(lines) or None, 'criteria': criteria,
+                           **({'level': criteria[0]['value']} if only_level else {})})
     record = {
         'dexNumber': dex, 'name': existing['name'] if existing else name,
         'classification': _text(sp.get('classification')), 'description': _text(sp.get('description')),
@@ -292,3 +305,56 @@ def delete_splash(file):
         raise ValueError('No such splash')
     os.remove(os.path.join(media.SPLASH_DIR, current['file']))
     return splashes()
+
+
+# ---------------------------------------------------------------------------
+# The battle logs (every battle's own file -- routes_combat._append_log_file -- PvE, PvP and adventures alike)
+# ---------------------------------------------------------------------------
+
+_LOG_NAME = re.compile(r'^[\w.-]+\.jsonl$')
+
+
+def _read_log(filename):
+    from .routes_combat import BATTLE_LOG_DIR
+    entries = []
+    try:
+        with open(os.path.join(BATTLE_LOG_DIR, filename), encoding='utf-8') as f:
+            for line in f:
+                try:
+                    entries.append(json.loads(line))
+                except ValueError:
+                    continue
+    except OSError:
+        pass
+    return entries
+
+
+def battle_logs():
+    """[{file, kind, started, ended, rounds, entries, who, caught}] -- every battle on the Pi, newest first. `who`: the
+    creatures that joined; `ended`: when it ended (None for one still running or cut off)."""
+    from .routes_combat import BATTLE_LOG_DIR
+    names = sorted((n for n in os.listdir(BATTLE_LOG_DIR) if _LOG_NAME.match(n)), reverse=True) if os.path.isdir(BATTLE_LOG_DIR) else []
+    out = []
+    for name in names:
+        entries = _read_log(name)
+        kind = name.rsplit('-', 1)[-1].split('.')[0] if '-' in name else ''
+        who = []
+        for e in entries:
+            if e.get('type') == 'join' and e.get('actorName') and e['actorName'] not in who:
+                who.append(e['actorName'])
+        out.append({
+            'file': name, 'kind': kind,
+            'started': entries[0].get('ts') if entries else None,
+            'ended': next((e.get('ts') for e in reversed(entries) if e.get('type') == 'session-end'), None),
+            'rounds': max((js_parse_int(e.get('round')) or 0 for e in entries), default=0),
+            'entries': len(entries), 'who': who,
+            'caught': sum(1 for e in entries if e.get('type') == 'capture'),
+        })
+    return out
+
+
+def battle_log(filename):
+    """One battle's log, every line (the DM-only ones too): [{round, ts, type, text, actorName, targetName, hidden...}]."""
+    if not _LOG_NAME.match(str(filename or '')):
+        raise ValueError('No such battle log')
+    return _read_log(filename)

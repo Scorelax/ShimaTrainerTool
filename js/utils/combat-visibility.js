@@ -55,6 +55,8 @@ export function redactForViewer(session) {
     delete session.participants[id];
     if (session.board?.tokens) delete session.board.tokens[id];
   });
+  // Whether the DM has marked a Pokemon catchable is the DM's own business (battle-live.js's Poke Ball)
+  Object.values(session.participants).forEach((p) => { delete p.catchable; });
   if (Array.isArray(session.turnOrder) && hidden.size) {
     const current = session.turnOrder[session.turnIndex];
     session.turnOrder = session.turnOrder.filter(id => !hidden.has(id));

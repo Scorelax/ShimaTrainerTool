@@ -5,6 +5,7 @@
  */
 
 import { MOVE_LEVELS, MOVEMENT, SENSES } from './species.js';
+import { skillLists } from './battle-lists.js';
 
 export { MOVE_LEVELS };
 
@@ -19,11 +20,19 @@ export function pokemonKey(name) {
   return KEY_PREFIX + String(name || '').toLowerCase();
 }
 
+/** Its skills and expertise as plain lists (a session from before the expertise list still has "Athletics+"). */
+function normalized(p) {
+  if (p && !Array.isArray(p) && typeof p === 'object') {
+    ({ skills: p.skills, expertise: p.expertise } = skillLists(p.skills, p.expertise));
+    return p;
+  }
+  return null;
+}
+
 /** One of the trainer's Pokemon from sessionStorage (by species), or null. */
 export function cachedPokemon(name) {
   try {
-    const p = JSON.parse(sessionStorage.getItem(pokemonKey(name)) || 'null');
-    return p && !Array.isArray(p) && typeof p === 'object' ? p : null;
+    return normalized(JSON.parse(sessionStorage.getItem(pokemonKey(name)) || 'null'));
   } catch {
     return null;
   }
@@ -41,8 +50,8 @@ export function forgetPokemon(name) {
 export function allCachedPokemon() {
   return Object.keys(sessionStorage)
     .filter(k => k.startsWith(KEY_PREFIX))
-    .map(k => { try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } })
-    .filter(p => p && !Array.isArray(p) && typeof p === 'object' && p.name);
+    .map(k => { try { return normalized(JSON.parse(sessionStorage.getItem(k))); } catch { return null; } })
+    .filter(p => p && p.name);
 }
 
 /** Whether sessionStorage still holds Pokemon as the old 62-cell rows (a session from before the change). */

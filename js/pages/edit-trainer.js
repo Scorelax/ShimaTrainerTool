@@ -5,6 +5,7 @@ import { showToast, showSuccess, showError } from '../utils/notifications.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 import { audioManager } from '../utils/audio.js';
 import { loadTrainer, storeTrainer } from '../utils/trainer-data.js';
+import { hasName } from '../utils/battle-lists.js';
 
 // Tracks the gear-autocomplete outside-click handler across repeated visits
 // to this page, so attachEditTrainerListeners() doesn't stack a fresh
@@ -783,6 +784,8 @@ async function handleFormSubmit() {
     trainerData.combat.ac = ac;
     trainerData.leaguePoints = leaguePoints;
     trainerData.skills = selectedSkills;
+    // Expertise has no box on the page (it comes from feats) -- kept for the skills still ticked, so a save never loses it
+    trainerData.expertise = trainerData.expertise.filter(s => selectedSkills.includes(s));
     trainerData.feats = selectedFeatNames;
     if (!selectedFeatNames.includes('Linguist')) trainerData.languages = [];
     const newFeatNames = selectedFeatNames.filter(name => !originalFeats.includes(name));
@@ -951,28 +954,17 @@ function applyStatIncrease(trainerData, stat) {
 }
 
 function getUnproficientSkills(trainerData) {
-  const current = trainerData.skills.map(s => s.trim().replace('+', '').toLowerCase()).filter(s => s);
-  return ALL_SKILL_NAMES.filter(s => !current.includes(s.toLowerCase()));
+  return ALL_SKILL_NAMES.filter(s => !hasName(trainerData.skills, s));
 }
 
 function addSkillProficiency(trainerData, skillName) {
-  const skills = trainerData.skills.map(s => s.trim()).filter(s => s);
-  const already = skills.some(s => s.replace('+', '').trim().toLowerCase() === skillName.toLowerCase());
-  if (!already) {
-    skills.push(skillName);
-    trainerData.skills = skills;
-  }
+  if (!hasName(trainerData.skills, skillName)) trainerData.skills = [...trainerData.skills, skillName];
 }
 
+/** Expertise in a skill (and the skill itself, if it wasn't there). */
 function addSkillExpertise(trainerData, skillName) {
-  const skills = trainerData.skills.map(s => s.trim()).filter(s => s);
-  const idx = skills.findIndex(s => s.replace('+', '').trim().toLowerCase() === skillName.toLowerCase());
-  if (idx !== -1 && !skills[idx].endsWith('+')) {
-    skills[idx] = skills[idx].trim() + '+';
-  } else if (idx === -1) {
-    skills.push(skillName + '+');
-  }
-  trainerData.skills = skills;
+  addSkillProficiency(trainerData, skillName);
+  if (!hasName(trainerData.expertise, skillName)) trainerData.expertise = [...trainerData.expertise, skillName];
 }
 
 function injectFeatModalStyles() {
@@ -1179,9 +1171,7 @@ async function processSkillExpert(trainerData) {
   }
 
   // Step 3: Expertise (from all current proficiencies, excluding those already with expertise)
-  const expertiseCandidates = trainerData.skills
-    .map(s => s.trim()).filter(s => s && !s.endsWith('+'))
-    .map(s => s.trim());
+  const expertiseCandidates = trainerData.skills.filter(s => !hasName(trainerData.expertise, s));
   if (expertiseCandidates.length > 0) {
     const expChoices = await showFeatChoiceModal({
       title: 'Skill Expert (3/3)',

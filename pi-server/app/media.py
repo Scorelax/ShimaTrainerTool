@@ -101,6 +101,25 @@ DISPLAY_IMAGE_DIR = os.path.expanduser(
     os.environ.get('DISPLAY_IMAGE_DIR', '~/pokemon-dnd/images/display-images'))
 DISPLAY_IMAGE_URL_PREFIX = '/display-images/'
 
+# The item pictures (the user's call, 2026-10-19): named after the item itself, "Frost Ball.png" -- the user adds them by
+# hand, and the DM console's Admin module uploads them the same way (admin.save_item_image). Served at /item-images/.
+ITEM_IMAGE_DIR = os.path.expanduser(os.environ.get('ITEM_IMAGE_DIR', '~/pokemon-dnd/images/items'))
+ITEM_IMAGE_URL_PREFIX = '/item-images/'
+ITEM_IMAGE_EXTS = IMG_FORMATS + ['webp', 'gif']
+
+
+def item_file_stem(name):
+    """The item's name as a file name: as it is, minus the characters a file name can't have."""
+    return re.sub(r'[\\/:*?"<>|]+', '', str(name or '')).strip().rstrip('.')
+
+
+def item_image_url(name):
+    """The picture of an item (ITEM_IMAGE_DIR, file named after it -- any case), or None."""
+    stem = item_file_stem(name).lower()
+    filename = _folder_files(ITEM_IMAGE_DIR, ITEM_IMAGE_EXTS).get(stem) if stem else None
+    return _versioned_url(ITEM_IMAGE_DIR, ITEM_IMAGE_URL_PREFIX, filename)
+
+
 def _sanitize_species_name(name):
     """Lowercase, non-alphanumeric runs collapsed to a single hyphen, no
     leading/trailing hyphens. The one filename rule shared by every local

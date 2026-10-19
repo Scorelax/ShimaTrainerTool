@@ -591,6 +591,10 @@ def _handle(conn, action, params):
     if action == 'clear-terrain-zones':
         return _mutate(conn, lambda s: (s.__setitem__('terrainZones', []), s.__setitem__('weatherZones', [])))
 
+    if action == 'adventure-settings':
+        # The DM: what the table screen shows during the adventure, and whether the players may join / move
+        return _mutate(conn, lambda s: _set_adventure_settings(s, params))
+
     if action == 'rotate-token':
         facing = js_parse_int(params.get('facing'))
         if not params.get('id') or facing is None:
@@ -803,6 +807,42 @@ def _board_from_map(board, m):
     board['traps'] = _clean_traps(m.get('traps'), cols, rows)
 
 
+# What the DM decides about a running adventure (the PokeNav module's Adventure Mode tab, the user's call, 2026-10-19):
+#   onScreen  'adventure' | 'region' -- what the table's board screen (battle-map.html) shows meanwhile
+#   canJoin   the players may join and place themselves on the map
+#   canMove   the players may move (and turn) their trainer and Pokemon -- the DM moves anyone either way (dm-place-token)
+_ADVENTURE_DEFAULTS = {'onScreen': 'adventure', 'canJoin': True, 'canMove': True}
+
+
+def adventure_settings(state):
+    """A running adventure's settings, every one filled in (an adventure started before they existed has none)."""
+    return {**_ADVENTURE_DEFAULTS, **(state.get('adventure') or {})}
+
+
+def _set_adventure_settings(state, params):
+    if not (state.get('active') and state.get('battleType') == 'adventure'):
+        raise ValueError('No adventure is running')
+    settings = adventure_settings(state)
+    if params.get('onScreen') in ('adventure', 'region'):
+        settings['onScreen'] = params['onScreen']
+    for key in ('canJoin', 'canMove'):
+        if params.get(key) in ('0', '1', 'true', 'false'):
+            settings[key] = params[key] in ('1', 'true')
+    state['adventure'] = settings
+
+
+def _player_on_adventure(state, participant):
+    """A player's creature on a running adventure (the DM's are never held back by the adventure's settings)."""
+    return state.get('battleType') == 'adventure' and (participant or {}).get('owner', '') not in ('', DM_OWNER)
+
+
+def _check_adventure_allows(state, participant, what):
+    """Raises when the DM has closed `what` ('canJoin' / 'canMove') for the players on the running adventure."""
+    if _player_on_adventure(state, participant) and not adventure_settings(state)[what]:
+        raise ValueError("The DM hasn't opened the map for joining yet -- wait a moment" if what == 'canJoin'
+                         else 'The DM has paused moving on the map for now')
+
+
 def existing_adventure(conn):
     state = load_state(conn)
     return bool(state.get('active')) and state.get('battleType') == 'adventure'
@@ -819,7 +859,8 @@ def start_adventure(conn, m):
         if not isinstance(m, dict):
             raise ValueError('Make the adventure map first')
         state = copy.deepcopy(_EMPTY_STATE)
-        state.update({'active': True, 'battleType': 'adventure', 'round': 0, 'log': [], 'logFile': _new_log_filename('adventure')})
+        state.update({'active': True, 'battleType': 'adventure', 'round': 0, 'log': [], 'logFile': _new_log_filename('adventure'),
+                      'adventure': dict(_ADVENTURE_DEFAULTS)})
         _board_from_map(state['board'], m)
         _log_event(state, 'session-start', text='Adventure started')
         return _save_and_publish(conn, state)
@@ -1248,6 +1289,7 @@ def _add_participant(state, data):
     if status not in ('participating', 'spectating'):
         raise ValueError('status must be participating or spectating')
     owner = data.get('owner') or ''
+    _check_adventure_allows(state, {'owner': owner}, 'canJoin')
     if owner and owner != DM_OWNER and not data.get('id'):
         # A player's join sent again -- retried after a lost answer, or tapped again after one that broke halfway: the
         # trainer (and a Pokemon of the same name) they already have in the battle isn't added a second time. (The DM may
@@ -1348,7 +1390,8 @@ def _add_participant(state, data):
         # The lists as lists (battle_lists.py) -- [{slot, name, description}] and names -- whatever the app sent.
         'abilities': battle_lists.ability_list(data.get('abilities')), 'item': data.get('item', ''),
         'moves': data.get('moves', []),
-        'savingThrows': battle_lists.name_list(data.get('savingThrows')), 'skills': battle_lists.name_list(data.get('skills')),
+        'savingThrows': battle_lists.name_list(data.get('savingThrows')),
+        **dict(zip(('skills', 'expertise'), battle_lists.split_expertise(data.get('skills'), data.get('expertise')))),
         # Whether this participant has been placed on the battle map through
         # the (per-player) placement step -- see confirm-placement below.
         # Only ever checked client-side against a participant's own `owner`
@@ -4452,7 +4495,7 @@ def _dm_update_participant(state, pid, data):
     for key in _EDITABLE_TEXT:
         if key in data:
             p[key] = str(data[key] or '').strip()
-    p.update(battle_lists.lists_of({k: v for k, v in data.items() if k in ('abilities', 'savingThrows', 'skills')}))
+    p.update(battle_lists.lists_of({k: v for k, v in data.items() if k in ('abilities', 'savingThrows', 'skills', 'expertise')}))
     for key in _EDITABLE_INT:
         if key in data:
             value = js_parse_int(data[key])
@@ -4548,6 +4591,7 @@ def _rotate_token(state, pid, facing):
         raise ValueError('Unknown participant: ' + pid)
     if pid != _active_participant_id(state) and state.get('battleType') != 'adventure':  # an adventure has no turns
         raise ValueError("It's not this participant's turn")
+    _check_adventure_allows(state, state['participants'][pid], 'canMove')
     token = state['board']['tokens'].get(pid)
     if not token:
         raise ValueError('That participant has no token on the map')
@@ -4756,6 +4800,7 @@ def _adventure_move(state, participant, col, row, z=None):
     """An adventure (start_adventure): anyone walks anywhere at any time -- no turn, no movement limit, nothing logged. The
     map still counts: blocked squares stop a creature on the ground, and the token has to fit on the board."""
     pid = participant['id']
+    _check_adventure_allows(state, participant, 'canMove')
     grid = state['board'].get('grid') or {}
     n = footprint_size(participant.get('size'))
     if not all(0 <= c < (grid.get('cols') or 0) and 0 <= r < (grid.get('rows') or 0) for c, r in footprint_cells(col, row, n)):
@@ -4788,6 +4833,7 @@ def _confirm_placement(state, pid, col, row, facing=None, z=None):
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
+    _check_adventure_allows(state, participant, 'canJoin')
     for other_id, pos in state['board']['tokens'].items():
         if other_id != pid and pos['col'] == col and pos['row'] == row:
             raise ValueError('That square is already taken')

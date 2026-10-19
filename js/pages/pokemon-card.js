@@ -9,6 +9,8 @@ import { showMovePopup, showDrainHealPopupForCard } from '../utils/move-popup.js
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
 import { addItem, currentHP, currentVP, loadTrainer, storeTrainer } from '../utils/trainer-data.js';
+import { hasName } from '../utils/battle-lists.js';
+import { itemHeadHtml, showItemHead } from '../utils/item-info.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -1626,6 +1628,7 @@ export function renderPokemonCard(pokemonName) {
         /* Inventory Popup Styles */
         #inventoryPopup .popup-content {
           max-width: min(90vw, 900px);
+          height: 82vh;
           max-height: 85vh;
           padding: 0;
           overflow: hidden;
@@ -2336,10 +2339,8 @@ export function renderPokemonCard(pokemonName) {
                 const skillKey = skill.name.toLowerCase();
                 const proficiencyLevel = skillCounts[skillKey] || 0;
 
-                // Check if this skill has double proficiency (+ suffix in original data)
-                const hasDoubleProficiency = skillsArray.some(s =>
-                  s.toLowerCase() === skillKey + '+' || s === skill.name + '+'
-                );
+                // Expertise: double proficiency
+                const hasDoubleProficiency = hasName(pokemonData.expertise, skill.name);
 
                 const skillClass = proficiencyLevel >= 1 ? 'unlocked' : '';
                 const doubleProfClass = hasDoubleProficiency ? 'double-proficiency' : '';
@@ -2655,7 +2656,7 @@ export function renderPokemonCard(pokemonName) {
             </div>
             <div class="inventory-main">
               <div class="item-info-card">
-                <h3 class="item-name" id="selectedItemName">Select an item</h3>
+                ${itemHeadHtml('selectedItemName')}
                 <div class="item-details">
                   <div class="detail-section">
                     <h4>Description</h4>
@@ -2988,7 +2989,7 @@ export function attachPokemonCardListeners() {
               cardSearchResults.querySelectorAll('.inventory-list-item').forEach(x => x.classList.remove('selected'));
               el.classList.add('selected');
               selectedItemData = JSON.parse(el.dataset.item);
-              document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+              showItemHead(document.getElementById('selectedItemName'), selectedItemData);
               document.getElementById('descriptionText').textContent = selectedItemData.description;
               document.getElementById('effectText').textContent = selectedItemData.effect;
               document.getElementById('editItemButton').disabled = false;
@@ -3035,7 +3036,7 @@ export function attachPokemonCardListeners() {
         selectedItemData = JSON.parse(this.dataset.item);
 
         // Update info panel
-        document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+        showItemHead(document.getElementById('selectedItemName'), selectedItemData);
         document.getElementById('descriptionText').textContent = selectedItemData.description;
         document.getElementById('effectText').textContent = selectedItemData.effect;
 
@@ -3072,7 +3073,7 @@ export function attachPokemonCardListeners() {
         selectedItemData = JSON.parse(matchingItem.dataset.item);
 
         // Update info panel with fresh data
-        document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+        showItemHead(document.getElementById('selectedItemName'), selectedItemData);
         document.getElementById('descriptionText').textContent = selectedItemData.description;
         document.getElementById('effectText').textContent = selectedItemData.effect;
 
@@ -3083,7 +3084,7 @@ export function attachPokemonCardListeners() {
       } else {
         // Item was removed, reset info panel
         selectedItemData = null;
-        document.getElementById('selectedItemName').textContent = 'Select an item';
+        showItemHead(document.getElementById('selectedItemName'), null);
         document.getElementById('descriptionText').textContent = 'Choose an item from your inventory to view its details.';
         document.getElementById('effectText').textContent = 'Item effects will appear here.';
         document.getElementById('editItemButton').disabled = true;
@@ -4454,8 +4455,9 @@ function loadMoveColorsAndListeners() {
     const rawMovesData = sessionStorage.getItem('moves');
     if (!rawMovesData) return;
     try {
-      const clean = JSON.parse(rawMovesData.replace(/\\"/g, '"').replace(/\\r/g, '').replace(/\\n/g, ''));
-      _moves = clean.map(move => Object.fromEntries(Object.entries(move).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])));
+      // Plain JSON from the Pi; a line break inside a text becomes a space (see combat.js's loadCombatMoves)
+      _moves = JSON.parse(rawMovesData).map(move => Object.fromEntries(Object.entries(move)
+        .map(([k, v]) => [k, typeof v === 'string' ? v.replace(/\s*[\r\n]+\s*/g, ' ').trim() : v])));
       _moveMap = new Map(_moves.map(m => [m.name, m]));
     } catch (e) {
       console.error('Failed to parse moves data:', e);

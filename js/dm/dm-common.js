@@ -211,6 +211,11 @@ export function openDmModal({ title, html, buttons = [{ label: 'Close', value: n
 let _species = null;
 let _speciesLoading = null;
 
+/** The species list fetched again next time (the Admin module added or changed one). */
+export function forgetSpecies() {
+  _species = null;
+}
+
 /** Every species (DmAPI.speciesList), fetched once per page. */
 export function getSpecies() {
   if (_species) return Promise.resolve(_species);

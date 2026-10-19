@@ -25,23 +25,23 @@
 
     <nav class="dm-rail" id="dmRail">
       <button class="dm-rail-btn active" data-module="battle" title="Battle -- map setup, encounter setup and post battle"><img src="assets/VS.png" alt="">Battle</button>
-      <button class="dm-rail-btn" data-module="adventure" title="Adventure -- a map on the table without a battle: the players walk around on it"><span>🧭</span>Adventure</button>
       <button class="dm-rail-btn" data-module="party" title="Party"><img src="assets/party-icon.png" alt="">Party</button>
       <button class="dm-rail-btn" data-module="pokedex" title="Pokédex"><img src="assets/pokedex.png" alt="">Pokédex</button>
       <button class="dm-rail-btn" data-module="npcs" title="NPCs"><span>👤</span>NPCs</button>
       <button class="dm-rail-btn" data-module="clock" title="Clock"><span>🕰️</span>Clock</button>
-      <button class="dm-rail-btn" data-module="pokenav" title="PokéNav -- the region map on the table screen"><img src="assets/pokenav-icon.png" alt="">PokéNav</button>
+      <button class="dm-rail-btn" data-module="pokenav" title="PokéNav -- the table screen outside a battle: the region map, or the adventure map the players walk around on"><img src="assets/pokenav-icon.png" alt="">PokéNav</button>
       <button class="dm-rail-btn" data-module="display" title="Display -- the backgrounds and pictures on the display"><span>📺</span>Display</button>
+      <button class="dm-rail-btn" data-module="admin" title="Admin -- add and edit items, Pokédex entries and splash screens, with their pictures"><span>🛠️</span>Admin</button>
     </nav>
 
     <main class="dm-main">
       <section class="dm-module dm-view" id="dmModuleParty" hidden></section>
-      <section class="dm-module dm-adv-module" id="dmModuleAdventure" hidden></section>
       <section class="dm-module" id="dmModulePokedex" hidden></section>
       <section class="dm-module" id="dmModuleNpcs" hidden></section>
       <section class="dm-module" id="dmModuleClock" hidden></section>
-      <section class="dm-module" id="dmModulePokenav" hidden></section>
+      <section class="dm-module dm-navmod-module" id="dmModulePokenav" hidden></section>
       <section class="dm-module" id="dmModuleDisplay" hidden></section>
+      <section class="dm-module dm-admin-module" id="dmModuleAdmin" hidden></section>
       <section class="dm-module dm-battle-module" id="dmModuleBattle">
         <!-- No battle running: the map and where everyone starts, who's in the battle (the encounters), the last battle's
              rewards. -->

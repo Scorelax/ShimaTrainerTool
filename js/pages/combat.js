@@ -13,7 +13,8 @@ import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 import { beginMove, commitMove } from '../utils/move-commit.js';
 import { addItem, currentAC as trainerCurrentAC, currentHP as trainerCurrentHP, currentVP as trainerCurrentVP, emptyTrainer, loadTrainer, storeTrainer } from '../utils/trainer-data.js';
-import { abilityList, nameList, speedsText } from '../utils/battle-lists.js';
+import { abilityList, nameList, skillLists, speedsText } from '../utils/battle-lists.js';
+import { itemHeadHtml, showItemHead } from '../utils/item-info.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
@@ -152,8 +153,11 @@ function loadCombatMoves() {
   const rawMovesData = sessionStorage.getItem('moves');
   if (!rawMovesData) return;
   try {
-    const clean = JSON.parse(rawMovesData.replace(/\\"/g, '"').replace(/\\r/g, '').replace(/\\n/g, ''));
-    _moves = clean.map(move => Object.fromEntries(Object.entries(move).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])));
+    // The move list is plain JSON from the Pi. A line break inside a text becomes a space -- they used to be cut out of
+    // the JSON text, which glued words ("at\nlevel" -> "atlevel": Milk Drink lost its level-5 tier) and would have
+    // broken the whole list on a quote mark.
+    _moves = JSON.parse(rawMovesData).map(move => Object.fromEntries(Object.entries(move)
+      .map(([k, v]) => [k, typeof v === 'string' ? v.replace(/\s*[\r\n]+\s*/g, ' ').trim() : v])));
     _moveMap = new Map(_moves.map(m => [m.name, m]));
   } catch (e) {
     console.error('Failed to parse moves data:', e);
@@ -273,6 +277,7 @@ export function buildTrainerCombatant() {
     proficiency: parseInt(trainerData.combat.proficiency) || computeProficiency(level),
     savingThrows: [...trainerData.savingThrows],
     skills: [...trainerData.skills],
+    expertise: [...trainerData.expertise],
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
     moves: [], types: [], rechargeStates: {},
@@ -354,7 +359,7 @@ export function buildPokemonCombatant(pokemonKey) {
     proficiency, stabBonusValue: parseInt(combat.stab) || 2,
     loyalty: parseInt(pokemonData.loyalty) || 0, // Frustration/Return's own damage_note condition
     savingThrows: [...(pokemonData.savingThrows || [])],
-    skills: [...(pokemonData.skills || [])],
+    ...skillLists(pokemonData.skills, pokemonData.expertise),
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
     moves, types: [pokemonData.types?.primary, pokemonData.types?.secondary].filter(Boolean),
@@ -477,7 +482,7 @@ export function renderCombat() {
 // PHASE 1: SETUP
 // ============================================================================
 
-/** `adventure`: joining the DM's adventure (no battle) -- bringing a Pokemon along is optional. */
+/** `adventure`: joining the DM's adventure (no battle) -- bringing Pokemon along is optional, as many as the player likes. */
 export function renderSetupPhase({ showWipButton = true, adventure = false } = {}) {
   const trainerData = loadTrainer();
   const trainerName = trainerData.name || 'Trainer';
@@ -522,7 +527,7 @@ export function renderSetupPhase({ showWipButton = true, adventure = false } = {
             <div class="setup-trainer-level">Level ${trainerLevel}</div>
           </div>
         </div>
-        <div class="setup-section-label">${adventure ? 'BRING A POKÉMON ALONG (optional -- tap again to leave it)' : 'SELECT LEAD POKÉMON (1)'}</div>
+        <div class="setup-section-label">${adventure ? 'BRING POKÉMON ALONG (optional -- tap each one you want, tap again to leave it)' : 'SELECT LEAD POKÉMON (1)'}</div>
         <div class="setup-pokemon-list" id="setupPokemonList">
           ${pokemonCards || '<div class="setup-empty">No active party Pokémon found.</div>'}
         </div>
@@ -756,7 +761,7 @@ export function renderBattlePhase(state, cardOptions = {}) {
             </div>
             <div class="inventory-main">
               <div class="item-info-card">
-                <h3 class="item-name" id="combatSelectedItemName">Select an item</h3>
+                ${itemHeadHtml('combatSelectedItemName')}
                 <div class="item-details">
                   <div class="detail-section">
                     <h4>Description</h4>
@@ -1130,10 +1135,10 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
     'Animal Handling': 'WIS', 'Insight': 'WIS', 'Medicine': 'WIS', 'Perception': 'WIS', 'Survival': 'WIS',
     'Deception': 'CHA', 'Intimidation': 'CHA', 'Performance': 'CHA', 'Persuasion': 'CHA'
   };
-  const skills = nameList(c.skills), saves = nameList(c.savingThrows);
+  const { skills } = skillLists(c.skills, c.expertise);
+  const saves = nameList(c.savingThrows);
   const proficiencyDisplay = c.proficiency != null
-    ? `+${c.proficiency}${skills.length ? ' — ' + skills.map(s => {
-        const skill = s.replace(/\+$/, '');
+    ? `+${c.proficiency}${skills.length ? ' — ' + skills.map(skill => {
         const stat = SKILL_STAT[skill];
         return stat ? `${skill} (${stat})` : skill;
       }).join(', ') : ''}`
@@ -1627,7 +1632,7 @@ function getCombatCSS() {
     .popup-body { color: #e0e0e0; font-size: clamp(0.95rem,2vw,1.1rem); line-height: 1.6; }
 
     /* INVENTORY POPUP */
-    .combat-inv-popup-content { max-width: min(90vw,900px); max-height: 85vh; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+    .combat-inv-popup-content { max-width: min(90vw,900px); height: 82vh; max-height: 85vh; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
     .inventory-popup-content { display: flex; height: 100%; flex: 1; overflow: hidden; min-height: 400px; }
     .inventory-sidebar { width: clamp(200px,35%,400px); background: linear-gradient(135deg,#2c2c2c,#252525); color: #fff; display: flex; flex-direction: column; border-right: 2px solid #333; overflow: hidden; }
     .inventory-title { padding: clamp(1rem,2vh,1.5rem); margin: 0; background: linear-gradient(135deg,#EE1515,#C91010); color: #fff; font-size: clamp(1.2rem,3vw,1.8rem); font-weight: 900; text-align: center; border-bottom: 2px solid #333; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
@@ -1850,9 +1855,14 @@ export function attachSetupListeners({ backRoute = 'trainer-card', onStart } = {
   document.querySelectorAll('.setup-pokemon-card').forEach(card => {
     card.addEventListener('click', () => {
       const wasSelected = card.classList.contains('selected');
-      // Deselect all, then select this one (unless it was already selected — toggle off)
-      document.querySelectorAll('.setup-pokemon-card').forEach(c => c.classList.remove('selected'));
-      if (!wasSelected) card.classList.add('selected');
+      if (startBtn.dataset.optional) {
+        // An adventure: any number of them, each tapped on / off
+        card.classList.toggle('selected', !wasSelected);
+      } else {
+        // Deselect all, then select this one (unless it was already selected — toggle off)
+        document.querySelectorAll('.setup-pokemon-card').forEach(c => c.classList.remove('selected'));
+        if (!wasSelected) card.classList.add('selected');
+      }
       // An adventure (data-optional) can be joined without a Pokemon.
       startBtn.disabled = !startBtn.dataset.optional && document.querySelectorAll('.setup-pokemon-card.selected').length === 0;
     });
@@ -1876,7 +1886,9 @@ export function attachSetupListeners({ backRoute = 'trainer-card', onStart } = {
     });
 
     if (onStart) {
-      onStart({ trainerCombatant, activePokemon, bench, allPartyKeys });
+      // `chosen`: every Pokemon picked (an adventure can bring several; a battle has one, activePokemon)
+      const chosen = [activePokemon, ...selectedKeys.slice(1).map(k => buildPokemonCombatant(k))].filter(Boolean);
+      onStart({ trainerCombatant, activePokemon, bench, allPartyKeys, chosen });
       return;
     }
 
@@ -4040,7 +4052,7 @@ function _showCombatAddItem() {
   const descEl = document.getElementById('combatDescriptionText');
   const effEl = document.getElementById('combatEffectText');
   if (!area) return;
-  if (nameEl) nameEl.textContent = 'Add an item';
+  if (nameEl) showItemHead(nameEl, null, 'Add an item');
   if (descEl) descEl.textContent = 'Pick one from the item list, or make your own.';
   if (effEl) effEl.textContent = '';
   area.innerHTML = `
@@ -4127,7 +4139,7 @@ function showCombatInventoryPopup() {
   const descEl    = document.getElementById('combatDescriptionText');
   const effEl     = document.getElementById('combatEffectText');
   const actionArea = document.getElementById('combatItemActionArea');
-  if (nameEl)    nameEl.textContent = 'Select an item';
+  if (nameEl)    showItemHead(nameEl, null);
   if (descEl)    descEl.textContent = 'Choose an item from your inventory to view its details.';
   if (effEl)     effEl.textContent  = 'Item effects will appear here.';
   if (actionArea) actionArea.innerHTML = '';
@@ -4150,7 +4162,7 @@ function showCombatInventoryPopup() {
   });
   if (trainerData.customItems.length > 0) {
     groupedItems['Custom Items'] = trainerData.customItems.map(ci => ({
-      name: ci.name, qty: ci.quantity, description: ci.description || '', effect: ''
+      name: ci.name, qty: ci.quantity, description: ci.description || '', effect: '', custom: true
     }));
   }
 
@@ -4198,7 +4210,7 @@ function showCombatInventoryPopup() {
             el.classList.add('selected');
             _combatSelectedItem = allItems.find(i => i.name === el.dataset.itemName) || null;
             if (_combatSelectedItem && nameEl && descEl && effEl) {
-              nameEl.textContent = `${_combatSelectedItem.name} (x${_combatSelectedItem.qty})`;
+              showItemHead(nameEl, _combatSelectedItem);
               descEl.textContent = _combatSelectedItem.description || 'No description available.';
               effEl.textContent = _combatSelectedItem.effect || 'No effect description.';
               populateCombatItemActionArea(_combatSelectedItem);
@@ -4231,7 +4243,7 @@ function showCombatInventoryPopup() {
       el.classList.add('selected');
       _combatSelectedItem = allItems.find(i => i.name === el.dataset.itemName) || null;
       if (_combatSelectedItem && nameEl && descEl && effEl) {
-        nameEl.textContent = `${_combatSelectedItem.name} (x${_combatSelectedItem.qty})`;
+        showItemHead(nameEl, _combatSelectedItem);
         descEl.textContent = _combatSelectedItem.description || 'No description available.';
         effEl.textContent  = _combatSelectedItem.effect || 'No effect description.';
         populateCombatItemActionArea(_combatSelectedItem);

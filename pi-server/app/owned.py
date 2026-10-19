@@ -16,7 +16,8 @@ trainer's Pokemon is found by trainer + species name, as always -- a trainer has
       "stats": {"strength": 15, ..., "charisma": 10},                          # its ability scores now
       "modifiers": {"strength": 2, ..., "charisma": 0},
       "totalStats": 63,                                                        # its species' base stats added up
-      "savingThrows": ["Strength"], "skills": ["Athletics", "Nature"],        # "Athletics+": expertise (a feat)
+      "savingThrows": ["Strength"], "skills": ["Athletics", "Nature"],
+      "expertise": ["Athletics"],                                              # skills with expertise (each in skills too)
       "moves": {"1": [...], "2": [...], "6": [...], "10": [...], "14": [...], "18": [...]},   # learned at each level
       "customMoves": ["Flamethrower"], "moveCharges": {"Flamethrower": {"chargesLeft": 1, "type": "SR"}},
       "evolvesInto": [{"species": "Ivysaur", "requirement": "Level 7", "level": 7}], "evolvesFrom": [],
@@ -33,6 +34,7 @@ import math
 import re
 
 from . import species as species_data
+from .battle_lists import split_expertise
 from .calculations import calculate_hp_vp, proficiency_for_level, stab_for_level, parse_feat
 from .jsutil import js_parse_int, floor_div2
 
@@ -197,7 +199,7 @@ def from_species(conn, species, *, trainer='', level=None, nature='', ability_sl
         'stats': dict(sp.get('baseStats') or {}),
         'totalStats': species_data.stat_total(sp),
         'savingThrows': list(sp.get('savingThrows') or []),
-        'skills': list(sp.get('skills') or []),
+        'skills': list(sp.get('skills') or []), 'expertise': [],
         'moves': {str(lvl): species_data.moves_at(sp, lvl) for lvl in MOVE_LEVELS},
         'customMoves': [], 'moveCharges': {},
         'evolvesInto': [dict(e) for e in sp.get('evolvesInto') or []],
@@ -212,17 +214,17 @@ def from_species(conn, species, *, trainer='', level=None, nature='', ability_sl
 
 
 def add_skills(pokemon, extra):
-    have = {s.rstrip('+').lower() for s in pokemon.get('skills') or []}
+    have = {s.lower() for s in pokemon.get('skills') or []}
     for s in extra or ():
         s = str(s).strip()
-        if s and s.rstrip('+').lower() not in have:
+        if s and s.lower() not in have:
             pokemon['skills'].append(s)
-            have.add(s.rstrip('+').lower())
+            have.add(s.lower())
 
 
 def evolve(conn, current, target, points, hidden_ability_shown):
     """`current` evolved into the species `target`: the target's species numbers, moves, senses, types... with the
-    ability scores it had plus the `points` the player spent ({'str': 1, ...}), its skills plus the target's, the same
+    ability scores it had plus the `points` the player spent ({'str': 1, ...}), its skills plus the target's (and its expertise), the same
     ability slots (the hidden one only if the players' Pokedex shows the target's -- `hidden_ability_shown`), and
     what's its own carried over (level, nature, loyalty, nickname, item, feats, party / utility slot, current HP / VP,
     custom moves...). Move charges and status conditions start over."""
@@ -237,6 +239,7 @@ def evolve(conn, current, target, points, hidden_ability_shown):
                     + (js_parse_int((points or {}).get(short)) or 0) for short, k in STAT_KEYS.items()}
     species_skills, new['skills'] = new['skills'], list(current.get('skills') or [])
     add_skills(new, species_skills)
+    new['expertise'] = list(current.get('expertise') or [])
     for k in ('customMoves', 'feats', 'gear', 'partySlot', 'utilitySlot', 'cry', 'comments'):
         new[k] = current.get(k, new[k])
     recalculate(new)
@@ -363,7 +366,7 @@ def from_row(row):
         'modifiers': {k: _num(r[39 + i]) for i, k in enumerate(STATS)},
         'totalStats': _num(r[14]),
         'savingThrows': _canonical(r[21], _SAVES),
-        'skills': _canonical(r[22], _SKILLS),
+        **dict(zip(('skills', 'expertise'), split_expertise(_canonical(r[22], _SKILLS)))),
         'moves': moves,
         'customMoves': _split(r[37]),
         'moveCharges': parse_move_charges(r[59]),
@@ -414,8 +417,8 @@ _CHOICE_FEATS = {
 
 def apply_feat_changes(pokemon, old_feats, new_feats):
     """The Pokemon's feats went from `old_feats` to `new_feats` (lists): what each one removed gave is taken back and
-    what each one added gives is added (ability scores, skills -- "Athletics+" when it was proficient already, i.e.
-    expertise --, AC Up, Mobile's 10ft walking), then everything that follows is worked out again (recalculate, which
+    what each one added gives is added (ability scores, skills -- expertise in it when it was proficient already --,
+    AC Up, Mobile's 10ft walking), then everything that follows is worked out again (recalculate, which
     also counts Tough, Tireless and Alert). In place; returns it."""
     old_feats = [str(f).strip() for f in old_feats or [] if str(f).strip()]
     new_feats = [str(f).strip() for f in new_feats or [] if str(f).strip()]
@@ -424,19 +427,19 @@ def apply_feat_changes(pokemon, old_feats, new_feats):
         st[k] = js_parse_int(st.get(k)) or 0
     combat = pokemon.setdefault('combat', {})
     movement = pokemon.setdefault('movement', {})
-    skills = pokemon.setdefault('skills', [])
+    pokemon['skills'], pokemon['expertise'] = split_expertise(pokemon.get('skills'), pokemon.get('expertise'))
+    skills, expertise = pokemon['skills'], pokemon['expertise']
 
     def add_skill(name):
-        for i, s in enumerate(skills):
-            if s.lower() == name.lower():
-                skills[i] = name + '+'
-                return
-        if name + '+' not in skills:
+        if any(s.lower() == name.lower() for s in skills):
+            if not any(s.lower() == name.lower() for s in expertise):
+                expertise.append(name)
+        else:
             skills.append(name)
 
     def remove_skill(name):
-        if name + '+' in skills:
-            skills[skills.index(name + '+')] = name
+        if any(s.lower() == name.lower() for s in expertise):
+            expertise[:] = [s for s in expertise if s.lower() != name.lower()]
         else:
             skills[:] = [s for s in skills if s.lower() != name.lower()]
 

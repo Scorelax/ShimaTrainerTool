@@ -6,6 +6,8 @@ import { showError, showSuccess } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { addItem, currentHP, currentVP, featEntries, listText, loadTrainer, storeTrainer } from '../utils/trainer-data.js';
+import { hasName } from '../utils/battle-lists.js';
+import { itemHeadHtml, showItemHead } from '../utils/item-info.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -900,7 +902,7 @@ export function renderTrainerInfo() {
         /* Special Inventory Popup Styles */
         #inventoryPopup .popup-content {
           max-width: min(90vw, 900px);
-          height: 75vh;
+          height: 82vh;
           max-height: 85vh;
           padding: 0;
           overflow: hidden;
@@ -2106,9 +2108,7 @@ export function renderTrainerInfo() {
               return allSkills.map(skill => {
                 const skillKey = skill.name.toLowerCase();
                 const profBonus = parseInt(trainerProficiency) || 2;
-                const isDouble = skillsArray.some(s =>
-                  s.toLowerCase() === skillKey + '+' || s === skill.name + '+'
-                );
+                const isDouble = hasName(trainerData.expertise, skill.name);
                 const isProficient = isDouble || skillsArray.some(s => s.toLowerCase().includes(skillKey));
                 const badgeBonus = (badgeSkillBonuses['all'] || 0) + (badgeSkillBonuses[skillKey] || 0);
                 const totalMod = skill.mod + badgeBonus + (isDouble ? 2 * profBonus : isProficient ? profBonus : 0);
@@ -2147,7 +2147,7 @@ export function renderTrainerInfo() {
             </div>
             <div class="inventory-main">
               <div class="item-info-card">
-                <h3 class="item-name" id="selectedItemName">Select an item</h3>
+                ${itemHeadHtml('selectedItemName')}
                 <div class="item-details">
                   <div class="detail-section">
                     <h4>Description</h4>
@@ -2722,7 +2722,7 @@ export function attachTrainerInfoListeners() {
         }
 
         // Update info panel
-        document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+        showItemHead(document.getElementById('selectedItemName'), selectedItemData);
         document.getElementById('descriptionText').textContent = selectedItemData.description;
         document.getElementById('effectText').textContent = selectedItemData.effect || 'Custom item — no effect.';
 
@@ -2762,7 +2762,7 @@ export function attachTrainerInfoListeners() {
         }
 
         // Update info panel with fresh data
-        document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+        showItemHead(document.getElementById('selectedItemName'), selectedItemData);
         document.getElementById('descriptionText').textContent = selectedItemData.description;
         document.getElementById('effectText').textContent = selectedItemData.effect || 'Custom item — no effect.';
 
@@ -2773,7 +2773,7 @@ export function attachTrainerInfoListeners() {
       } else {
         // Item was removed, reset info panel
         selectedItemData = null;
-        document.getElementById('selectedItemName').textContent = 'Select an item';
+        showItemHead(document.getElementById('selectedItemName'), null);
         document.getElementById('descriptionText').textContent = 'Choose an item from your inventory to view its details.';
         document.getElementById('effectText').textContent = 'Item effects will appear here.';
         document.getElementById('editItemButton').disabled = true;
@@ -2817,7 +2817,7 @@ export function attachTrainerInfoListeners() {
           this.classList.add('selected');
           selectedItemData = JSON.parse(this.dataset.item);
           if (selectedItemData.fullData && selectedItemData.fullData.isCustom) selectedItemData.isCustom = true;
-          document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+          showItemHead(document.getElementById('selectedItemName'), selectedItemData);
           document.getElementById('descriptionText').textContent = selectedItemData.description;
           document.getElementById('effectText').textContent = selectedItemData.effect || 'Custom item — no effect.';
           document.getElementById('editItemButton').disabled = false;
@@ -4676,6 +4676,11 @@ async function applyMaxPotentialBoost(stat) {
       const hpIncrease = modifierIncrease * pokemonLevel;
       const vpIncrease = modifierIncrease * pokemonLevel;
 
+      // Current HP and VP first (none stored = at the max -- read before the max moves; `|| 0` made a full one
+      // drop to just the increase)
+      const currentHP = currentHPOf(pokemonData);
+      const currentVP = currentVPOf(pokemonData);
+
       // Update max HP and VP
       const currentMaxHP = parseInt(pokemonData.combat.maxHP, 10) || 0;
       const currentMaxVP = parseInt(pokemonData.combat.maxVP, 10) || 0;
@@ -4683,8 +4688,6 @@ async function applyMaxPotentialBoost(stat) {
       pokemonData.combat.maxVP = currentMaxVP + vpIncrease;
 
       // Also update current HP and VP
-      const currentHP = parseInt(pokemonData.current.hp, 10) || 0;
-      const currentVP = parseInt(pokemonData.current.vp, 10) || 0;
       pokemonData.current.hp = currentHP + hpIncrease;
       pokemonData.current.vp = currentVP + vpIncrease;
     }

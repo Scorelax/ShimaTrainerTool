@@ -36,21 +36,31 @@ def handle(conn, action, params):
 
 
 def splash_list():
-    """The loading-screen splashes on the Pi (media.SPLASH_DIR): the splash-N.png files, and whether session.png is
-    there."""
+    """The loading-screen splashes on the Pi (media.SPLASH_DIR): the splash-N files, and whether session.png is there."""
     if not os.path.isdir(media.SPLASH_DIR):
         return {'status': 'error', 'message': 'no splash folder on the Pi'}
     names = os.listdir(media.SPLASH_DIR)
     return {
         'status': 'success',
-        'splashFiles': sorted(n for n in names if re.match(r'^splash-\d+\.png$', n)),
+        # PNG, JPG or WebP (the DM console's Admin module uploads any of them -- admin.SPLASH_NAME)
+        'splashFiles': sorted(n for n in names if re.match(r'^splash-\d+\.(png|jpe?g|webp)$', n, re.I)),
         'hasSession': 'session.png' in names,
     }
 
 
+def items_with_pictures():
+    """The item list as the app gets it: each item that has a picture (media.ITEM_IMAGE_DIR, named after the item) with
+    its address in `image` -- the inventory shows it by the item's name (the user's call, 2026-10-19)."""
+    out = []
+    for i in gamedata.items():
+        image = media.item_image_url(i['name'])
+        out.append({**i, 'image': image} if image else i)
+    return out
+
+
 def _common(conn):
     return {
-        'itemsData': {'status': 'success', 'items': gamedata.items()},
+        'itemsData': {'status': 'success', 'items': items_with_pictures()},
         'moves': gamedata.moves(),
         'natures': gamedata.natures(),
         'trainerFeatsData': {'status': 'success', 'trainerFeats': gamedata.trainer_feats()},

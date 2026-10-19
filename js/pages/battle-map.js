@@ -64,7 +64,7 @@ async function mountRegion() {
     await map.ready;
     // Never steered yet (and not while loading either): the whole island lying along the screen, north to the right
     // (like the painting was)
-    if (!steered) map.home({ ms: 0, azimuth: Math.PI / 2 });
+    if (!steered) map.home({ ms: 0, azimuth: Math.PI / 2, fill: true });
     box.classList.add('ready');
   } catch (err) {
     console.warn('[BattleMap] The region map could not be shown -- the painting stays:', err);
@@ -84,7 +84,9 @@ function render() {
   const stage = document.getElementById('mapStage');
   if (!stage) return;
 
-  const active = !!(session.active && session.board);
+  // An adventure the DM has taken off this screen (the PokeNav module's "On the table screen") leaves the region map up.
+  const adventureAway = session.battleType === 'adventure' && session.adventure?.onScreen === 'region';
+  const active = !!(session.active && session.board) && !adventureAway;
   stage.classList.toggle('active', active);
   // Idle state (no active battle): battle-map.html's .map-empty-bg shows the
   // Shima map -- but the token layer sits above it (z-index 3), so the

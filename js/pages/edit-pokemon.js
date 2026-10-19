@@ -1308,8 +1308,15 @@ async function handleFormSubmit(pokemonName, originalNature) {
     const nature = form.nature.value;
 
     // Get selected skills
-    let selectedSkills = Array.from(form.querySelectorAll('input[name="skills"]:checked'))
+    const selectedSkills = Array.from(form.querySelectorAll('input[name="skills"]:checked'))
       .map(cb => cb.value);
+    // Expertise it keeps: in the skills still ticked (unticking a skill takes its expertise with it). The page has no
+    // box for it -- it comes from feats -- so it's carried over here instead of being lost on save.
+    const expertise = (pokemonData.expertise || []).filter(s => selectedSkills.includes(s));
+    const addProficiencyOrExpertise = (skill) => {
+      if (!selectedSkills.includes(skill)) selectedSkills.push(skill);
+      else if (!expertise.includes(skill)) expertise.push(skill);
+    };
 
     // Get selected feats
     let selectedFeats = Array.from(form.querySelectorAll('input[name="feats"]:checked'))
@@ -1353,13 +1360,7 @@ async function handleFormSubmit(pokemonName, originalNature) {
           type: 'checkbox', options: skillOptions, maxSelect: 1,
         });
         const choice = choices && choices[0];
-        if (choice) {
-          if (!selectedSkills.includes(choice) && !selectedSkills.includes(choice + '+')) {
-            selectedSkills.push(choice);
-          } else if (selectedSkills.includes(choice)) {
-            selectedSkills = selectedSkills.map(s => s === choice ? choice + '+' : s);
-          }
-        }
+        if (choice) addProficiencyOrExpertise(choice);
       } else if (feat === 'Type Adept') {
         const types = ['Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'];
         const choice = await showFeatChoiceModal({
@@ -1377,11 +1378,7 @@ async function handleFormSubmit(pokemonName, originalNature) {
       }
       // Handle Quick-Fingered feat - add Sleight of Hand proficiency
       else if (feat === 'Quick-Fingered') {
-        if (!selectedSkills.includes('Sleight of Hand') && !selectedSkills.includes('Sleight of Hand+')) {
-          selectedSkills.push('Sleight of Hand');
-        } else if (selectedSkills.includes('Sleight of Hand')) {
-          selectedSkills = selectedSkills.map(s => s === 'Sleight of Hand' ? 'Sleight of Hand+' : s);
-        }
+        addProficiencyOrExpertise('Sleight of Hand');
       }
       // Handle Hidden Ability feat
       else if (feat === 'Hidden Ability') {
@@ -1421,10 +1418,11 @@ async function handleFormSubmit(pokemonName, originalNature) {
     pokemonData.heldItem = heldItemsString;
     pokemonData.customMoves = customMoves;
     pokemonData.feats = selectedFeats;
-    // The skills as ticked (with Skilled's / Quick-Fingered's) -- recalculate-stats then adds / takes away the ones
-    // feats give. (They used to be set only when nothing needed recalculating, so a skill ticked -- or Skilled's
-    // pick -- together with a feat change was lost.)
+    // The skills as ticked (with Skilled's / Quick-Fingered's) and the expertise kept -- recalculate-stats then adds /
+    // takes away the ones feats give. (They used to be set only when nothing needed recalculating, so a skill ticked --
+    // or Skilled's pick -- together with a feat change was lost.)
     pokemonData.skills = selectedSkills;
+    pokemonData.expertise = expertise;
 
     // Check if any stat affecting HP/VP changed
     const featsChanged = JSON.stringify([...selectedFeats].sort()) !== JSON.stringify([...originalFeats].sort());

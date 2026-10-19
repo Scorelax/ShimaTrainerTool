@@ -199,7 +199,7 @@ function trainerStatsHtml(t) {
     <div class="dm-tstats six">
       ${STATS.map((s, i) => cell(s, `${num(t.stats?.[STAT_NAMES[i]], 10)} <small>${sign(num(t.modifiers?.[STAT_NAMES[i]], Math.floor((num(t.stats?.[STAT_NAMES[i]], 10) - 10) / 2)))}</small>`)).join('')}
     </div>
-    ${line('Saving throws', list(t.savingThrows))}${line('Skills', list(t.skills))}
+    ${line('Saving throws', list(t.savingThrows))}${line('Skills', list(t.skills))}${line('Expertise', list(t.expertise))}
     ${line('Trainer path', t.trainerPath)}${line('Affinity', list(t.affinities))}${line('Specialization', list(t.specializations))}
     ${line('Poké slots', t.pokeslots)}${line('League points', t.leaguePoints)}${line('Hit / vitality dice', `d${t.combat?.hitDie || '?'} / d${t.combat?.vitalityDie || '?'}`)}
     ${line('Feats', list(t.feats))}${line('Gear', list(t.gear))}`;
@@ -252,7 +252,7 @@ function pokemonRowHtml(trainer, p, xp) {
           ${STATS.map((s, i) => { const v = num(p.stats?.[STAT_NAMES[i]], 10); return cell(s, `${v} <small>${sign(num(p.modifiers?.[STAT_NAMES[i]], Math.floor((v - 10) / 2)))}</small>`); }).join('')}
         </div>
         ${line('Held item', p.heldItem)}${line('Status', (p.statusConditions || []).join(', '))}${line('Size', p.size)}${line('Speed', speedLine(p))}
-        ${line('Saving throws', (p.savingThrows || []).join(', '))}${line('Skills', (p.skills || []).join(', '))}${line('Hit / vitality dice', `d${c.hitDie || '?'} / d${c.vitalityDie || '?'}`)}
+        ${line('Saving throws', (p.savingThrows || []).join(', '))}${line('Skills', (p.skills || []).join(', '))}${line('Expertise', (p.expertise || []).join(', '))}${line('Hit / vitality dice', `d${c.hitDie || '?'} / d${c.vitalityDie || '?'}`)}
         ${line('Feats', (p.feats || []).join(', '))}${line('Gear', p.gear)}${line('Evolution', evolutionLine(p))}
         ${abilitiesOf(p).map(a => `<div class="dm-tline"><span>Ability</span><span><strong>${escapeHtml(a.name)}</strong>${a.description ? ` -- ${escapeHtml(a.description)}` : ''}</span></div>`).join('')}
         <div class="dm-tline"><span>Moves</span><span class="dm-move-chips">${movesKnown(p).map(m => `<span>${escapeHtml(m)}</span>`).join('') || '—'}</span></div>

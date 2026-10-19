@@ -26,11 +26,12 @@ import { renderParty } from './party.js';
 import { renderNpcs, npcsHaveUnsaved } from './npcs.js';
 import { renderClock } from './clock.js';
 import { renderEncounters, encountersHaveUnsaved, importEncounterDialog } from './encounters.js';
-import { renderAdventure, adventureSessionChanged } from './adventure.js';
+import { adventureSessionChanged } from './adventure.js';
 import { loadClock, renderTopWidget, tickTurnTimers, getClock, WEATHER } from './world-clock.js';
 import { TERRAIN, WEATHER_ROLL_MOD } from './encounter-rules.js';
 import { renderDisplay, displayAway, displaySessionChanged } from './display.js';
 import { renderPokenav, pokenavSessionChanged } from './pokenav.js';
+import { renderAdmin } from './admin.js';
 
 enableDmMode(DM);
 
@@ -100,13 +101,14 @@ async function init() {
 }
 
 // ---------------------------------------------------------------------------
-// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Clock, PokeNav, Display. The battle
+// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Clock, PokeNav (the region map and the adventure, one tab
+// each -- pokenav.js), Display, Admin (items, Pokedex entries, splashes -- admin.js). The battle
 // keeps running in its own section while another module is open; Party is fetched fresh every time it's opened, the
 // Clock is redrawn (the time may have moved), the Pokedex, NPCs, PokeNav and Display keep where the DM was. The module
 // open last opens again after a reload.
 // ---------------------------------------------------------------------------
 
-const MODULES = { battle: 'dmModuleBattle', adventure: 'dmModuleAdventure', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', clock: 'dmModuleClock', pokenav: 'dmModulePokenav', display: 'dmModuleDisplay' };
+const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', clock: 'dmModuleClock', pokenav: 'dmModulePokenav', display: 'dmModuleDisplay', admin: 'dmModuleAdmin' };
 const _moduleOpened = new Set(['battle']);
 const MODULE_KEY = 'dmConsoleModule'; // the module open last, opened again after a reload (this browser only)
 
@@ -124,7 +126,7 @@ function showModule(name) {
   else if (name === 'clock') renderClock(section);
   else if (name === 'display') renderDisplay(section, { session, firstTime: !_moduleOpened.has('display') });
   else if (name === 'pokenav') renderPokenav(section, { session });
-  else if (name === 'adventure') renderAdventure(section, { session });
+  else if (name === 'admin') renderAdmin(section);
   else if (name === 'battle') route(); // an editor drawn elsewhere meanwhile may have taken the map editor from it
   else if (name === 'pokedex' && !_moduleOpened.has('pokedex')) renderPokedex(section);
   else if (name === 'npcs' && !_moduleOpened.has('npcs')) renderNpcs(section);
@@ -181,7 +183,7 @@ async function loadGameData() {
   put('skills', d.skillsData?.skills);
 }
 
-/** A battle (PvE or PvP) is running -- an adventure (the Adventure module) isn't one: the Battle module stays on its setup. */
+/** A battle (PvE or PvP) is running -- an adventure (PokeNav's Adventure Mode) isn't one: the Battle module stays on its setup. */
 function battleRunning() {
   return !!session?.active && session.battleType !== 'adventure';
 }

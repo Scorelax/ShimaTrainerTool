@@ -47,13 +47,20 @@ const GROUPS = [
   ['Evolution', [
     ['evoFrom', 'Evolves from', d => d.evolvesFrom || '—'],
     ['evoTo', 'Evolves into', d => (d.evolvesTo.length ? d.evolvesTo.join(', ') : '—')],
+    ['evoReq', 'Evolution requirements', d => requirementsText(d)],
   ]],
 ];
 const BOOL_KEYS = GROUPS.flatMap(([, rows]) => rows.map(r => r[0])).concat('moves');
 
 /** What a species gets when there's nothing at all to go on -- the same fallback js/utils/visibility.js uses. */
 function fallbackSettings() {
-  return { ...Object.fromEntries(BOOL_KEYS.map(k => [k, false])), description: true, evoToTargets: {}, movesMaxLevel: 1, extraVisibleMoves: [] };
+  return { ...Object.fromEntries(BOOL_KEYS.map(k => [k, false])), description: true, evoToTargets: {}, evoReqTargets: {}, movesMaxLevel: 1, extraVisibleMoves: [] };
+}
+
+/** "Sargent: Level 7 · Merchent: Level 7 Near ports" -- what each of its evolutions takes. */
+function requirementsText(d) {
+  const req = d.evolutionRequirements || {};
+  return (d.evolvesTo || []).map(t => `${t}: ${req[t] || 'not written down'}`).join(' · ') || '—';
 }
 
 function abilityText(d, slot) {
@@ -125,6 +132,16 @@ export async function renderPokedex(root) {
       _exclusions = e.detail;
       const cb = document.getElementById('pdxNoRandom');
       if (cb && _selected) cb.checked = isExcluded(_selected);
+    });
+    // The Admin module saved a Pokedex entry (admin.js): the list and that species' page read it again.
+    window.addEventListener('dm:species-changed', async (e) => {
+      const name = e.detail?.name;
+      _details.delete(name);
+      if (!document.getElementById('pdxList')) return; // not drawn yet -- it reads everything fresh when it is
+      try { _species = await getSpecies(); } catch (err) { return; }
+      renderList();
+      applyFilter();
+      if (_selected === name) select(name);
     });
   }
   DmAPI.getState('encounter-exclusions').then((x) => { _exclusions = Array.isArray(x) ? x : []; if (_selected) { const cb = document.getElementById('pdxNoRandom'); if (cb) cb.checked = isExcluded(_selected); } }).catch(() => {});
@@ -265,6 +282,7 @@ function editSettings(name, fn, { link = true } = {}) {
       // species' targets): each of its targets starts as "Evolves into" itself was.
       const copy = JSON.parse(JSON.stringify(effectiveSettings(name)));
       copy.evoToTargets = Object.fromEntries((_details.get(name)?.evolvesTo || []).map(t => [t, !!copy.evoTo]));
+      copy.evoReqTargets = Object.fromEntries((_details.get(name)?.evolvesTo || []).map(t => [t, !!copy.evoReq]));
       _config.visibility[key] = copy;
     }
     fn(_config.visibility[key]);
@@ -292,9 +310,16 @@ function targetStates(name) {
   return Object.fromEntries(list.map(t => [t, own ? !!own.evoToTargets?.[t] : !!v.evoTo]));
 }
 
+/** Each evolution target of `name` and whether the players see what it takes (with the target -- see evoTargetsHtml). */
+function requirementStates(name) {
+  const own = ownSettings(name);
+  const v = effectiveSettings(name);
+  return Object.fromEntries(Object.keys(targetStates(name)).map(t => [t, own ? !!own.evoReqTargets?.[t] : !!v.evoReq]));
+}
+
 function evoSnapshot(name) {
   const v = effectiveSettings(name);
-  return { evoFrom: !!v.evoFrom, evoTo: !!v.evoTo, targets: targetStates(name) };
+  return { evoFrom: !!v.evoFrom, evoTo: !!v.evoTo, targets: targetStates(name), evoReq: !!v.evoReq, reqs: requirementStates(name) };
 }
 
 /** After a change: "Evolves into" turned on with a single target shows that target, turned off hides them all; a
@@ -311,6 +336,10 @@ function settleEvolution(name, before) {
   } else if (targets.some(t => !!s.evoToTargets[t] !== before.targets[t])) {
     s.evoTo = targets.some(t => s.evoToTargets[t]);
   }
+  // The requirements the same way: "Evolution requirements" shows or hides every one, and it's on while any one is.
+  s.evoReqTargets = { ...(s.evoReqTargets || {}) };
+  if (!!s.evoReq !== before.evoReq) targets.forEach((t) => { s.evoReqTargets[t] = !!s.evoReq; });
+  else if (targets.some(t => !!s.evoReqTargets[t] !== before.reqs[t])) s.evoReq = targets.some(t => s.evoReqTargets[t]);
 }
 
 async function detailOf(name) {
@@ -457,9 +486,19 @@ function evoTargetsHtml(d, v) {
   const targets = [...new Set([...(d.evolvesTo || []), ...Object.keys(own)])]
     .filter(t => t.toLowerCase() !== d.name.toLowerCase()); // (old settings can name the species itself)
   if (!targets.length) return '';
-  v = { ...v, evoToTargets: ownSettings(d.name) ? own : Object.fromEntries(targets.map(t => [t, !!v.evoTo])) };
-  return `<div class="dm-pdx-sub">Evolution targets the players can see
-    ${targets.map(t => `<label class="dm-pdx-field small${v.evoToTargets?.[t] ? ' on' : ''}"><input type="checkbox" data-evo="${escapeHtml(t)}" ${v.evoToTargets?.[t] ? 'checked' : ''}><span class="dm-pdx-label">${escapeHtml(t)}</span></label>`).join('')}
+  const ownReqs = ownSettings(d.name)?.evoReqTargets || {};
+  v = { ...v, evoToTargets: ownSettings(d.name) ? own : Object.fromEntries(targets.map(t => [t, !!v.evoTo])),
+    evoReqTargets: ownSettings(d.name) ? ownReqs : Object.fromEntries(targets.map(t => [t, !!v.evoReq])) };
+  // Under each target, what it takes -- the players see it only with the target itself (the user's call, 2026-10-19).
+  const reqs = d.evolutionRequirements || {};
+  return `<div class="dm-pdx-sub">Evolution targets the players can see, and what each one takes
+    ${targets.map((t) => {
+      const shown = !!v.evoToTargets?.[t], reqOn = !!v.evoReqTargets?.[t], req = reqs[t];
+      return `<label class="dm-pdx-field small${shown ? ' on' : ''}"><input type="checkbox" data-evo="${escapeHtml(t)}" ${shown ? 'checked' : ''}><span class="dm-pdx-label">${escapeHtml(t)}</span></label>
+        <label class="dm-pdx-field small dm-pdx-req${reqOn && shown ? ' on' : ''}" title="${req ? (shown ? 'The players see what this evolution takes' : `Shown once ${escapeHtml(t)} is`) : 'The encyclopedia has no requirement for it'}">
+          <input type="checkbox" data-evoreq="${escapeHtml(t)}" ${reqOn ? 'checked' : ''} ${req ? '' : 'disabled'}>
+          <span class="dm-pdx-label">Requirement</span><span class="dm-pdx-value">${escapeHtml(req || '—')}</span></label>`;
+    }).join('')}
   </div>`;
 }
 
@@ -489,11 +528,15 @@ function wireDetail(name, d) {
   box.querySelectorAll('[data-key]').forEach(cb => cb.addEventListener('change', () => {
     editSettings(name, s => { s[cb.dataset.key] = cb.checked; });
     // (an evolution switch can move the others with it -- drawn again to show them)
-    if (['moves', 'evoTo', 'evoFrom'].includes(cb.dataset.key)) renderDetail();
+    if (['moves', 'evoTo', 'evoFrom', 'evoReq'].includes(cb.dataset.key)) renderDetail();
     else cb.closest('.dm-pdx-field')?.classList.toggle('on', cb.checked);
   }));
   box.querySelectorAll('[data-evo]').forEach(cb => cb.addEventListener('change', () => {
     editSettings(name, s => { s.evoToTargets = { ...(s.evoToTargets || {}), [cb.dataset.evo]: cb.checked }; });
+    renderDetail();
+  }));
+  box.querySelectorAll('[data-evoreq]').forEach(cb => cb.addEventListener('change', () => {
+    editSettings(name, s => { s.evoReqTargets = { ...(s.evoReqTargets || {}), [cb.dataset.evoreq]: cb.checked }; });
     renderDetail();
   }));
   box.querySelectorAll('[data-extra]').forEach(cb => cb.addEventListener('change', () => {
@@ -512,6 +555,7 @@ function wireDetail(name, d) {
       BOOL_KEYS.forEach(k => { s[k] = true; });
       s.movesMaxLevel = 20;
       if (d) s.evoToTargets = Object.fromEntries((d.evolvesTo || []).map(t => [t, true]));
+      if (d) s.evoReqTargets = Object.fromEntries((d.evolvesTo || []).map(t => [t, true]));
     });
     renderDetail();
   });
@@ -520,6 +564,7 @@ function wireDetail(name, d) {
       BOOL_KEYS.forEach(k => { s[k] = false; });
       s.extraVisibleMoves = [];
       s.evoToTargets = Object.fromEntries(Object.keys(s.evoToTargets || {}).map(t => [t, false]));
+      s.evoReqTargets = Object.fromEntries(Object.keys(s.evoReqTargets || {}).map(t => [t, false]));
     });
     renderDetail();
   });

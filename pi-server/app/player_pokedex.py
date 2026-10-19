@@ -22,6 +22,9 @@ _BASE_VISIBILITY = {
     'senseEcholocation': False, 'senseTelepathy': False, 'senseBlindsight': False, 'senseDarkvision': False,
     'senseTruesight': False,
     'evoFrom': False, 'evoTo': False, 'evoToTargets': {},
+    # What each evolution takes ('Level 7 Near ports'), per target like evoToTargets -- shown only with its target (the
+    # user's call, 2026-10-19: what the players have learned about how a Pokemon evolves)
+    'evoReq': False, 'evoReqTargets': {},
     'moves': False, 'movesMaxLevel': 1, 'extraVisibleMoves': [],
 }
 # Older config files used one switch per group; his migrateVisibility spread each over its fields.
@@ -61,8 +64,9 @@ def _visibility(vis):
             for k in keys:
                 if k not in vis:
                     out[k] = vis[old]
-    if not isinstance(out.get('evoToTargets'), dict):
-        out['evoToTargets'] = {}
+    for key in ('evoToTargets', 'evoReqTargets'):
+        if not isinstance(out.get(key), dict):
+            out[key] = {}
     if not isinstance(out.get('extraVisibleMoves'), list):
         out['extraVisibleMoves'] = []
     return out
@@ -117,9 +121,13 @@ def _species_entry(conn, sp, vis, own):
     evolves_from = {'fusion': len(parents) > 1, 'name': ' + '.join(parents)} if parents else None
     evolves_to = species_data.evolves_into_names(sp)
     targets = vis['evoToTargets'] if own else {t: bool(vis['evoTo']) for t in evolves_to}
+    requirements = vis['evoReqTargets'] if own else {t: bool(vis['evoReq']) for t in evolves_to}
+    need = {e['species']: e.get('requirement') for e in sp.get('evolvesInto') or []}
     entry['evolution'] = {
         'from': evolves_from if vis['evoFrom'] else None,
-        'to': [t for t in evolves_to if targets.get(t)],
+        # [{name, requirement}] -- the requirement None unless the DM shows it (and the encyclopedia has one)
+        'to': [{'name': t, 'requirement': (_text(need.get(t)) or None) if requirements.get(t) else None}
+               for t in evolves_to if targets.get(t)],
     }
 
     # Moves: everything learned up to movesMaxLevel, plus the extra ones the DM ticked; per level, how many stay hidden.

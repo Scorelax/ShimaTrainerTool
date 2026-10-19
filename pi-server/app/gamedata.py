@@ -10,6 +10,8 @@ import json
 import os
 from datetime import datetime, timezone
 
+from .db import DB_PATH
+
 DOCS = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'docs'))
 ITEMS_FILE = os.path.join(DOCS, 'DnD_items.json')
 # The move list with the user's own categorization and effects (routes_combat.py reads the whole of each move).
@@ -19,9 +21,14 @@ FEATS_FILE = os.path.join(DOCS, 'DnD_feats.json')
 TRAINER_OPTIONS_FILE = os.path.join(DOCS, 'DnD_trainer_options.json')
 CONDUIT_FILE = os.path.join(DOCS, 'DnD_conduit.json')
 TYPE_CHART_FILE = os.path.join(DOCS, 'DnD_type_chart.json')
-FILES = (ITEMS_FILE, MOVES_FILE, NATURES_FILE, FEATS_FILE, TRAINER_OPTIONS_FILE, CONDUIT_FILE, TYPE_CHART_FILE)
+# The items the DM added or edited in the DM console's Admin module (admin.py) -- in the data folder, not docs/ (git keeps
+# docs/, and an edit there would block the next pull): {lowercase name: item}, laid over ITEMS_FILE's.
+ITEMS_OVERLAY_FILE = os.path.join(os.path.dirname(DB_PATH), 'admin_items.json')
+FILES = (ITEMS_FILE, MOVES_FILE, NATURES_FILE, FEATS_FILE, TRAINER_OPTIONS_FILE, CONDUIT_FILE, TYPE_CHART_FILE,
+         ITEMS_OVERLAY_FILE)
 
 _files = {}  # path -> ((mtime_ns, size), parsed file)
+_NOTHING = {}  # what a missing / broken file reads as -- the same object every time (callers compare by identity)
 
 
 def read_file(path):
@@ -38,16 +45,26 @@ def read_file(path):
         _files[path] = (stamp, data)
         return data
     except (OSError, ValueError):
-        return {}
+        return _NOTHING
 
 
 # ---------------------------------------------------------------------------
 # Items and moves
 # ---------------------------------------------------------------------------
 
+_items = (None, None, [])  # (the file's list, the overlay it was made with, the items)
+
+
 def items():
-    """[{name, category, price, description, effect}] -- price a number, None, or a text ("Not sold")."""
-    return read_file(ITEMS_FILE).get('items') or []
+    """[{name, category, price, description, effect}] -- price a number, None, or a text ("Not sold"). The file's, with the
+    DM's added / edited ones laid over (an edited one keeps its place, an added one comes after the file's)."""
+    global _items
+    base, overlay = read_file(ITEMS_FILE).get('items') or [], read_file(ITEMS_OVERLAY_FILE)
+    if _items[0] is not base or _items[1] is not overlay:
+        extra = {k: v for k, v in (overlay or {}).items() if isinstance(v, dict) and v.get('name')}
+        merged = [extra.pop(str(i.get('name', '')).lower(), i) for i in base] + list(extra.values())
+        _items = (base, overlay, merged)
+    return _items[2]
 
 
 def move_records():

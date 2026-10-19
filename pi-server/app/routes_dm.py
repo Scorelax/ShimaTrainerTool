@@ -55,6 +55,21 @@ def handle(conn, action, params):
             bonus=json.loads(params['bonus']) if params.get('bonus') else None,
             extra_skills=[s for s in str(params.get('skills', '')).split(',') if s.strip()])}
 
+    # The Admin module (admin.py): the items with their pictures, one Pokedex entry as it's kept, the splashes
+    if action == 'admin-items':
+        from . import admin
+        return {'status': 'success', 'data': admin.item_list()}
+
+    if action == 'admin-species':
+        from . import admin
+        if not params.get('name'):
+            raise ValueError('Missing species name')
+        return {'status': 'success', 'data': admin.species_record(params['name'])}
+
+    if action == 'admin-splashes':
+        from . import admin
+        return {'status': 'success', 'data': admin.splashes()}
+
     if action == 'species-detail':
         if not params.get('name'):
             raise ValueError('Missing species name')
@@ -179,6 +194,8 @@ def species_detail(conn, name):
         'behavior': sp.get('behavior') or '', 'activity': sp.get('active') or '',
         'evolution': species_data.evolution_text(sp), 'evolvesFrom': ' + '.join(sp.get('evolvesFrom') or []),
         'evolvesTo': species_data.evolves_into_names(sp),
+        # {target: what it takes (the text the players can be shown), or None when the encyclopedia doesn't say}
+        'evolutionRequirements': {e['species']: e.get('requirement') or None for e in sp.get('evolvesInto') or []},
         'catchDifficulty': (sp.get('encounter') or {}).get('catchDifficulty'),
         'level': (sp.get('encounter') or {}).get('minimumLevel') or 1,
         'ac': combat.get('ac'), 'hitDice': combat.get('hitDie'), 'hp': combat.get('baseHP'),

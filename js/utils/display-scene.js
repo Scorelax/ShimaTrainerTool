@@ -8,7 +8,8 @@
 // Item:  { id, kind: 'pokemon' | 'npc' | 'trainer' | 'image', label, src, still, animated, x, y, size, flip, hidden }
 //   x, y = the picture's middle, as a share of the screen's width / height (0..1); size = its side as a share of the
 //   screen's height -- pictures are always square (the picture itself fits inside, never stretched). The TV is 16:9.
-//   Later items are drawn on top. `still` / `animated` are the Pokemon's two pictures (`src` is the one in use).
+//   Later items are drawn on top. `still` / `animated` are the Pokemon's two pictures (`src` is the one in use -- always
+//   the animated one when there is one: the user's call, 2026-10-19, there's no switching it to the still any more).
 
 import { spriteSrc, BLANK_POSTER } from './sprite-media.js';
 
@@ -18,7 +19,7 @@ export const BATTLE_PICTURES = { away: 'Put the pictures away', keep: 'Keep the 
 export function normaliseScene(s) {
   const out = {
     background: s?.background?.url ? { url: String(s.background.url), name: String(s.background.name || '') } : null,
-    items: Array.isArray(s?.items) ? s.items.filter(i => i && i.id && i.src) : [],
+    items: Array.isArray(s?.items) ? s.items.filter(i => i && i.id && i.src).map(i => (i.animated ? { ...i, src: i.animated } : i)) : [],
     battlePictures: BATTLE_PICTURES[s?.battlePictures] ? s.battlePictures : 'away',
     // The battle the DM has taken off the display (its log file -- one battle's id): the regular scene shows meanwhile.
     // Tied to that one battle, so the next one shows again even if the box was left unticked.
@@ -89,6 +90,13 @@ export function renderScene(stage, scene, { editing = false, selectedId = null }
       el.innerHTML = mediaHtml(it.src);
       const media = el.querySelector('.scene-media');
       media.addEventListener('error', () => el.classList.add('broken'));
+      // Sized to the picture's own shape (not the square box), so its rounded corners are the picture's corners.
+      const fit = () => {
+        const w = media.naturalWidth || media.videoWidth, h = media.naturalHeight || media.videoHeight;
+        if (w && h) media.style.setProperty('--ar', String(w / h));
+      };
+      media.addEventListener(media.tagName === 'VIDEO' ? 'loadedmetadata' : 'load', fit);
+      fit();
     }
     const size = Math.max(0.01, Number(it.size) || 0.3);
     el.style.left = `${(Number(it.x) || 0) * 100}%`;
@@ -126,8 +134,12 @@ export function injectSceneStyles() {
   css.textContent = `
     .scene-stage { position: relative; overflow: hidden; background: #0a0a12; }
     .scene-bg { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
-    .scene-item { position: absolute; transform: translate(-50%, -50%); box-sizing: border-box; }
-    .scene-media { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; user-select: none; }
+    .scene-item { position: absolute; transform: translate(-50%, -50%); box-sizing: border-box;
+      display: flex; align-items: center; justify-content: center; container-type: size; }
+    /* The picture at its own shape, as big as the square box allows, with rounded corners (the user's call, 2026-10-19:
+       to fit the app's look) -- the radius a share of the box, so the DM's preview and the TV round it alike. */
+    .scene-media { width: min(100cqw, calc(100cqh * var(--ar, 1))); height: auto; aspect-ratio: var(--ar, 1);
+      object-fit: cover; border-radius: 6cqmin; display: block; pointer-events: none; user-select: none; }
     .scene-item.flip .scene-media { transform: scaleX(-1); }
     .scene-item.broken .scene-media { opacity: 0; }
     .scene-stage.editing .scene-item { cursor: move; touch-action: none; }

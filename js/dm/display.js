@@ -219,7 +219,6 @@ function drawLayers() {
         ${thumbHtml(it.src, '', { still: it.still })}
         <span class="dm-disp-layer-name"><strong>${escapeHtml(it.label || 'Picture')}</strong>
           <small>${KIND_LABEL[it.kind] || 'Picture'} · ${Math.round((Number(it.size) || 0) * 100)}% high${it.hidden ? ' · <span class="dm-warn-text">hidden</span>' : ''}</small></span>
-        ${it.still && it.animated ? `<button class="dm-icon-btn" data-l="anim" title="${it.src === it.animated ? 'Animated -- click for the still picture' : 'Still -- click for the animated sprite'}">${it.src === it.animated ? '▶' : '🖼'}</button>` : ''}
         <button class="dm-icon-btn${it.hidden ? ' off' : ''}" data-l="hide" title="${it.hidden ? 'Show it on the display' : 'Hide it from the display (it stays here)'}">${it.hidden ? '🙈' : '👁'}</button>
         <button class="dm-icon-btn danger" data-l="remove" title="Take it off">✕</button>
       </div>`).join('')}
@@ -235,7 +234,6 @@ function itemAction(id, act) {
   if (act === 'hide') updateScene(() => { it.hidden = !it.hidden; });
   else if (act === 'remove') { updateScene((s) => { s.items = s.items.filter(x => x.id !== id); }); if (_editor?.selectedId === id) _editor.selectedId = null; }
   else if (act === 'flip') updateScene(() => { it.flip = !it.flip; });
-  else if (act === 'anim') updateScene(() => { it.src = it.src === it.animated ? it.still : it.animated; });
   else if (act === 'dup') {
     const copy = { ...it, id: newId('pic'), x: Math.min(1, it.x + 0.04), y: Math.min(1, it.y + 0.04) };
     updateScene((s) => { s.items.splice(s.items.indexOf(it) + 1, 0, copy); });
@@ -574,7 +572,6 @@ function drawEditorSide() {
         <button class="dm-btn small" data-e="flip">↔ Flip</button>
         <button class="dm-btn small" data-e="hide" title="${it.hidden ? 'Show it on the display' : 'Hide it from the display (it stays here)'}">${it.hidden ? '👁 Show' : '🙈 Hide'}</button>
         <button class="dm-btn small" data-e="dup">⧉ Duplicate</button>
-        ${it.still && it.animated ? `<button class="dm-btn small" data-e="anim">${it.src === it.animated ? '🖼 Still picture' : '▶ Animated'}</button>` : ''}
         <button class="dm-btn small danger" data-e="remove">✕ Take it off</button>
       </div>` : '<div class="dm-hint">Click a picture to pick it.</div>'}
     <div class="dm-card-title" style="margin-top:0.8rem">Pictures (${scene.items.length})</div>

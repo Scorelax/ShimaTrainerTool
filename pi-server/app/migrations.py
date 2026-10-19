@@ -8,6 +8,8 @@
     (2026-10-19)
   - the battle's text lists (abilities "0:Name;description|...", saving throws / skills / feats "A, B") -> lists, in the
     running battle and in what the DM console keeps -- its battle setups, saved encounters and NPCs (2026-10-19)
+  - expertise out of the skill names ("Stealth+") into its own `expertise` list, on the trainers, the players' Pokemon
+    and everything the battle text lists cover (2026-10-19)
 """
 import json
 import os
@@ -254,8 +256,9 @@ def _localize_repo_pictures(conn):
 
 def _lists_in(value):
     """`value` with every text list in it made a list (battle_lists.py): `abilities` text, `savingThrows` / `skills` /
-    `feats` text, and an ability swap's (`ability_override`) "Name;description". True as the second value if anything
-    changed. Lists and every other value are left as they are, so it does nothing the second time."""
+    `feats` text, an ability swap's (`ability_override`) "Name;description", and a "Stealth+" in `skills` (its skill
+    plus an `expertise` entry, battle_lists.split_expertise). True as the second value if anything changed. Lists and
+    every other value are left as they are, so it does nothing the second time."""
     from . import battle_lists
     changed = False
     if isinstance(value, list):
@@ -279,11 +282,15 @@ def _lists_in(value):
         else:
             out[k], c = _lists_in(v)
             changed = changed or c
+    if isinstance(out.get('skills'), list) and any(str(s).strip().endswith('+') for s in out['skills']):
+        out['skills'], out['expertise'] = battle_lists.split_expertise(out['skills'], out.get('expertise'))
+        changed = True
     return out, changed
 
 
 def _battle_text_to_lists(conn):
-    for table, key in (('combat_session', 'id'), ('dm_state', 'key'), ('dm_npcs', 'id'), ('dm_encounters', 'id')):
+    for table, key in (('combat_session', 'id'), ('dm_state', 'key'), ('dm_npcs', 'id'), ('dm_encounters', 'id'),
+                       ('trainers', 'id'), ('owned_pokemon', 'id')):
         for k, text in conn.execute(f'SELECT {key}, json FROM {table}').fetchall():
             try:
                 data = json.loads(text or 'null')

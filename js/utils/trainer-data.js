@@ -4,6 +4,8 @@
  * back with loadTrainer() and writes it with storeTrainer() (plus TrainerAPI.update to save it on the Pi).
  */
 
+import { skillLists } from './battle-lists.js';
+
 const KEY = 'trainerData';
 
 /** A trainer with every part there (empty), so `t.current.hp` and the like never throw on a missing piece. */
@@ -12,10 +14,11 @@ function normalized(t) {
   for (const k of ['stats', 'modifiers', 'combat', 'current', 'charges']) {
     if (!t[k] || typeof t[k] !== 'object') t[k] = {};
   }
-  for (const k of ['savingThrows', 'skills', 'feats', 'languages', 'inventory', 'customItems', 'gear', 'affinities',
-    'specializations']) {
+  for (const k of ['savingThrows', 'skills', 'expertise', 'feats', 'languages', 'inventory', 'customItems', 'gear',
+    'affinities', 'specializations']) {
     if (!Array.isArray(t[k])) t[k] = [];
   }
+  ({ skills: t.skills, expertise: t.expertise } = skillLists(t.skills, t.expertise)); // a session from before: "Insight+"
   return t;
 }
 
@@ -47,17 +50,19 @@ export function hasOldTrainerRow() {
   try { return Array.isArray(JSON.parse(sessionStorage.getItem(KEY) || 'null')); } catch { return false; }
 }
 
-/** Current HP / VP / AC -- the max (or the AC) when it hasn't been set. */
+/** Current HP / VP / AC as numbers -- the max (or the AC) when it hasn't been set; 0 is 0 (fainted), not "unset". */
+const _setOr = (v, fallback) => (v === null || v === undefined || v === '' ? Number(fallback) || 0 : Number(v) || 0);
+
 export function currentHP(t) {
-  return t?.current?.hp ?? t?.combat?.maxHP ?? 0;
+  return _setOr(t?.current?.hp, t?.combat?.maxHP);
 }
 
 export function currentVP(t) {
-  return t?.current?.vp ?? t?.combat?.maxVP ?? 0;
+  return _setOr(t?.current?.vp, t?.combat?.maxVP);
 }
 
 export function currentAC(t) {
-  return t?.current?.ac ?? t?.combat?.ac ?? 10;
+  return _setOr(t?.current?.ac, t?.combat?.ac ?? 10);
 }
 
 /** The names on a list field, or 'None' -- for showing it as text. */

@@ -403,6 +403,8 @@
 .pdx-evo-item.evo-to { border-left-color: var(--pdx-accent); }
 .pdx-evo-label { font-size: 0.7rem; color: var(--pdx-text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
 .pdx-evo-name { font-family: var(--pdx-font-display); font-size: 1.1rem; margin-top: 2px; }
+.pdx-evo-req { margin-top: 6px; font-size: 0.9rem; line-height: 1.35; }
+.pdx-evo-req-label { display: block; font-size: 0.65rem; color: var(--pdx-text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
 
 /* Moves (in a card) */
 .pdx-moves-container { display: flex; flex-direction: column; gap: 14px; padding-bottom: 14px; }

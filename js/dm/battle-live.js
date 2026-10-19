@@ -25,7 +25,7 @@ import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFrom
 import { getClock, WEATHER } from './world-clock.js';
 import { TERRAIN, WEATHER_ROLL_MOD, STATUS_CAPTURE_BONUS, captureDc, accuracyDc } from './encounter-rules.js';
 import { getSetup } from './setup-store.js';
-import { abilityList, nameList } from '../utils/battle-lists.js';
+import { abilityList, nameList, skillLists } from '../utils/battle-lists.js';
 import { renderMapEditor, editorShownIn } from './map-editor.js';
 import { setLiveSession } from './live-map-store.js';
 import * as liveMapStore from './live-map-store.js';
@@ -584,6 +584,12 @@ const ALL_TYPES = ['Normal', 'Fire', 'Water', 'Grass', 'Electric', 'Ice', 'Fight
 const SIZE_NAMES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic'];
 const SCORE_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
+/** Its skills as the Edit form's text -- "Stealth+" for one it has expertise in (read back by skillLists). */
+function skillsText(p) {
+  const { skills, expertise } = skillLists(p.skills, p.expertise);
+  return skills.map(s => (expertise.includes(s) ? `${s}+` : s)).join(', ');
+}
+
 function speedsText(speeds) {
   return (speeds || []).map(sp => `${sp.type} ${sp.ft}`).join(', ');
 }
@@ -620,7 +626,7 @@ async function openEditCreature(p) {
       </div>
       <div class="dm-field"><label for="edMoves">Moves <small class="dm-label-note">comma-separated</small></label><textarea class="dm-input" id="edMoves" rows="2">${escapeHtml((p.moves || []).join(', '))}</textarea></div>` : ''}
       <div class="dm-row">${text('edItem', 'Held item', p.item, 'None')}${text('edSpeeds', 'Speeds', speedsText(p.speeds), 'Walking 30, Flying 60')}</div>
-      <div class="dm-row">${text('edSaves', 'Saving throws', nameList(p.savingThrows).join(', '), 'e.g. Dexterity, Wisdom')}${text('edSkills', 'Skills', nameList(p.skills).join(', '), 'e.g. Perception, Stealth')}</div>
+      <div class="dm-row">${text('edSaves', 'Saving throws', nameList(p.savingThrows).join(', '), 'e.g. Dexterity, Wisdom')}${text('edSkills', 'Skills', skillsText(p), 'e.g. Perception, Stealth+ (+ = expertise)')}</div>
       <div class="dm-hint" id="edNote">${isMon ? 'Recalculate works its numbers out again from its species at the level above (abilities and item as ticked; no nature or encounter bonuses) -- check them, then Save.' : ''}</div>
     </div>`;
   const val = (body, id) => body.querySelector(`#${id}`)?.value ?? '';
@@ -639,7 +645,7 @@ async function openEditCreature(p) {
         set('edVp', Math.max(0, np.maxVP - ((p.maxVP || 0) - (p.currentVP || 0))));
         set('edMaxHp', np.maxHP); set('edMaxVp', np.maxVP); set('edAc', np.baseAc ?? np.ac); set('edProf', np.proficiency); set('edStab', np.stabBonusValue);
         SCORE_KEYS.forEach(k => set(`ed_${k}`, np[k]));
-        set('edMoves', (np.moves || []).join(', ')); set('edSaves', nameList(np.savingThrows).join(', ')); set('edSkills', nameList(np.skills).join(', ')); set('edSpeeds', speedsText(np.speeds));
+        set('edMoves', (np.moves || []).join(', ')); set('edSaves', nameList(np.savingThrows).join(', ')); set('edSkills', skillsText(np)); set('edSpeeds', speedsText(np.speeds));
         set('edType1', np.type1 || ''); set('edType2', np.type2 || '');
         body.querySelector('#edNote').textContent = `Worked out again for a level ${level} ${p.speciesName} -- check the numbers, then Save.`;
       } catch (err) {
@@ -651,7 +657,7 @@ async function openEditCreature(p) {
   buttons.push({ label: 'Save', kind: 'primary', keepOpen: true, onClick: async (body) => {
     const data = {
       name: val(body, 'edName').trim(), item: val(body, 'edItem').trim(),
-      savingThrows: nameList(val(body, 'edSaves')), skills: nameList(val(body, 'edSkills')), speeds: parseSpeeds(val(body, 'edSpeeds')),
+      savingThrows: nameList(val(body, 'edSaves')), ...skillLists(val(body, 'edSkills')), speeds: parseSpeeds(val(body, 'edSpeeds')),
     };
     const ints = { level: 'edLevel', initiative: 'edInit', currentHP: 'edHp', maxHP: 'edMaxHp', currentVP: 'edVp', maxVP: 'edMaxVp',
       ac: 'edAc', proficiency: 'edProf', critMod: 'edCrit', ...(isMon ? { stabBonusValue: 'edStab' } : {}) };

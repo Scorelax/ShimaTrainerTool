@@ -17,7 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, gamedata, live, media, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews
+from . import admin, db, gamedata, live, media, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
 
@@ -78,11 +78,12 @@ async def caching_policy(request: Request, call_next):
 
 def _data_version():
     """gamedata.data_version (the Pokedex settings' last save, every data file's last change), plus the species files
-    and the species pictures folder (a picture added for a species shows on every device without waiting) -- whenever
-    it changes, the devices drop the game data they keep."""
+    and the species / item pictures folders (a picture added shows on every device without waiting) -- whenever it
+    changes, the devices drop the game data they keep."""
     conn = db.connect()
     try:
-        return gamedata.data_version(conn, (species.SPECIES_FILE, species.ABILITIES_FILE, media.POKEMON_IMAGE_DIR))
+        return gamedata.data_version(conn, (species.SPECIES_FILE, species.ABILITIES_FILE, species.OVERLAY_FILE,
+                                            species.ABILITY_OVERLAY_FILE, media.POKEMON_IMAGE_DIR, media.ITEM_IMAGE_DIR))
     finally:
         conn.close()
 
@@ -127,7 +128,7 @@ def _dispatch(params):
                                'remove-participant', 'set-status', 'set-visibility',
                                'advance-turn', 'reaction-start', 'use-bonus-action', 'disengage', 'hold-action', 'use-held-action', 'rapid-orders', 'rotate-token', 'clear-terrain-zones', 'remove-field-zone', 'trick-room', 'resolve-hazard', 'grant-extra-turn', 'quash', 'switch-pokemon', 'cancel-pending-switch', 'queue-switch-heal', 'reaction-end', 'play-animation',
                                'use-move', 'apply-damage', 'update-stats', 'set-board-template', 'set-cell-terrain',
-                               'set-token-position', 'move-token', 'clear-token-position',
+                               'set-token-position', 'move-token', 'adventure-settings', 'clear-token-position',
                                'confirm-placement', 'hover-token', 'list-backgrounds', 'set-board-background'],
                 },
             }
@@ -268,6 +269,52 @@ def dm_save_pokemon_image(payload: dict):
     return JSONResponse({'status': 'success', 'data': data})
 
 
+def _admin(fn):
+    """A DM console Admin module request (admin.py): its answer as data, a refusal as {status: error, error}."""
+    try:
+        data = fn()
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    return JSONResponse({'status': 'success', 'data': data})
+
+
+@app.post('/api/dm/admin-item')
+def dm_admin_item(payload: dict):
+    """An item added or edited ({item, isNew})."""
+    return _admin(lambda: admin.save_item(payload.get('item'), bool(payload.get('isNew'))))
+
+
+@app.post('/api/dm/admin-item-image')
+def dm_admin_item_image(payload: dict):
+    """An item's picture ({name, data: "data:image/...;base64,..."}), saved as "<Item Name>.<ext>"."""
+    return _admin(lambda: admin.save_item_image(payload.get('name'), payload.get('data')))
+
+
+@app.post('/api/dm/admin-species')
+def dm_admin_species(payload: dict):
+    """A Pokedex entry added or edited ({species, isNew, abilityDescriptions})."""
+    return _admin(lambda: admin.save_species(payload.get('species'), bool(payload.get('isNew')),
+                                             payload.get('abilityDescriptions')))
+
+
+@app.post('/api/dm/admin-pokemon-image')
+def dm_admin_pokemon_image(payload: dict):
+    """A species' still picture or animated sprite ({species, kind: 'still' | 'animated', shiny, data})."""
+    return _admin(lambda: admin.save_pokemon_picture(payload.get('species'), payload.get('kind'), payload.get('data'),
+                                                     bool(payload.get('shiny'))))
+
+
+@app.post('/api/dm/admin-splash')
+def dm_admin_splash(payload: dict):
+    """A loading-screen splash: a new one, or in place of `replace` ({data, replace})."""
+    return _admin(lambda: admin.save_splash(payload.get('data'), payload.get('replace') or None))
+
+
+@app.post('/api/dm/admin-splash-delete')
+def dm_admin_splash_delete(payload: dict):
+    return _admin(lambda: admin.delete_splash(payload.get('file')))
+
+
 @app.post('/api/dm/npc-image')
 def dm_save_npc_image(payload: dict):
     """A picture for an NPC uploaded from the DM's computer, into the NPC pictures folder (routes_dm.save_npc_image)."""
@@ -400,6 +447,7 @@ async def live_events(request: Request):
 mimetypes.add_type('image/jpeg', '.jfif')
 for _folder, _prefix, _name in ((media.POKEMON_IMAGE_DIR, media.POKEMON_IMAGE_URL_PREFIX, 'pokemon-images'),
                                 (media.NPC_IMAGE_DIR, media.NPC_IMAGE_URL_PREFIX, 'npc-images'),
+                                (media.ITEM_IMAGE_DIR, media.ITEM_IMAGE_URL_PREFIX, 'item-images'),
                                 (media.BADGE_DIR, media.BADGE_URL_PREFIX, 'badges'),
                                 (media.SPLASH_DIR, media.SPLASH_URL_PREFIX, 'splashes')):
     os.makedirs(_folder, exist_ok=True)
@@ -423,8 +471,9 @@ sprite_previews.queue_missing()
 # Self-uploaded animated sprites, mp4 only (see media.SPRITE_DIR /
 # media.local_sprite_url). URL prefix stays /gifs -- see
 # media.SPRITE_URL_PREFIX for why that's not renamed along with the folder.
-if os.path.isdir(media.SPRITE_DIR):
-    app.mount('/gifs', StaticFiles(directory=media.SPRITE_DIR), name='gifs')
+# Made here if it isn't there yet: the DM console's Admin module can upload the first one (a mount needs the folder).
+os.makedirs(media.SPRITE_DIR, exist_ok=True)
+app.mount('/gifs', StaticFiles(directory=media.SPRITE_DIR), name='gifs')
 
 # Self-uploaded evolution transition videos (see media.EVOLUTION_VIDEO_DIR /
 # media.local_evolution_video_url)

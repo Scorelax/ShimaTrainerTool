@@ -56,7 +56,7 @@ import {
   persistedMoveCharges, COMBAT_CSS, showMoveDetailsReadOnly,
 } from './combat.js';
 import { loadTrainer, storeTrainer } from '../utils/trainer-data.js';
-import { abilityList, nameList } from '../utils/battle-lists.js';
+import { abilityList, nameList, skillLists } from '../utils/battle-lists.js';
 
 const WIP_CSS = `
   /* Breaks out of the SPA shell's own centered/padded ".app" container
@@ -92,6 +92,7 @@ const WIP_CSS = `
     white-space: nowrap;
   }
   .combat-wip-title img { height: 1.6em; width: auto; }
+  .wip-adv-paused { font-size: 0.6em; font-weight: 600; color: #ffb74d; margin-left: 0.4em; white-space: nowrap; }
   .wip-map-btn, .wip-log-btn { font-size: 0.9rem; letter-spacing: 0.3px; }
   /* The battle log's button: at the bottom-left of the page in the player app (seen after
      scrolling down), floating in the screen's corner in the DM console. */
@@ -715,7 +716,12 @@ async function _prefetchAllBackgrounds() {
   _backgroundOptionsCache.forEach(b => prefetchSprite(b.url).catch(() => {}));
 }
 
-export async function renderCombatWip() {
+// Opened from the trainer card's map button (main.js's 'adventure' route): join the DM's adventure straight away -- no
+// "join or spectate" question -- or say there's none right now (the user's call, 2026-10-19).
+let _adventureIntent = false;
+
+export async function renderCombatWip({ adventure = false } = {}) {
+  _adventureIntent = adventure;
   const result = await CombatAPI.getState();
   session = result.status === 'success' ? result.data : { active: false };
   setAbilitySession(session); // ability-mods.js reads weather, round and positions from it
@@ -764,15 +770,27 @@ function _renderCurrentView() {
   }
   const inJoinFlow = _joinStage === 'setup' || _joinStage === 'initiative' || _joinStage === 'placement';
 
+  if (!_dmName) {
+    // The map button with no adventure on: say so (the page carries on by itself once there is one).
+    if (_adventureIntent && !_isAdventure()) return _renderAdventureWait(session.active ? 'battle' : 'none');
+    // The DM hasn't opened the adventure for joining / placing yet: wait for it (from either button).
+    if (_isAdventure() && session.adventure?.canJoin === false && (inJoinFlow || _needsToJoin(session)) && !_spectating) {
+      return _renderAdventureWait('closed');
+    }
+    // The map button: straight to picking who comes along.
+    if (_adventureIntent && _isAdventure() && _needsToJoin(session) && !inJoinFlow && !_spectating) _joinStage = 'setup';
+  }
+
   // Needs-to-join but hasn't picked a side yet (join vs. just watch) --
   // ask, rather than assuming everyone wants to play. Only reached once per
   // session (picking either option moves past this: 'setup' starts
   // inJoinFlow, Spectate sets _spectating).
-  if (session.active && !_spectating && _needsToJoin(session) && !inJoinFlow) {
+  const joining = _joinStage === 'setup' || _joinStage === 'initiative' || _joinStage === 'placement';
+  if (session.active && !_spectating && _needsToJoin(session) && !joining) {
     return _renderJoinOrSpectateChoice();
   }
 
-  if (session.active && !_spectating && inJoinFlow) {
+  if (session.active && !_spectating && joining) {
     // Start warming the browser's cache for every available background now
     // -- Setup/Initiative give a real few seconds of "picking a Pokemon,
     // entering initiative" time, so by the time this trainer actually
@@ -837,6 +855,27 @@ function _renderJoinOrSpectateChoice() {
     </div>`;
 }
 
+/** The map button's page while there's nothing to join: no adventure ('none'), a battle instead ('battle'), or an
+ * adventure the DM hasn't opened for joining / placing yet ('closed'). Redrawn on every live push, so it moves on by itself. */
+function _renderAdventureWait(why) {
+  const text = {
+    none: ['🗺️ No adventure right now', "The DM hasn't put an adventure map out. This page opens it as soon as they do."],
+    battle: ['⚔️ A battle is on', 'The adventure map is back once the battle has ended -- the ⚔️ button on the trainer card takes you to the battle.'],
+    closed: ['🗺️ The map isn\'t open yet', 'The DM opens the adventure map for you in a moment -- this page carries on by itself.'],
+  }[why];
+  return `
+    <div class="combat-wip-page">
+      <style>${WIP_CSS}</style>
+      <div class="combat-wip-join-choice-topbar">
+        <button class="combat-wip-btn-secondary" id="advWaitBackBtn">← Back</button>
+      </div>
+      <div class="combat-wip-empty" id="advWaitScreen" data-why="${why}">
+        <h2>${text[0]}</h2>
+        <p style="color:#a0a0c0;max-width:340px;">${text[1]}</p>
+      </div>
+    </div>`;
+}
+
 /** Full page re-render + re-attach -- used for join-flow transitions, which
  * swap between entirely different page structures (combat.js's own
  * self-styled pages vs. this page's own shell), unlike the SSE handler
@@ -875,7 +914,7 @@ function _combatantToParticipant(c) {
     intMod: c.intMod, wisMod: c.wisMod, chaMod: c.chaMod,
     abilities: abilityList(c.abilities), item: c.item || '',
     moves: c.moves || [],
-    savingThrows: nameList(c.savingThrows), skills: nameList(c.skills),
+    savingThrows: nameList(c.savingThrows), ...skillLists(c.skills, c.expertise),
   };
 }
 
@@ -900,7 +939,7 @@ function _richCombatantFromParticipant(p) {
     ac: p.ac, baseAc: p.baseAc, critMod: p.critMod || 0,
     maxHp: p.maxHP, currentHp: p.currentHP, maxVp: p.maxVP, currentVp: p.currentVP,
     proficiency: p.proficiency, stabBonusValue: p.stabBonusValue,
-    savingThrows: nameList(p.savingThrows), skills: nameList(p.skills),
+    savingThrows: nameList(p.savingThrows), ...skillLists(p.skills, p.expertise),
     str: p.str, dex: p.dex, con: p.con, int: p.int, wis: p.wis, cha: p.cha,
     strMod: p.strMod, dexMod: p.dexMod, conMod: p.conMod,
     intMod: p.intMod, wisMod: p.wisMod, chaMod: p.chaMod,
@@ -2501,7 +2540,7 @@ function _syncHeaderBar(state) {
     const vsIcon = '<img src="assets/VS.png" alt="">';
     titleEl.innerHTML = !state?.active
       ? `${vsIcon}Battle`
-      : _isAdventure(state) ? '🧭 Adventure'
+      : _isAdventure(state) ? `🧭 Adventure${state.adventure?.canMove === false && !_dmName ? ' <small class="wip-adv-paused">· moving paused by the DM</small>' : ''}`
         : `${vsIcon}${state.battleType === 'pvp' ? 'PvP' : 'PvE'} Battle`;
   }
   const leftBtnEl = document.getElementById('wipHeaderLeftBtn');
@@ -2815,7 +2854,7 @@ function _foreignCombatantView(p, { masked = false } = {}) {
     strMod: eff.strMod, dexMod: eff.dexMod, conMod: eff.conMod,
     intMod: eff.intMod, wisMod: eff.wisMod, chaMod: eff.chaMod,
     proficiency: p.proficiency, abilities: effectiveAbilities(p), item: p.item, stabBonusValue: p.stabBonusValue,
-    savingThrows: nameList(p.savingThrows), skills: nameList(p.skills), size: p.size,
+    savingThrows: nameList(p.savingThrows), ...skillLists(p.skills, p.expertise), size: p.size,
     moves: p.moves || [], rechargeStates: {}, // this device doesn't track another player's recharge state
     initiativeTotal: p.initiative,
     statusEffects: (p.statuses || []).map(st => _statusToBadge(st, session?.round)),
@@ -2851,6 +2890,7 @@ function _maskForeignView(v, p) {
   if (!see('abilities')) v.abilities = [];
   v.item = '';
   v.skills = [];
+  v.expertise = [];
   v.savingThrows = [];
   v.proficiency = null; // no Proficiency / Skills / Saving Throws rows (hasStatBlock was worked out above)
   v.feats = [];
@@ -3257,6 +3297,10 @@ export function attachCombatWipListeners() {
     if (incoming?.version && session?.version && incoming.version <= session.version) return;
     session = incoming;
     setAbilitySession(session);
+    // Waiting for an adventure / for the DM to open it: drawn again, which moves on once it's there.
+    if (document.getElementById('advWaitScreen')) { _rerenderFull(); return; }
+    // The DM closed joining while this trainer was still joining: wait (picked up again when it opens).
+    if (_joinStage && _isAdventure() && session.adventure?.canJoin === false && !_dmName) { _rerenderFull(); return; }
     _showNewAbilityReminders(session);
     _answerPromptsForMe(session); // another player's attack asking this player to roll (their Sturdy, Rough Skin...)
     _answerConcentrationChecks(session); // one of this player's creatures took damage while concentrating
@@ -3337,6 +3381,13 @@ export function attachCombatWipListeners() {
   window.addEventListener('app:combat-updated', combatUpdateHandler);
   _startSessionResync();
 
+  if (document.getElementById('advWaitScreen')) {
+    document.getElementById('advWaitBackBtn').addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
+    });
+    return;
+  }
+
   if (document.getElementById('joinChoiceJoinBtn')) {
     document.getElementById('joinChoiceJoinBtn').addEventListener('click', () => {
       _joinStage = 'setup';
@@ -3358,10 +3409,10 @@ export function attachCombatWipListeners() {
   if (_joinStage === 'setup') {
     attachSetupListeners({
       backRoute: 'trainer-card', // the old combat page isn't a way back any more -- the trainer card opens this one
-      onStart: ({ trainerCombatant, activePokemon }) => {
+      onStart: ({ trainerCombatant, activePokemon, chosen }) => {
         if (_isAdventure()) {
-          // No initiative on an adventure: straight in, then placed on the map.
-          _joinWith([trainerCombatant, activePokemon].filter(Boolean).map(c => ({ ...c, initiativeTotal: null })));
+          // No initiative on an adventure: straight in -- with every Pokemon picked -- then placed on the map.
+          _joinWith([trainerCombatant, ...(chosen || [])].filter(Boolean).map(c => ({ ...c, initiativeTotal: null })));
           return;
         }
         _joinState = { combatants: [trainerCombatant, activePokemon] };
@@ -3395,7 +3446,7 @@ export function attachCombatWipListeners() {
 /** Puts this trainer's chosen combatants into the session (the end of the join flow: after initiative in a battle, right
  * after Setup on an adventure), then on to placing them. */
 async function _joinWith(combatants) {
-  if (combatants[1]?.id) _myPokemonKeys.set(combatants[1].name, combatants[1].id);
+  combatants.slice(1).forEach((c) => { if (c?.id) _myPokemonKeys.set(c.name, c.id); });
   // Each one is tried twice (a phone's connection can drop one request); a trainer already in the battle from a
   // join that broke halfway isn't sent again (the server ignores a repeat anyway). What still fails is said
   // plainly -- and written to the battle log, so the reason can be looked up afterwards.

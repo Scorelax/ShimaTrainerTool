@@ -7,14 +7,23 @@ out instead of stored so the two directions can never disagree. The ability desc
 docs/DnD_abilities.json, the one place they're written.
 
 The helpers at the bottom turn a species back into the text the app has always shown (the evolution line, the one-line
-speed, "25ft" / "-" movement...), so the pages and the players' saved Pokemon read exactly what they did before."""
+speed, "25ft" / "-" movement...), so the pages and the players' saved Pokemon read exactly what they did before.
+
+The DM console's Admin module adds and edits species and abilities on the Pi (admin.py): those go to OVERLAY_FILE /
+ABILITY_OVERLAY_FILE in the data folder -- not into docs/, which git keeps (an edit there would block the next pull) --
+and are laid over the files here, one species / ability replacing the file's of the same name."""
 import json
 import os
 import re
 
+from .db import DB_PATH
+
 DOCS = os.path.join(os.path.dirname(__file__), '..', 'docs')
 SPECIES_FILE = os.path.join(DOCS, 'DnD_species.json')
 ABILITIES_FILE = os.path.join(DOCS, 'DnD_abilities.json')
+DATA_DIR = os.path.dirname(DB_PATH)
+OVERLAY_FILE = os.path.join(DATA_DIR, 'admin_species.json')            # {lowercase name: species}
+ABILITY_OVERLAY_FILE = os.path.join(DATA_DIR, 'admin_abilities.json')  # {lowercase name: {name, description}}
 
 MOVE_LEVELS = (1, 2, 6, 10, 14, 18)
 MOVEMENT = ('walking', 'climbing', 'flying', 'hovering', 'swimming', 'burrowing')
@@ -27,12 +36,33 @@ _cache = {'mtime': None, 'list': [], 'by_name': {}}
 _abilities_cache = {'mtime': None, 'by_name': {}}
 
 
+def _mtime(path):
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return None
+
+
+def read_overlay(path):
+    """One of the DM's overlay files ({lowercase name: record}), {} when there's none (or it's broken)."""
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
 def all_species():
-    """Every species, sorted by dex number (re-read only when the file changes)."""
-    mtime = os.path.getmtime(SPECIES_FILE)
+    """Every species, sorted by dex number -- the file's, with the DM's added / edited ones laid over (re-read only when
+    either changes)."""
+    mtime = (os.path.getmtime(SPECIES_FILE), _mtime(OVERLAY_FILE))
     if _cache['mtime'] != mtime:
         with open(SPECIES_FILE, encoding='utf-8') as f:
             species = json.load(f)['species']
+        overlay = {k: v for k, v in read_overlay(OVERLAY_FILE).items() if isinstance(v, dict) and v.get('name')}
+        species = [overlay.pop(s['name'].lower(), s) for s in species] + list(overlay.values())
+        species.sort(key=lambda s: (s.get('dexNumber') if isinstance(s.get('dexNumber'), int) else 10 ** 6, s['name']))
         by_name = {s['name'].lower(): s for s in species}
         for s in species:
             s['evolvesFrom'] = []
@@ -60,13 +90,21 @@ def require(name):
 
 def ability_description(name):
     """An ability's description from DnD_abilities.json ('' when it isn't there)."""
-    mtime = os.path.getmtime(ABILITIES_FILE)
+    mtime = (os.path.getmtime(ABILITIES_FILE), _mtime(ABILITY_OVERLAY_FILE))
     if _abilities_cache['mtime'] != mtime:
         with open(ABILITIES_FILE, encoding='utf-8') as f:
             items = json.load(f)['abilities']
-        _abilities_cache.update(mtime=mtime, by_name={a['name'].lower(): a for a in items})
+        by_name = {a['name'].lower(): a for a in items}
+        by_name.update({k: v for k, v in read_overlay(ABILITY_OVERLAY_FILE).items() if isinstance(v, dict) and v.get('name')})
+        _abilities_cache.update(mtime=mtime, by_name=by_name)
     a = _abilities_cache['by_name'].get(str(name or '').strip().lower())
     return re.sub(r'\s+', ' ', str(a.get('description') or '')).strip() if a else ''
+
+
+def ability_names():
+    """Every ability the game knows (DnD_abilities.json and the DM's own), by name."""
+    ability_description('')  # (loads them)
+    return sorted((a['name'] for a in _abilities_cache['by_name'].values()), key=str.lower)
 
 
 def abilities(s):

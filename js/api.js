@@ -334,7 +334,7 @@ export class PokemonAPI {
       useCache: false
     });
 
-    cache.remove(`pokemon:${trainerName}:${pokemonName}`);
+    forgetCachedPokemon(trainerName, pokemonName);
     forgetCachedTrainer(trainerName);
     cache.remove('pokemon:registered-list');
 
@@ -784,6 +784,16 @@ export class CombatAPI {
 
   static async addParticipant(participant) {
     return API.request('combat', 'add-participant', { data: JSON.stringify(participant) }, { useCache: false });
+  }
+
+  /** The DM, during an adventure: { onScreen: 'adventure' | 'region', canJoin, canMove } -- any of them (routes_combat.py's
+   * _set_adventure_settings). */
+  static async adventureSettings({ onScreen, canJoin, canMove } = {}) {
+    const params = {};
+    if (onScreen) params.onScreen = onScreen;
+    if (canJoin !== undefined) params.canJoin = canJoin ? '1' : '0';
+    if (canMove !== undefined) params.canMove = canMove ? '1' : '0';
+    return API.request('combat', 'adventure-settings', params, { useCache: false });
   }
 
   static async removeParticipant(id) {
@@ -1498,6 +1508,58 @@ export class DmAPI {
    * stats, extraSkills, nickname}. */
   static async givePokemon(trainer, pokemon) {
     return DmAPI._post('give-pokemon', { trainer, pokemon }, 'Giving the Pokémon');
+  }
+
+  // --- The Admin module (pi-server/app/admin.py) ---
+
+  /** Every item with its picture and whether it was added / edited here -> [{name, category, price, description,
+   * effect, image, edited}]. */
+  static async adminItems() {
+    return (await API.request('dm', 'admin-items', {}, { useCache: false, timeout: HEAVY_TIMEOUT })).data || [];
+  }
+
+  /** An item added (`isNew`) or edited -> the item as saved. */
+  static async adminSaveItem(item, isNew) {
+    return (await DmAPI._post('admin-item', { item, isNew }, 'Saving the item')).data;
+  }
+
+  /** An item's picture ({name, data: a data: URL}) -> {image}. */
+  static async adminItemImage(name, data) {
+    return (await DmAPI._post('admin-item-image', { name, data }, 'Uploading the picture')).data;
+  }
+
+  /** One Pokedex entry as it's kept -> {species, edited, pictures, abilityDescriptions}. */
+  static async adminSpecies(name) {
+    return (await API.request('dm', 'admin-species', { name }, { useCache: false })).data;
+  }
+
+  /** A Pokedex entry added or edited (`abilityDescriptions`: {ability: description} for new / changed ones). */
+  static async adminSaveSpecies(species, isNew, abilityDescriptions) {
+    return (await DmAPI._post('admin-species', { species, isNew, abilityDescriptions }, 'Saving the Pokédex entry')).data;
+  }
+
+  /** A species' still picture or animated sprite ({species, kind: 'still' | 'animated', shiny, data}) -> its pictures. */
+  static async adminPokemonImage(upload) {
+    return (await DmAPI._post('admin-pokemon-image', upload, 'Uploading')).data;
+  }
+
+  /** The loading-screen splashes -> [{file, url, session}]. */
+  static async adminSplashes() {
+    return (await API.request('dm', 'admin-splashes', {}, { useCache: false })).data || [];
+  }
+
+  /** A new splash, or one in place of `replace` -> the splashes. */
+  static async adminSaveSplash(data, replace = null) {
+    return (await DmAPI._post('admin-splash', { data, replace }, 'Uploading the splash')).data;
+  }
+
+  static async adminDeleteSplash(file) {
+    return (await DmAPI._post('admin-splash-delete', { file }, 'Deleting the splash')).data;
+  }
+
+  /** The game data this device keeps (species lists, details...) dropped -- after the Admin module changed some. */
+  static forgetCachedData() {
+    cache.clear();
   }
 
   static async _post(path, body, what) {

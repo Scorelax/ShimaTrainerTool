@@ -11,7 +11,8 @@ read a trainer by name, the same way as the Pokemon (owned.py).
       "combat":  {"hitDie": 8, "vitalityDie": 8, "maxHP": 48, "maxVP": 76, "ac": 12, "initiative": 1,
                   "proficiency": 3, "walkingSpeed": 30},
       "current": {"hp": 48, "vp": 76, "ac": null, "hitDice": 8, "vitalityDice": 8},   # null: not set (= the max / combat.ac)
-      "savingThrows": ["Strength"], "skills": ["Athletics", "Insight+"],              # "X+" = expertise
+      "savingThrows": ["Strength"], "skills": ["Athletics", "Insight"],
+      "expertise": ["Insight"],                                                       # skills with expertise (each in skills too)
       "feats": ["Skilled", "Linguist"], "languages": ["Elvish"],                      # languages: Linguist's three
       "money": 783, "leaguePoints": 28,
       "inventory":   [{"name": "Poke Ball", "quantity": 2}],                          # items of the item list
@@ -32,6 +33,7 @@ XP is not in the object: only the DM sees it (the dm_xp column, routes_dm.change
 import json
 import re
 
+from .battle_lists import split_expertise
 from .jsutil import js_number, js_parse_int, floor_div2
 
 STATS = ('strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma')
@@ -131,6 +133,7 @@ def create(form):
         'savingThrows': _split(form.get('savingThrows')),
         'skills': [str(s) for s in form.get('skills') or [] if str(s).strip()] if isinstance(form.get('skills'), list)
         else _split(form.get('skills')),
+        'expertise': [],
         'feats': [], 'languages': [],
         'money': js_parse_int(form.get('money')) or 0, 'leaguePoints': js_parse_int(form.get('leaguePoints')) or 0,
         'inventory': inventory, 'customItems': [], 'gear': [],
@@ -236,7 +239,7 @@ def from_row(r, image=''):
                    'walkingSpeed': js_parse_int(r[14]) or 30},
         'current': {'hp': _num(r[34]), 'vp': _num(r[35]), 'ac': current_ac, 'hitDice': _num(r[47]),
                     'vitalityDice': _num(r[48])},
-        'savingThrows': _split(r[15]), 'skills': _split(r[18]),
+        'savingThrows': _split(r[15]), **dict(zip(('skills', 'expertise'), split_expertise(_split(r[18])))),
         'feats': feats, 'languages': languages,
         'money': js_parse_int(r[19]) or 0, 'leaguePoints': js_parse_int(r[21]) or 0,
         'inventory': inventory, 'customItems': custom, 'gear': _split(r[37]),

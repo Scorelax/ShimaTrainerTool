@@ -281,9 +281,16 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     wake();
   }
 
-  /** The whole island in view, tilted a little, turned the way it is now (or `azimuth`). */
-  function home({ ms = 900, azimuth = controls.getAzimuthalAngle() } = {}) {
+  /** The whole island in view, tilted a little, turned the way it is now (or `azimuth`). `fill`: the map looked at
+   * straight down instead, filling the screen -- as close as the painting still covers all of it, so as little as
+   * possible of what's behind the painting shows (the PokeNav's default view, the user's call, 2026-10-19). */
+  function home({ ms = 900, azimuth = controls.getAzimuthalAngle(), fill = false } = {}) {
     if (!land) return;
+    if (fill) {
+      // a hair off straight down -- exactly 0 leaves the camera no way to know which way is up
+      flyTo(new THREE.Vector3(0, 0, 0), fillFor(azimuth), 0.001, azimuth, ms);
+      return;
+    }
     const t = new THREE.Vector3(land.cx - land.W / 2, 0, land.cy - land.H / 2);
     flyTo(t, fitFor(azimuth), 0.55, azimuth, ms);
   }
@@ -383,6 +390,16 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const spanX = land.sizeX * c + land.sizeZ * s + 300;   // room for the names at the island's edges
     const spanZ = land.sizeX * s + land.sizeZ * c + 160;
     return Math.max(spanZ / (2 * tanV), spanX / (2 * tanV * camera.aspect)) * 0.95;
+  }
+
+  /** How far back the camera stands, looking straight down at the painting's middle turned `azimuth`, for the screen
+   * to be covered by the painting edge to edge: the screen's footprint on the ground, turned, has to fit inside the
+   * painting (W x H) both ways. */
+  function fillFor(azimuth = 0) {
+    const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const c = Math.abs(Math.cos(azimuth)), s = Math.abs(Math.sin(azimuth));
+    const k = Math.min((land.W / 2) / (camera.aspect * c + s), (land.H / 2) / (camera.aspect * s + c));
+    return Math.max(controls.minDistance, (k / tanV) * 0.97); // a little in, for the land standing above the sea
   }
 
   function resize() {
@@ -497,7 +514,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (t.closest('[data-act="north"]')) {
       // With a home direction (the DM's PokeNav: turned like the battle maps), the compass is the way back to the
       // default view -- the whole island, turned that way.
-      if (homeAzimuth != null) { home({ azimuth: homeAzimuth }); return; }
+      if (homeAzimuth != null) { home({ azimuth: homeAzimuth, fill: true }); return; }
       const dist = camera.position.distanceTo(controls.target);
       flyTo(controls.target.clone(), dist, controls.getPolarAngle(), 0, 600);
       return;

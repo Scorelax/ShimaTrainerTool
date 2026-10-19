@@ -4,7 +4,8 @@ import { showError } from '../utils/notifications.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { audioManager } from '../utils/audio.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
-import { loadTrainer, storeTrainer } from '../utils/trainer-data.js';
+import { currentHP as hpOfTrainer, currentVP as vpOfTrainer, loadTrainer, storeTrainer } from '../utils/trainer-data.js';
+import { currentHP as hpOfPokemon, currentVP as vpOfPokemon } from '../utils/owned-pokemon.js';
 
 /** The badges among the trainer's items (the item list's 'Badges, Seals & Sigils') -- [{name, description}]. */
 function earnedBadgesOf(trainerData) {
@@ -490,6 +491,12 @@ export function renderTrainerCard() {
           overflow: hidden;
         }
 
+        /* The adventure map (the DM's Adventure Mode), right under the battle button -- the same round button. */
+        .adventure-corner-btn {
+          top: calc(clamp(15px, 3vh, 25px) + clamp(45px, 9vw, 60px) + clamp(8px, 1.5vh, 12px));
+          font-size: clamp(1.4rem, 3.2vw, 2rem);
+        }
+
         .combat-corner-btn img {
           width: 100%;
           height: 100%;
@@ -897,6 +904,8 @@ export function renderTrainerCard() {
 
       <!-- Combat Button -->
       <button class="combat-corner-btn" id="combatBtn"><img src="assets/VS.png" alt="Combat"></button>
+      <!-- Adventure button: the DM's adventure map -->
+      <button class="combat-corner-btn adventure-corner-btn" id="adventureBtn" title="Adventure map" aria-label="Adventure map">🗺️</button>
 
       <!-- Trainer and Utility Container -->
       <div class="trainer-utility-wrapper">
@@ -1195,6 +1204,11 @@ export function attachTrainerCardListeners() {
     window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'combat-wip' } }));
   });
 
+  // Adventure button: the DM's adventure map (combat-wip.js, joined straight away -- the user's call, 2026-10-19)
+  document.getElementById('adventureBtn')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'adventure' } }));
+  });
+
   // Badge tap interaction
   const badgeSlots = document.querySelectorAll('.badge-slot.earned');
   if (badgeSlots.length > 0) {
@@ -1446,9 +1460,9 @@ function showShortRestSelectionPopup() {
   selectionList.innerHTML = '';
 
   // Add trainer option
-  const trainerCurrentHP = parseInt(trainerData.current.hp, 10) || parseInt(trainerData.combat.maxHP, 10);
+  const trainerCurrentHP = hpOfTrainer(trainerData);
   const trainerMaxHP = parseInt(trainerData.combat.maxHP, 10);
-  const trainerCurrentVP = parseInt(trainerData.current.vp, 10) || parseInt(trainerData.combat.maxVP, 10);
+  const trainerCurrentVP = vpOfTrainer(trainerData);
   const trainerMaxVP = parseInt(trainerData.combat.maxVP, 10);
   const trainerMaxHD = parseInt(trainerData.combat.hitDie, 10) || 0;
   const trainerMaxVD = parseInt(trainerData.combat.vitalityDie, 10) || 0;
@@ -1469,9 +1483,9 @@ function showShortRestSelectionPopup() {
   // Add Pokemon options
   activePokemon.forEach(pokemon => {
     const pokemonName = pokemon.name;
-    const currentHP = parseInt(pokemon.current.hp, 10) || parseInt(pokemon.combat.maxHP, 10);
+    const currentHP = hpOfPokemon(pokemon);
     const maxHP = parseInt(pokemon.combat.maxHP, 10);
-    const currentVP = parseInt(pokemon.current.vp, 10) || parseInt(pokemon.combat.maxVP, 10);
+    const currentVP = vpOfPokemon(pokemon);
     const maxVP = parseInt(pokemon.combat.maxVP, 10);
     const pokemonMaxHD = parseInt(pokemon.combat.hitDie, 10) || 0;
     const pokemonMaxVD = parseInt(pokemon.combat.vitalityDie, 10) || 0;
@@ -1556,9 +1570,9 @@ function showShortRestHealingForm() {
     const maxVD = parseInt(trainerData.combat.vitalityDie, 10) || 0;
     currentHD = (trainerData.current.hitDice === '' || trainerData.current.hitDice === null || trainerData.current.hitDice === undefined) ? maxHD : parseInt(trainerData.current.hitDice, 10);
     currentVD = (trainerData.current.vitalityDice === '' || trainerData.current.vitalityDice === null || trainerData.current.vitalityDice === undefined) ? maxVD : parseInt(trainerData.current.vitalityDice, 10);
-    currentHP = parseInt(trainerData.current.hp, 10) || parseInt(trainerData.combat.maxHP, 10);
+    currentHP = hpOfTrainer(trainerData);
     maxHP = parseInt(trainerData.combat.maxHP, 10);
-    currentVP = parseInt(trainerData.current.vp, 10) || parseInt(trainerData.combat.maxVP, 10);
+    currentVP = vpOfTrainer(trainerData);
     maxVP = parseInt(trainerData.combat.maxVP, 10);
   } else {
     const pokemon = JSON.parse(sessionStorage.getItem(entity.storageKey));
@@ -1566,9 +1580,9 @@ function showShortRestHealingForm() {
     const maxVD = parseInt(pokemon.combat.vitalityDie, 10) || 0;
     currentHD = (pokemon.current.hitDice === '' || pokemon.current.hitDice === null || pokemon.current.hitDice === undefined) ? maxHD : parseInt(pokemon.current.hitDice, 10);
     currentVD = (pokemon.current.vitalityDice === '' || pokemon.current.vitalityDice === null || pokemon.current.vitalityDice === undefined) ? maxVD : parseInt(pokemon.current.vitalityDice, 10);
-    currentHP = parseInt(pokemon.current.hp, 10) || parseInt(pokemon.combat.maxHP, 10);
+    currentHP = hpOfPokemon(pokemon);
     maxHP = parseInt(pokemon.combat.maxHP, 10);
-    currentVP = parseInt(pokemon.current.vp, 10) || parseInt(pokemon.combat.maxVP, 10);
+    currentVP = vpOfPokemon(pokemon);
     maxVP = parseInt(pokemon.combat.maxVP, 10);
   }
 
@@ -1637,8 +1651,8 @@ async function processShortRestHealing() {
       return;
     }
 
-    const currentHP = parseInt(trainerData.current.hp, 10) || parseInt(trainerData.combat.maxHP, 10);
-    const currentVP = parseInt(trainerData.current.vp, 10) || parseInt(trainerData.combat.maxVP, 10);
+    const currentHP = hpOfTrainer(trainerData);
+    const currentVP = vpOfTrainer(trainerData);
     const maxHP = parseInt(trainerData.combat.maxHP, 10);
     const maxVP = parseInt(trainerData.combat.maxVP, 10);
 
@@ -1676,8 +1690,8 @@ async function processShortRestHealing() {
       return;
     }
 
-    const currentHP = parseInt(pokemon.current.hp, 10) || parseInt(pokemon.combat.maxHP, 10);
-    const currentVP = parseInt(pokemon.current.vp, 10) || parseInt(pokemon.combat.maxVP, 10);
+    const currentHP = hpOfPokemon(pokemon);
+    const currentVP = vpOfPokemon(pokemon);
     const maxHP = parseInt(pokemon.combat.maxHP, 10);
     const maxVP = parseInt(pokemon.combat.maxVP, 10);
 
@@ -1727,9 +1741,9 @@ function showLongRestPokemonSelection(activePokemon) {
   // Create selection row for each active Pokemon (same layout as short rest)
   activePokemon.forEach(pokemon => {
     const pokemonName = pokemon.name;
-    const currentHP = parseInt(pokemon.current.hp, 10) || parseInt(pokemon.combat.maxHP, 10);
+    const currentHP = hpOfPokemon(pokemon);
     const maxHP = parseInt(pokemon.combat.maxHP, 10);
-    const currentVP = parseInt(pokemon.current.vp, 10) || parseInt(pokemon.combat.maxVP, 10);
+    const currentVP = vpOfPokemon(pokemon);
     const maxVP = parseInt(pokemon.combat.maxVP, 10);
     const pokemonMaxHD = parseInt(pokemon.combat.hitDie, 10) || 0;
     const pokemonMaxVD = parseInt(pokemon.combat.vitalityDie, 10) || 0;

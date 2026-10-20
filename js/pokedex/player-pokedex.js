@@ -236,7 +236,7 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
         ${s.skills ? `<p class="pdx-stat-extra"><strong>Skills:</strong> ${esc(s.skills)}</p>` : ''}` });
     }
     if (s.abilities.length) {
-      tabs.push({ id: 'abilities', label: 'Abilities', icon: '✨', html: `<div class="pdx-ability-list">${s.abilities.map(a => `
+      tabs.push({ id: 'abilities', label: 'Abilities', icon: '🌀', html: `<div class="pdx-ability-list">${s.abilities.map(a => `
         <div class="pdx-ability-card${a.hidden ? ' hidden-ability' : ''}">
           <div class="pdx-ability-header"><span class="pdx-ability-name">${esc(a.name)}</span>${a.hidden ? '<span class="pdx-ability-tag">Hidden</span>' : ''}</div>
           <p class="pdx-ability-desc">${esc(a.description)}</p>

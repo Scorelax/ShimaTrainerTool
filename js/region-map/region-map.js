@@ -279,7 +279,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         const b = shapeBounds(l.shape);
         if (!b) return;
         const minor = isMajor(l) ? '' : ' minor';
-        if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], 40, { locId: l.id, extra: `${l.type === 'cave' ? ' cave' : ''}${painted(l, b) ? ' on-painting' : ''}${minor}` });
+        if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], 40, { locId: l.id, extra: `${['cave', 'landmark', 'building'].includes(l.type) ? ` ${l.type}` : ''}${painted(l, b) ? ' on-painting' : ''}${minor}` });
         else add('region', l.name || '', b.mid[0], b.mid[1], 30, { locId: l.id, extra: ` ${l.shape.kind}${minor}${l.icon?.url ? ' has-icon' : ''}` });
       });
     } else {

@@ -384,7 +384,7 @@ async function initApp() {
     // doesn't fire a "tap to retry" prompt over a working app.
     clearTimeout(window.__bootWatchdog);
 
-    console.log('✨ App ready!');
+    console.log('✅ App ready!');
 
   } catch (error) {
     console.error('❌ App initialization failed:', error);

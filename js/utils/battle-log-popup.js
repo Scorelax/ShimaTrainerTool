@@ -37,7 +37,7 @@ function _injectStyles() {
 
 const _ICONS = {
   'session-start': '⚔️', 'session-end': '🏁', join: '➕', leave: '➖',
-  'move-used': '✨', damage: '💥', miss: '💨', heal: '💚',
+  'move-used': '👊', damage: '💥', miss: '💨', heal: '💚',
   'status-applied': '🌀', 'status-removed': '✅',
   'turn-advance': '🔄', 'reaction-start': '⚡', 'reaction-end': '⚡',
   ability: '🧬', 'ability-reminder': '💡',

@@ -1128,7 +1128,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
   const trainerActionsSection = c.type === 'trainer' && !readOnly ? `
     <div class="expanded-trainer-actions">
       <button class="combat-trainer-action-btn combat-inv-open-btn" data-combatant-id="${c.id}"><img src="assets/Bag.png" alt="Bag" class="combat-inv-icon"> Inventory</button>
-      <button class="combat-trainer-action-btn combat-buffs-open-btn" data-combatant-id="${c.id}">✨ Trainer Buffs</button>
+      <button class="combat-trainer-action-btn combat-buffs-open-btn" data-combatant-id="${c.id}">💪 Trainer Buffs</button>
       ${switchBtn}
     </div>` : '';
 
@@ -1349,7 +1349,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
           // An ability the creature uses on its own turn (Healing Rain, Between Worlds...) -- ability-mods.js.
           const used = activatedAbilityEffects(c);
           return used.length ? `<button class="combat-basic-action-btn" data-action="ability" data-combatant-id="${c.id}" ${isActive ? '' : 'disabled'}
-            title="Use ${used[0].ability}">✨ ${used[0].ability}</button>` : '';
+            title="Use ${used[0].ability}">🌀 ${used[0].ability}</button>` : '';
         })()}
       </div>
     </div>` : '';

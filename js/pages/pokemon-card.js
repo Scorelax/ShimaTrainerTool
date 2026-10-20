@@ -2568,7 +2568,7 @@ export function renderPokemonCard(pokemonName) {
                 <div class="combat-buttons">
                   <button id="addStats" class="combat-btn combat-btn-add">➕ Add</button>
                   <button id="removeStats" class="combat-btn combat-btn-remove">➖ Remove</button>
-                  <button id="fullRestore" class="combat-btn combat-btn-restore">✨ Full Restore</button>
+                  <button id="fullRestore" class="combat-btn combat-btn-restore">💖 Full Restore</button>
                 </div>
               </div>
 
@@ -2592,7 +2592,7 @@ export function renderPokemonCard(pokemonName) {
                 <div class="combat-buttons">
                   <button id="addTrainerStats" class="combat-btn combat-btn-add">➕ Add</button>
                   <button id="removeTrainerStats" class="combat-btn combat-btn-remove">➖ Remove</button>
-                  <button id="fullRestoreTrainer" class="combat-btn combat-btn-restore">✨ Full Restore</button>
+                  <button id="fullRestoreTrainer" class="combat-btn combat-btn-restore">💖 Full Restore</button>
                 </div>
               </div>
             </div>

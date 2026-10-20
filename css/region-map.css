@@ -63,6 +63,9 @@
 .rmap-label.far { opacity: 0; }
 /* the DM's own locations (setLocations): a cave's pin dark; a route's or a forest's name on it, in closer like the sea's */
 .rmap-label.town.cave .rmap-pin { background: #6b5a48; border-color: #24180c; }
+/* a building's pin square, a landmark's a diamond (the user's call, 2026-10-20) */
+.rmap-label.town.building .rmap-pin { border-radius: 2px; }
+.rmap-label.town.landmark .rmap-pin { border-radius: 1px; rotate: 45deg; }
 .rmap-label.region {
   margin: 0; padding: 0; border: none; background: none; cursor: pointer; pointer-events: auto;
   translate: -50% -50%;

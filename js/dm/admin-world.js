@@ -23,7 +23,9 @@ import { ICON_SIZE, iconFor, uploadIcon, pickLibraryIcon, openIconLibrary } from
 
 export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
 
-export const LOCATION_TYPES = { city: '🏙️ City', route: '🛤️ Route', cave: '🕳️ Cave', forest: '🌲 Forest' };
+// (Landmark and Building added -- the user's call, 2026-10-20: a sawmill, a shrine... often inside a bigger location;
+// each one spot on the map like a city, not major unless ticked)
+export const LOCATION_TYPES = { city: '🏙️ City', route: '🛤️ Route', cave: '🕳️ Cave', forest: '🌲 Forest', landmark: '🗿 Landmark', building: '🏠 Building' };
 
 const PICTURE_SIDE = 1600;
 
@@ -416,7 +418,7 @@ export async function drawLocations(body) {
             <strong>${escapeHtml(describeShape(l.shape))}</strong>
             <button class="dm-btn small primary" data-w-act="map">🗺 ${l.shape ? 'Change it on the map' : 'Mark it on the map'}</button>
             ${l.shape ? '<button class="dm-btn small danger" data-w-act="map-remove">Take it off the map</button>' : ''}
-            <span class="dm-hint">A city or a cave is one spot, a route a line along the roads, a forest an area.</span>
+            <span class="dm-hint">A city, a cave, a landmark or a building is one spot, a route a line along the roads, a forest an area.</span>
           </span>
         </div>
         <label class="dm-check"><input type="checkbox" data-w="major" ${isMajor(l) ? 'checked' : ''}><span>⭐ Major location

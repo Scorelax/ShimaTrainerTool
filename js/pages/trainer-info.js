@@ -2548,7 +2548,7 @@ export function renderTrainerInfo() {
                   <span class="btn-text">Remove</span>
                 </button>
                 <button class="combat-button restore" id="fullRestore">
-                  <span class="btn-icon">✨</span>
+                  <span class="btn-icon">💖</span>
                   <span class="btn-text">Full Restore</span>
                 </button>
               </div>

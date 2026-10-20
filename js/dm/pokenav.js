@@ -257,7 +257,8 @@ async function drawLocations() {
       <div class="dm-card-title"><span>📍 Locations</span></div>
       <div class="dm-nav-groups">${Object.entries(LOCATION_TYPES).map(([k, label]) => {
         const here = withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort((a, b) => String(a.name).localeCompare(String(b.name))), locations, folded);
-        return `<div class="dm-nav-locgroup"><div class="dm-cs-group-title">${label} <small>${here.length}</small></div>
+        // (the count: the locations of this type -- not what's inside them, listed here under them whatever their type)
+        return `<div class="dm-nav-locgroup"><div class="dm-cs-group-title">${label} <small>${locations.filter(l => (l.type || 'city') === k).length}</small></div>
           ${here.map(({ l, depth }) => row(l, depth)).join('') || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
       }).join('')}</div>
       <div class="dm-hint">Locations are added and marked on the map in the Admin module (📍 Locations).</div>

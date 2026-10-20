@@ -495,7 +495,8 @@ export async function drawLocations(body) {
         if (!await showCombatConfirm(`Delete the location "${l.name}"?${n ? ` Its ${n} event(s) stay, without a location.` : ''}`, { title: 'Delete location', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
         locations.splice(locations.indexOf(l), 1);
         // what was inside it is part of what it was part of now
-        locations.forEach((x) => { if (x.parentId === l.id) x.parentId = l.parentId || ''; });
+        // (or, if it was part of nothing, left free to go under the next area it's marked in)
+        locations.forEach((x) => { if (x.parentId === l.id) { if (l.parentId) x.parentId = l.parentId; else delete x.parentId; } });
         if (n) { events.forEach((e) => { if (e.locationId === l.id) e.locationId = ''; }); saveSoon('events'); }
         _selected.locations = null;
         changed(); form();
@@ -514,23 +515,29 @@ export async function drawLocations(body) {
         const shape = await editLocationShape(l, locations.filter(x => x !== l && (x.shape || x.icon)), { onIcon: (icon) => { l.icon = icon; } });
         if (shape === undefined) return;
         l.shape = shape;
-        // A region marked: the locations inside it that aren't part of anything yet go under it (not other regions).
+        // A region marked: the locations inside it that aren't part of anything yet go under it (not other regions,
+        // nor one the DM has set to "not part of another location" -- that stays as they set it, however often the
+        // region is marked again).
         if (l.type === 'region' && shape.kind === 'area') {
           const inside = locations.filter((x) => {
-            const p = x !== l && (x.type || 'city') !== 'region' && !parentOf(x, locations) && iconSpot(x.shape);
+            const p = x !== l && (x.type || 'city') !== 'region' && x.parentId !== '' && !parentOf(x, locations) && iconSpot(x.shape);
             return p && pointInRings(shape.rings, p[0], p[1]);
           });
           inside.forEach((x) => { x.parentId = l.id; });
           if (inside.length) toast(`${inside.length} location${inside.length === 1 ? '' : 's'} inside ${l.name || 'the region'} ${inside.length === 1 ? 'is' : 'are'} listed under it now`);
         }
         // marked inside a forest (or another area, a region) and never given a Part of: it's put under it -- the
-        // smallest one
+        // smallest one. Moved out of the area it was part of (into another region, say): it goes under the one it's in
+        // now, or under none.
         const at = iconSpot(shape);
-        if (l.parentId === undefined && l.type !== 'region' && at) {
+        const was = parentOf(l, locations);
+        const movedOut = !!(at && was?.shape?.kind === 'area' && !pointInRings(was.shape.rings, at[0], at[1]));
+        if ((l.parentId === undefined || movedOut) && l.type !== 'region' && at) {
           const size = x => { const b = shapeBounds(x.shape); return (b.x1 - b.x0) * (b.y1 - b.y0); };
           const holder = locations.filter(x => x !== l && x.shape?.kind === 'area' && pointInRings(x.shape.rings, at[0], at[1]) && !partOfChain(x, locations).includes(l))
             .sort((a, b) => size(a) - size(b))[0];
           if (holder) { l.parentId = holder.id; toast(`It's inside ${holder.name || 'an area'}, so it's listed under it -- change that in Part of`); }
+          else if (movedOut) { delete l.parentId; toast(`It's outside ${was.name || 'the area'} now, so it's no longer listed under it`); }
         }
         changed(); form();
       } else if (act === 'icon-up' || act === 'icon-pick' || act === 'icon-mine') {

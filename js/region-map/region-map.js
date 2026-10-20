@@ -771,6 +771,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     }
     root.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === next));
     root.classList.toggle('painted', next === 'painted'); // the painting has its own names and red dots
+    // (asked for before the map's loaded -- the PokéNav's saved view: load() starts in this style itself)
+    if (!version) return;
     if (!textures[next]) textures[next] = await loadTexture(renderer, version.files[STYLES[next]]);
     if (style !== next || !mesh) return;
     mesh.material.map = textures[next];

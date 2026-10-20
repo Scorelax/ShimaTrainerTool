@@ -275,22 +275,27 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       // A spot (a city, a cave) as a town's pin; a route's or a forest's name on its middle, in closer (like the sea's).
       // A town the painting already names (one of places.json's, where it is) keeps only its pin on the painted map.
       const painted = (l, b) => places.towns.some(t => t.name.toLowerCase() === String(l.name || '').trim().toLowerCase() && Math.hypot(t.x - b.mid[0], t.y - b.mid[1]) < 40);
+      // A location with an icon: its name (and the party's marker) placed from the icon's own middle -- on the ground,
+      // not lifted like the others' -- so tilted, it's still exactly under the picture / on it (the user's call,
+      // 2026-10-20: lifted, the name came out over the bottom of the icon and the marker north of it).
+      const liftOf = (l, lift) => (l.icon?.url ? 0 : lift);
       locations.forEach((l) => {
         const b = shapeBounds(l.shape);
         if (!b) return;
         const minor = isMajor(l) ? '' : ' minor';
-        if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], 40, { locId: l.id, extra: `${['cave', 'landmark', 'building'].includes(l.type) ? ` ${l.type}` : ''}${painted(l, b) ? ' on-painting' : ''}${minor}` });
-        else add('region', l.name || '', b.mid[0], b.mid[1], 30, { locId: l.id, extra: ` ${l.shape.kind}${minor}${l.icon?.url ? ' has-icon' : ''}` });
+        if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], liftOf(l, 40), { locId: l.id, extra: `${['cave', 'landmark', 'building'].includes(l.type) ? ` ${l.type}` : ''}${painted(l, b) ? ' on-painting' : ''}${minor}` });
+        else add('region', l.name || '', b.mid[0], b.mid[1], liftOf(l, 30), { locId: l.id, extra: ` ${l.shape.kind}${minor}${l.icon?.url ? ' has-icon' : ''}` });
       });
     } else {
       places.towns.forEach(t => add('town', t.name, t.x, t.y, 40, { extra: ' on-painting' }));
     }
     places.spots.forEach(s => add('spot', '', s.x, s.y, 25));
     places.water.forEach(w => add('water', w.name, w.x, w.y, 0));
-    // the party's marker: standing on its location's spot (region-map.css puts it there, whatever the zoom)
+    // the party's marker: standing on its location's spot, or on its icon (region-map.css puts it there, whatever the
+    // zoom)
     const party = partyAt && locations?.find(l => l.id === partyAt);
     const pb = shapeBounds(party?.shape);
-    if (pb) add('party', '', pb.mid[0], pb.mid[1], party.shape.kind === 'pin' ? 40 : 30);
+    if (pb) add('party', '', pb.mid[0], pb.mid[1], party.icon?.url ? 0 : party.shape.kind === 'pin' ? 40 : 30);
     markLabels();
     dirty = true;
     wake();
@@ -479,8 +484,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     // A minor location's name only closer in than 60 % of the whole-island view the compass goes back to (the user's
     // call, 2026-10-20): from far out only the major locations are named.
     const minorAway = dist > fillFor(controls.getAzimuthalAngle()) * 0.6;
-    // Half an icon's height on the screen, by its location: its name goes that far down, under the picture standing
-    // round the pin, and the party's marker that far up, on top of it (region-map.css --below / --above).
+    // Half an icon's height on the screen, by its location (a sprite always faces the screen, so its bottom edge is that
+    // far under its middle): its name goes just under it (region-map.css --below); with the icon showing, the location's
+    // white dot is left out and the party's marker sits on the picture (.iconed, .on-icon).
     const halfIcon = new Map();
     const pxPerUnit = h / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
     icons.forEach((sp) => {
@@ -497,7 +503,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       if (l.kind === 'town' || l.kind === 'region') l.el.classList.toggle('unnamed', minorAway && l.el.classList.contains('minor'));
       const half = halfIcon.get(l.kind === 'party' ? partyAt : l.locId);
       if (l.kind === 'town' || l.kind === 'region') l.el.style.setProperty('--below', `${Math.round(half || 0)}px`);
-      if (l.kind === 'party') l.el.style.setProperty('--above', `${Math.round(half || 0)}px`);
+      if (l.kind === 'town') l.el.classList.toggle('iconed', !!half);
+      if (l.kind === 'party') l.el.classList.toggle('on-icon', !!half);
       // The party's marker as big on any screen and at any zoom (the user's call, 2026-10-20): a share of the screen's
       // height, a little bigger closer in -- never lost when the whole island is in view, never huge up close.
       if (l.kind === 'party') {

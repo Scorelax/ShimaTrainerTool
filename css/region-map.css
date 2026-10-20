@@ -41,7 +41,6 @@
   font-family: 'Chakra Petch', 'Outfit', sans-serif;
   font-size: 0.48rem; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; line-height: 1.15;
   white-space: normal; text-align: center; text-wrap: balance; max-width: 6.5em; min-width: min-content;
-  margin-top: max(0px, calc(var(--below, 0px) - 8px));
   padding: 1px 5px; border-radius: 4px;
   /* a little see-through, so the land shows behind it */
   color: #2a1d10; background: linear-gradient(rgba(251, 243, 226, 0.78), rgba(233, 217, 184, 0.78)); border: 1px solid rgba(74, 53, 32, 0.85);
@@ -87,8 +86,9 @@
 /* where the party is (setParty): the players' marker, fading out over a second and back in over a second, over and
    over, standing on its location's spot; its size (--mk) set from the screen and the zoom in region-map.js's
    placeLabels */
-/* (on top of the location's icon when it has one: --above, half the icon's height on the screen) */
-.rmap-label.party { translate: -50% calc(-92% - var(--above, 0px)); pointer-events: none; z-index: 2; }
+.rmap-label.party { translate: -50% -92%; pointer-events: none; z-index: 2; }
+/* on a location with an icon: in the middle of the picture, so it's plainly at that place (the user's call, 2026-10-20) */
+.rmap .rmap-label.party.on-icon { translate: -50% -50%; }
 .rmap-party-marker {
   display: block; width: var(--mk, 40px); height: var(--mk, 40px); image-rendering: pixelated;
   filter: drop-shadow(0 0 2px #fff) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
@@ -109,6 +109,12 @@
 .rmap.painted .rmap-label.lit .rmap-name { display: block; }
 .rmap.painted .rmap-pin { width: 14px; height: 14px; }
 .rmap.painted .rmap-label.town { translate: -50% -7px; }
+/* A location whose icon is showing (region-map.js placeLabels): no white dot -- the picture marks it -- and the name's
+   top just under the picture's bottom edge (--below: half the icon's height on the screen, the label anchored on the
+   icon's middle), whatever the zoom or tilt (the user's call, 2026-10-20) */
+.rmap .rmap-label.town.iconed { translate: -50% 0; }
+.rmap .rmap-label.town.iconed .rmap-pin { display: none; }
+.rmap .rmap-label.town.iconed .rmap-name { margin-top: calc(var(--below, 0px) + 2px); }
 
 /* the controls on top */
 .rmap-top {

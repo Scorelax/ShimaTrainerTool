@@ -182,7 +182,7 @@ function uploadPicture(maxSide = PICTURE_SIDE) {
 /** One of the pictures already uploaded as backgrounds in the Display module (the user's call, 2026-10-20: no need to
  * upload the same picture twice) -> its URL (null: none picked / it failed, already told). Searchable by name and by
  * the folder it's in. The event keeps pointing at the background's file, so deleting it there takes it off here too. */
-async function pickBackground() {
+async function pickBackground(locationId = '') {
   let images, folders;
   try {
     const [res, f] = await Promise.all([DmAPI.displayImages(), DmAPI.getState('display-folders').catch(() => null)]);
@@ -197,10 +197,17 @@ async function pickBackground() {
     for (let f = folders.find(x => x.id === id), guard = 0; f && guard < 20; f = folders.find(x => x.id === f.parent), guard++) names.unshift(f.name);
     return names.join(' › ');
   };
+  // the location's own folder (display.js keeps one for each, the user's call, 2026-10-20): its pictures first
+  const own = locationId ? folders.find(f => f.locId === locationId) : null;
+  const inOwn = (b) => {
+    for (let f = folders.find(x => x.id === b.folder), guard = 0; own && f && guard < 20; f = folders.find(x => x.id === f.parent), guard++) if (f.id === own.id) return true;
+    return false;
+  };
+  const sorted = [...images.filter(inOwn), ...images.filter(b => !inOwn(b))];
   const picked = await openPicker({
     title: '🖼️ Select an image',
-    items: images.map(b => ({ key: b.id, label: b.name || 'Picture', sub: b.folder ? `📁 ${pathOf(b.folder)}` : '', image: b.url })),
-    hint: "The pictures uploaded as backgrounds in the Display module.",
+    items: sorted.map(b => ({ key: b.id, label: b.name || 'Picture', sub: b.folder ? `${inOwn(b) ? '✓' : '📁'} ${pathOf(b.folder)}` : '', image: b.url })),
+    hint: `The pictures uploaded as backgrounds in the Display module.${own ? ` The ones in ${own.name}'s folder first.` : ''}`,
     emptyText: 'No backgrounds uploaded yet -- the Display module\'s Backgrounds keeps them.',
   });
   const key = picked?.keys?.[0];
@@ -282,7 +289,7 @@ export async function drawEvents(body) {
         _selected.events = null;
         changed(); form();
       } else if (act === 'pic' || act === 'pic-pick' || act === 'pic-remove') {
-        const url = act === 'pic' ? await uploadPicture() : act === 'pic-pick' ? await pickBackground() : '';
+        const url = act === 'pic' ? await uploadPicture() : act === 'pic-pick' ? await pickBackground(e.locationId) : '';
         if (url === null) return;
         e.image = url; changed(); form();
       }
@@ -464,7 +471,7 @@ export async function drawLocations(body) {
         l.pois.splice(Number(btn.dataset.i), 1);
         changed(); form();
       } else if (act === 'pic' || act === 'pic-pick' || act === 'pic-remove') {
-        const url = act === 'pic' ? await uploadPicture() : act === 'pic-pick' ? await pickBackground() : '';
+        const url = act === 'pic' ? await uploadPicture() : act === 'pic-pick' ? await pickBackground(l.id) : '';
         if (url === null) return;
         l.image = url; changed(); form();
       } else if (act === 'map') {

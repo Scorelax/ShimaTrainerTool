@@ -51,6 +51,15 @@ const _folderSets = {};
 let _folders = [];
 let _folder = ''; // the folder open
 let _picked = new Set(); // pictures / NPCs picked to move together (ids)
+// Every location (Admin › Locations) has a folder of its own in the backgrounds (the user's call, 2026-10-20: easier to
+// keep a place's pictures together), in one called Locations: made, renamed and removed along with the location
+// (syncLocationFolders), so it has no rename or delete of its own -- it can still be dragged elsewhere. A folder keeps
+// its location's id (`locId`); the Locations folder itself has a fixed id.
+const LOCATIONS_FOLDER = 'fold-locations';
+// Folder mode (the user's call, 2026-10-20): ticked, the backgrounds show the folder open -- its folders and its pictures;
+// unticked, just pictures: every one, the ones inside folders too. Remembered on this computer.
+const FOLDER_MODE_KEY = 'dm-display-folder-mode';
+let _folderMode = (() => { try { return localStorage.getItem(FOLDER_MODE_KEY) !== 'off'; } catch { return true; } })();
 
 function useFolderSet(name) {
   if (!FOLDERED[name] || name === _folderSet) return;
@@ -62,6 +71,7 @@ function useFolderSet(name) {
 
 /** The folder open in tab `name` (an upload goes there). */
 function folderOpenIn(name) {
+  if (name === 'backgrounds' && !_folderMode) return '';   // every picture shown: an upload goes to the top
   return name === _folderSet ? _folder : (_folderSets[name]?.open || '');
 }
 
@@ -178,6 +188,7 @@ function draw() {
   document.getElementById('dispAddHidden').addEventListener('change', (e) => { _addHidden = e.target.checked; });
   document.getElementById('dispUpload').addEventListener('click', pickFiles);
   document.getElementById('dispGrid').addEventListener('click', onGridClick);
+  document.getElementById('dispGrid').addEventListener('change', (e) => { if (e.target.matches('[data-folder-mode]')) setFolderMode(e.target.checked); });
   document.getElementById('dispOverBattle').addEventListener('change', (e) => updateLive((s) => { s.overBattle = e.target.checked; }));
   document.getElementById('dispBattlePictures').addEventListener('click', (e) => {
     const b = e.target.closest('[data-bp]');
@@ -694,6 +705,11 @@ async function drawSource() {
   if (!_data[_source]) grid.innerHTML = '<div class="dm-loading">Loading…</div>';
   useFolderSet(_source);
   try { await loadSource(_source); } catch (err) { grid.innerHTML = `<div class="dm-hint">Couldn't load: ${escapeHtml(err.message)}</div>`; return; }
+  // the locations' folders, each time the backgrounds are shown (one made or renamed in Admin meanwhile)
+  if (_source === 'backgrounds') {
+    const locations = await DmAPI.getState('locations').catch(() => null);
+    if (_folderSet === 'backgrounds' && syncLocationFolders(locations)) saveFolders();   // (not if another tab is open by now)
+  }
   drawGrid();
 }
 
@@ -704,14 +720,16 @@ function drawGrid() {
   const q = (_queries[_source] || '').trim().toLowerCase();
   if (_source === 'backgrounds') {
     const current = getScene().background?.url;
-    // Searching looks in every folder; otherwise the folder open: its folders, then its pictures
-    const shown = list.filter(b => (q ? b.name.toLowerCase().includes(q) : (b.folder || '') === _folder));
-    const folders = q ? [] : _folders.filter(f => (f.parent || '') === _folder).sort((a, b) => a.name.localeCompare(b.name));
+    // Searching looks in every folder, and so does Folder mode unticked; otherwise the folder open: its folders, then its
+    // pictures
+    const every = !!q || !_folderMode;
+    const shown = list.filter(b => (q ? b.name.toLowerCase().includes(q) : every || (b.folder || '') === _folder));
+    const folders = every ? [] : _folders.filter(f => (f.parent || '') === _folder).sort((a, b) => a.name.localeCompare(b.name));
     grid.innerHTML = `${foldersBarHtml(q)}${folders.map(folderCardHtml).join('')}` + (shown.length ? shown.map(b => `
       <div class="dm-disp-bg${b.url === current ? ' current' : ''}${_picked.has(b.id) ? ' picked' : ''}" data-bg="${escapeHtml(b.id)}" draggable="true" role="button" tabindex="0" title="Put it on the display as the background -- drag it into a folder, or tick it (Ctrl + click) to move several">
         <span class="dm-disp-bg-img"><img src="${escapeHtml(b.url)}" alt="" loading="lazy" draggable="false"></span>
         <button class="dm-disp-tick" data-pick-bg title="${_picked.has(b.id) ? 'Unpick it' : 'Pick it -- to move several at once'}">✓</button>
-        <span class="dm-disp-bg-name">${b.url === current ? '✓ ' : ''}${escapeHtml(b.name)}${q && b.folder ? `<small> · 📁 ${escapeHtml(folderPath(b.folder).map(f => f.name).join(' › '))}</small>` : ''}</span>
+        <span class="dm-disp-bg-name">${b.url === current ? '✓ ' : ''}${escapeHtml(b.name)}${every && b.folder ? `<small> · 📁 ${escapeHtml(folderPath(b.folder).map(f => f.name).join(' › '))}</small>` : ''}</span>
         <span class="dm-disp-bg-tools">
           <button class="dm-icon-btn" data-bgact="pic" title="Put it on as a picture instead (to move and resize)">＋</button>
           <button class="dm-icon-btn" data-bgact="rename" title="Rename">✎</button>
@@ -1131,24 +1149,66 @@ function folderPath(id) {
 }
 
 function foldersBarHtml(q) {
-  if (q) return '<div class="dm-disp-crumbs"><span class="dm-hint">Searching every folder</span></div>';
+  const mode = _source === 'backgrounds' ? `<label class="dm-check dm-disp-foldermode" title="Ticked: the folders and the pictures in the one open. Unticked: every picture, the ones in folders too.">
+    <input type="checkbox" data-folder-mode ${_folderMode ? 'checked' : ''}><span>Folder mode</span></label>` : '';
+  if (q) return `<div class="dm-disp-crumbs"><span class="dm-hint">Searching every folder</span>${mode}</div>`;
+  if (_source === 'backgrounds' && !_folderMode) {
+    return `<div class="dm-disp-crumbs"><span class="dm-disp-crumb here">🖼️ All pictures</span><span class="dm-hint">every one, the ones in folders too</span>${mode}</div>`;
+  }
   const all = _source === 'npcs' ? '👤 All NPCs' : '🖼️ All pictures';
   return `<div class="dm-disp-crumbs">
     <button class="dm-disp-crumb${_folder ? '' : ' here'}" data-open-folder="" data-drop-folder="">${all}</button>
-    ${folderPath(_folder).map(f => `<span>›</span><button class="dm-disp-crumb${f.id === _folder ? ' here' : ''}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}">📁 ${escapeHtml(f.name)}</button>`).join('')}
-    <button class="dm-btn small dm-disp-newfolder" data-new-folder>＋ New folder</button>
+    ${folderPath(_folder).map(f => `<span>›</span><button class="dm-disp-crumb${f.id === _folder ? ' here' : ''}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}">${f.locId ? '📍' : '📁'} ${escapeHtml(f.name)}</button>`).join('')}
+    ${mode}<button class="dm-btn small dm-disp-newfolder" data-new-folder>＋ New folder</button>
   </div>`;
+}
+
+/** Folder mode ticked or not (the box above the backgrounds). */
+function setFolderMode(on) {
+  _folderMode = on;
+  try { localStorage.setItem(FOLDER_MODE_KEY, on ? 'on' : 'off'); } catch { /* not remembered: fine */ }
+  drawGrid();
+}
+
+/** The backgrounds' folders brought in line with the locations (null: couldn't load them -- left as they are): a folder
+ * for each one inside Locations, named as it is; a deleted location's folder goes when it's empty, otherwise it stays as
+ * an ordinary folder. -> true when something changed (to be saved). */
+function syncLocationFolders(locations) {
+  if (!Array.isArray(locations)) return false;
+  let changed = false;
+  const ids = new Set(locations.map(l => l?.id).filter(Boolean));
+  const has = id => _folders.some(f => f.id === id);
+  if (!has(LOCATIONS_FOLDER) && locations.some(l => l?.id && String(l.name || '').trim())) {
+    _folders.push({ id: LOCATIONS_FOLDER, name: 'Locations', parent: '' });
+    changed = true;
+  }
+  locations.forEach((l) => {
+    const name = String(l?.name || '').trim();
+    if (!l?.id || !name) return;
+    const f = _folders.find(x => x.locId === l.id);
+    if (!f) { _folders.push({ id: newId('fold'), name, parent: LOCATIONS_FOLDER, locId: l.id }); changed = true; return; }
+    if (f.name !== name) { f.name = name; changed = true; }
+    if (f.parent && !has(f.parent)) { f.parent = LOCATIONS_FOLDER; changed = true; }   // the folder it was in is gone
+  });
+  _folders.filter(f => f.locId && !ids.has(f.locId)).forEach((f) => {
+    const used = (_data.backgrounds || []).some(b => b.folder === f.id) || _folders.some(x => x.parent === f.id);
+    if (used) delete f.locId; else _folders = _folders.filter(x => x !== f);
+    changed = true;
+  });
+  return changed;
 }
 
 function folderCardHtml(f) {
   const inside = (_data[_source] || []).filter(b => b.folder === f.id).length + _folders.filter(x => x.parent === f.id).length;
-  return `<div class="dm-disp-folder" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}" data-drag-folder="${escapeHtml(f.id)}" draggable="true" role="button" tabindex="0" title="Open it -- or drop ${_source === 'npcs' ? 'NPCs' : 'pictures'} on it">
-    <span class="dm-disp-folder-icon">📁</span>
+  // a location's folder (and Locations itself) comes and goes with the locations: no rename or delete here
+  const kept = _source === 'backgrounds' && (f.locId || f.id === LOCATIONS_FOLDER);
+  return `<div class="dm-disp-folder${f.locId ? ' location' : ''}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}" data-drag-folder="${escapeHtml(f.id)}" draggable="true" role="button" tabindex="0" title="${f.locId ? 'The location\'s own folder -- named and removed with it in Admin › Locations. ' : ''}Open it -- or drop ${_source === 'npcs' ? 'NPCs' : 'pictures'} on it">
+    <span class="dm-disp-folder-icon">${f.locId ? '📍' : f.id === LOCATIONS_FOLDER ? '🗺️' : '📁'}</span>
     <span class="dm-disp-bg-name">${escapeHtml(f.name)}<small>${inside} inside</small></span>
-    <span class="dm-disp-bg-tools">
+    ${kept ? '' : `<span class="dm-disp-bg-tools">
       <button class="dm-icon-btn" data-folder-act="rename" title="Rename">✎</button>
       <button class="dm-icon-btn danger" data-folder-act="delete" title="Delete the folder (what's in it moves up)">✕</button>
-    </span>
+    </span>`}
   </div>`;
 }
 
@@ -1162,6 +1222,7 @@ function saveFolders() {
 
 /** A click on a folder, a step of the path or New folder -- true when it was one of those. */
 function onFolderClick(e) {
+  if (e.target.closest('.dm-disp-foldermode')) return true;   // the box's own change does it (setFolderMode)
   if (e.target.closest('[data-new-folder]')) { newFolder(); return true; }
   const act = e.target.closest('[data-folder-act]');
   if (act) {

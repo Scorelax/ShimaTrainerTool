@@ -45,6 +45,8 @@
 /* a minor location's name, from far out (region-map.js placeLabels): its pin stays */
 .rmap-label.town.unnamed .rmap-name { display: none; }
 .rmap-label.region.unnamed { opacity: 0; }
+.rmap-label.town.lit.unnamed .rmap-name { display: block; }
+.rmap-label.region.lit.unnamed { opacity: 1; }
 .rmap-pin { width: 10px; height: 10px; border-radius: 50%; background: #fbf3e2; border: 2px solid #4a3520; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
 .rmap-label.spot { translate: -50% -50%; transition: opacity 0.25s; }
 .rmap-spot {
@@ -92,6 +94,7 @@
 .rmap.painted .on-painting .rmap-name, .rmap.painted .rmap-label.spot, .rmap.painted .rmap-label.water { display: none; }
 .rmap.painted .rmap-label.lit .rmap-name { display: block; }
 .rmap.painted .rmap-pin { width: 14px; height: 14px; }
+.rmap.painted .rmap-label.town { translate: -50% -7px; }
 
 /* the controls on top */
 .rmap-top {

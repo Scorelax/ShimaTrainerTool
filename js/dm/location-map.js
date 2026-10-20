@@ -535,18 +535,22 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     };
     function finish() {
       const r = v => Math.round(v * 10) / 10;
-      if (icon && iconChanged) onIcon?.({ url: icon.url, x: r(icon.x), y: r(icon.y), size: icon.size });
+      // the icon's move goes back only with the mark itself -- not when Done is refused and the DM then cancels
+      const done = (shape) => {
+        if (icon && iconChanged) onIcon?.({ url: icon.url, x: r(icon.x), y: r(icon.y), size: icon.size });
+        close(shape);
+      };
       if (kind === 'pin') {
         if (!pin) { toast('Click on the map where it is first.'); return; }
-        close({ kind: 'pin', x: r(pin[0]), y: r(pin[1]) });
+        done({ kind: 'pin', x: r(pin[0]), y: r(pin[1]) });
       } else if (kind === 'path') {
         if (anchors.length < 2) { toast('A line needs a start and an end -- click both on the map.'); return; }
-        close({ kind: 'path', follow, anchors: anchors.map(p => p.map(r)), points: pathPoints().map(p => p.map(r)) });
+        done({ kind: 'path', follow, anchors: anchors.map(p => p.map(r)), points: pathPoints().map(p => p.map(r)) });
       } else {
         if (lasso.length >= 3) closeLasso(false);
         const rings = F.maskToRings(mask, W, H);
         if (!rings.length) { toast('Nothing filled in yet -- click inside the forest, paint it, or draw its outline.'); return; }
-        close({ kind: 'area', rings });
+        done({ kind: 'area', rings });
       }
     }
     const onKey = (e) => {

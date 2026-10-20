@@ -845,7 +845,7 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-disp-upload { display: flex; align-items: center; gap: 0.7rem; }
 .dm-disp-upload[hidden] { display: none; }
 .dm-disp-upload .dm-btn { flex: none; }
-.dm-disp-grid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 0.5rem; align-content: start; }
+.dm-disp-grid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); grid-auto-rows: max-content; gap: 0.5rem; align-content: start; }
 .dm-disp-grid.wide { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 .dm-disp-grid > .dm-hint, .dm-disp-grid > .dm-loading { grid-column: 1 / -1; }
 .dm-disp-card {
@@ -1310,9 +1310,14 @@ span.dm-trap-pick { cursor: default; }
   font: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
 .dm-disp-crumb.here { color: var(--dm-gold); background: rgba(255, 215, 0, 0.1); }
 .dm-disp-newfolder { margin-left: auto; }
+.dm-disp-crumbs .dm-disp-foldermode { margin: 0 0 0 auto; align-items: center; white-space: nowrap; }
+.dm-disp-foldermode input { margin-top: 0; }
+.dm-disp-foldermode + .dm-disp-newfolder { margin-left: 0.3rem; }
 .dm-disp-folder { position: relative; display: flex; flex-direction: column; border: 2px solid var(--dm-line); border-radius: 10px; overflow: hidden;
   background: linear-gradient(160deg, rgba(255, 215, 0, 0.08), var(--dm-panel-2)); cursor: pointer; }
 .dm-disp-folder:hover { border-color: rgba(255, 215, 0, 0.6); }
+/* the picture and the name never squeezed (a long list of folders -- every location has one -- crushed them) */
+.dm-disp-folder > .dm-disp-folder-icon, .dm-disp-folder > .dm-disp-bg-name { flex: none; }
 .dm-disp-folder-icon { display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; font-size: 2.6rem; }
 .dm-disp-folder .dm-disp-bg-name small { display: block; font-weight: 600; color: var(--dm-muted); font-size: 0.7rem; }
 .dm-disp-bg-name small { font-weight: 600; color: var(--dm-muted); }

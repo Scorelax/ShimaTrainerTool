@@ -25,7 +25,9 @@ export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
 
 // (Landmark and Building added -- the user's call, 2026-10-20: a sawmill, a shrine... often inside a bigger location;
 // each one spot on the map like a city, not major unless ticked)
-export const LOCATION_TYPES = { city: '🏙️ City', route: '🛤️ Route', cave: '🕳️ Cave', forest: '🌲 Forest', landmark: '🗿 Landmark', building: '🏠 Building' };
+// (Region added, first -- the user's call, 2026-10-20: the painting's dark lines mark the regions; everything inside one
+// is listed under it, like folders)
+export const LOCATION_TYPES = { region: '🗺️ Region', city: '🏙️ City', route: '🛤️ Route', cave: '🕳️ Cave', forest: '🌲 Forest', landmark: '🗿 Landmark', building: '🏠 Building' };
 
 const PICTURE_SIDE = 1600;
 
@@ -217,6 +219,17 @@ async function pickBackground(locationId = '') {
   return key ? images.find(b => b.id === key)?.url || null : null;
 }
 
+/** The locations folded up in a list (their ids), kept on this computer: Admin's and the PokéNav's each their own. */
+export const ADMIN_FOLDED = 'dm-admin-folded';
+export function readFolded(key) {
+  try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')); } catch { return new Set(); }
+}
+export function toggleFold(key, id) {
+  const s = readFolded(key);
+  if (s.has(id)) s.delete(id); else s.add(id);
+  try { localStorage.setItem(key, JSON.stringify([...s])); } catch { /* not remembered: fine */ }
+}
+
 /** A picture file picked on the DM's computer (null: none). */
 function pickIconFile() {
   return new Promise((resolve) => {
@@ -380,8 +393,17 @@ export async function drawLocations(body) {
     const { openRegionMaps } = await import('./map-upload.js');
     openRegionMaps({ locations, onChanged: () => { list(); form(); } });
   });
+  // Folded up in the list: what's inside them hidden (remembered on this computer)
+  document.getElementById('worldList').addEventListener('click', (e) => {
+    const fold = e.target.closest('[data-fold]');
+    if (!fold) return;
+    e.stopPropagation();
+    toggleFold(ADMIN_FOLDED, fold.dataset.fold);
+    list();
+  }, true);
   const list = () => {
     const q = document.getElementById('worldSearch').value.trim().toLowerCase();
+    const folded = readFolded(ADMIN_FOLDED);
     const shown = locations.filter(l => !q || `${l.name} ${l.description} ${(l.pois || []).join(' ')}`.toLowerCase().includes(q));
     const byName = (a, b) => String(a.name).localeCompare(String(b.name));
     // A location inside another is listed under it, a step in, whatever its own type (the user's call, 2026-10-20);
@@ -389,11 +411,11 @@ export async function drawLocations(body) {
     const row = (l, depth = 0) => `
         <button class="dm-pdx-row${l.id === _selected.locations ? ' selected' : ''}${depth ? ' dm-world-sub' : ''}" data-id="${escapeHtml(l.id)}" ${depth ? `style="--depth: ${depth}"` : ''}>
           <span class="dm-pdx-thumb">${l.image ? `<img src="${escapeHtml(l.image)}" alt="">` : '📍'}</span>
-          <span class="dm-pdx-main"><strong>${depth ? '<span class="dm-world-subarrow">⤷</span> ' : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' <span title="Secret: not on the table\'s map">🔒</span>' : ''}</strong><small>${[q && parentOf(l, locations) && `in ${escapeHtml(parentOf(l, locations).name || 'Unnamed')}`, l.shape ? '🗺 On the map' : '<span class="dm-warn-text">Not on the map</span>', `${events.filter(e => e.locationId === l.id).length} event(s)`, !q && locations.some(x => parentOf(x, locations) === l) && `${locations.filter(x => parentOf(x, locations) === l).length} inside`].filter(Boolean).join(' · ')}</small></span><span></span>
+          <span class="dm-pdx-main"><strong>${!q && locations.some(x => parentOf(x, locations) === l) ? `<span class="dm-world-fold" data-fold="${escapeHtml(l.id)}" title="${folded.has(l.id) ? 'Show' : 'Hide'} what's inside">${folded.has(l.id) ? '▸' : '▾'}</span> ` : ''}${depth ? '<span class="dm-world-subarrow">⤷</span> ' : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' <span title="Secret: not on the table\'s map">🔒</span>' : ''}</strong><small>${[q && parentOf(l, locations) && `in ${escapeHtml(parentOf(l, locations).name || 'Unnamed')}`, l.shape ? '🗺 On the map' : '<span class="dm-warn-text">Not on the map</span>', `${events.filter(e => e.locationId === l.id).length} event(s)`, !q && locations.some(x => parentOf(x, locations) === l) && `${locations.filter(x => parentOf(x, locations) === l).length} inside`].filter(Boolean).join(' · ')}</small></span><span></span>
         </button>`;
     document.getElementById('worldList').innerHTML = Object.entries(LOCATION_TYPES).map(([k, label]) => {
       const here = q ? shown.filter(l => (l.type || 'city') === k).sort(byName).map(l => ({ l, depth: 0 }))
-        : withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort(byName), locations);
+        : withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort(byName), locations, folded);
       return here.length ? `<div class="dm-cs-group-title">${label}</div>${here.map(({ l, depth }) => row(l, depth)).join('')}` : '';
     }).join('') || `<div class="dm-hint">${locations.length ? 'Nothing matches that.' : 'No locations yet.'}</div>`;
   };
@@ -418,7 +440,7 @@ export async function drawLocations(body) {
             <strong>${escapeHtml(describeShape(l.shape))}</strong>
             <button class="dm-btn small primary" data-w-act="map">🗺 ${l.shape ? 'Change it on the map' : 'Mark it on the map'}</button>
             ${l.shape ? '<button class="dm-btn small danger" data-w-act="map-remove">Take it off the map</button>' : ''}
-            <span class="dm-hint">A city, a cave, a landmark or a building is one spot, a route a line along the roads, a forest an area.</span>
+            <span class="dm-hint">A city, a cave, a landmark or a building is one spot, a route a line along the roads, a forest or a region an area (🗺 Region fills one in up to its border lines).</span>
           </span>
         </div>
         <label class="dm-check"><input type="checkbox" data-w="major" ${isMajor(l) ? 'checked' : ''}><span>⭐ Major location
@@ -492,9 +514,19 @@ export async function drawLocations(body) {
         const shape = await editLocationShape(l, locations.filter(x => x !== l && (x.shape || x.icon)), { onIcon: (icon) => { l.icon = icon; } });
         if (shape === undefined) return;
         l.shape = shape;
-        // marked inside a forest (or another area) and never given a Part of: it's put under it -- the smallest one
+        // A region marked: the locations inside it that aren't part of anything yet go under it (not other regions).
+        if (l.type === 'region' && shape.kind === 'area') {
+          const inside = locations.filter((x) => {
+            const p = x !== l && (x.type || 'city') !== 'region' && !parentOf(x, locations) && iconSpot(x.shape);
+            return p && pointInRings(shape.rings, p[0], p[1]);
+          });
+          inside.forEach((x) => { x.parentId = l.id; });
+          if (inside.length) toast(`${inside.length} location${inside.length === 1 ? '' : 's'} inside ${l.name || 'the region'} ${inside.length === 1 ? 'is' : 'are'} listed under it now`);
+        }
+        // marked inside a forest (or another area, a region) and never given a Part of: it's put under it -- the
+        // smallest one
         const at = iconSpot(shape);
-        if (l.parentId === undefined && at) {
+        if (l.parentId === undefined && l.type !== 'region' && at) {
           const size = x => { const b = shapeBounds(x.shape); return (b.x1 - b.x0) * (b.y1 - b.y0); };
           const holder = locations.filter(x => x !== l && x.shape?.kind === 'area' && pointInRings(x.shape.rings, at[0], at[1]) && !partOfChain(x, locations).includes(l))
             .sort((a, b) => size(a) - size(b))[0];

@@ -21,7 +21,7 @@ import { iconImage, drawIcon, ICON_SIZE } from './location-icon.js';
 export const SHAPE_KINDS = { pin: '📍 One spot', path: '〰️ A line', area: '⬚ An area' };
 
 /** What a new location of this type is marked as: a route a line, a forest an area, the rest one spot. */
-export const defaultKind = type => (type === 'route' ? 'path' : type === 'forest' ? 'area' : 'pin');
+export const defaultKind = type => (type === 'route' ? 'path' : type === 'forest' || type === 'region' ? 'area' : 'pin');
 
 /** "A line, about 14 km" -- for the location's form. */
 export function describeShape(s) {
@@ -148,6 +148,7 @@ export async function drawShapePreview(canvas, shape) {
 // ---------------------------------------------------------------------------
 
 const AREA_TOOLS = {
+  region: { label: '🗺 Region', hint: 'Click inside a region: it fills in up to the dark border lines and the coast. If it spills out through a gap in a line, Undo and draw that bit with Outline (or Erase what spilled). Alt + click takes it away again.' },
   wand: { label: '🪄 Fill', hint: 'Click inside a forest (or a lake, or a patch of one colour) and it fills it in. Alt + click takes a patch away again.' },
   brush: { label: '🖌 Paint', hint: 'Paint to add to the area.' },
   erase: { label: '🧽 Erase', hint: 'Paint to take away from the area.' },
@@ -175,7 +176,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   let follow = old?.kind === 'path' ? old.follow !== false : true;
   let segs = [];
   let mask = old?.kind === 'area' ? F.ringsToMask(old.rings, W, H) : new Uint8Array(W * H);
-  let areaTool = 'wand';
+  let areaTool = loc.type === 'region' ? 'region' : 'wand';
   let brush = 10;
   let tolerance = 30;
   let showOthers = true;
@@ -463,6 +464,14 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       remember();
       const seg = anchors.length > 1 ? segmentAt(p) : -1;
       if (seg >= 0) { anchors.splice(seg + 1, 0, snap(p)); retrace(seg, seg + 1); } else { anchors.push(snap(p)); retrace(anchors.length - 2); }
+    } else if (areaTool === 'region') {
+      const got = F.regionAt(f, p[0], p[1]);
+      if (!got.size) { toast("That's on a border line or in the sea -- click inside the region."); return; }
+      if (got.spilled) { toast('The lines round there don\'t close it in -- it ran out over most of the island. Draw this region with ✏️ Outline instead.'); return; }
+      remember();
+      for (let i = 0; i < mask.length; i++) if (got.mask[i]) mask[i] = e.altKey ? 0 : 1;
+      paintMask();
+      if (!e.altKey) toast(`Filled in the region -- about ${Math.round(got.size * kmPerPx() * kmPerPx())} km²`);
     } else if (areaTool === 'wand') {
       const got = F.wandAt(f, p[0], p[1], tolerance);
       if (!got.size) { toast('Nothing to fill there -- try the paint brush or an outline.'); return; }

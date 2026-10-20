@@ -210,6 +210,27 @@ export function wandAt(f, x, y, tolerance = 30) {
   return { mask: region, kind, size: region.reduce((a, v) => a + v, 0) };
 }
 
+/** The region round a click (the user's call, 2026-10-20: the painting's dark lines are the regions' borders): the
+ * land reached from it without crossing a dark line or the sea -- the lines first thickened to close small gaps in
+ * them, then the region grown back over the line it stopped at (neighbouring regions meet on it); the rivers and lakes
+ * inside stay in it. -> { mask, size, spilled } (empty when the click is on a line or in the sea; `spilled`: it took
+ * more than half the land -- the lines round it don't close, it ran out through a gap). */
+export function regionAt(f, x, y) {
+  const { W, H } = f;
+  const sea = dilate(erode(f.water, W, H, 3), W, H, 3);   // the sea and the big lakes -- not the rivers
+  const lines = dilate(f.road, W, H, 2);
+  const open = new Uint8Array(W * H);
+  for (let i = 0; i < open.length; i++) open[i] = sea[i] || lines[i] ? 0 : 1;
+  let region = floodFrom(open, W, H, x, y);
+  if (!region.some(v => v)) return { mask: region, size: 0 };
+  region = dilate(region, W, H, 3);
+  for (let i = 0; i < region.length; i++) if (sea[i]) region[i] = 0;
+  fillHoles(region, W, H, 20000);   // a lake, a town's name box
+  const size = region.reduce((a, v) => a + v, 0);
+  const land = sea.reduce((a, v) => a + (v ? 0 : 1), 0);
+  return { mask: region, size, spilled: size > land / 2 };
+}
+
 /** Where the colour (a little blurred, so the painting's brushwork doesn't break it up) is close to the click's. */
 function similarColour(f, x, y, tolerance) {
   const { W, H, rgba } = f;

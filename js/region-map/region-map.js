@@ -284,7 +284,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         if (!b) return;
         const minor = isMajor(l) ? '' : ' minor';
         if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], liftOf(l, 40), { locId: l.id, extra: `${['cave', 'landmark', 'building'].includes(l.type) ? ` ${l.type}` : ''}${painted(l, b) ? ' on-painting' : ''}${minor}` });
-        else add('region', l.name || '', b.mid[0], b.mid[1], liftOf(l, 30), { locId: l.id, extra: ` ${l.shape.kind}${minor}${l.icon?.url ? ' has-icon' : ''}` });
+        else add('region', l.name || '', b.mid[0], b.mid[1], liftOf(l, 30), { locId: l.id, extra: ` ${l.shape.kind}${minor}${l.icon?.url ? ' has-icon' : ''}${l.type === 'region' ? ' realm' : ''}` });
       });
     } else {
       places.towns.forEach(t => add('town', t.name, t.x, t.y, 40, { extra: ' on-painting' }));
@@ -367,12 +367,13 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     ctx.clearRect(0, 0, c.width, c.height);
     // what's looked at drawn on the land -- and what it's part of: a sawmill's forest outlined round it (the user's call,
     // 2026-10-20)
-    const looked = litChain().map(l => l.shape).filter(s => shapeBounds(s) && s.kind !== 'pin');
+    // (a region -- a big stretch of the island -- only just tinted inside its outline)
+    const looked = litChain().filter(l => shapeBounds(l.shape) && l.shape.kind !== 'pin');
     overlay.mesh.visible = looked.length > 0;
     const k = c.width / (land.W - 1);   // painting pixel -> picture pixel (the land's uv runs 0..W-1)
     // (the party's place has nothing drawn on it, nor the map round it dimmed -- the user's call, 2026-10-20: the
     // players' marker on it is enough)
-    looked.reverse().forEach(s => drawLit(ctx, s, k, '#8fd8ff', 'rgba(143, 216, 255, 0.28)'));
+    looked.reverse().forEach(l => drawLit(ctx, l.shape, k, '#8fd8ff', l.type === 'region' ? 'rgba(143, 216, 255, 0.07)' : 'rgba(143, 216, 255, 0.28)'));
     overlay.tex.needsUpdate = true;
     dirty = true;
     wake();

@@ -59,7 +59,7 @@ export function drawIcon(ctx, img, icon, v, { faint = false } = {}) {
 // made -- a location then finds its own (the same type and name) to use with one click.
 // ---------------------------------------------------------------------------
 
-export const ICON_TYPES = { city: '🏙️ City / Town', route: '🛤️ Route', cave: '🕳️ Cave', forest: '🌲 Forest', landmark: '🗿 Landmark', building: '🏠 Building' };
+export const ICON_TYPES = { region: '🗺️ Region', city: '🏙️ City / Town', route: '🛤️ Route', cave: '🕳️ Cave', forest: '🌲 Forest', landmark: '🗿 Landmark', building: '🏠 Building' };
 const ICON_SIDE = 600;   // never shown big
 const norm = s => String(s || '').trim().toLowerCase();
 
@@ -71,7 +71,7 @@ export function parseIconName(filename) {
   const stem = String(filename || '').replace(/\.[^.]+$/, '');
   const at = stem.indexOf('-');
   const word = at > 0 ? stem.slice(0, at).trim().toLowerCase() : '';
-  const type = { city: 'city', town: 'city', route: 'route', cave: 'cave', forest: 'forest', landmark: 'landmark', building: 'building' }[word] || '';
+  const type = { region: 'region', city: 'city', town: 'city', route: 'route', cave: 'cave', forest: 'forest', landmark: 'landmark', building: 'building' }[word] || '';
   return { type, name: (type ? stem.slice(at + 1) : stem).trim() };
 }
 

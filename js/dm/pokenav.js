@@ -10,7 +10,7 @@
 import { CombatAPI, DmAPI } from '../api.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, toast, openDmModal } from './dm-common.js';
-import { loadLocations, loadEvents, LOCATION_TYPES } from './admin-world.js';
+import { loadLocations, loadEvents, LOCATION_TYPES, readFolded, toggleFold } from './admin-world.js';
 import { shapeDistance } from '../region-map/map-features.js';
 import { currentMap, kmPerPx, parentOf, isTopLocation, withInside } from '../region-map/map-version.js';
 import { getClock, formatDate, formatTime } from './world-clock.js';
@@ -134,6 +134,7 @@ export async function renderPokenav(section, { session } = {}) {
 // ---------------------------------------------------------------------------
 
 const NEAR_KM = 30;
+const NAV_FOLDED = 'dm-nav-folded';
 // the players' marker (assets/MapMarker.png) as the party's icon here too (the user's call, 2026-10-20)
 const PARTY_ICON = '<img class="dm-nav-partyicon" src="assets/region-map/party-marker.png" alt="">';
 
@@ -237,7 +238,11 @@ async function drawLocations() {
   _map?.setParty(_party?.locationId);
   if (_lit && !locations.some(l => l.id === _lit && l.shape)) { _lit = null; _map?.highlight(null); }
   // a location inside another under it, a step in (the user's call, 2026-10-20) -- picked, what it's part of lights up too
-  const row = (l, depth = 0) => `<div class="dm-nav-locrow${depth ? ' sub' : ''}" ${depth ? `style="--depth: ${depth}"` : ''}><button class="dm-nav-loc${l.id === _lit ? ' lit' : ''}${l.id === _party?.locationId ? ' party' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
+  // one with others inside folds up (▾ / ▸, remembered on this computer)
+  const folded = readFolded(NAV_FOLDED);
+  const fold = l => (locations.some(x => parentOf(x, locations) === l)
+    ? `<button class="dm-nav-fold" data-fold="${escapeHtml(l.id)}" title="${folded.has(l.id) ? 'Show' : 'Hide'} what's inside">${folded.has(l.id) ? '▸' : '▾'}</button>` : '<span class="dm-nav-fold"></span>');
+  const row = (l, depth = 0) => `<div class="dm-nav-locrow${depth ? ' sub' : ''}" ${depth ? `style="--depth: ${depth}"` : ''}>${fold(l)}<button class="dm-nav-loc${l.id === _lit ? ' lit' : ''}${l.id === _party?.locationId ? ' party' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
       title="${l.shape ? 'Show it on the map' : 'Not marked on the map yet (Admin › Locations)'}">
       <span>${depth ? '<span class="dm-nav-subarrow">⤷</span> ' : ''}${l.id === _party?.locationId ? `${PARTY_ICON} ` : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
       <small>${[!l.shape && 'not on the map', events.some(e => e.locationId === l.id) && `${events.filter(e => e.locationId === l.id).length} event(s)`].filter(Boolean).join(' · ')}</small></button>
@@ -246,7 +251,7 @@ async function drawLocations() {
   box.innerHTML = `${partyHtml(locations, events)}
     <div class="dm-card-title"><span>📍 Locations</span></div>
     ${Object.entries(LOCATION_TYPES).map(([k, label]) => {
-      const here = withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort((a, b) => String(a.name).localeCompare(String(b.name))), locations);
+      const here = withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort((a, b) => String(a.name).localeCompare(String(b.name))), locations, folded);
       return `<div class="dm-nav-locgroup"><div class="dm-cs-group-title">${label} <small>${here.length}</small></div>
         ${here.map(({ l, depth }) => row(l, depth)).join('') || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
     }).join('')}
@@ -254,6 +259,8 @@ async function drawLocations() {
   box.querySelector('#navPartyAt').onchange = e => setPartyAt(e.target.value);
   box.querySelector('#navPartyBoard').onchange = e => saveParty({ ..._party, onBoard: e.target.checked });
   box.onclick = (e) => {
+    const fb = e.target.closest('[data-fold]');
+    if (fb) { toggleFold(NAV_FOLDED, fb.dataset.fold); drawLocations(); return; }
     const ev = e.target.closest('[data-event]');
     if (ev) { showEvent(events.find(x => x.id === ev.dataset.event), locations); return; }
     const party = e.target.closest('[data-party]');

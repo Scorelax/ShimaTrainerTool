@@ -80,6 +80,9 @@
   transition: opacity 0.25s;
 }
 .rmap-label.region.area { font-style: italic; color: #e9ffd9; }
+/* a region's name (the user's call, 2026-10-20): big and spaced out over its stretch of the island, like a painted map's */
+.rmap-label.region.realm { font-size: 0.85rem; letter-spacing: 4px; font-style: normal; max-width: 12em; color: rgba(255, 246, 222, 0.9);
+  text-shadow: 0 0 4px #1d1405, 0 1px 4px rgba(0, 0, 0, 0.85); }
 /* a route or a forest with an icon on its middle: the name just under the picture, like a town's (--below: half the
    icon's height on the screen) */
 .rmap-label.region.has-icon { translate: -50% calc(var(--below, 0px) + 2px); }
@@ -172,6 +175,7 @@
 .rmap.view-only .rmap-canvas { cursor: default; }
 .rmap.view-only .rmap-name { font-size: 0.79rem; padding: 2px 7px; }
 .rmap.view-only .rmap-label.region { font-size: 0.68rem; }
+.rmap.view-only .rmap-label.region.realm { font-size: 1.1rem; }
 .rmap.view-only .rmap-pin { width: 12px; height: 12px; }
 .rmap.view-only.painted .rmap-pin { width: 16px; height: 16px; }
 .rmap.view-only .rmap-spot { width: 16px; height: 16px; }

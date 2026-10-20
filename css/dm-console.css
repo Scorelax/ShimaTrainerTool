@@ -1516,6 +1516,10 @@ span.dm-trap-pick { cursor: default; }
 .dm-nav-locrow .dm-nav-loc { flex: 1; min-width: 0; }
 /* a location inside another, under it a step in (the user's call, 2026-10-20) */
 .dm-nav-locrow.sub { padding-left: calc(var(--depth, 1) * 0.9rem); }
+/* fold up what's inside a location (a region, a forest) */
+.dm-nav-fold { flex: none; width: 1.3rem; padding: 0; border: none; background: none; color: var(--dm-muted); font-size: 0.8rem; cursor: pointer; }
+button.dm-nav-fold:hover, .dm-world-fold:hover { color: var(--dm-gold); }
+.dm-world-fold { display: inline-block; width: 1rem; color: var(--dm-muted); cursor: pointer; }
 .dm-nav-subarrow, .dm-world-subarrow { color: var(--dm-muted); font-weight: 400; }
 .dm-pdx-row.dm-world-sub { padding-left: calc(0.4rem + var(--depth, 1) * 1rem); }
 .dm-nav-loc.lit { border-color: var(--dm-gold); background: rgba(255, 215, 0, 0.12); color: var(--dm-gold); }

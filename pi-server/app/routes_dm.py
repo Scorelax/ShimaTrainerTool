@@ -649,10 +649,10 @@ def save_admin_picture(payload):
 # The locations' icons (media.LOCATION_IMAGE_DIR, the user's call, 2026-10-20): "<LocationType>-<LocationName>.png".
 # The type as the file says it -> the Admin module's location type (Town and City are both a city).
 _ICON_TYPES = {'city': 'city', 'town': 'city', 'route': 'route', 'cave': 'cave', 'forest': 'forest',
-               'landmark': 'landmark', 'building': 'building'}   # (Landmark and Building: the user's call, 2026-10-20)
+               'landmark': 'landmark', 'building': 'building', 'region': 'region'}   # (Landmark and Building: the user's call, 2026-10-20)
 # ...and how a new one is named
 _ICON_TYPE_NAMES = {'city': 'City', 'route': 'Route', 'cave': 'Cave', 'forest': 'Forest', 'landmark': 'Landmark',
-                    'building': 'Building'}
+                    'building': 'Building', 'region': 'Region'}
 _ICON_EXTS = ('.png', '.webp', '.jpg', '.jpeg', '.gif')
 
 

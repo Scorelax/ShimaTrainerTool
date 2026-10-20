@@ -75,7 +75,7 @@ export async function currentMap({ fresh = false } = {}) {
 
 /** A major location (the user's call, 2026-10-20): its name shows on the map with the whole island in view; the others'
  * come in as it zooms in. Ticked by the DM on the location -- until then a city is, the rest aren't. */
-export const isMajor = l => (typeof l?.major === 'boolean' ? l.major : (l?.type || 'city') === 'city');
+export const isMajor = l => (typeof l?.major === 'boolean' ? l.major : ['city', 'region'].includes(l?.type || 'city'));
 
 // A location inside another (the user's call, 2026-10-20: a sawmill in Inex Woods, with its own mark and icon): it keeps
 // the id of the one it's part of (`parentId`; '' = picked "not part of another", missing = never set -- then marking it
@@ -101,14 +101,16 @@ export function isTopLocation(l, all) {
   return chain.length === 1 || !!parentOf(chain[chain.length - 1], all);
 }
 
-/** `tops` (in order) each followed by what's inside it, by name, nested -> [{ l, depth }]. */
-export function withInside(tops, all) {
+/** `tops` (in order) each followed by what's inside it, by name, nested -> [{ l, depth }]. `folded`: the ids of the
+ * ones folded up (what's inside them left out). */
+export function withInside(tops, all, folded = null) {
   const out = [];
   const seen = new Set();
   const walk = (l, depth) => {
     if (seen.has(l.id)) return;
     seen.add(l.id);
     out.push({ l, depth });
+    if (folded?.has(l.id)) return;
     all.filter(x => parentOf(x, all) === l).sort((a, b) => String(a.name).localeCompare(String(b.name))).forEach(x => walk(x, depth + 1));
   };
   tops.forEach(l => walk(l, 0));

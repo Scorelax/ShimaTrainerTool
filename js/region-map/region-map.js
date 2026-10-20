@@ -74,7 +74,12 @@ function graphicsInfo() {
   }
 }
 
-export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null } = {}) {
+export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false } = {}) {
+  // `turned` (the DM's PokeNav, the user's call, 2026-10-20): this screen is the table's 16:9 board screen seen from the
+  // players' side -- portrait, a quarter turn round. The views it sends and takes stay the board's own (its azimuth and
+  // zoom); only this screen shows them turned, and as far back as the board's long side needs.
+  const TURN = turned ? -Math.PI / 2 : 0;
+  const BOARD_LONG = 16 / 9;
   root.classList.add('rmap');
   root.classList.toggle('view-only', viewOnly); // nothing to press or drag: it follows setView
   let style = 'topo';
@@ -312,20 +317,30 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function getView() {
     if (!land) return null;
     const t = controls.target;
+    const dist = camera.position.distanceTo(t);
     return {
       x: round(t.x + land.W / 2, 1), y: round(t.z + land.H / 2, 1),
-      zoom: round(camera.position.distanceTo(t) / land.fit, 4),
-      polar: round(controls.getPolarAngle(), 4), azimuth: round(controls.getAzimuthalAngle(), 4), style,
+      zoom: round(turned ? dist / BOARD_LONG / boardFit() : dist / land.fit, 4),
+      polar: round(controls.getPolarAngle(), 4), azimuth: round(wrapAngle(controls.getAzimuthalAngle() - TURN), 4), style,
     };
+  }
+
+  /** What a zoom of 1 is on the board screen itself (16:9) -- a turned screen's views are in its terms. */
+  function boardFit() {
+    const aspect = camera.aspect;
+    camera.aspect = 16 / 9;
+    const fit = fitFor(0);
+    camera.aspect = aspect;
+    return fit;
   }
 
   /** The view as camera numbers for this screen. */
   function goalOf(view) {
     return {
       target: new THREE.Vector3(Number(view.x) - land.W / 2, 0, Number(view.y) - land.H / 2),
-      dist: Math.max(controls.minDistance, Math.min(controls.maxDistance, Number(view.zoom) * land.fit)),
+      dist: Math.max(controls.minDistance, Math.min(controls.maxDistance, Number(view.zoom) * (turned ? boardFit() * BOARD_LONG : land.fit))),
       polar: Math.max(0, Math.min(controls.maxPolarAngle, Number(view.polar))),
-      azimuth: wrapAngle(Number(view.azimuth)),
+      azimuth: wrapAngle(Number(view.azimuth) + TURN),
     };
   }
 

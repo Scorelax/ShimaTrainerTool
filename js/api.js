@@ -956,6 +956,11 @@ export class CombatAPI {
     return API.request('combat', 'apply-status', { targetId, status: JSON.stringify(status) }, { useCache: false });
   }
 
+  /** A custom status condition's popup closed (routes_combat.py's statusNotices). */
+  static async dismissNotice(id) {
+    return API.request('combat', 'dismiss-notice', { id }, { useCache: false });
+  }
+
   /** Removes one live effect by its id (a passed save, a manual cure...). */
   static async removeStatus(targetId, statusId, reason = '') {
     commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
@@ -1542,6 +1547,11 @@ export class DmAPI {
 
   /** A move from the move list taught to a player's Pokemon for good -- one it hasn't learned yet or can't normally
    * learn (its custom moves, like Edit Pokemon's) -- or with `forget`, one taken away. */
+  /** A player's Pokemon's hit / vitality die set by the DM (4, 6, 8, 10, 12, 20) -- kept when it evolves. */
+  static async setPokemonDice(trainer, pokemon, { hitDie, vitalityDie }) {
+    return API.request('dm', 'pokemon-dice', { trainer, pokemon, hitDie, vitalityDie }, { useCache: false });
+  }
+
   static async giveMove(trainer, pokemon, move, { forget = false } = {}) {
     return API.request('dm', 'give-move', { trainer, pokemon, move, ...(forget ? { forget: '1' } : {}) }, { useCache: false });
   }
@@ -1583,6 +1593,11 @@ export class DmAPI {
   /** Every battle's log on the Pi, newest first -> [{file, kind, started, ended, rounds, entries, who, players, name, caught}]. */
   static async adminBattleLogs() {
     return (await API.request('dm', 'admin-battle-logs', {}, { useCache: false })).data || [];
+  }
+
+  /** A picture for an event or a location (the Admin module) -> {url}. */
+  static async adminPicture(data) {
+    return (await DmAPI._post('admin-picture', { data }, 'Uploading the picture')).data;
   }
 
   /** The DM's name for a battle (an empty one: back to its players and date). */

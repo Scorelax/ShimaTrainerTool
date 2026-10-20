@@ -6,7 +6,7 @@
 import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
-import { escapeHtml, typeBadges, toast, attachSuggest, stepperHtml } from './dm-common.js';
+import { escapeHtml, typeBadges, toast, attachSuggest, stepperHtml, openDmModal } from './dm-common.js';
 import { xpOrStart, xpPanelHtml, xpButtonHtml, giveXpPopup } from './xp.js';
 import { givePokemonPopup } from './give-pokemon.js';
 import { pickMoves } from './move-picker.js';
@@ -66,6 +66,8 @@ function draw() {
 
 const num = (v, d = 0) => (Number.isFinite(parseInt(v, 10)) ? parseInt(v, 10) : d);
 const sign = n => (n >= 0 ? `+${n}` : `${n}`);
+/** The DM's change to its dice (" · +2 on the hit die"), kept when it evolves. */
+const diceBonusText = p => Object.entries(p.diceBonus || {}).filter(([, v]) => Number(v)).map(([k, v]) => ` <small class="dm-hint">(${sign(Number(v))} on the ${k === 'hitDie' ? 'hit' : 'vitality'} die, kept on evolving)</small>`).join('');
 const pct = (cur, max) => (max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0);
 // A trainer's current HP / VP (the max where none is stored)
 const curHP = t => num(t.current?.hp ?? t.combat?.maxHP);
@@ -253,7 +255,8 @@ function pokemonRowHtml(trainer, p, xp) {
           ${STATS.map((s, i) => { const v = num(p.stats?.[STAT_NAMES[i]], 10); return cell(s, `${v} <small>${sign(num(p.modifiers?.[STAT_NAMES[i]], Math.floor((v - 10) / 2)))}</small>`); }).join('')}
         </div>
         ${line('Held item', p.heldItem)}${line('Status', (p.statusConditions || []).join(', '))}${line('Size', p.size)}${line('Speed', speedLine(p))}
-        ${line('Saving throws', (p.savingThrows || []).join(', '))}${line('Skills', (p.skills || []).join(', '))}${line('Expertise', (p.expertise || []).join(', '))}${line('Hit / vitality dice', `d${c.hitDie || '?'} / d${c.vitalityDie || '?'}`)}
+        ${line('Saving throws', (p.savingThrows || []).join(', '))}${line('Skills', (p.skills || []).join(', '))}${line('Expertise', (p.expertise || []).join(', '))}<div class="dm-tline"><span>Hit / vitality dice</span><span>d${escapeHtml(c.hitDie || '?')} / d${escapeHtml(c.vitalityDie || '?')}${diceBonusText(p)}
+          <button class="dm-btn small" data-dice="${escapeHtml(p.name)}" title="Change its hit or vitality die -- the change stays when it evolves">✎ Change</button></span></div>
         ${line('Feats', (p.feats || []).join(', '))}${line('Gear', p.gear)}${line('Evolution', evolutionLine(p))}
         ${abilitiesOf(p).map(a => `<div class="dm-tline"><span>Ability</span><span><strong>${escapeHtml(a.name)}</strong>${a.description ? ` -- ${escapeHtml(a.description)}` : ''}</span></div>`).join('')}
         <div class="dm-tline"><span>Moves</span><span class="dm-move-chips">${movesKnown(p).map(m => ((p.customMoves || []).includes(m)
@@ -351,6 +354,26 @@ function wireTrainer(name, items) {
     const picked = await pickMoves({ title: `💥 Teach ${pokemonName(mon)} a move`, exclude: movesKnown(mon) });
     if (!picked?.length) return;
     run(async () => { for (const m of picked) await DmAPI.giveMove(name, mon.name, m); }, `${pokemonName(mon)} learned ${picked.join(', ')}`);
+  }));
+  // Its hit / vitality die by hand (the user's call, 2026-10-20) -- kept as a change from its species' die, so it carries
+  // on when it evolves (routes_dm.set_pokemon_dice, owned.apply_dice_bonus)
+  _root.querySelectorAll('[data-dice]').forEach(b => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const mon = _party.find(x => x.trainer.name === name)?.pokemon.find(x => x.name === b.dataset.dice);
+    if (!mon) return;
+    const sizes = [4, 6, 8, 10, 12, 20];
+    const pick = (id, cur) => `<select class="dm-select" id="${id}">${sizes.map(d => `<option value="${d}" ${Number(cur) === d ? 'selected' : ''}>d${d}</option>`).join('')}</select>`;
+    const out = await openDmModal({
+      title: `🎲 ${pokemonName(mon)}'s dice`,
+      html: `<div class="dm-row">
+          <div class="dm-field"><label for="diceHd">Hit die</label>${pick('diceHd', mon.combat?.hitDie)}</div>
+          <div class="dm-field"><label for="diceVd">Vitality die</label>${pick('diceVd', mon.combat?.vitalityDie)}</div></div>
+        <div class="dm-hint">Its max HP and VP follow. The change from its species' own die stays when it evolves -- a d6 made a d8 is +2, so an evolution with a d8 gets a d10.</div>`,
+      buttons: [{ label: 'Cancel', value: null }, { label: 'Save', kind: 'primary', keepOpen: true, value: true,
+        onClick: (body) => { b._dice = { hitDie: body.querySelector('#diceHd').value, vitalityDie: body.querySelector('#diceVd').value }; return true; } }],
+    });
+    if (!out || !b._dice) return;
+    run(() => DmAPI.setPokemonDice(name, mon.name, b._dice), `${pokemonName(mon)}: d${b._dice.hitDie} hit die, d${b._dice.vitalityDie} vitality die`);
   }));
   _root.querySelectorAll('[data-forget-move]').forEach(b => b.addEventListener('click', (e) => {
     e.stopPropagation();

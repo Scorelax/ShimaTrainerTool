@@ -101,6 +101,11 @@ DISPLAY_IMAGE_DIR = os.path.expanduser(
     os.environ.get('DISPLAY_IMAGE_DIR', '~/pokemon-dnd/images/display-images'))
 DISPLAY_IMAGE_URL_PREFIX = '/display-images/'
 
+# Pictures for the Admin module's events and locations (the user's call, 2026-10-20) -- a new random name each, so a URL
+# never shows different content (cached hard, see main.py). Served at /admin-images/.
+ADMIN_IMAGE_DIR = os.path.expanduser(os.environ.get('ADMIN_IMAGE_DIR', '~/pokemon-dnd/images/admin'))
+ADMIN_IMAGE_URL_PREFIX = '/admin-images/'
+
 # The item pictures (the user's call, 2026-10-19): named after the item itself, "Frost Ball.png" -- the user adds them by
 # hand, and the DM console's Admin module uploads them the same way (admin.save_item_image). Served at /item-images/.
 ITEM_IMAGE_DIR = os.path.expanduser(os.environ.get('ITEM_IMAGE_DIR', '~/pokemon-dnd/images/items'))

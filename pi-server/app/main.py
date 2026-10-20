@@ -40,7 +40,7 @@ db.init()
 # ever go stale, nothing to manually clear.
 _VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', media.CHARACTER_IMAGE_URL_PREFIX,
                              media.DISPLAY_IMAGE_URL_PREFIX, media.POKEMON_IMAGE_URL_PREFIX,
-                             media.NPC_IMAGE_URL_PREFIX, sprite_previews.SPRITE_PREVIEW_URL_PREFIX)
+                             media.NPC_IMAGE_URL_PREFIX, media.ADMIN_IMAGE_URL_PREFIX, sprite_previews.SPRITE_PREVIEW_URL_PREFIX)
 
 # The splashes, badges and the bundled PWA assets aren't stamped with a
 # version (their filenames stay constant even when the content behind them
@@ -321,6 +321,12 @@ def dm_admin_battle_log_name(payload: dict):
     return _admin(lambda: admin.rename_battle_log(payload.get('file'), payload.get('name')))
 
 
+@app.post('/api/dm/admin-picture')
+def dm_admin_picture(payload: dict):
+    """A picture for an event or a location in the Admin module ({data}) -> {url}."""
+    return _admin(lambda: routes_dm.save_admin_picture(payload))
+
+
 @app.post('/api/dm/npc-image')
 def dm_save_npc_image(payload: dict):
     """A picture for an NPC uploaded from the DM's computer, into the NPC pictures folder (routes_dm.save_npc_image)."""
@@ -454,6 +460,7 @@ mimetypes.add_type('image/jpeg', '.jfif')
 for _folder, _prefix, _name in ((media.POKEMON_IMAGE_DIR, media.POKEMON_IMAGE_URL_PREFIX, 'pokemon-images'),
                                 (media.NPC_IMAGE_DIR, media.NPC_IMAGE_URL_PREFIX, 'npc-images'),
                                 (media.ITEM_IMAGE_DIR, media.ITEM_IMAGE_URL_PREFIX, 'item-images'),
+                                (media.ADMIN_IMAGE_DIR, media.ADMIN_IMAGE_URL_PREFIX, 'admin-images'),
                                 (media.BADGE_DIR, media.BADGE_URL_PREFIX, 'badges'),
                                 (media.SPLASH_DIR, media.SPLASH_URL_PREFIX, 'splashes')):
     os.makedirs(_folder, exist_ok=True)

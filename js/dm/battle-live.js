@@ -18,7 +18,7 @@ import { CombatAPI, DmAPI, GameDataAPI, setHideBattleLog } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { VISIBILITY_DEFAULTS } from '../utils/combat-visibility.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { renderCombatWip, attachCombatWipListeners, startDmPlacement, setOnDmFocusChange, setDmMapOpener, focusParticipant, forgetLocalCombatant } from '../pages/combat-wip.js';
+import { renderCombatWip, attachCombatWipListeners, startDmPlacement, setOnDmFocusChange, setDmMapOpener, focusParticipant, forgetLocalCombatant, setDmEventsTab, refreshDmEventsTab } from '../pages/combat-wip.js';
 import { showBattleMap, hideBattleMap } from '../utils/battle-map-popup.js';
 import { footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
 import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemon, natureOptions, openDmModal, abilityMod } from './dm-common.js';
@@ -33,6 +33,9 @@ import { loadScene, getScene, updateScene, onSceneChange } from './display-store
 import { renderEncounters, monConfig } from './encounters.js';
 import { pickMoves } from './move-picker.js';
 import { openPicker } from './picker.js';
+import { loadStatusConditions, loadEvents } from './admin-world.js';
+import { describeTrigger } from '../utils/custom-status.js';
+import { CONDITION_RULES } from '../utils/condition-rules.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
 let species = [];
@@ -57,6 +60,8 @@ export async function mountLive(stageEl, toolsEl, currentSession) {
   getSpecies().then(list => { species = list; renderSpeciesResults(); }).catch(() => {});
   lastRound = session.started ? Number(session.round) || 1 : null;
   DmAPI.getState('encounter-run').then((r) => { run = r; if (run) run.eventState = run.eventState || {}; renderEncounterCard(); }).catch(() => {});
+  setDmEventsTab({ state: remindersState, open: openReminders });
+  loadReminders();
 }
 
 export function updateLive(currentSession) {
@@ -65,9 +70,154 @@ export function updateLive(currentSession) {
   checkTraps();
   renderCreatures();
   const round = session.started ? Number(session.round) || 1 : null;
-  if (round !== null && lastRound !== null && round > lastRound) newRound(round);
+  if (round !== null && lastRound !== null && round > lastRound) { newRound(round); remindersNewRound(round); }
   if (round !== null) lastRound = round;
   renderEncounterCard();
+  if (reminders && reminders.logFile !== (session.logFile || '')) loadReminders(); // another battle
+  else renderReminders();
+}
+
+// ---------------------------------------------------------------------------
+// The DM's reminders for this battle (the user's call, 2026-10-20): the Events tab at the end of the turn order (only
+// the DM's screen has it, combat-wip.js's setDmEventsTab) and the ⏰ Reminders card here -- things to remember to happen
+// in the fight, picked from the Admin module's Events or made on the spot, each with a countdown in rounds that pops up
+// when it runs out. Kept on the Pi ('battle-reminders') for this battle (its log file); a new battle starts empty.
+// ---------------------------------------------------------------------------
+
+let reminders = null; // {logFile, list: [{id, title, description, rounds, startRound, eventId, firedAt, done}]}
+let remSaveTimer = null;
+
+async function loadReminders() {
+  const logFile = session.logFile || '';
+  const saved = await DmAPI.getState('battle-reminders').catch(() => null);
+  reminders = saved && saved.logFile === logFile && Array.isArray(saved.list) ? saved : { logFile, list: [] };
+  renderReminders();
+}
+
+function saveRemindersSoon() {
+  clearTimeout(remSaveTimer);
+  remSaveTimer = setTimeout(() => DmAPI.saveState('battle-reminders', reminders).catch(err => toast(`Couldn't save the reminders: ${err.message}`)), 400);
+}
+
+const roundNow = () => (session.started ? Number(session.round) || 1 : 1);
+const remDue = r => (Number(r.startRound) || 1) + (Number(r.rounds) || 0);
+const remIsDue = r => !r.done && Number(r.rounds) > 0 && roundNow() >= remDue(r) && session.started;
+
+function remStatus(r) {
+  if (r.done) return 'Done';
+  if (!(Number(r.rounds) > 0)) return 'No countdown';
+  if (remIsDue(r)) return r.firedAt ? `Due since round ${r.firedAt}` : 'Due now!';
+  const left = remDue(r) - roundNow();
+  return `In ${left} round${left === 1 ? '' : 's'} (round ${remDue(r)})`;
+}
+
+/** What the turn order's Events tile shows: how many are waiting, one due, the soonest countdown. */
+function remindersState() {
+  const open = (reminders?.list || []).filter(r => !r.done);
+  const counting = open.filter(r => Number(r.rounds) > 0 && !remIsDue(r)).map(r => remDue(r) - roundNow());
+  return { count: open.length, due: open.some(remIsDue), next: counting.length ? Math.min(...counting) : null };
+}
+
+function remindersNewRound(round) {
+  if (!reminders) return;
+  const due = reminders.list.filter(r => !r.done && !r.firedAt && Number(r.rounds) > 0 && round >= remDue(r));
+  due.forEach((r) => { r.firedAt = round; });
+  if (!due.length) return;
+  saveRemindersSoon();
+  showCombatAlert(due.map(r => `⏰ ${r.title}${r.description ? `\n${r.description}` : ''}`).join('\n\n'), { title: `Round ${round}: ${due.length > 1 ? 'reminders' : 'a reminder'} due` });
+}
+
+function remindersHtml() {
+  const list = reminders?.list || [];
+  return `${list.map(r => `
+    <div class="dm-live-evt${r.done ? ' done' : ''}${remIsDue(r) ? ' due' : ''}" data-rem="${escapeHtml(r.id)}" title="${escapeHtml(r.description || '')}">
+      <div class="dm-live-evt-top"><span>⏰ <strong>${escapeHtml(r.title || 'Reminder')}</strong></span><span class="dm-live-evt-status">${escapeHtml(remStatus(r))}</span></div>
+      ${r.description ? `<div class="dm-hint dm-rem-desc">${escapeHtml(r.description)}</div>` : ''}
+      <div class="dm-live-evt-btns">
+        ${!r.done && Number(r.rounds) > 0 ? `<button class="dm-btn small" data-rem-act="later" title="One more round on the countdown">＋1 round</button>` : ''}
+        <button class="dm-btn small" data-rem-act="done">${r.done ? '↺ Bring back' : '✓ Done'}</button>
+        <button class="dm-icon-btn danger" data-rem-act="delete" title="Delete it">✕</button>
+      </div>
+    </div>`).join('') || '<div class="dm-hint">No reminders for this battle yet.</div>'}
+    <div class="dm-row" style="margin-top:0.5rem"><button class="dm-btn small primary" data-rem-act="new">＋ Reminder</button></div>`;
+}
+
+function renderReminders() {
+  refreshDmEventsTab();
+  const el = document.getElementById('dmRemCard');
+  if (!el || !reminders) return;
+  el.innerHTML = `<div class="dm-card-title"><span>⏰ Reminders</span><span class="dm-pill ${remindersState().due ? 'warn' : 'ok'}">Only you</span></div>${remindersHtml()}`;
+  if (!el.dataset.bound) {
+    el.dataset.bound = '1';
+    el.addEventListener('click', onReminderClick);
+  }
+  const modal = document.getElementById('dmRemModal');
+  if (modal) modal.innerHTML = remindersHtml();
+}
+
+async function onReminderClick(e) {
+  const act = e.target.closest('[data-rem-act]')?.dataset.remAct;
+  if (!act || !reminders) return;
+  if (act === 'new') { await newReminder(); return; }
+  const r = reminders.list.find(x => x.id === e.target.closest('[data-rem]')?.dataset.rem);
+  if (!r) return;
+  if (act === 'done') { r.done = !r.done; if (!r.done && remIsDue(r)) r.firedAt = null; }
+  else if (act === 'later') { // one round later than now, if it's already due
+    r.rounds = Math.max(Number(r.rounds) || 0, roundNow() - (Number(r.startRound) || 1)) + 1;
+    r.firedAt = null;
+  }
+  else if (act === 'delete') reminders.list.splice(reminders.list.indexOf(r), 1);
+  saveRemindersSoon();
+  renderReminders();
+}
+
+/** The turn order's Events tile: the reminders in a popup. */
+function openReminders() {
+  if (!reminders) return;
+  openDmModal({
+    title: '📅 Events in this battle',
+    html: `<div class="dm-hint" style="margin-bottom:0.5rem">Only you see these. The countdown is in rounds -- you get a popup when one runs out.</div><div id="dmRemModal">${remindersHtml()}</div>`,
+    onOpen: (body) => body.addEventListener('click', onReminderClick),
+  });
+}
+
+async function newReminder() {
+  const events = await loadEvents().catch(() => []);
+  const draft = { title: '', description: '', rounds: 3, eventId: '' };
+  const ok = await openDmModal({
+    title: '⏰ New reminder',
+    html: `<div class="dm-edit-form">
+      ${events.length ? '<button type="button" class="dm-btn small" id="remFromEvent">📅 From your Events…</button>' : '<div class="dm-hint">Events you make in the Admin module (📅 Events) can be picked here.</div>'}
+      <div class="dm-field"><label for="remTitle">What</label><input class="dm-input" id="remTitle" maxlength="120" placeholder="The bridge collapses"></div>
+      <div class="dm-field"><label for="remDesc">Notes</label><textarea class="dm-input" id="remDesc" rows="3" placeholder="Optional"></textarea></div>
+      <div class="dm-field"><label for="remRounds">In how many rounds</label><input class="dm-input" id="remRounds" type="number" min="0" max="99" value="3">
+        <div class="dm-hint">0: no countdown -- just a note to keep in mind.</div></div></div>`,
+    buttons: [{ label: 'Cancel', value: false }, { label: 'Add it', value: true, kind: 'primary', keepOpen: true, onClick: (body) => {
+      draft.title = body.querySelector('#remTitle').value.trim();
+      draft.description = body.querySelector('#remDesc').value.trim();
+      draft.rounds = Math.max(0, parseInt(body.querySelector('#remRounds').value, 10) || 0);
+      if (!draft.title) { body.querySelector('#remTitle').focus(); return false; }
+      return true;
+    } }],
+    onOpen: (body) => {
+      body.querySelector('#remTitle').focus();
+      body.querySelector('#remFromEvent')?.addEventListener('click', async () => {
+        const pick = await openPicker({
+          title: '📅 Pick an event',
+          items: events.map(ev => ({ key: ev.id, label: ev.title || 'Untitled event', sub: [ev.timeframe, ev.trigger].filter(Boolean).join(' · '), image: ev.image || '', search: `${ev.title} ${ev.description} ${ev.trigger} ${ev.timeframe}` })),
+        });
+        const ev = events.find(x => x.id === pick?.keys?.[0]);
+        if (!ev) return;
+        draft.eventId = ev.id;
+        body.querySelector('#remTitle').value = ev.title || '';
+        body.querySelector('#remDesc').value = [ev.description, ev.trigger && `Trigger: ${ev.trigger}`].filter(Boolean).join('\n');
+      });
+    },
+  });
+  if (!ok) return;
+  reminders.list.push({ id: `rem-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, ...draft, startRound: roundNow(), firedAt: null, done: false });
+  saveRemindersSoon();
+  renderReminders();
 }
 
 // ---------------------------------------------------------------------------
@@ -358,6 +508,7 @@ function renderVisibilityColumn(focusId, currentSession) {
       <div class="dm-vis" data-id="${p.id}">
         <div class="dm-vis-title">${escapeHtml(p.owner)}'s ${isMon ? 'Pokémon' : 'trainer'}</div>
         <div class="dm-vis-actions">
+          <button class="dm-btn small" data-pl-act="status" title="A status condition on it -- the rulebook's, or your own">🌀 Status</button>
           ${isMon ? `<button class="dm-btn small" data-pl-act="teach" title="A move it hasn't learned yet, or can't normally learn -- it keeps it after the battle">💥 Teach a move</button>`
             : `<button class="dm-btn small" data-pl-act="item" title="Straight into their bag -- from the item list, or one of your own">🎒 Give an item</button>`}
         </div>
@@ -366,6 +517,7 @@ function renderVisibilityColumn(focusId, currentSession) {
       </div>`;
     el.querySelector('[data-pl-act="teach"]')?.addEventListener('click', () => teachPlayerMove(session.participants[p.id] || p));
     el.querySelector('[data-pl-act="item"]')?.addEventListener('click', () => giveTrainerItem(p.owner));
+    el.querySelector('[data-pl-act="status"]')?.addEventListener('click', () => giveStatus([p.id]));
     return;
   }
   if (!p || p.owner !== DM) {
@@ -383,6 +535,7 @@ function renderVisibilityColumn(focusId, currentSession) {
         ${p.combatantType === 'pokemon' && p.speciesName ? '<button class="dm-btn small" data-vis-act="pokedex" title="Show what the players\' Pokédex already knows about its species">📖 Pokédex</button>' : ''}
         <button class="dm-btn small" data-vis-act="none" title="Untick everything -- only its picture shows">Only picture</button>
         <button class="dm-btn small" data-vis-act="edit" title="Change its level, stats, abilities, moves...">✏️ Edit</button>
+        <button class="dm-btn small" data-vis-act="status" title="A status condition on it -- the rulebook's, or your own">🌀 Status</button>
       </div>
       ${p.combatantType === 'pokemon' ? `<label class="dm-vis-row dm-vis-catch" title="A Poké Ball on its card -- click it when a player throws one: the capture DC, and register it to the trainer">
         <input type="checkbox" data-catchable ${p.catchable ? 'checked' : ''}><span>🔴 Catchable<small>Only you see this</small></span></label>` : ''}
@@ -407,6 +560,7 @@ function renderVisibilityColumn(focusId, currentSession) {
       .catch(err => showCombatAlert(err.message, { title: p.name }));
   });
   el.querySelector('[data-vis-act="edit"]').addEventListener('click', () => openEditCreature(session.participants[p.id] || p));
+  el.querySelector('[data-vis-act="status"]').addEventListener('click', () => giveStatus([p.id]));
   el.querySelectorAll('[data-vis]').forEach(cb => cb.addEventListener('change', async () => {
     try {
       await CombatAPI.setVisibility(p.id, cb.dataset.vis, cb.checked);
@@ -430,11 +584,14 @@ function renderTools(el) {
         <button class="dm-btn" id="dmEditMap" title="Change the map, move any creature -- any time, whoever's turn it is">✏️ Edit map</button>
       </div>
       <button class="dm-btn wide" id="dmGiveTurn" style="margin-top:0.5rem" title="Any creature takes a turn now -- then the turn order carries on where it was">🎯 Give a turn…</button>
+      <button class="dm-btn wide" id="dmGiveStatus" style="margin-top:0.5rem" title="A status condition on any creatures in the battle -- the rulebook's, or your own from the Admin module">🌀 Give a status…</button>
       <label class="dm-check" style="margin-top:0.5rem"><input type="checkbox" id="dmShowBattle" checked>
         <span>Show the battle on the display screen <small>Untick for the display's regular screen (the Display module's scene) meanwhile -- tick to bring the battle back.</small></span></label>
     </div>
 
     <div class="dm-card" id="dmEncCard" hidden></div>
+
+    <div class="dm-card" id="dmRemCard"></div>
 
     <div class="dm-card">
       <div class="dm-card-title">
@@ -485,6 +642,7 @@ function renderTools(el) {
   document.getElementById('dmCreatures').addEventListener('click', onCreatureAction);
   document.getElementById('dmEditMap').addEventListener('click', () => showLiveTab('map', { mode: 'edit' }));
   document.getElementById('dmGiveTurn').addEventListener('click', giveTurn);
+  document.getElementById('dmGiveStatus').addEventListener('click', () => giveStatus());
   // The display screen: this battle on it, or the regular scene (display-scene.js's hideBattle -- just this battle).
   const showBox = document.getElementById('dmShowBattle');
   const syncShowBox = () => { if (showBox.isConnected) showBox.checked = !(getScene().hideBattle && getScene().hideBattle === session?.logFile); };
@@ -541,6 +699,7 @@ export function showLiveTab(tab = liveTab, { mode = null, selectId = null } = {}
 
 /** The battle is over (dm-console.js): the map goes back to being a popup, and the tabs start on Battle next time. */
 export function leaveLive() {
+  setDmEventsTab(null);
   hideBattleMap();
   setHideLog(false);
   setDmMapOpener(null);
@@ -612,6 +771,56 @@ async function giveTurn() {
   } catch (err) {
     showCombatAlert(err.message, { title: 'Give a turn' });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Give a status (the user's call, 2026-10-20): any status condition on any creatures in play -- the rulebook's, or the
+// DM's own from the Admin module's Status conditions tab (its trigger and effect go with it, routes_combat.py's
+// _custom_status_point). `ids`: the creatures already picked (a creature's own 🌀 Status); none -> pick them after.
+// ---------------------------------------------------------------------------
+
+const ruleName = k => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+async function giveStatus(ids = null) {
+  if (!session?.active) return;
+  const custom = await loadStatusConditions({ complete: true }).catch(() => []);
+  const pick = await openPicker({
+    title: '🌀 Give a status',
+    hint: 'Your own status conditions (the Admin module) first, then the rulebook\'s.',
+    items: [
+      ...custom.map(d => ({ key: `c:${d.id}`, label: `🌀 ${d.name}`, sub: describeTrigger(d), search: `${d.name} ${d.description}` })),
+      ...Object.entries(CONDITION_RULES).map(([k, r]) => ({ key: `r:${k}`, label: `📖 ${ruleName(k)}`, sub: String(r.summary || '').slice(0, 90), search: `${k} ${r.summary || ''}` }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    ],
+  });
+  const key = pick?.keys?.[0];
+  if (!key) return;
+  const def = key.startsWith('c:') ? custom.find(d => `c:${d.id}` === key) : null;
+  const spec = def
+    ? { kind: 'condition', apply: def.name, note: def.description,
+      custom: { trigger: def.trigger, turns: def.turns, recurring: !!def.recurring, effect: def.effect || '', amount: def.amount || 0, description: def.description } }
+    : { kind: 'condition', apply: key.slice(2) };
+  let targets = ids;
+  if (!targets?.length) {
+    const inPlay = orderedParticipants().filter(p => p.status === 'participating');
+    const who = await openPicker({
+      title: `Who gets ${def ? def.name : ruleName(key.slice(2))}?`,
+      multi: true,
+      items: inPlay.map(p => ({ key: p.id, label: p.name, sub: p.owner === DM ? 'Yours' : p.owner || '', image: p.image, search: `${p.name} ${p.owner || ''}` })),
+    });
+    targets = who?.keys || [];
+  }
+  if (!targets.length) return;
+  const done = [];
+  for (const id of targets) {
+    try {
+      await CombatAPI.applyStatus(id, spec);
+      done.push(session.participants[id]?.name || 'it');
+    } catch (err) {
+      showCombatAlert(err.message, { title: session.participants[id]?.name || 'Give a status' });
+    }
+  }
+  if (done.length) toast(`${def ? def.name : ruleName(key.slice(2))}: ${done.join(', ')}${def ? ` -- ${describeTrigger(def)}` : ''}.`);
 }
 
 // ---------------------------------------------------------------------------

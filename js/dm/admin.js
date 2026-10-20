@@ -14,9 +14,10 @@ import { prepareImage } from './display.js';
 import { loadMoves } from './move-picker.js';
 import { openPicker } from './picker.js';
 import { forgetMapAssets } from './map-editor.js';
+import { drawEvents, drawLocations, drawStatuses, setWorldNav } from './admin-world.js';
 
 const TAB_KEY = 'dmAdminTab';
-const TABS = ['items', 'species', 'pictures', 'splashes', 'logs'];
+const TABS = ['items', 'species', 'pictures', 'splashes', 'logs', 'events', 'locations', 'statuses'];
 const MOVE_LEVELS = ['1', '2', '6', '10', '14', '18'];
 const MOVEMENT = ['walking', 'climbing', 'flying', 'hovering', 'swimming', 'burrowing'];
 const SENSES = ['sight', 'hearing', 'smell', 'tremorsense', 'echolocation', 'telepathy', 'blindsight', 'darkvision', 'truesight'];
@@ -44,6 +45,9 @@ export function renderAdmin(section) {
         <button data-atab="pictures">🌲 Map pictures</button>
         <button data-atab="splashes">🖼️ Splash screens</button>
         <button data-atab="logs">📜 Battle logs</button>
+        <button data-atab="events">📅 Events</button>
+        <button data-atab="locations">📍 Locations</button>
+        <button data-atab="statuses">🌀 Status conditions</button>
       </div>
       <div class="dm-admin-body" id="admBody"></div>
     </div>`;
@@ -51,6 +55,7 @@ export function renderAdmin(section) {
     const b = e.target.closest('[data-atab]');
     if (b) showTab(b.dataset.atab);
   });
+  setWorldNav(showTab);
   showTab(_tab);
 }
 
@@ -64,6 +69,9 @@ function showTab(name) {
   else if (name === 'species') drawSpecies(body);
   else if (name === 'pictures') drawMapPictures(body);
   else if (name === 'logs') drawBattleLogs(body);
+  else if (name === 'events') drawEvents(body);
+  else if (name === 'locations') drawLocations(body);
+  else if (name === 'statuses') drawStatuses(body);
   else drawSplashes(body);
 }
 

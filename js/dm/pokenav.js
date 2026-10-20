@@ -9,13 +9,17 @@
 // the tabs' right, picks which one the board shows; picking the adventure map starts the adventure if it isn't running.
 import { CombatAPI, DmAPI } from '../api.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
-import { escapeHtml, toast } from './dm-common.js';
+import { escapeHtml, toast, openDmModal } from './dm-common.js';
+import { loadLocations, loadEvents, LOCATION_TYPES } from './admin-world.js';
 import { renderAdventure, startAdventure } from './adventure.js';
 
 const SEND_EVERY_MS = 120;
 const SAVE_EVERY_MS = 1000;
 const SETTLED_MS = 600;   // no move for this long: it has come to rest, store where
-const HOME_AZIMUTH = Math.PI / 2; // the default view: north to the right, the way the battle maps lie
+// The default view (in this screen's terms): north up. The DM's screen is the board screen turned a quarter, the way the
+// players see it from their side of the table (the user's call, 2026-10-20) -- on the board itself north is to the
+// right, the way the battle maps lie (region-map.js's `turned`).
+const HOME_AZIMUTH = 0;
 
 let _section = null;
 let _map = null;
@@ -33,7 +37,7 @@ let _tab = 'region';
 
 export async function renderPokenav(section, { session } = {}) {
   _session = session;
-  if (_section === section) { renderStatus(); if (_tab === 'adventure') showTab('adventure'); return; }
+  if (_section === section) { renderStatus(); drawLocations(); if (_tab === 'adventure') showTab('adventure'); return; }
   _section = section;
   try { _tab = localStorage.getItem(TAB_KEY) === 'adventure' ? 'adventure' : 'region'; } catch (e) { /* the default */ }
   section.innerHTML = `
@@ -53,7 +57,10 @@ export async function renderPokenav(section, { session } = {}) {
           <span class="dm-pill" id="navStatus"></span>
           <span class="dm-pill todo" id="navSlow" hidden></span>
         </div>
-        <div class="dm-nav-frame"><div class="dm-nav-screen"><div id="navMap"></div></div></div>
+        <div class="dm-nav-body">
+          <div class="dm-nav-frame"><div class="dm-nav-screen" title="The table's board screen, the way the players see it from their side"><div id="navMap"></div></div></div>
+          <aside class="dm-nav-locs" id="navLocations"><div class="dm-loading">Loading…</div></aside>
+        </div>
       </div>
       <div class="dm-adv-module" id="navAdventureView" hidden></div>
     </div>`;
@@ -64,13 +71,14 @@ export async function renderPokenav(section, { session } = {}) {
   section.querySelector('#navOnScreen').addEventListener('change', (e) => pickOnScreen(e.target.value));
   showTab(_tab);
   renderStatus();
+  drawLocations();
   try {
     const [{ mountRegionMap }, saved] = await Promise.all([
       import('../region-map/region-map.js'),
       DmAPI.getState('region-map-view').catch(() => null),
     ]);
     // Turned a quarter like the battle maps (north to the right); the compass in the corner goes back to that view.
-    _map = mountRegionMap(document.getElementById('navMap'), { title: false, rememberStyle: false, onView: queue, homeAzimuth: HOME_AZIMUTH });
+    _map = mountRegionMap(document.getElementById('navMap'), { title: false, rememberStyle: false, onView: queue, homeAzimuth: HOME_AZIMUTH, turned: true });
     // Drawn without the graphics card (hardware acceleration off in the browser): it moves slowly, and that's why.
     if (_map.graphics.software) {
       const slow = document.getElementById('navSlow');
@@ -86,6 +94,48 @@ export async function renderPokenav(section, { session } = {}) {
   } catch (err) {
     document.getElementById('navMap').innerHTML = `<div class="dm-loading">Couldn't load the map: ${escapeHtml(err.message)}</div>`;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Locations (the user's call, 2026-10-20): the Admin module's locations, by type -- one clicked shows what's kept on it.
+// (Tying them to places on the map comes later.)
+// ---------------------------------------------------------------------------
+
+async function drawLocations() {
+  const box = document.getElementById('navLocations');
+  if (!box) return;
+  const [locations, events] = await Promise.all([loadLocations(), loadEvents()]).catch(() => [[], []]);
+  box.innerHTML = `<div class="dm-card-title"><span>📍 Locations</span></div>
+    ${Object.entries(LOCATION_TYPES).map(([k, label]) => {
+      const here = locations.filter(l => (l.type || 'city') === k).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      return `<div class="dm-nav-locgroup"><div class="dm-cs-group-title">${label} <small>${here.length}</small></div>
+        ${here.map(l => `<button class="dm-nav-loc" data-loc="${escapeHtml(l.id)}">${escapeHtml(l.name || 'Unnamed')}
+          ${events.some(e => e.locationId === l.id) ? `<small>${events.filter(e => e.locationId === l.id).length} event(s)</small>` : ''}</button>`).join('')
+          || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
+    }).join('')}
+    <div class="dm-hint">Locations are added in the Admin module (📍 Locations).</div>`;
+  box.onclick = (e) => {
+    const b = e.target.closest('[data-loc]');
+    const l = b && locations.find(x => x.id === b.dataset.loc);
+    if (l) showLocation(l, events.filter(ev => ev.locationId === l.id));
+  };
+}
+
+function showLocation(l, events) {
+  openDmModal({
+    title: `📍 ${l.name || 'Location'}`,
+    wide: true,
+    html: `<div class="dm-nav-locview">
+      ${l.image ? `<img class="dm-nav-locimg" src="${escapeHtml(l.image)}" alt="">` : ''}
+      <div class="dm-hint">${escapeHtml(LOCATION_TYPES[l.type || 'city'] || '')}</div>
+      ${l.description ? `<p class="dm-world-text">${escapeHtml(l.description)}</p>` : ''}
+      ${(l.pois || []).filter(p => String(p).trim()).length ? `<div class="dm-card-title">Points of interest</div><ul>${l.pois.filter(p => String(p).trim()).map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>` : ''}
+      <div class="dm-card-title">Events</div>
+      ${events.map(e => `<div class="dm-world-event" style="cursor:default"><strong>${escapeHtml(e.title || 'Untitled event')}</strong>
+        <small>${escapeHtml([e.timeframe && `When: ${e.timeframe}`, e.trigger && `Trigger: ${e.trigger}`].filter(Boolean).join(' · '))}</small>
+        ${e.description ? `<span class="dm-world-text" style="font-size:0.84rem">${escapeHtml(e.description)}</span>` : ''}</div>`).join('') || '<div class="dm-hint">No events here.</div>'}
+    </div>`,
+  });
 }
 
 /** A battle or adventure started or ended, or the adventure's settings changed. */

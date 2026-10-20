@@ -12,6 +12,7 @@ trainer's Pokemon is found by trainer + species name, as always -- a trainer has
       "abilities": [{"slot": 0, "name": "Overgrow", "description": "..."}],     # the ones it has (slot 2 = hidden)
       "combat": {"ac": 13, "hitDie": 6, "maxHP": 41, "vitalityDie": 6, "maxVP": 57,
                  "initiative": 1, "proficiency": 3, "stab": 4},
+      "diceBonus": {"hitDie": 2},                                              # the DM's change to its dice, kept on evolving
       "current": {"hp": 41, "vp": 57, "ac": null, "hitDice": null, "vitalityDice": null},   # null: not used up / the max
       "stats": {"strength": 15, ..., "charisma": 10},                          # its ability scores now
       "modifiers": {"strength": 2, ..., "charisma": 0},
@@ -139,6 +140,21 @@ def recalculate(pokemon):
     return pokemon
 
 
+def apply_dice_bonus(pokemon, bonus):
+    """The DM's change to its hit / vitality die (routes_dm.set_pokemon_dice: how far from its species' die, +2 for a
+    d6 made a d8) put on its new species' die -- an evolution keeps it (the user's call, 2026-10-20). Dice stay d4-d20."""
+    bonus = {k: js_parse_int(v) for k, v in (bonus or {}).items() if k in ('hitDie', 'vitalityDie') and js_parse_int(v)}
+    if not bonus:
+        return pokemon
+    combat = pokemon.setdefault('combat', {})
+    for k, v in bonus.items():
+        die = js_parse_int(combat.get(k))
+        if die:
+            combat[k] = max(4, min(20, die + v))
+    pokemon['diceBonus'] = bonus
+    return pokemon
+
+
 def _nature(conn, name):
     from . import gamedata
     return gamedata.nature(name)
@@ -242,6 +258,7 @@ def evolve(conn, current, target, points, hidden_ability_shown):
     new['expertise'] = list(current.get('expertise') or [])
     for k in ('customMoves', 'feats', 'gear', 'partySlot', 'utilitySlot', 'cry', 'comments'):
         new[k] = current.get(k, new[k])
+    apply_dice_bonus(new, current.get('diceBonus'))
     recalculate(new)
     new['current'] = dict(current.get('current') or {})
     return new

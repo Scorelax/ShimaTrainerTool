@@ -160,6 +160,11 @@ const WIP_CSS = `
     border-radius: 7px; background: #9b59b6; color: #fff; font-size: 0.6rem; font-weight: 700; line-height: 14px;
     text-align: center; box-shadow: 0 0 0 2px #14141f;
   }
+  /* The DM console's own Events tile at the end of the turn order (battle-live.js's reminders) -- only the DM has it. */
+  .wip-turn-item.wip-turn-events .wip-turn-portrait { display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+    border-radius: 8px; border: 2px dashed rgba(255, 215, 0, 0.45); }
+  .wip-turn-item.wip-turn-events.due .wip-turn-portrait { border-style: solid; border-color: #e67e22; box-shadow: 0 0 8px rgba(230, 126, 34, 0.7); }
+  .wip-turn-events .wip-turn-status-count { background: #e67e22; }
   .wip-turn-name {
     font-size: 0.55rem; font-weight: 600; margin-top: 0.15rem; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42px;
@@ -2647,7 +2652,7 @@ function _syncTurnOrderSidebar(state) {
   ];
 
   const liveIds = new Set(orderedIds);
-  [...el.children].forEach(node => { if (!liveIds.has(node.dataset.id)) node.remove(); });
+  [...el.children].forEach(node => { if (!liveIds.has(node.dataset.id) && node.dataset.id !== DM_EVENTS_TILE) node.remove(); });
 
   orderedIds.forEach((id, index) => {
     const p = state.participants[id];
@@ -2695,8 +2700,50 @@ function _syncTurnOrderSidebar(state) {
     if (el.children[index] !== node) el.insertBefore(node, el.children[index] || null);
   });
 
+  _syncDmEventsTile(el);
+
   // Runs on every push and every focus change -- the DM console redraws its checkbox column for whoever is focused.
   if (_dmName && _dmFocusListener) _dmFocusListener(focusId, state);
+}
+
+// The DM's Events tab at the end of the turn order (the user's call, 2026-10-20): its reminders for the battle --
+// battle-live.js keeps them and says what the tile shows ({count, due, next}) and what a click opens. Players never
+// have it.
+const DM_EVENTS_TILE = '__dmEvents';
+let _dmEventsTab = null;
+
+/** DM console: `{ state() -> {count, due, next}, open() }` for the Events tile; null takes it away. */
+export function setDmEventsTab(tab) {
+  _dmEventsTab = tab;
+  refreshDmEventsTab();
+}
+
+export function refreshDmEventsTab() {
+  const el = document.getElementById('wipTurnOrder');
+  if (el) _syncDmEventsTile(el);
+}
+
+function _syncDmEventsTile(el) {
+  let tile = el.querySelector(`[data-id="${DM_EVENTS_TILE}"]`);
+  if (!_dmName || !_dmEventsTab || !el.children.length || (tile && el.children.length === 1)) {
+    tile?.remove();
+    return;
+  }
+  if (!tile) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `<div class="wip-turn-item wip-turn-events" data-id="${DM_EVENTS_TILE}" title="Your reminders for this battle -- only you see this">
+      <div class="wip-turn-portrait">📅<div class="wip-turn-status-count" style="display:none"></div></div><div class="wip-turn-name">Events</div></div>`;
+    tile = wrapper.firstElementChild;
+    tile.addEventListener('click', () => _dmEventsTab?.open());
+  }
+  const st = _dmEventsTab.state() || {};
+  tile.classList.toggle('due', !!st.due);
+  const badge = tile.querySelector('.wip-turn-status-count');
+  badge.style.display = st.count ? '' : 'none';
+  badge.textContent = st.due ? '!' : st.count || '';
+  tile.querySelector('.wip-turn-name').textContent = st.due ? 'Due!' : st.next != null ? `in ${st.next}r` : 'Events';
+  tile.title = st.due ? 'A reminder is due -- click to see it' : 'Your reminders for this battle -- only you see this';
+  if (el.lastElementChild !== tile) el.appendChild(tile);
 }
 
 let _dmFocusListener = null;
@@ -3332,6 +3379,7 @@ export function attachCombatWipListeners() {
     _showNewAbilityReminders(session);
     _answerPromptsForMe(session); // another player's attack asking this player to roll (their Sturdy, Rough Skin...)
     _answerConcentrationChecks(session); // one of this player's creatures took damage while concentrating
+    _showStatusNotices(session); // one of the DM's own status conditions went off on one of this player's creatures
     if (_joinStage === 'placement') {
       if (_placementQueue.length) {
         _renderPlacementTokens(session, _placementQueue[0]);
@@ -7125,6 +7173,35 @@ function _answerPromptsForMe(s) {
   }
 }
 const _promptsOpen = new Map(); // prompt id -> kind, while its popup is up on this screen
+
+/** The DM's own status conditions (the Admin module's, the user's call, 2026-10-20) that went off on one of this player's
+ * creatures (routes_combat.py's _fire_custom_status): a popup with what it does, and the effect it had by itself
+ * (damage, heal, VP), for them to handle the rest -- one at a time, each once, then it's taken off the list. */
+let _statusNoticeOpen = null;
+const _statusNoticesShown = new Set();
+function _showStatusNotices(s) {
+  const me = _currentTrainerName();
+  if (!me || _spectating || _statusNoticeOpen) return;
+  const n = (s?.statusNotices || []).find(x => x.owner === me && !_statusNoticesShown.has(x.id));
+  if (!n) return;
+  _statusNoticesShown.add(n.id);
+  _statusNoticeOpen = n.id;
+  const text = [n.effect ? `${n.name} ${n.effect}.` : '', n.description].filter(Boolean).join(String.fromCharCode(10, 10));
+  // (Another alert taking the popup over closes this one with it -- the watch notices it's gone.)
+  const shown = showCombatAlert(text || `${n.name}'s ${n.status} went off.`, { title: `🌀 ${n.name}: ${n.status}` });
+  const gone = new Promise((resolve) => {
+    const t = setInterval(() => {
+      const el = document.getElementById('combatAlertPopup');
+      if (!el || el.style.display === 'none' || document.getElementById('combatAlertTitle')?.textContent !== `🌀 ${n.name}: ${n.status}`) { clearInterval(t); resolve(); }
+    }, 500);
+  });
+  Promise.race([shown, gone])
+    .finally(() => {
+      _statusNoticeOpen = null;
+      CombatAPI.dismissNotice(n.id).catch(() => {});
+      if (session) _showStatusNotices(session);
+    });
+}
 
 /** The server's concentration checks for this player's creatures (routes_combat.py _check_concentration_after_damage):
  * a Constitution save, DC half the damage (at least 10); a failure ends every move it concentrates on. One at a time,

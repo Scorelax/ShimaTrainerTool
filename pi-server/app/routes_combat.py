@@ -95,6 +95,7 @@ _EMPTY_STATE = {
     # to a creature someone else controls -- the target's Sturdy d4, its Rough Skin roll, the save against a Static.
     # {promptId: {id, participantId, owner, kind, args, askedBy, answered, answer}}. The asker removes it once read.
     'pendingPrompts': {},
+    'statusNotices': [],
     'participants': {},
     'fieldEffects': [],
     # Shared weather/terrain -- {name, effect} freeform (the DM types both,
@@ -510,6 +511,12 @@ def _handle(conn, action, params):
             raise ValueError('Missing targetId or status')
         spec = json.loads(params['status'])
         return _mutate(conn, lambda s: _apply_status(s, params['targetId'], spec))
+
+    if action == 'dismiss-notice':
+        # A custom status condition's popup, seen and closed by whoever controls the creature (see _fire_custom_status)
+        if not params.get('id'):
+            raise ValueError('Missing id')
+        return _mutate(conn, lambda s: s.__setitem__('statusNotices', [n for n in s.get('statusNotices') or [] if n.get('id') != params['id']]))
 
     if action == 'remove-status':
         if not params.get('targetId') or not params.get('statusId'):
@@ -2125,15 +2132,19 @@ def _advance_turn(state, after_departure=None):
     # section) -- after the log line, so "wore off" entries read as happening
     # in the new turn/round.
     if ending_id:
+        _custom_status_point(state, 'turn_end', ending_id)
         _ability_auto(state, ending_id, 'end_of_turn')  # Rain Dish, Ice Body, Dry Skin
         _ability_turn_auras(state, ending_id, 'end')  # Bad Dreams, Freezing Aura
         _apply_condition_turn_damage(state, ending_id, 'end')
         _queue_status_ticks(state, ending_id, 'end')
         _expire_statuses_on_turn_point(state, ending_id, 'end')
     if new_round:
+        _custom_status_point(state, 'round_end')
+        _custom_status_point(state, 'round_start')
         _expire_statuses_by_round(state)
         _ability_start_of_round(state)  # Primordial Shift, Prankster
     starting_id = state['turnOrder'][state['turnIndex']]
+    _custom_status_point(state, 'turn_start', starting_id)
     _ability_auto(state, starting_id, 'start_of_turn')  # Chlorophyll, Psychic Barrier, Energy Intensive, Cosmic Slumber
     _ability_turn_auras(state, starting_id, 'start')  # Frigid Aura, Time Warp
     _expire_fields(state, starting_id)
@@ -2825,7 +2836,7 @@ _END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'lon
 # target's) with this field saying who actually receives it. Every other
 # repeat heal (Aqua Ring, Ingrain) is self-only, so holder and recipient
 # were always the same participant before this.
-_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'healTargetId', 'against', 'appliesTo', 'noSwitch', 'tick')
+_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'healTargetId', 'against', 'appliesTo', 'noSwitch', 'tick', 'custom')
 
 
 def _statuses_of(participant):
@@ -2961,6 +2972,10 @@ def _apply_status(state, target_id, spec):
 
     new['dc'] = js_parse_int(spec.get('dc'))
     new['appliedRound'] = state['round']
+    if 'custom' in new:
+        new['custom'] = _prime_custom_status(state, target_id, new['custom'])
+        if not new['custom']:
+            del new['custom']
     new['ends'] = [_prime_end(e, state, target_id, source_id) for e in raw_ends]
 
     if spec.get('kind') == 'condition' and spec.get('apply') == 'exhaustion':
@@ -3247,6 +3262,93 @@ def _expire_statuses_on_turn_point(state, pid, point):
                 if e['count'] <= 0:
                     _expire_status(state, p, s, f'{point} of the turn')
                     break
+
+
+# ---------------------------------------------------------------------------
+# The DM's own status conditions (the Admin module's Status conditions tab, the user's call, 2026-10-20): a `condition`
+# status carrying `custom` -- {trigger, turns, recurring, effect, amount, description} -- that goes off at its trigger:
+# its effect (damage, heal, VP gain / drain) happens by itself, and whoever controls the creature gets a popup with the
+# description (statusNotices, combat-wip.js's _showStatusNotices) to handle the rest. Not recurring: it wears off after.
+# ---------------------------------------------------------------------------
+
+_CUSTOM_TRIGGERS = ('turn_start', 'turn_end', 'round_start', 'round_end', 'turns_start', 'turns_end')
+_CUSTOM_EFFECTS = ('damage', 'heal', 'vp_gain', 'vp_drain')
+_MAX_NOTICES = 30
+
+
+def _prime_custom_status(state, target_id, c):
+    """An incoming custom definition -> its stored form, with its countdown (`left`). "The end of your next turn" given
+    during the holder's own turn means the following one, so this turn's end is skipped (like until_turn's skip)."""
+    if not isinstance(c, dict) or c.get('trigger') not in _CUSTOM_TRIGGERS:
+        return None
+    turns = max(1, js_parse_int(c.get('turns')) or 1)
+    out = {'trigger': c['trigger'], 'turns': turns, 'left': turns, 'recurring': bool(c.get('recurring')),
+           'effect': c.get('effect') if c.get('effect') in _CUSTOM_EFFECTS else '',
+           'amount': max(0, js_parse_int(c.get('amount')) or 0), 'description': str(c.get('description') or '')[:600]}
+    out['skip'] = c['trigger'] in ('turn_end', 'turns_end') and target_id == _active_participant_id(state)
+    return out
+
+
+def _custom_status_point(state, point, pid=None):
+    """A turn point ('turn_start' / 'turn_end' of `pid`) or a round point ('round_start' / 'round_end', everyone):
+    the custom statuses waiting on it go off -- the "X turns" ones when their count runs out."""
+    holders = [state['participants'].get(pid)] if pid else list(state['participants'].values())
+    for p in holders:
+        if not p or p.get('status') != 'participating':
+            continue
+        for st in list(_statuses_of(p)):
+            c = st.get('custom')
+            if not isinstance(c, dict) or not any(x is st for x in _statuses_of(p)):
+                continue
+            trig = c.get('trigger')
+            if point in ('turn_start', 'turn_end'):
+                end = point.split('_')[1]
+                if trig not in (f'turn_{end}', f'turns_{end}'):
+                    continue
+                if c.get('skip'):
+                    c['skip'] = False
+                    continue
+                if trig.startswith('turns_'):
+                    c['left'] = (js_parse_int(c.get('left')) or 1) - 1
+                    if c['left'] > 0:
+                        continue
+                    c['left'] = max(1, js_parse_int(c.get('turns')) or 1)
+            elif trig != point:
+                continue
+            _fire_custom_status(state, p, st)
+
+
+def _fire_custom_status(state, p, st):
+    c = st['custom']
+    name = st.get('apply') or 'Status'
+    amount = js_parse_int(c.get('amount')) or 0
+    effect = c.get('effect') or ''
+    did = ''
+    if effect and amount > 0:
+        if effect == 'damage':
+            p['currentHP'] = (p.get('currentHP') or 0) - _absorb_temp_hp(state, p, amount)
+            did = f'takes {amount} damage'
+        elif effect == 'heal':
+            before = p.get('currentHP') or 0
+            p['currentHP'] = max(before, min(p.get('maxHP') or before + amount, before + amount))
+            did = f"regains {p['currentHP'] - before} HP"
+        elif effect == 'vp_gain':
+            before = p.get('currentVP') or 0
+            p['currentVP'] = max(before, min(p.get('maxVP') or before + amount, before + amount))
+            did = f"gains {p['currentVP'] - before} VP"
+        elif effect == 'vp_drain':
+            before = p.get('currentVP') or 0
+            p['currentVP'] = max(0, before - amount)
+            did = f"loses {before - p['currentVP']} VP"
+    _log_event(state, 'status-trigger', text=f"{p['name']}'s {name} goes off" + (f' -- {did}' if did else ''),
+               actorId=p['id'], actorName=p['name'])
+    notices = state.setdefault('statusNotices', [])
+    notices.append({'id': uuid.uuid4().hex[:8], 'participantId': p['id'], 'owner': p.get('owner') or DM_OWNER,
+                    'name': p['name'], 'status': name, 'description': c.get('description') or st.get('note') or '',
+                    'effect': did, 'round': state.get('round', 0)})
+    del notices[:-_MAX_NOTICES]
+    if not c.get('recurring'):
+        _expire_status(state, p, st, 'it went off')
 
 
 def _absorb_temp_hp(state, target, amount):

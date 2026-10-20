@@ -28,7 +28,11 @@ _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclu
                'display-folders',  # the Display module's folders for its pictures: [{id, name, parent}] (js/dm/display.js)
                'display-npc-folders',  # ...and for its NPCs: {folders: [{id, name, parent}], placed: {npc id: folder id}}
                'display-planner',  # its planned scenes, waiting to be shown: [{id, name, folder, scene, shownAt}] (js/dm/display-store.js)
-               'display-plan-folders'}  # ...and their folders: [{id, name, parent}] (js/dm/display.js)
+               'display-plan-folders',  # ...and their folders: [{id, name, parent}] (js/dm/display.js)
+               # The Admin module's world (js/dm/admin-world.js, the user's call, 2026-10-20): planned events, the region's
+               # locations, and the DM's own status conditions (their battle triggers run in routes_combat.py)
+               'events', 'locations', 'status-conditions',
+               'battle-reminders'}  # the Battle module's DM-only reminders: {logFile, reminders: [...]} (js/dm/reminders.js)
 # The species the players have ever caught (lowercase names) -- see caught_species.
 _CAUGHT_KEY = 'pokedex-caught'
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and
@@ -197,6 +201,12 @@ def handle(conn, action, params):
             raise ValueError('Missing trainer, Pokemon or move')
         return give_move(conn, params['trainer'], params['pokemon'], params['move'],
                          forget=str(params.get('forget', '')).lower() in ('1', 'true'))
+
+    if action == 'pokemon-dice':
+        # The Party module: a player's Pokemon's hit / vitality die set by hand (Joey's Redent, d6 -> d8)
+        if not params.get('trainer') or not params.get('pokemon'):
+            raise ValueError('Missing trainer or Pokemon')
+        return set_pokemon_dice(conn, params['trainer'], params['pokemon'], params.get('hitDie'), params.get('vitalityDie'))
 
     raise ValueError('Unknown dm action: ' + str(action))
 
@@ -454,6 +464,36 @@ def give_move(conn, trainer_name, pokemon_name, move, forget=False):
     return {'status': 'success', 'data': {'customMoves': custom}}
 
 
+_DIE_SIZES = (4, 6, 8, 10, 12, 20)
+
+
+def set_pokemon_dice(conn, trainer_name, pokemon_name, hit_die, vitality_die):
+    """The DM sets a player's Pokemon's hit and vitality die by hand (the user's call, 2026-10-20). Kept as how far it is
+    from its species' own die (`diceBonus`, d6 -> d8 is +2), which goes on with it when it evolves (owned.evolve: the
+    evolution's d8 becomes a d10). Max HP / VP follow."""
+    from . import live, owned, species as species_data
+    pid, mon = owned.find(conn, trainer_name, pokemon_name)
+    if pid is None:
+        raise ValueError(f'{trainer_name} has no {pokemon_name}')
+    base = (species_data.get(mon.get('name')) or {}).get('combat') or {}
+    combat = mon.setdefault('combat', {})
+    bonus = dict(mon.get('diceBonus') or {})
+    for key, value in (('hitDie', hit_die), ('vitalityDie', vitality_die)):
+        if value in (None, ''):
+            continue
+        die = js_parse_int(value)
+        if die not in _DIE_SIZES:
+            raise ValueError(f'A die is one of d{", d".join(map(str, _DIE_SIZES))}')
+        combat[key] = die
+        own = js_parse_int(base.get(key))
+        bonus[key] = die - own if own else 0
+    mon['diceBonus'] = {k: v for k, v in bonus.items() if v}
+    owned.recalculate(mon)
+    owned.save(conn, pid, mon)
+    live.publish({'type': 'trainer-data', 'trainer': mon.get('trainer') or trainer_name})
+    return {'status': 'success', 'data': {'combat': combat, 'diceBonus': mon['diceBonus']}}
+
+
 def give_money(conn, trainer_name, amount):
     """Adds `amount` (negative takes some away, never below 0) to the trainer's money, in one go."""
     from . import live
@@ -570,6 +610,24 @@ def list_display_images(conn):
         if os.path.isfile(os.path.join(media.DISPLAY_IMAGE_DIR, img.get('file', ''))):
             out.append({**img, 'url': media.DISPLAY_IMAGE_URL_PREFIX + img['file']})
     return sorted(out, key=lambda i: i.get('createdAt', ''), reverse=True)
+
+
+def save_admin_picture(payload):
+    """POST /api/dm/admin-picture: a picture for an event or a location ({data: "data:image/...;base64,..."}) written to
+    media.ADMIN_IMAGE_DIR under a new random name -> {url}."""
+    import base64
+    import secrets
+    m = re.match(r'^data:(image/[a-z+.-]+);base64,(.+)$', str(payload.get('data') or ''), re.S)
+    if not m or m.group(1) not in _IMAGE_TYPES:
+        raise ValueError("That isn't a picture (JPG, PNG, WebP or GIF)")
+    raw = base64.b64decode(m.group(2))
+    if len(raw) > _MAX_IMAGE_BYTES:
+        raise ValueError('That picture is too big (15 MB at most)')
+    os.makedirs(media.ADMIN_IMAGE_DIR, exist_ok=True)
+    name = secrets.token_hex(8) + _IMAGE_TYPES[m.group(1)]
+    with open(os.path.join(media.ADMIN_IMAGE_DIR, name), 'wb') as f:
+        f.write(raw)
+    return {'url': media.ADMIN_IMAGE_URL_PREFIX + name}
 
 
 def save_display_image(conn, payload):

@@ -15,11 +15,12 @@ import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import {
   escapeHtml, typeBadges, getSpecies, newId, toast, natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml,
-  bindMultiSelects, readMultiSelect, abilityMod, trainerHp, portraitOptionsHtml,
+  bindMultiSelects, readMultiSelect, abilityMod, trainerHp,
 } from './dm-common.js';
 import { MONTHS } from './world-clock.js';
 import { addNpcToSetup } from './creature-setup.js';
 import { prepareImage } from './display.js';
+import { openPicker } from './picker.js';
 
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 const STAT_NAMES = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
@@ -76,6 +77,7 @@ export async function renderNpcs(root) {
           <button class="dm-btn" id="npcImport" title="Bring over the NPCs from the old DM tool's trainer backup (shima-trainers-….json)">📂 Import</button>
           <input type="file" id="npcImportFile" accept="application/json,.json" hidden>
         </div>
+        <button class="dm-btn" id="npcUploadMany" title="Several pictures from your computer at once -- kept on the Pi, ready to pick for any NPC with Select image">⬆ Upload NPC pictures</button>
         <div class="dm-pdx-list" id="npcList"></div>
       </aside>
       <section class="dm-editor-canvas" id="npcSheet"></section>
@@ -83,6 +85,7 @@ export async function renderNpcs(root) {
   document.getElementById('npcSearch').addEventListener('input', renderList);
   document.getElementById('npcNew').addEventListener('click', createNpc);
   document.getElementById('npcImport').addEventListener('click', () => document.getElementById('npcImportFile').click());
+  document.getElementById('npcUploadMany').addEventListener('click', () => pickPictureFiles(true, uploadMany));
   document.getElementById('npcImportFile').addEventListener('change', (e) => { if (e.target.files?.[0]) importOldTool(e.target.files[0]); e.target.value = ''; });
   document.getElementById('npcList').addEventListener('click', (e) => {
     const row = e.target.closest('[data-npc]');
@@ -205,12 +208,8 @@ function renderSheet() {
         <div class="dm-row">
           <div class="dm-field"><label>Picture</label>
             <div class="dm-npc-picrow">
-              <select class="dm-select" id="npcPicture">
-                <option value="">None</option>
-                ${portraitOptionsHtml(_portraits, n.image)}
-                <option value="__url" ${n.image && !known ? 'selected' : ''}>Picture from a link…</option>
-              </select>
-              <button class="dm-btn" id="npcUpload" title="A picture from your computer -- kept on the Pi with the other NPC pictures">⬆ Upload</button>
+              <span class="dm-npc-picname" title="${escapeHtml(n.image || '')}">${escapeHtml(!n.image ? 'None' : known ? _portraits.find(p => p.url === n.image).name : 'A picture from a link')}</span>
+              <button class="dm-btn" id="npcSelectImage" title="Pick one of the pictures on the Pi -- or upload a new one">🖼 Select image</button>
             </div>
           </div>
           <div class="dm-field" ${n.image && !known ? '' : 'hidden'} id="npcImageUrlBox"><label>Link</label><input class="dm-input" id="npcImageUrl" value="${escapeHtml(n.image && !known ? n.image : '')}" placeholder="https://…"></div>
@@ -451,34 +450,84 @@ function bindSheetFields(box) {
       const day = Math.max(1, Math.min(28, Number(document.getElementById('npcBdayDay').value) || 1));
       n.birthday = month ? { month, day } : null;
       changed(n);
-    } else if (el.id === 'npcPicture' || el.id === 'npcImageUrl') {
-      const pick = document.getElementById('npcPicture').value;
-      document.getElementById('npcImageUrlBox').hidden = pick !== '__url';
-      n.image = pick === '__url' ? document.getElementById('npcImageUrl').value.trim() : pick;
+    } else if (el.id === 'npcImageUrl') {
+      n.image = el.value.trim();
       patchPortrait(n.image);
       changed(n, true);
     }
   });
 }
 
-/** A picture from the DM's computer for this NPC: into the Pi's NPC pictures folder, named after the NPC (or the file,
- * for one still called "New NPC"), added to the picture list and put on the NPC. */
-async function uploadPicture(n, file) {
-  const btn = document.getElementById('npcUpload');
-  if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
-  try {
-    const name = n.name && n.name !== 'New NPC' ? n.name : file.name.replace(/\.[^.]+$/, '');
-    const pic = await DmAPI.uploadNpcImage({ name, data: await prepareImage(file, NPC_PICTURE_SIDE) });
-    _portraits = [..._portraits.filter(p => !p.own), pic].sort((a, b) => a.name.localeCompare(b.name))
-      .concat(_portraits.filter(p => p.own));
-    n.image = pic.url;
-    scheduleSave(n);
-    renderList();
-    if (current() === n) renderSheet();
-  } catch (err) {
-    showCombatAlert(err.message, { title: "Couldn't upload the picture" });
-    if (btn) { btn.disabled = false; btn.textContent = '⬆ Upload'; }
+/** A file dialog for pictures (`multi`: several) -> `then(files)`. */
+function pickPictureFiles(multi, then) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.multiple = multi;
+  input.addEventListener('change', () => { if (input.files?.length) then([...input.files]); });
+  input.click();
+}
+
+/** One picture from the DM's computer into the Pi's NPC pictures folder (named `name`), added to the picture list. */
+async function uploadOne(file, name) {
+  const pic = await DmAPI.uploadNpcImage({ name, data: await prepareImage(file, NPC_PICTURE_SIDE) });
+  _portraits = [..._portraits.filter(p => !p.own), pic].sort((a, b) => a.name.localeCompare(b.name))
+    .concat(_portraits.filter(p => p.own));
+  return pic;
+}
+
+/** "Upload NPC pictures" (the user's call, 2026-10-20): several at once, each named after its file -- picked later with
+ * Select image. */
+async function uploadMany(files) {
+  const btn = document.getElementById('npcUploadMany');
+  const label = btn?.textContent;
+  let done = 0;
+  const failed = [];
+  for (const file of files) {
+    if (btn) btn.textContent = `Uploading ${done + 1} / ${files.length}…`;
+    try { await uploadOne(file, file.name.replace(/\.[^.]+$/, '')); done++; } catch (err) { failed.push(`${file.name}: ${err.message}`); }
   }
+  if (btn) btn.textContent = label;
+  if (failed.length) showCombatAlert(`${done} uploaded. These weren't: ${failed.join(' · ')}`, { title: 'Upload NPC pictures' });
+  else toast(`${done} picture${done === 1 ? '' : 's'} on the Pi -- pick them with Select image.`);
+}
+
+/** "Select image": every NPC picture on the Pi (and the players' own portraits) with a search -- or None, a link, or
+ * Upload image for one that isn't there yet. */
+async function selectPicture(n) {
+  const items = [
+    { key: '__none', label: 'No picture', image: '' },
+    { key: '__url', label: 'A picture from a link…', image: '' },
+    ..._portraits.map(p => ({ key: p.url, label: p.name, sub: p.own ? "A player's portrait" : '', image: p.url })),
+  ];
+  const res = await openPicker({
+    title: `🖼 A picture for ${n.name || 'the NPC'}`, items, extraAction: { label: '⬆ Upload image' }, imageFallback: 'assets/Pokeball.png',
+    hint: 'Click one to use it. Not there yet? Upload image puts a new one on the Pi.',
+  });
+  if (!res) return;
+  if (res.extra) {
+    pickPictureFiles(false, async ([file]) => {
+      try {
+        const name = n.name && n.name !== 'New NPC' ? n.name : file.name.replace(/\.[^.]+$/, '');
+        setPicture(n, (await uploadOne(file, name)).url);
+      } catch (err) { showCombatAlert(err.message, { title: "Couldn't upload the picture" }); }
+    });
+    return;
+  }
+  const key = res.keys[0];
+  if (key === '__url') {
+    const box = document.getElementById('npcImageUrlBox');
+    if (box) { box.hidden = false; document.getElementById('npcImageUrl').focus(); }
+    return;
+  }
+  setPicture(n, key === '__none' ? '' : key);
+}
+
+function setPicture(n, url) {
+  n.image = url;
+  scheduleSave(n);
+  renderList();
+  if (current() === n) renderSheet();
 }
 
 /** A team member's header line, redrawn in place as its nickname / level / nature / item / shiny change. */
@@ -573,13 +622,7 @@ function wireSheet(box, n) {
     btn.disabled = false;
     btn.textContent = '⚔ Add to the next battle';
   });
-  document.getElementById('npcUpload').addEventListener('click', () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.addEventListener('change', () => { if (input.files?.[0]) uploadPicture(n, input.files[0]); });
-    input.click();
-  });
+  document.getElementById('npcSelectImage').addEventListener('click', () => selectPicture(n));
   document.getElementById('npcDuplicate').addEventListener('click', async () => {
     const copy = { ...JSON.parse(JSON.stringify(n)), id: newId('npc'), name: `${n.name} (copy)`, createdAt: new Date().toISOString() };
     copy.team = (copy.team || []).map(m => ({ ...m, id: newId('mon') }));

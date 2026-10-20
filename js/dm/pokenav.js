@@ -248,14 +248,21 @@ async function drawLocations() {
       <small>${[!l.shape && 'not on the map', events.some(e => e.locationId === l.id) && `${events.filter(e => e.locationId === l.id).length} event(s)`].filter(Boolean).join(' · ')}</small></button>
     <button class="dm-icon-btn" data-party="${escapeHtml(l.id)}" title="The party is here">${PARTY_ICON}</button>
     <button class="dm-icon-btn" data-info="${escapeHtml(l.id)}" title="Location info">ⓘ</button></div>`;
-  box.innerHTML = `${partyHtml(locations, events)}
-    <div class="dm-card-title"><span>📍 Locations</span></div>
-    ${Object.entries(LOCATION_TYPES).map(([k, label]) => {
-      const here = withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort((a, b) => String(a.name).localeCompare(String(b.name))), locations, folded);
-      return `<div class="dm-nav-locgroup"><div class="dm-cs-group-title">${label} <small>${here.length}</small></div>
-        ${here.map(({ l, depth }) => row(l, depth)).join('') || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
-    }).join('')}
-    <div class="dm-hint">Locations are added and marked on the map in the Admin module (📍 Locations).</div>`;
+  // Two columns side by side, using the room beside the map (the user's call, 2026-10-20): the party and what's planned
+  // there, and the locations -- their groups flowing into as many columns as fit. Each scrolls on its own, and keeps its
+  // place when the list is drawn again (a fold, the party moving).
+  const scrolled = [...box.querySelectorAll('.dm-nav-col')].map(c => c.scrollTop);
+  box.innerHTML = `<div class="dm-nav-col dm-nav-partycol">${partyHtml(locations, events)}</div>
+    <div class="dm-nav-col dm-nav-placescol">
+      <div class="dm-card-title"><span>📍 Locations</span></div>
+      <div class="dm-nav-groups">${Object.entries(LOCATION_TYPES).map(([k, label]) => {
+        const here = withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort((a, b) => String(a.name).localeCompare(String(b.name))), locations, folded);
+        return `<div class="dm-nav-locgroup"><div class="dm-cs-group-title">${label} <small>${here.length}</small></div>
+          ${here.map(({ l, depth }) => row(l, depth)).join('') || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
+      }).join('')}</div>
+      <div class="dm-hint">Locations are added and marked on the map in the Admin module (📍 Locations).</div>
+    </div>`;
+  box.querySelectorAll('.dm-nav-col').forEach((c, i) => { c.scrollTop = scrolled[i] || 0; });
   box.querySelector('#navPartyAt').onchange = e => setPartyAt(e.target.value);
   box.querySelector('#navPartyBoard').onchange = e => saveParty({ ..._party, onBoard: e.target.checked });
   box.onclick = (e) => {

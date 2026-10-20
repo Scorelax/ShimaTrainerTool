@@ -26,7 +26,7 @@
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds, iconSpot } from './map-features.js';
-import { currentMap, isMajor, partOfChain } from './map-version.js';
+import { currentMap, isMajor, partOfChain, FIRST_ID } from './map-version.js';
 
 const BASE = 'assets/region-map/';
 // (one pixel of the first painting is 120 m: the island is ~110 x 200 km -- each map says its own, kmPerPx)
@@ -273,8 +273,11 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     };
     if (locations) {
       // A spot (a city, a cave) as a town's pin; a route's or a forest's name on its middle, in closer (like the sea's).
-      // A town the painting already names (one of places.json's, where it is) keeps only its pin on the painted map.
-      const painted = (l, b) => places.towns.some(t => t.name.toLowerCase() === String(l.name || '').trim().toLowerCase() && Math.hypot(t.x - b.mid[0], t.y - b.mid[1]) < 40);
+      // A town the painting already names (one of places.json's, where it is) keeps only its pin on the painted map --
+      // only the first painting has the names painted on (an uploaded one carries the towns along for the land, not
+      // their names: the user's call, 2026-10-20, every name hidden there), and a location with its own icon covers the
+      // painted town, so it keeps its name.
+      const painted = (l, b) => version?.id === FIRST_ID && !l.icon?.url && places.towns.some(t => t.name.toLowerCase() === String(l.name || '').trim().toLowerCase() && Math.hypot(t.x - b.mid[0], t.y - b.mid[1]) < 40);
       // A location with an icon: its name (and the party's marker) placed from the icon's own middle -- on the ground,
       // not lifted like the others' -- so tilted, it's still exactly under the picture / on it (the user's call,
       // 2026-10-20: lifted, the name came out over the bottom of the icon and the marker north of it).
@@ -287,7 +290,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         else add('region', l.name || '', b.mid[0], b.mid[1], liftOf(l, 30), { locId: l.id, extra: ` ${l.shape.kind}${minor}${l.icon?.url ? ' has-icon' : ''}${l.type === 'region' ? ' realm' : ''}` });
       });
     } else {
-      places.towns.forEach(t => add('town', t.name, t.x, t.y, 40, { extra: ' on-painting' }));
+      places.towns.forEach(t => add('town', t.name, t.x, t.y, 40, { extra: version?.id === FIRST_ID ? ' on-painting' : '' }));
     }
     places.spots.forEach(s => add('spot', '', s.x, s.y, 25));
     places.water.forEach(w => add('water', w.name, w.x, w.y, 0));

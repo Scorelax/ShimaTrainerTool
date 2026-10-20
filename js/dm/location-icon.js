@@ -20,7 +20,7 @@ import { kmPerPx } from '../region-map/map-version.js';
 export const ICON_SIZE = { min: 0.5, max: 30, step: 0.5, first: 5 };   // km tall
 
 const _images = {};
-function iconImage(url) {
+export function iconImage(url) {
   if (!_images[url]) {
     _images[url] = new Promise((resolve, reject) => {
       const img = new Image();
@@ -33,7 +33,7 @@ function iconImage(url) {
 }
 
 /** One icon onto a 2D canvas, standing on its spot (`v` = { s (canvas pixels per painting pixel), ox, oy }). */
-function drawIcon(ctx, img, icon, v, { faint = false } = {}) {
+export function drawIcon(ctx, img, icon, v, { faint = false } = {}) {
   const h = ((icon.size || ICON_SIZE.first) / kmPerPx()) * v.s;
   const w = (h * img.naturalWidth) / Math.max(1, img.naturalHeight);
   const x = v.ox + icon.x * v.s, y = v.oy + icon.y * v.s;

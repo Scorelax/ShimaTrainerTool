@@ -186,7 +186,9 @@ def main():
     forest_d = blur(c['forest'] & land, 7)
     rock_d = blur(c['rock'] & land & ~lake & ~river, 9)
     snow_d = blur(c['snow'] & land, 8)
-    mountain = smoothstep(0.18, 0.62, rock_d + snow_d * 0.8)
+    # the rocks and cliffs painted along the shore read as mountains -- seen from the side the coast stood up in walls
+    # (2026-10-20): a mountain only rises away from the sea, fully ~1.7 km inland (as js/region-map/make-terrain.js)
+    mountain = smoothstep(0.18, 0.62, rock_d + snow_d * 0.8) * smoothstep(0, 14, coast_d)
     ridges = fractal((H, W), rng, [64, 32, 16, 8, 4], ridged=True)
     hills = fractal((H, W), rng, [96, 48, 24, 12])
 
@@ -199,6 +201,7 @@ def main():
     h = np.where(lake, lake_level - np.minimum(lake_depth * 2.5, 40), h)
     river_soft = blur(river, 1.5)
     h -= 30 * np.clip(river_soft * 3, 0, 1) * (1 - mountain * 0.7)
+    h = np.where(land, np.minimum(h, 15 + 55 * coast_d), h)   # no higher than a steep slope up from the shore allows
     h = np.where(land, np.maximum(h, 3), -np.minimum(sea_d * 6 + 4, SEA_OFFSET - 10))
     h = np.where(land | (sea_d > 2), h, ndi.gaussian_filter(h, 1.0))
 

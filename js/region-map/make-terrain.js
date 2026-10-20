@@ -340,7 +340,9 @@ export async function buildTerrain(rgba, W, H, { towns = [], water = [], k = 1, 
   let h = new Float32Array(N);
   const mountain = new Float32Array(N);
   for (let i = 0; i < N; i++) {
-    mountain[i] = smoothstep(0.18, 0.62, rockD[i] + snowD[i] * 0.8);
+    // The rocks and cliffs painted along the shore read as mountains -- seen from the side the coast stood up in walls
+    // (the user's call, 2026-10-20): a mountain only rises away from the sea, fully ~1.7 km inland.
+    mountain[i] = smoothstep(0.18, 0.62, rockD[i] + snowD[i] * 0.8) * smoothstep(0, 14 * k, coastD[i]);
     h[i] = 25 + 240 * (1 - Math.exp(-coastD[i] / (70 * k)))
       + 140 * forestD[i] + 90 * (hills[i] - 0.5)
       + mountain[i] * (900 + 1100 * ridges[i] + 500 * smoothstep(0.1, 0.5, snowD[i]));
@@ -360,6 +362,8 @@ export async function buildTerrain(rgba, W, H, { towns = [], water = [], k = 1, 
   for (let i = 0; i < N; i++) {
     if (lake[i]) h[i] = lakeLevel - Math.min(lakeDepth[i] * 2.5 / k, 40);
     h[i] -= 30 * Math.min(1, Math.max(0, riverSoft[i] * 3)) * (1 - mountain[i] * 0.7);
+    // ...and no land stands higher than a steep slope up from the shore allows (55 m a pixel, ~25 degrees)
+    if (land[i]) h[i] = Math.min(h[i], 15 + (55 * coastD[i]) / k);
     h[i] = land[i] ? Math.max(h[i], 3) : -Math.min(seaD[i] * 6 / k + 4, SEA_OFFSET - 10);
   }
   const hSoft = gaussian(h, W, H, 1.0);

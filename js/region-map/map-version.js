@@ -73,6 +73,10 @@ export async function currentMap({ fresh = false } = {}) {
   return _now;
 }
 
+/** A major location (the user's call, 2026-10-20): its name shows on the map with the whole island in view; the others'
+ * come in as it zooms in. Ticked by the DM on the location -- until then a city is, the rest aren't. */
+export const isMajor = l => (typeof l?.major === 'boolean' ? l.major : (l?.type || 'city') === 'city');
+
 /** How many km one pixel of the map in use is (the last one loaded). */
 export const kmPerPx = () => _now.kmPerPx || 0.12;
 

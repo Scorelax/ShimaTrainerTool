@@ -127,13 +127,15 @@ export async function renderPokenav(section, { session } = {}) {
 // on the map, clicked: the map flies there and it's drawn onto the land in light blue (here only -- the table's map
 // follows the flight); clicked again, it's let go. ⓘ shows the location's info.
 //
-// Where the party is (🧭, the 'party-location' state): picked at the top or with a row's 🧭. The map flies there, lights
-// it up gold with a marker on it -- on the table's map too, unless the DM unticks that (a secret
+// Where the party is (the 'party-location' state): picked at the top or with a row's marker button. The map flies there
+// and puts the players' marker on it -- on the table's map too, unless the DM unticks that (a secret
 // location never shows there). Under it the events planned there, and at the places within NEAR_KM (touching counts:
 // a route running into the town, the town inside the forest), nearest first.
 // ---------------------------------------------------------------------------
 
 const NEAR_KM = 30;
+// the players' marker (assets/MapMarker.png) as the party's icon here too (the user's call, 2026-10-20)
+const PARTY_ICON = '<img class="dm-nav-partyicon" src="assets/region-map/party-marker.png" alt="">';
 
 let _lit = null;     // the location drawn onto the map here
 let _party = null;   // { locationId, onBoard, at (the world clock's date and time), recent: [ids] }
@@ -210,7 +212,7 @@ function partyHtml(locations, events) {
       ${!here.shape ? '<div class="dm-hint dm-nav-locnone">Mark it on the map to see what\'s near it.</div>'
         : near.map(({ e, l, km }) => eventRowHtml(e, `${l.name || 'Unnamed'}, ${kmText(km)}`)).join('') || `<div class="dm-hint dm-nav-locnone">Nothing planned within ${NEAR_KM} km.</div>`}`;
   }
-  return `<div class="dm-card-title"><span>🧭 The party</span></div>
+  return `<div class="dm-card-title"><span>${PARTY_ICON} The party</span></div>
     <div class="dm-nav-party">
       <select class="dm-select" id="navPartyAt"><option value="">— Not set —</option>${opts}</select>
       ${here ? `<div class="dm-hint">${here.shape ? '' : 'Not marked on the map, so it can\'t be shown there. '}${_party.at ? `Since ${escapeHtml(_party.at)}.` : ''}</div>` : '<div class="dm-hint">Pick where the players are -- the map lights it up and shows what\'s planned there and nearby.</div>'}
@@ -236,9 +238,9 @@ async function drawLocations() {
   if (_lit && !locations.some(l => l.id === _lit && l.shape)) { _lit = null; _map?.highlight(null); }
   const row = l => `<div class="dm-nav-locrow"><button class="dm-nav-loc${l.id === _lit ? ' lit' : ''}${l.id === _party?.locationId ? ' party' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
       title="${l.shape ? 'Show it on the map' : 'Not marked on the map yet (Admin › Locations)'}">
-      <span>${l.id === _party?.locationId ? '🧭 ' : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
+      <span>${l.id === _party?.locationId ? `${PARTY_ICON} ` : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
       <small>${[!l.shape && 'not on the map', events.some(e => e.locationId === l.id) && `${events.filter(e => e.locationId === l.id).length} event(s)`].filter(Boolean).join(' · ')}</small></button>
-    <button class="dm-icon-btn" data-party="${escapeHtml(l.id)}" title="The party is here">🧭</button>
+    <button class="dm-icon-btn" data-party="${escapeHtml(l.id)}" title="The party is here">${PARTY_ICON}</button>
     <button class="dm-icon-btn" data-info="${escapeHtml(l.id)}" title="Location info">ⓘ</button></div>`;
   box.innerHTML = `${partyHtml(locations, events)}
     <div class="dm-card-title"><span>📍 Locations</span></div>

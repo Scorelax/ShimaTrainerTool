@@ -15,8 +15,8 @@
 // Its names are the DM's locations (setLocations -- the Admin module's Locations tab, each with a `shape` on the map,
 // js/dm/location-map.js) once it's given them, the towns in places.json until then; a highlighted location is drawn
 // onto the land (a glowing line along a route, a forest shaded and outlined, a ring round a town). Where the party is
-// (setParty, the user's call, 2026-10-20) is outlined in gold with the players' marker on it -- the map round it kept
-// as bright as ever; a route or a forest the DM only looks at (highlight) is drawn in light blue (a town or a cave
+// (setParty, the user's call, 2026-10-20) has the players' marker standing on it -- nothing else drawn, the map as
+// bright as ever. A minor location's name (not ticked Major, map-version.js isMajor) only shows zoomed in. A route or a forest the DM only looks at (highlight) is drawn in light blue (a town or a cave
 // isn't: its own pin is enough, and a ring over it looked odd).
 // A location with an icon (the user's call, 2026-10-20: a little model of the place the DM uploads, js/dm/location-icon.js)
 // has it standing on the land where the DM put it, facing the camera like the painted cities, as tall as the DM set in
@@ -26,7 +26,7 @@
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds } from './map-features.js';
-import { currentMap } from './map-version.js';
+import { currentMap, isMajor } from './map-version.js';
 
 const BASE = 'assets/region-map/';
 // (one pixel of the first painting is 120 m: the island is ~110 x 200 km -- each map says its own, kmPerPx)
@@ -278,15 +278,16 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       locations.forEach((l) => {
         const b = shapeBounds(l.shape);
         if (!b) return;
-        if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], 40, { locId: l.id, extra: `${l.type === 'cave' ? ' cave' : ''}${painted(l, b) ? ' on-painting' : ''}` });
-        else add('region', l.name || '', b.mid[0], b.mid[1], 30, { locId: l.id, extra: ` ${l.shape.kind}` });
+        const minor = isMajor(l) ? '' : ' minor';
+        if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], 40, { locId: l.id, extra: `${l.type === 'cave' ? ' cave' : ''}${painted(l, b) ? ' on-painting' : ''}${minor}` });
+        else add('region', l.name || '', b.mid[0], b.mid[1], 30, { locId: l.id, extra: ` ${l.shape.kind}${minor}` });
       });
     } else {
       places.towns.forEach(t => add('town', t.name, t.x, t.y, 40, { extra: ' on-painting' }));
     }
     places.spots.forEach(s => add('spot', '', s.x, s.y, 25));
     places.water.forEach(w => add('water', w.name, w.x, w.y, 0));
-    // the party's marker: just under its location's pin or name (region-map.css puts it there, whatever the zoom)
+    // the party's marker: standing on its location's spot (region-map.css puts it there, whatever the zoom)
     const party = partyAt && locations?.find(l => l.id === partyAt);
     const pb = shapeBounds(party?.shape);
     if (pb) add('party', '', pb.mid[0], pb.mid[1], party.shape.kind === 'pin' ? 40 : 30);
@@ -320,7 +321,6 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function markLabels() {
     labels.forEach((l) => {
       l.el.classList.toggle('lit', !!highlighted && l.locId === highlighted);
-      l.el.classList.toggle('party-here', !!partyAt && l.locId === partyAt);
     });
   }
 
@@ -354,15 +354,12 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const { canvas: c, ctx } = overlay;
     ctx.clearRect(0, 0, c.width, c.height);
     const find = id => id && locations?.find(l => l.id === id);
-    const party = find(partyAt)?.shape;
     const looked = find(highlighted)?.shape;
-    const hasParty = !!shapeBounds(party);
-    const hasLook = !!shapeBounds(looked) && looked.kind !== 'pin' && highlighted !== partyAt;
-    overlay.mesh.visible = hasParty || hasLook;
+    const hasLook = !!shapeBounds(looked) && looked.kind !== 'pin';
+    overlay.mesh.visible = hasLook;
     const k = c.width / (land.W - 1);   // painting pixel -> picture pixel (the land's uv runs 0..W-1)
-    // (the map round the party's place isn't dimmed any more -- the user's call, 2026-10-20: the usual brightness
-    // whether the marker is on it or not)
-    if (hasParty) drawLit(ctx, party, k, '#ffd23f', 'rgba(255, 214, 70, 0.22)');
+    // (the party's place has nothing drawn on it, nor the map round it dimmed -- the user's call, 2026-10-20: the
+    // players' marker on it is enough)
     if (hasLook) drawLit(ctx, looked, k, '#8fd8ff', 'rgba(143, 216, 255, 0.28)');
     overlay.tex.needsUpdate = true;
     dirty = true;
@@ -467,6 +464,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function placeLabels() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     const dist = camera.position.distanceTo(controls.target);
+    // A minor location's name only closer in than 60 % of the whole-island view the compass goes back to (the user's
+    // call, 2026-10-20): from far out only the major locations are named.
+    const minorAway = dist > fillFor(controls.getAzimuthalAngle()) * 0.6;
     for (const l of labels) {
       v.copy(l.at).project(camera);
       const visible = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
@@ -474,13 +474,14 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       if (!visible) continue;
       l.el.style.transform = `translate(${((v.x + 1) / 2 * w).toFixed(1)}px, ${((1 - v.y) / 2 * h).toFixed(1)}px)`;
       // from far away only the towns: the spots and the sea names come in closer
-      if (l.kind !== 'town' && l.kind !== 'party') l.el.classList.toggle('far', dist > land.fit * 0.75);
+      if (l.kind === 'spot' || l.kind === 'water') l.el.classList.toggle('far', dist > land.fit * 0.75);
+      if (l.kind === 'town' || l.kind === 'region') l.el.classList.toggle('unnamed', minorAway && l.el.classList.contains('minor'));
       // The party's marker as big on any screen and at any zoom (the user's call, 2026-10-20): a share of the screen's
       // height, a little bigger closer in -- never lost when the whole island is in view, never huge up close.
       if (l.kind === 'party') {
         const grow = Math.min(1.7, Math.max(0.85, (land.fit / dist) ** 0.3));
-        // half the size it was first (the user's call, 2026-10-20)
-        l.el.style.setProperty('--mk', `${Math.round(Math.min(75, Math.max(13, h * 0.0275 * grow)))}px`);
+        // three eighths of the size it was first (the user's call, 2026-10-20: half, then three quarters of that)
+        l.el.style.setProperty('--mk', `${Math.round(Math.min(56, Math.max(10, h * 0.0206 * grow)))}px`);
       }
     }
   }

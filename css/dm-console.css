@@ -1574,3 +1574,5 @@ span.dm-trap-pick { cursor: default; }
 .dm-icl-status.ok { color: #7ee787; }
 .dm-icl-status.bad { color: #ff8a80; }
 .dm-world-icon.small { width: 56px; height: 56px; font-size: 1.2rem; }
+/* the players' marker as the party's icon in the PokéNav (the user's call, 2026-10-20) */
+.dm-nav-partyicon { width: 1.15em; height: 1.15em; image-rendering: pixelated; vertical-align: -0.2em; }

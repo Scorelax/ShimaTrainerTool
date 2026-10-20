@@ -30,17 +30,22 @@
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   margin: 0; padding: 0; border: none; background: none; color: inherit; font: inherit; cursor: pointer;
   pointer-events: auto;
-  translate: -50% -100%;
+  /* the pin on the spot, the name under it (the user's call, 2026-10-20: a location's icon stands above) */
+  translate: -50% -5px;
 }
 .rmap-name {
   font-family: 'Chakra Petch', 'Outfit', sans-serif;
-  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap;
-  padding: 2px 8px; border-radius: 6px;
-  color: #2a1d10; background: linear-gradient(#fbf3e2, #e9d9b8); border: 1.5px solid #4a3520;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; white-space: nowrap;
+  padding: 1px 6px; border-radius: 5px;
+  /* a little see-through, so the land shows behind it */
+  color: #2a1d10; background: linear-gradient(rgba(251, 243, 226, 0.78), rgba(233, 217, 184, 0.78)); border: 1px solid rgba(74, 53, 32, 0.85);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
-.rmap-label.town:hover .rmap-name, .rmap-label.town:focus-visible .rmap-name { background: linear-gradient(#fff8e8, #f3e2bf); }
-.rmap-pin { order: 2; width: 10px; height: 10px; border-radius: 50%; background: #fbf3e2; border: 2px solid #4a3520; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+.rmap-label.town:hover .rmap-name, .rmap-label.town:focus-visible .rmap-name { background: linear-gradient(rgba(255, 248, 232, 0.95), rgba(243, 226, 191, 0.95)); }
+/* a minor location's name, from far out (region-map.js placeLabels): its pin stays */
+.rmap-label.town.unnamed .rmap-name { display: none; }
+.rmap-label.region.unnamed { opacity: 0; }
+.rmap-pin { width: 10px; height: 10px; border-radius: 50%; background: #fbf3e2; border: 2px solid #4a3520; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
 .rmap-label.spot { translate: -50% -50%; transition: opacity 0.25s; }
 .rmap-spot {
   display: block; width: 13px; height: 13px; border-radius: 50%;
@@ -65,9 +70,9 @@
 }
 .rmap-label.region.area { font-style: italic; color: #e9ffd9; }
 /* where the party is (setParty): the players' marker, fading out over a second and back in over a second, over and
-   over, just under its location's point; its size (--mk) set from the screen and the zoom in region-map.js's
+   over, standing on its location's spot; its size (--mk) set from the screen and the zoom in region-map.js's
    placeLabels */
-.rmap-label.party { translate: -50% -30%; pointer-events: none; z-index: 2; }
+.rmap-label.party { translate: -50% -92%; pointer-events: none; z-index: 2; }
 .rmap-party-marker {
   display: block; width: var(--mk, 40px); height: var(--mk, 40px); image-rendering: pixelated;
   filter: drop-shadow(0 0 2px #fff) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
@@ -79,9 +84,6 @@
   animation-direction: alternate !important;
 }
 @keyframes rmap-party { from { opacity: 1; } to { opacity: 0.1; } }
-.rmap-label.party-here .rmap-name { background: linear-gradient(#fff2b8, #ffd23f); border-color: #6b4a00; }
-.rmap-label.region.party-here { color: #ffd23f; opacity: 1; }
-.rmap.painted .rmap-label.party-here .rmap-name { display: block; }
 /* the highlighted location's name (the DM looking at it: light blue) */
 .rmap-label.lit .rmap-name { background: linear-gradient(#eef9ff, #8fd8ff); border-color: #0d4a6b; }
 .rmap-label.lit .rmap-pin { background: #8fd8ff; }

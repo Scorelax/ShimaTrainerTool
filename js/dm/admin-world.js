@@ -17,7 +17,7 @@ import { prepareImage } from './display.js';
 import { openPicker } from './picker.js';
 import { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger } from '../utils/custom-status.js';
 import { editLocationShape, drawShapePreview, describeShape } from './location-map.js';
-import { currentMap } from '../region-map/map-version.js';
+import { currentMap, isMajor } from '../region-map/map-version.js';
 import { placeLocationIcon, ICON_SIZE, iconFor, uploadIcon, pickLibraryIcon, openIconLibrary } from './location-icon.js';
 
 export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
@@ -401,6 +401,8 @@ export async function drawLocations(body) {
             <span class="dm-hint">A city or a cave is one spot, a route a line along the roads, a forest an area.</span>
           </span>
         </div>
+        <label class="dm-check"><input type="checkbox" data-w="major" ${isMajor(l) ? 'checked' : ''}><span>⭐ Major location
+          <small>Its name shows with the whole island in view -- the others' names come in as the map zooms in.</small></span></label>
         <label class="dm-check"><input type="checkbox" data-w="secret" ${l.secret ? 'checked' : ''}><span>🔒 Secret
           <small>Only on your PokéNav -- the table's map doesn't show it, its name or its icon.</small></span></label>
       </div>
@@ -466,7 +468,7 @@ export async function drawLocations(body) {
         if (url === null) return;
         l.image = url; changed(); form();
       } else if (act === 'map') {
-        const shape = await editLocationShape(l, locations.filter(x => x !== l && x.shape));
+        const shape = await editLocationShape(l, locations.filter(x => x !== l && (x.shape || x.icon)), { onIcon: (icon) => { l.icon = icon; } });
         if (shape === undefined) return;
         l.shape = shape;
         changed(); form();

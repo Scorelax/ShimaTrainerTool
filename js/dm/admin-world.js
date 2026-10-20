@@ -18,7 +18,7 @@ import { openPicker } from './picker.js';
 import { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger } from '../utils/custom-status.js';
 import { editLocationShape, drawShapePreview, describeShape } from './location-map.js';
 import { currentMap, isMajor } from '../region-map/map-version.js';
-import { placeLocationIcon, ICON_SIZE, iconFor, uploadIcon, pickLibraryIcon, openIconLibrary } from './location-icon.js';
+import { ICON_SIZE, iconFor, uploadIcon, pickLibraryIcon, openIconLibrary } from './location-icon.js';
 
 export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
 
@@ -417,13 +417,12 @@ export async function drawLocations(body) {
         <div class="dm-world-map">
           <span class="dm-world-icon">${l.icon?.url ? `<img src="${escapeHtml(l.icon.url)}" alt="">` : '🏰'}</span>
           <span class="dm-world-mapside">
-            <strong>${l.icon?.url ? `Stands on the map, about ${l.icon.size || ICON_SIZE.first} km tall` : 'No icon'}</strong>
+            <strong>${!l.icon?.url ? 'No icon' : l.shape ? `Stands on its mark, about ${l.icon.size || ICON_SIZE.first} km tall` : 'Shows once it\'s marked on the map'}</strong>
             ${!l.icon?.url && iconFor(library, l) ? `<button class="dm-btn small primary" data-w-act="icon-mine">✨ Use ${escapeHtml(iconFor(library, l).file)}</button>` : ''}
             <span class="dm-row"><button class="dm-btn small" data-w-act="icon-up" title="Stored on the Pi as ${escapeHtml(`${(l.type || 'city') === 'city' ? 'City' : (l.type || '').replace(/^./, c => c.toUpperCase())}-${l.name || ''}`)}">⬆ ${l.icon ? 'Another icon' : 'Upload an icon'}</button>
               <button class="dm-btn small" data-w-act="icon-pick" title="One of the icons on the Pi (~/pokemon-dnd/images/locations)">🏰 Select icon</button></span>
-            ${l.icon?.url ? `<span class="dm-row"><button class="dm-btn small primary" data-w-act="icon-place">📍 Place and size it</button>
-              <button class="dm-btn small danger" data-w-act="icon-remove">Remove</button></span>` : ''}
-            <span class="dm-hint">A little model of the place, standing on the 3D map like the painted cities -- a PNG with a see-through background looks best.</span>
+            ${l.icon?.url ? '<span class="dm-row"><button class="dm-btn small danger" data-w-act="icon-remove">Remove</button></span>' : ''}
+            <span class="dm-hint">A little model of the place, standing on its mark on the 3D map like the painted cities -- a PNG with a see-through background looks best. It's sized in On the map (Change it on the map).</span>
           </span>
         </div>
       </div>
@@ -480,8 +479,9 @@ export async function drawLocations(body) {
         l.shape = shape;
         changed(); form();
       } else if (act === 'icon-up' || act === 'icon-pick' || act === 'icon-mine') {
-        // a new picture: placed and sized right away (cancelled: the icon it had stays). Uploaded here, it goes into the
-        // icon library as "<Type>-<the location's name>" (one there already under that name replaced).
+        // a new picture: it stands on the location's mark at the size the old one had (sized in the mark's editor --
+        // the user's call, 2026-10-20). Uploaded here, it goes into the icon library as "<Type>-<the location's name>"
+        // (one there already under that name replaced).
         let url = null;
         if (act === 'icon-mine') url = iconFor(library, l)?.url || null;
         else if (act === 'icon-pick') url = await pickLibraryIcon(l);
@@ -502,14 +502,7 @@ export async function drawLocations(body) {
           loadLibrary();
         }
         if (!url) return;
-        const icon = await placeLocationIcon({ ...l, icon: { ...(l.icon || {}), url } }, locations.filter(x => x !== l));
-        if (icon === undefined) return;
-        l.icon = icon;
-        changed(); form();
-      } else if (act === 'icon-place') {
-        const icon = await placeLocationIcon(l, locations.filter(x => x !== l));
-        if (icon === undefined) return;
-        l.icon = icon;
+        l.icon = { url, size: l.icon?.size || ICON_SIZE.first };
         changed(); form();
       } else if (act === 'icon-remove') {
         delete l.icon;

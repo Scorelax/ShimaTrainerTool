@@ -153,7 +153,7 @@ const AREA_TOOLS = {
 
 /** Marks `loc` on the map, full screen. `others`: the other locations, drawn faintly for reference.
  * -> the new shape, or undefined (cancelled). */
-/** `onIcon(icon)`: the location's icon moved or resized here (at Done). */
+/** `onIcon(icon)`: the location's icon resized here (at Done) -- it stands on the mark, wherever that's put. */
 export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   let P;
   try {
@@ -178,12 +178,12 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   let showOthers = true;
   let lasso = [];
   const undos = { pin: [], path: [], area: [] };
-  // The location's icon, drawn live as it stands on the map (the user's call, 2026-10-20: easier to fit the mark and the
-  // icon to each other) -- moved ("Move the icon", then click or drag) and sized here too; the others' icons faint.
-  let icon = loc.icon?.url && Number.isFinite(loc.icon.x) ? { ...loc.icon, size: loc.icon.size || ICON_SIZE.first } : null;
+  // The location's icon, drawn live standing on the mark as it's placed (the user's call, 2026-10-20: the icon and the
+  // mark go together -- the icon is only picked in the location's form, it's sized here); the others' icons faint.
+  const icon = loc.icon?.url ? { url: loc.icon.url, size: loc.icon.size || ICON_SIZE.first } : null;
   let iconImg = null;
-  let movingIcon = false;
   let iconChanged = false;
+  let areaSpot; // the painted area's middle (undefined: worked out again -- the mask changed)
   const otherIcons = [];
 
   const overlay = document.createElement('div');
@@ -213,6 +213,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   const mctx = maskCanvas.getContext('2d');
   const mimg = mctx.createImageData(W, H);
   function paintMask(x0 = 0, y0 = 0, x1 = W - 1, y1 = H - 1) {
+    areaSpot = undefined;
     x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(W - 1, Math.ceil(x1)); y1 = Math.min(H - 1, Math.ceil(y1));
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
@@ -259,6 +260,31 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     for (let i = Math.max(0, from); i <= Math.min(to, anchors.length - 2); i++) segs[i] = F.tracePath(f, anchors[i], anchors[i + 1], { follow });
   }
   const pathPoints = () => segs.reduce((all, sg, i) => all.concat(i ? sg.slice(1) : sg), []);
+
+  /** Where the icon stands on the mark as it is now -- as map-features.js iconSpot will on the saved shape: the spot,
+   * halfway along the line, the middle of the widest stretch across the area's middle row (null: nothing marked). */
+  function markSpot() {
+    if (kind === 'pin') return pin || null;
+    if (kind === 'path') { const pts = pathPoints(); return pts.length > 1 ? F.alongPath(pts, 0.5) : pts[0] || null; }
+    if (areaSpot !== undefined) return areaSpot;
+    let y0 = H, y1 = -1;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0, i = y * W; x < W; x++, i++) if (mask[i]) { if (y < y0) y0 = y; y1 = y; break; }
+    }
+    areaSpot = null;
+    let best = 0;
+    for (const t of [0.5, 0.4, 0.6, 0.3, 0.7]) {
+      if (y1 < 0) break;
+      const y = Math.round(y0 + (y1 - y0) * t);
+      for (let x = 0, run = -1; x <= W; x++) {
+        const on = x < W && mask[y * W + x];
+        if (on && run < 0) run = x;
+        if (!on && run >= 0) { if (x - run > best) { best = x - run; areaSpot = [(run + x - 1) / 2, y]; } run = -1; }
+      }
+      if (best > 20) break;
+    }
+    return areaSpot;
+  }
   const snap = p => (follow ? F.snapToRoad(f, p[0], p[1], 10) : p.map(v => Math.round(v * 10) / 10));
   retrace();
 
@@ -288,11 +314,15 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     ctx.drawImage(P.shown, ox, oy, W * s, H * s);
     const tf = { s, ox, oy };
     if (showOthers) others.forEach(o => drawShape(ctx, o.shape, tf, { faint: true, name: o.name || '' }));
-    if (showOthers) otherIcons.forEach(({ o, im }) => drawIcon(ctx, im, o.icon, tf, { faint: true }));
-    if (icon && iconImg) drawIcon(ctx, iconImg, icon, tf, { faint: !movingIcon });
+    if (showOthers) otherIcons.forEach(({ o, im }) => { const at = F.iconSpot(o.shape); if (at) drawIcon(ctx, im, { ...o.icon, x: at[0], y: at[1] }, tf, { faint: true }); });
+    const at = icon && iconImg && markSpot();
+    // (over an area's fill, under the lines and the tools' marks)
+    if (at && kind !== 'area') drawIcon(ctx, iconImg, { ...icon, x: at[0], y: at[1] }, tf, { faint: true });
     if (kind === 'area') {
       ctx.imageSmoothingEnabled = s < 2;
       ctx.drawImage(maskCanvas, ox, oy, W * s, H * s);
+      ctx.imageSmoothingEnabled = true;
+      if (at) drawIcon(ctx, iconImg, { ...icon, x: at[0], y: at[1] }, tf, { faint: true });
       if (lasso.length) {
         ctx.save();
         ctx.beginPath();
@@ -342,9 +372,10 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     overlay.querySelectorAll('[data-kind]').forEach(b => b.classList.toggle('active', b.dataset.kind === kind));
     const box = overlay.querySelector('#lmeTools');
     const iconTools = icon ? `<div class="dm-card-title">🏰 Its icon</div>
-      <button class="dm-btn small${movingIcon ? ' primary' : ''}" data-lme="icon-move">${movingIcon ? '✓ Moving the icon -- click or drag on the map' : '✥ Move the icon'}</button>
+      <div class="dm-hint">Stands on the mark -- ${kind === 'pin' ? 'the spot' : kind === 'path' ? 'halfway along the line' : 'the middle of the area'}.</div>
       <label class="dm-field"><span>How big: <b>about ${icon.size} km tall</b></span>
-        <input type="range" id="lmeIconSize" min="${ICON_SIZE.min}" max="${ICON_SIZE.max}" step="${ICON_SIZE.step}" value="${icon.size}"></label>` : '';
+        <input type="range" id="lmeIconSize" min="${ICON_SIZE.min}" max="${ICON_SIZE.max}" step="${ICON_SIZE.step}" value="${icon.size}"></label>`
+      : '<div class="dm-hint">🏰 No icon -- pick one under Icon on the map, then size it here.</div>';
     const common = `${iconTools}<label class="dm-check"><input type="checkbox" id="lmeOthers" ${showOthers ? 'checked' : ''}><span>Show the other locations</span></label>
       <div class="dm-hint">Scroll to zoom. Drag (or right-drag) to move the map.</div>`;
     if (kind === 'pin') {
@@ -442,7 +473,6 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     const p = toPaint(e);
     drag = { x: e.clientX, y: e.clientY, ox, oy, moved: false, button: e.button, pan: e.button !== 0 || space, mode: null, last: p };
     if (drag.pan) return;
-    if (movingIcon) { drag.mode = 'icon'; return; }
     if (kind === 'pin' && near(pin, p, 14)) drag.mode = 'pin';
     else if (kind === 'path' && anchorAt(p) >= 0) drag.mode = { anchor: anchorAt(p) };
     else if (kind === 'area' && (areaTool === 'brush' || areaTool === 'erase')) { remember(); drag.mode = 'paint'; stroke(p, p); draw(); }
@@ -457,7 +487,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     }
     if (!drag.moved) return;
     if (drag.mode === 'pin') pin = p;
-    else if (drag.mode === 'icon') { icon.x = p[0]; icon.y = p[1]; iconChanged = true; } else if (drag.mode?.anchor !== undefined) {
+    else if (drag.mode?.anchor !== undefined) {
       anchors[drag.mode.anchor] = p;
       // straight lines while dragging, along the road again when it's let go
       const i = drag.mode.anchor;
@@ -474,13 +504,6 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     const d = drag;
     drag = null;
     const p = toPaint(e);
-    if (d.mode === 'icon') {
-      icon.x = Math.round(Math.min(W - 1, Math.max(0, p[0])) * 10) / 10;
-      icon.y = Math.round(Math.min(H - 1, Math.max(0, p[1])) * 10) / 10;
-      iconChanged = true;
-      draw();
-      return;
-    }
     if (d.mode?.anchor !== undefined && d.moved) {
       anchors[d.mode.anchor] = snap(p);
       retrace(d.mode.anchor - 1, d.mode.anchor);
@@ -535,9 +558,9 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     };
     function finish() {
       const r = v => Math.round(v * 10) / 10;
-      // the icon's move goes back only with the mark itself -- not when Done is refused and the DM then cancels
+      // the icon's new size goes back only with the mark itself -- not when Done is refused and the DM then cancels
       const done = (shape) => {
-        if (icon && iconChanged) onIcon?.({ url: icon.url, x: r(icon.x), y: r(icon.y), size: icon.size });
+        if (icon && iconChanged) onIcon?.({ url: icon.url, size: icon.size });
         close(shape);
       };
       if (kind === 'pin') {
@@ -571,7 +594,6 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       if (act === 'cancel') close(undefined);
       else if (act === 'done') finish();
       else if (act === 'undo') undo();
-      else if (act === 'icon-move') { movingIcon = !movingIcon; tools(); draw(); }
       else if (act === 'in') zoomAt(1.4);
       else if (act === 'out') zoomAt(1 / 1.4);
       else if (act === 'fit') { fitAll(); draw(); }
@@ -590,7 +612,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     tools();
     resize();
     if (icon) iconImage(icon.url).then((im) => { iconImg = im; draw(); }).catch(() => {});
-    others.filter(o => o.icon?.url && Number.isFinite(o.icon.x)).forEach((o) => {
+    others.filter(o => o.icon?.url && o.shape).forEach((o) => {
       iconImage(o.icon.url).then((im) => { otherIcons.push({ o, im }); draw(); }).catch(() => {});
     });
   });

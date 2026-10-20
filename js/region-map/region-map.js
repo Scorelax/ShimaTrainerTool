@@ -25,7 +25,7 @@
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
-import { shapeBounds } from './map-features.js';
+import { shapeBounds, iconSpot } from './map-features.js';
 import { currentMap, isMajor } from './map-version.js';
 
 const BASE = 'assets/region-map/';
@@ -280,7 +280,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         if (!b) return;
         const minor = isMajor(l) ? '' : ' minor';
         if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], 40, { locId: l.id, extra: `${l.type === 'cave' ? ' cave' : ''}${painted(l, b) ? ' on-painting' : ''}${minor}` });
-        else add('region', l.name || '', b.mid[0], b.mid[1], 30, { locId: l.id, extra: ` ${l.shape.kind}${minor}` });
+        else add('region', l.name || '', b.mid[0], b.mid[1], 30, { locId: l.id, extra: ` ${l.shape.kind}${minor}${l.icon?.url ? ' has-icon' : ''}` });
       });
     } else {
       places.towns.forEach(t => add('town', t.name, t.x, t.y, 40, { extra: ' on-painting' }));
@@ -389,13 +389,15 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     icons.length = 0;
     (locations || []).forEach((l) => {
       const ic = l.icon;
-      if (!ic?.url || !Number.isFinite(ic.x) || !Number.isFinite(ic.y)) return;
+      const at = ic?.url && iconSpot(l.shape);   // standing on its mark (map-features.js)
+      if (!at) return;
+      const [ix, iy] = at;
       const tall = (ic.size || 5) / land.kmPerPx;   // km -> painting pixels (the world's units across the land)
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false }));
       sp.center.set(0.5, 0);   // standing on its spot
       sp.renderOrder = 2;
       sp.visible = false;
-      sp.position.copy(toWorld(ic.x, ic.y, heightAt(ic.x, ic.y)));
+      sp.position.copy(toWorld(ix, iy, heightAt(ix, iy)));
       scene.add(sp);
       icons.push(sp);
       iconTexture(ic.url).then((tex) => {

@@ -71,6 +71,8 @@
   transition: opacity 0.25s;
 }
 .rmap-label.region.area { font-style: italic; color: #e9ffd9; }
+/* a route or a forest with an icon standing on its middle: the name just under it, like a town's */
+.rmap-label.region.has-icon { translate: -50% 3px; }
 /* where the party is (setParty): the players' marker, fading out over a second and back in over a second, over and
    over, standing on its location's spot; its size (--mk) set from the screen and the zoom in region-map.js's
    placeLabels */

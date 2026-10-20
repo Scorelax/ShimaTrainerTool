@@ -462,6 +462,13 @@ export function shapeBounds(shape) {
   return { x0, y0, x1, y1, mid };
 }
 
+/** Where a location's icon stands (the user's call, 2026-10-20: the icon and the mark go together, never placed
+ * apart): its mark's middle -- the spot of a town, halfway along a route, well inside a forest -- where its name goes
+ * too. null: not on the map (nor its icon then). */
+export function iconSpot(shape) {
+  return shapeBounds(shape)?.mid || null;
+}
+
 /** The point `t` (0-1) of the way along a line. */
 export function alongPath(pts, t) {
   const lens = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));

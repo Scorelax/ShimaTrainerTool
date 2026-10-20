@@ -54,8 +54,23 @@
   transition: opacity 0.25s;
 }
 .rmap-label.far { opacity: 0; }
-/* the painted map has its own names and red dots: only the town pins (to fly there) */
-.rmap.painted .rmap-name, .rmap.painted .rmap-label.spot, .rmap.painted .rmap-label.water { display: none; }
+/* the DM's own locations (setLocations): a cave's pin dark; a route's or a forest's name on it, in closer like the sea's */
+.rmap-label.town.cave .rmap-pin { background: #6b5a48; border-color: #24180c; }
+.rmap-label.region {
+  margin: 0; padding: 0; border: none; background: none; cursor: pointer; pointer-events: auto;
+  translate: -50% -50%;
+  font-family: 'Chakra Petch', 'Outfit', sans-serif; font-size: 0.74rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
+  color: #fff8e6; text-shadow: 0 0 3px #1d1405, 0 1px 3px rgba(0, 0, 0, 0.8);
+  transition: opacity 0.25s;
+}
+.rmap-label.region.area { font-style: italic; color: #e9ffd9; }
+/* the highlighted location's name */
+.rmap-label.lit .rmap-name { background: linear-gradient(#fff2b8, #ffd23f); border-color: #6b4a00; }
+.rmap-label.lit .rmap-pin { background: #ffd23f; }
+.rmap-label.region.lit { color: #ffd23f; opacity: 1; }
+/* the painted map has its own names and red dots: only the pins of the towns it names (to fly there) */
+.rmap.painted .on-painting .rmap-name, .rmap.painted .rmap-label.spot, .rmap.painted .rmap-label.water { display: none; }
+.rmap.painted .rmap-label.lit .rmap-name { display: block; }
 .rmap.painted .rmap-pin { width: 14px; height: 14px; }
 
 /* the controls on top */

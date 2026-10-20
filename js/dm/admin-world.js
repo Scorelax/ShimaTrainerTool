@@ -4,12 +4,17 @@
 // tied to them; PokeNav's region map lists them) and Status conditions (the rulebook's, to look up, and the DM's own,
 // with a battle trigger and an optional automatic effect -- routes_combat.py runs them, see _custom_status_point).
 // Kept on the Pi in dm_state ('events', 'locations', 'status-conditions') and saved as they change.
+// A location can be marked on the region map (`shape`, js/dm/location-map.js) -- the 3D map's names and highlights
+// come from these (region-map.js's setLocations; the board screen hears of a change live, routes_dm.save_state).
+// The towns the map was made with (assets/region-map/places.json) are added as locations the first time, already
+// marked ('region-map' state: townsSeeded).
 import { DmAPI } from '../api.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import { escapeHtml, newId, toast, stepperHtml } from './dm-common.js';
 import { prepareImage } from './display.js';
 import { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger } from '../utils/custom-status.js';
+import { editLocationShape, drawShapePreview, describeShape } from './location-map.js';
 
 export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
 
@@ -22,14 +27,47 @@ const PICTURE_SIDE = 1600;
 // ---------------------------------------------------------------------------
 
 const _data = { events: null, locations: null, 'status-conditions': null };
+const _loading = {};
 const _timers = {};
 
-async function load(key) {
-  if (!_data[key]) {
-    const saved = await DmAPI.getState(key).catch(() => null);
-    _data[key] = Array.isArray(saved) ? saved.filter(x => x && x.id) : [];
+/** One of the lists, fetched once per page. Not reached (the Pi didn't answer): nothing is kept, so the next try
+ * fetches again -- an empty list kept here would be saved over the real one by the next change. Two callers at once
+ * share one fetch (the towns added only once). */
+function load(key) {
+  if (_data[key]) return Promise.resolve(_data[key]);
+  if (!_loading[key]) {
+    _loading[key] = (async () => {
+      const saved = await DmAPI.getState(key);
+      const list = Array.isArray(saved) ? saved.filter(x => x && x.id) : [];
+      if (key === 'locations') await seedTowns(list);
+      _data[key] = list;
+      return list;
+    })().finally(() => { delete _loading[key]; });
   }
-  return _data[key];
+  return _loading[key];
+}
+
+/** The first time: the towns the 3D map was made with as locations, marked where they are (one already made with the
+ * same name only gets its spot). Kept from happening again by the 'region-map' state, so a town deleted stays gone. */
+async function seedTowns(list) {
+  let flags;
+  try {
+    flags = (await DmAPI.getState('region-map')) || {};
+  } catch (err) {
+    return; // not known whether it was done: not now
+  }
+  if (flags.townsSeeded) return;
+  const places = await fetch('assets/region-map/places.json').then(r => r.json()).catch(() => null);
+  if (!places?.towns) return;
+  places.towns.forEach((t) => {
+    const same = list.find(l => String(l.name || '').trim().toLowerCase() === t.name.toLowerCase());
+    if (same) { if (!same.shape) same.shape = { kind: 'pin', x: t.x, y: t.y }; return; }
+    list.push({ id: newId('loc'), name: t.name, type: 'city', description: '', pois: [], image: '', shape: { kind: 'pin', x: t.x, y: t.y }, createdAt: new Date().toISOString() });
+  });
+  try {
+    await DmAPI.saveState('locations', list);
+    await DmAPI.saveState('region-map', { ...flags, townsSeeded: true });
+  } catch (err) { /* tried again next time */ }
 }
 
 function saveSoon(key) {
@@ -139,8 +177,15 @@ function uploadPicture() {
 // Events
 // ---------------------------------------------------------------------------
 
+/** The tab couldn't get its list from the Pi: said so, with a way to try again (nothing to edit meanwhile). */
+function loadFailed(body, err, again) {
+  body.innerHTML = `<div class="dm-cs-empty">Couldn't load it from the Pi: ${escapeHtml(err.message)}<br><button class="dm-btn" id="worldRetry">Try again</button></div>`;
+  document.getElementById('worldRetry').addEventListener('click', () => again(body));
+}
+
 export async function drawEvents(body) {
-  const [events, locations] = await Promise.all([loadEvents(), loadLocations()]);
+  let events, locations;
+  try { [events, locations] = await Promise.all([loadEvents(), loadLocations()]); } catch (err) { loadFailed(body, err, drawEvents); return; }
   shell(body, { title: '📅 Events', newLabel: '＋ New event', searchPh: 'Find an event…' });
   const locName = (e) => (e.locationId === '__manual' ? e.locationText : locations.find(l => l.id === e.locationId)?.name) || '';
   const list = () => {
@@ -253,7 +298,8 @@ function wireLocationCombo(box, e, locations, onChange) {
 // ---------------------------------------------------------------------------
 
 export async function drawLocations(body) {
-  const [locations, events] = await Promise.all([loadLocations(), loadEvents()]);
+  let locations, events;
+  try { [locations, events] = await Promise.all([loadLocations(), loadEvents()]); } catch (err) { loadFailed(body, err, drawLocations); return; }
   shell(body, { title: '📍 Locations', newLabel: '＋ New location', searchPh: 'Find a location…' });
   const list = () => {
     const q = document.getElementById('worldSearch').value.trim().toLowerCase();
@@ -263,7 +309,7 @@ export async function drawLocations(body) {
       return here.length ? `<div class="dm-cs-group-title">${label}</div>${here.map(l => `
         <button class="dm-pdx-row${l.id === _selected.locations ? ' selected' : ''}" data-id="${escapeHtml(l.id)}">
           <span class="dm-pdx-thumb">${l.image ? `<img src="${escapeHtml(l.image)}" alt="">` : '📍'}</span>
-          <span class="dm-pdx-main"><strong>${escapeHtml(l.name || 'Unnamed')}</strong><small>${events.filter(e => e.locationId === l.id).length} event(s) · ${(l.pois || []).length} point(s) of interest</small></span><span></span>
+          <span class="dm-pdx-main"><strong>${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' <span title="Secret: not on the table\'s map">🔒</span>' : ''}</strong><small>${l.shape ? '🗺 On the map' : '<span class="dm-warn-text">Not on the map</span>'} · ${events.filter(e => e.locationId === l.id).length} event(s)</small></span><span></span>
         </button>`).join('')}` : '';
     }).join('') || `<div class="dm-hint">${locations.length ? 'Nothing matches that.' : 'No locations yet.'}</div>`;
   };
@@ -276,6 +322,19 @@ export async function drawLocations(body) {
       <div class="dm-world-formhead">${input('name', l.name, 'Name / title').replace('class="dm-input"', 'class="dm-input dm-world-title"')}
         <button class="dm-btn danger" data-w-act="delete">🗑 Delete</button></div>
       ${field('Location type', `<select class="dm-select" data-w="type">${Object.entries(LOCATION_TYPES).map(([k, lab]) => `<option value="${k}" ${(l.type || 'city') === k ? 'selected' : ''}>${lab}</option>`).join('')}</select>`)}
+      <div class="dm-field"><label>On the map</label>
+        <div class="dm-world-map">
+          ${l.shape ? '<canvas class="dm-world-mapprev" id="worldMapPrev"></canvas>' : '<button class="dm-world-mapnone" data-w-act="map">🗺<span>Not on the map yet</span></button>'}
+          <span class="dm-world-mapside">
+            <strong>${escapeHtml(describeShape(l.shape))}</strong>
+            <button class="dm-btn small primary" data-w-act="map">🗺 ${l.shape ? 'Change it on the map' : 'Mark it on the map'}</button>
+            ${l.shape ? '<button class="dm-btn small danger" data-w-act="map-remove">Take it off the map</button>' : ''}
+            <span class="dm-hint">A city or a cave is one spot, a route a line along the roads, a forest an area.</span>
+          </span>
+        </div>
+        <label class="dm-check"><input type="checkbox" data-w="secret" ${l.secret ? 'checked' : ''}><span>🔒 Secret
+          <small>Only on your PokéNav -- the table's map doesn't show it or its name.</small></span></label>
+      </div>
       ${field('Description', area('description', l.description, 'What the place is like', 5))}
       <div class="dm-field"><label>Points of interest</label>
         <div class="dm-world-pois">${(l.pois || []).map((p, i) => `<div class="dm-row"><input class="dm-input" data-poi="${i}" value="${escapeHtml(p)}" placeholder="What the players can do here" maxlength="200"><button class="dm-icon-btn danger" data-w-act="poi-del" data-i="${i}" title="Remove">✕</button></div>`).join('')}</div>
@@ -288,6 +347,8 @@ export async function drawLocations(body) {
         <button class="dm-btn small" data-w-act="new-event">＋ New event here</button></div>
     </div>`;
     box.querySelectorAll('[data-poi]').forEach(el => el.addEventListener('input', () => { l.pois[Number(el.dataset.poi)] = el.value; changed(); }));
+    const prev = document.getElementById('worldMapPrev');
+    if (prev) drawShapePreview(prev, l.shape).catch(() => {});
   };
   const changed = () => { saveSoon('locations'); list(); };
   wireShell(body, {
@@ -321,6 +382,15 @@ export async function drawLocations(body) {
         const url = act === 'pic' ? await uploadPicture() : '';
         if (url === null) return;
         l.image = url; changed(); form();
+      } else if (act === 'map') {
+        const shape = await editLocationShape(l, locations.filter(x => x !== l && x.shape));
+        if (shape === undefined) return;
+        l.shape = shape;
+        changed(); form();
+      } else if (act === 'map-remove') {
+        if (!await showCombatConfirm(`Take "${l.name}" off the map? It stays a location, just not marked anywhere.`, { title: 'Take it off the map', yesLabel: 'Take it off', noLabel: 'Cancel' })) return;
+        delete l.shape;
+        changed(); form();
       } else if (act === 'open-event') {
         _selected.events = btn.dataset.i;
         _goTo?.('events');
@@ -339,7 +409,8 @@ export async function drawLocations(body) {
 const RULE_NAME = k => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 export async function drawStatuses(body) {
-  const custom = await loadStatusConditions();
+  let custom;
+  try { custom = await loadStatusConditions(); } catch (err) { loadFailed(body, err, drawStatuses); return; }
   shell(body, { title: '🌀 Status conditions', newLabel: '＋ New status condition', searchPh: 'Find a status condition…' });
   const rules = Object.entries(CONDITION_RULES).map(([k, r]) => ({ key: `rule:${k}`, name: RULE_NAME(k), summary: r.summary || '', note: r.note || '' }))
     .sort((a, b) => a.name.localeCompare(b.name));

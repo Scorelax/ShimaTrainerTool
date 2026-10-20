@@ -23,6 +23,11 @@ const MOVEMENT = ['walking', 'climbing', 'flying', 'hovering', 'swimming', 'burr
 const SENSES = ['sight', 'hearing', 'smell', 'tremorsense', 'echolocation', 'telepathy', 'blindsight', 'darkvision', 'truesight'];
 const STATS = [['strength', 'STR'], ['dexterity', 'DEX'], ['constitution', 'CON'], ['intelligence', 'INT'], ['wisdom', 'WIS'], ['charisma', 'CHA']];
 const SLOTS = [['primary', 'Primary'], ['secondary', 'Secondary'], ['hidden', 'Hidden']];
+const SENSE_LEVELS = ['Poor', 'Average', 'Good', 'Excellent', 'Superior'];
+const NEW_ABILITY = '__new';
+// The Pokemon's four pictures side by side (the user's call, 2026-10-20): still, still shiny, animated, animated shiny.
+const PICTURE_SLOTS = [['still', false, 'Still', 'still'], ['still', true, 'Still shiny', 'stillShiny'],
+  ['animated', false, 'Animated', 'animated'], ['animated', true, 'Animated shiny', 'animatedShiny']];
 const LIST_MAX = 250; // rows drawn in a list at once -- the search narrows it down
 
 let _root = null;
@@ -31,6 +36,7 @@ let _items = null;           // [{name, category, price, description, effect, im
 let _item = null;            // the item on the form ({...} -- `isNew` while it hasn't been saved)
 let _speciesName = null;     // the Pokedex entry on the form (null: a new one)
 let _record = null;          // its admin-species answer
+let _moveList = null;        // the move list (with the DM's own moves) for the moves' dropdowns -- fetched once
 let _splashes = null;
 
 export function renderAdmin(section) {
@@ -316,7 +322,14 @@ function blankSpecies(dex) {
   };
 }
 
+/** The move names for the moves' dropdowns, sorted (the console's copy when the Pi doesn't answer). */
+async function moveNames() {
+  if (!_moveList) _moveList = [...new Set((await loadMoves()).map(m => m.name).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  return _moveList;
+}
+
 async function loadSpeciesForm(species, redrawList) {
+  await moveNames().catch(() => []);
   const box = document.getElementById('admSpForm');
   box.innerHTML = '<div class="dm-loading">Loading…</div>';
   try {
@@ -336,7 +349,11 @@ function drawSpeciesForm(species, redrawList) {
   const num = (id, label, value) => field(id, label, value, 'type="number" inputmode="numeric"');
   const pick = (key) => [...new Set(species.map(s => s[key]).filter(Boolean))].sort();
   const typeOptions = (sel, none) => `${none ? '<option value="">— none —</option>' : '<option value="">Pick a type</option>'}${POKEMON_TYPES.map(t => `<option ${t === sel ? 'selected' : ''}>${t}</option>`).join('')}`;
-  const moveNames = (() => { try { return JSON.parse(sessionStorage.getItem('moves') || '[]').map(m => m.name); } catch (e) { return []; } })();
+  const moveList = _moveList || [];
+  // A dropdown of every name in `names` (and the value it has, if that isn't one of them).
+  const options = (names, value, none) => `<option value="">${none}</option>${(!value || names.includes(value) ? names : [value, ...names])
+    .map(v => `<option value="${escapeHtml(v)}" ${v === value ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('')}`;
+  const abilityList = [...abilityNames].sort((a, b) => a.localeCompare(b));
   box.innerHTML = `
     <div class="dm-adm-form">
       <div class="dm-adm-head">
@@ -380,21 +397,24 @@ function drawSpeciesForm(species, redrawList) {
           ${SLOTS.map(([slot, label]) => {
             const name = sp.abilities?.[slot] || '';
             return `<div class="dm-field"><label for="admSpAb_${slot}">${label}</label>
-              <input class="dm-input" id="admSpAb_${slot}" list="admSpAbilities" value="${escapeHtml(name)}" placeholder="None" maxlength="60">
+              <select class="dm-select" id="admSpAb_${slot}">${options(abilityList, name, '— None —')}<option value="${NEW_ABILITY}">＋ A new ability…</option></select>
+              <input class="dm-input" id="admSpAbNew_${slot}" placeholder="The new ability's name" maxlength="60" hidden>
               <textarea class="dm-input dm-adm-text" id="admSpAbDesc_${slot}" rows="2" placeholder="What it does (a new ability needs this)">${escapeHtml(abilityDescriptions[name] || '')}</textarea></div>`;
           }).join('')}
         </div>
         <div class="dm-card">
-          <div class="dm-card-title">Moves learned (comma between them)</div>
-          ${MOVE_LEVELS.map(l => `<div class="dm-field"><label for="admSpMoves_${l}">${l === '1' ? 'Starting moves' : `Level ${l}`}</label>
-            <textarea class="dm-input dm-adm-text" id="admSpMoves_${l}" rows="2">${escapeHtml((sp.moves?.[l] || []).join(', '))}</textarea></div>`).join('')}
+          <div class="dm-card-title">Moves learned</div>
+          ${MOVE_LEVELS.map(l => `<div class="dm-field"><label for="admSpMoveAdd_${l}">${l === '1' ? 'Starting moves' : `Level ${l}`}</label>
+            <div class="dm-adm-movechips" id="admSpMoves_${l}">${(sp.moves?.[l] || []).map(moveChipHtml).join('')}</div>
+            <select class="dm-select" id="admSpMoveAdd_${l}" data-move-add="${l}">${options(moveList, '', '＋ Add a move…')}</select></div>`).join('')}
           <div class="dm-hint" id="admSpMoveWarn"></div>
         </div>
         <div class="dm-card">
           <div class="dm-card-title">Movement (feet -- 0 = can't)</div>
           <div class="dm-row dm-adm-scores">${MOVEMENT.map(k => num(`admSpMove_${k}`, k[0].toUpperCase() + k.slice(1), sp.movement?.[k])).join('')}</div>
           <div class="dm-card-title" style="margin-top:0.4rem">Senses (empty = none)</div>
-          <div class="dm-adm-senses">${SENSES.map(k => field(`admSpSense_${k}`, k[0].toUpperCase() + k.slice(1), sp.senses?.[k], 'list="admSpSenseLevels" placeholder="—"')).join('')}</div>
+          <div class="dm-adm-senses">${SENSES.map(k => `<div class="dm-field"><label for="admSpSense_${k}">${k[0].toUpperCase() + k.slice(1)}</label>
+            <select class="dm-select" id="admSpSense_${k}">${options(SENSE_LEVELS, sp.senses?.[k] || '', '—')}</select></div>`).join('')}</div>
         </div>
         <div class="dm-card dm-adm-evocard">
           <div class="dm-card-title">Evolves into</div>
@@ -402,14 +422,11 @@ function drawSpeciesForm(species, redrawList) {
           <button class="dm-btn small" id="admSpEvoAdd">＋ Add an evolution</button>
           <div class="dm-hint" style="margin-top:0.3rem">Each criterion is one line in the players' Pokédex (when you show it there) -- a level, an item, a place, a time of day...</div>
         </div>
-        <div class="dm-card">
+        <div class="dm-card dm-adm-piccard">
           <div class="dm-card-title">Pictures</div>
           ${isNew ? '<div class="dm-hint">Save the Pokémon first.</div>' : `
-          <div class="dm-adm-pics">
-            ${pictureSlotHtml('still', 'Still picture', pictures.still, pictures.stillShiny)}
-            ${pictureSlotHtml('animated', 'Animated sprite (MP4)', pictures.animated, pictures.animatedShiny)}
-          </div>
-          <label class="dm-adm-shiny"><input type="checkbox" id="admSpShiny"> Upload as the shiny version</label>`}
+          <div class="dm-adm-pics">${PICTURE_SLOTS.map(([kind, shiny, label, key]) => pictureSlotHtml(kind, shiny, label, pictures[key])).join('')}</div>
+          <div class="dm-hint">Still: PNG, JPG or WebP. Animated: an MP4. A ? is one it doesn't have yet.</div>`}
         </div>
       </div>
       <div class="dm-adm-actions"><button class="dm-btn primary" id="admSpSave">💾 Save Pokédex entry</button></div>
@@ -419,8 +436,6 @@ function drawSpeciesForm(species, redrawList) {
     <datalist id="admSpHabitats">${pick('habitat').map(v => `<option value="${escapeHtml(v)}">`).join('')}</datalist>
     <datalist id="admSpBehaviors">${pick('behavior').map(v => `<option value="${escapeHtml(v)}">`).join('')}</datalist>
     <datalist id="admSpActives">${pick('activity').map(v => `<option value="${escapeHtml(v)}">`).join('')}</datalist>
-    <datalist id="admSpSenseLevels">${['Poor', 'Average', 'Good', 'Excellent'].map(v => `<option value="${v}">`).join('')}</datalist>
-    <datalist id="admSpAbilities">${abilityNames.map(v => `<option value="${escapeHtml(v)}">`).join('')}</datalist>
 `;
   bindMultiSelects(box);
   const pic = document.getElementById('admSpPic');
@@ -429,20 +444,38 @@ function drawSpeciesForm(species, redrawList) {
   box.querySelectorAll('[data-pic-media]').forEach(el => { if (el.dataset.picMedia) patchPortraitMedia(el, el.dataset.picMedia, ''); });
 
   // A known ability fills in its description when it's picked (and an unknown one leaves it to be written)
+  // A known ability fills in its description when it's picked; "A new ability…" asks for its name (and a description)
   SLOTS.forEach(([slot]) => document.getElementById(`admSpAb_${slot}`).addEventListener('change', async (e) => {
     const desc = document.getElementById(`admSpAbDesc_${slot}`);
+    const fresh = document.getElementById(`admSpAbNew_${slot}`);
+    fresh.hidden = e.target.value !== NEW_ABILITY;
+    if (!fresh.hidden) { desc.value = ''; fresh.focus(); return; }
     const known = abilityDescriptions[e.target.value];
     if (known) { desc.value = known; return; }
     const other = species.flatMap(s => s.abilities || []).find(a => a.name.toLowerCase() === e.target.value.trim().toLowerCase());
     desc.value = other?.description && other.description !== 'No description available' ? other.description : '';
   }));
-  // Moves the game doesn't know are pointed out (a typo would never show up anywhere)
-  const known = new Set(moveNames.map(m => m.toLowerCase()));
+  // Moves: picked from the dropdown under each level, taken off with their ✕. One the move list doesn't have (kept from
+  // before, or the list not loaded) is pointed out -- a typo would never show up anywhere.
+  const known = new Set(moveList.map(m => m.toLowerCase()));
   const checkMoves = () => {
-    const unknown = MOVE_LEVELS.flatMap(l => splitNames(val(`admSpMoves_${l}`))).filter(m => known.size && !known.has(m.toLowerCase()));
+    const unknown = MOVE_LEVELS.flatMap(l => levelMoves(l)).filter(m => known.size && !known.has(m.toLowerCase()));
     document.getElementById('admSpMoveWarn').innerHTML = unknown.length ? `<span class="dm-warn-text">Not in the move list: ${unknown.map(escapeHtml).join(', ')}</span>` : '';
+    box.querySelectorAll('.dm-adm-movechip').forEach(c => c.classList.toggle('unknown', known.size > 0 && !known.has(c.dataset.move.toLowerCase())));
   };
-  MOVE_LEVELS.forEach(l => document.getElementById(`admSpMoves_${l}`).addEventListener('input', checkMoves));
+  box.querySelectorAll('[data-move-add]').forEach(sel => sel.addEventListener('change', () => {
+    const name = sel.value;
+    sel.value = '';
+    const chips = document.getElementById(`admSpMoves_${sel.dataset.moveAdd}`);
+    if (!name || levelMoves(sel.dataset.moveAdd).some(m => m.toLowerCase() === name.toLowerCase())) return;
+    chips.insertAdjacentHTML('beforeend', moveChipHtml(name));
+    checkMoves();
+  }));
+  // (on the form itself, drawn new each time -- the box stays, and would gather a listener per redraw)
+  box.querySelector('.dm-adm-form').addEventListener('click', (e) => {
+    const x = e.target.closest('[data-move-remove]');
+    if (x) { x.closest('.dm-adm-movechip').remove(); checkMoves(); }
+  });
   checkMoves();
   const evos = document.getElementById('admSpEvos');
   evos.querySelectorAll('.dm-adm-evo').forEach(row => wireEvoRow(row, species));
@@ -460,7 +493,7 @@ function drawSpeciesForm(species, redrawList) {
     const change = e.target.closest('[data-crit-pick]');
     if (change) pickCriterionValue(change.closest('.dm-adm-crit').dataset.type).then((v) => { if (v) setCriterionValue(change.closest('.dm-adm-crit'), v); });
   });
-  box.querySelectorAll('[data-upload]').forEach(b => b.addEventListener('click', () => uploadPicture(b.dataset.upload, species, redrawList)));
+  box.querySelectorAll('[data-upload]').forEach(b => b.addEventListener('click', () => uploadPicture(b.dataset.upload, b.dataset.shiny === '1', species, redrawList)));
   document.getElementById('admSpSave').addEventListener('click', (e) => saveSpecies(e.currentTarget, species, redrawList));
 }
 
@@ -559,21 +592,22 @@ function setCriterionValue(row, value) {
   if (shown) shown.textContent = value;
 }
 
-function pictureSlotHtml(kind, label, url, shinyUrl) {
+function pictureSlotHtml(kind, shiny, label, url) {
   return `<div class="dm-adm-picslot">
-    <div class="dm-adm-picbox" data-pic-media="${escapeHtml(url || '')}">${url ? '' : '<span>None yet</span>'}</div>
-    <div><strong>${label}</strong>${shinyUrl ? '<div class="dm-hint">✨ has a shiny one too</div>' : ''}
-      <button class="dm-btn small" data-upload="${kind}">⬆ ${url ? 'Replace' : 'Upload'}…</button></div>
+    <div class="dm-adm-picbox${url ? '' : ' missing'}" data-pic-media="${escapeHtml(url || '')}">${url ? '' : '<span>?</span>'}</div>
+    <strong>${shiny ? '✨ ' : ''}${label}</strong>
+    <button class="dm-btn small" data-upload="${kind}" data-shiny="${shiny ? 1 : 0}">⬆ ${url ? 'Replace' : 'Upload'}…</button>
   </div>`;
 }
 
-const splitNames = (text) => String(text || '').split(',').map(s => s.trim()).filter(Boolean);
+const moveChipHtml = name => `<span class="dm-adm-movechip" data-move="${escapeHtml(name)}">${escapeHtml(name)}<button type="button" data-move-remove title="Take it off">✕</button></span>`;
+/** The moves on the form for one level. */
+const levelMoves = l => [...document.querySelectorAll(`#admSpMoves_${l} .dm-adm-movechip`)].map(c => c.dataset.move);
 
-async function uploadPicture(kind, species, redrawList) {
+async function uploadPicture(kind, shiny, species, redrawList) {
   const file = await pickFile(kind === 'animated' ? 'video/mp4' : 'image/png,image/jpeg,image/webp');
   if (!file) return;
-  const shiny = !!document.getElementById('admSpShiny')?.checked;
-  const btn = document.querySelector(`[data-upload="${kind}"]`);
+  const btn = document.querySelector(`[data-upload="${kind}"][data-shiny="${shiny ? 1 : 0}"]`);
   if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
   try {
     const data = kind === 'animated' ? await readAsDataUrl(file) : await prepareImage(file, 1024);
@@ -587,8 +621,16 @@ async function uploadPicture(kind, species, redrawList) {
   }
 }
 
+/** The ability picked for a slot ('' for none) -- a new one's typed name. */
+function abilityAt(slot) {
+  const v = val(`admSpAb_${slot}`);
+  return (v === NEW_ABILITY ? val(`admSpAbNew_${slot}`) : v).trim();
+}
+
 async function saveSpecies(btn, species, redrawList) {
   const isNew = !_speciesName;
+  const newEmpty = SLOTS.find(([slot]) => val(`admSpAb_${slot}`) === NEW_ABILITY && !abilityAt(slot));
+  if (newEmpty) { showCombatAlert(`Give the new ${newEmpty[1].toLowerCase()} ability a name (or pick one from the list).`, { title: 'Abilities' }); return; }
   const n = (id) => (val(id).trim() === '' ? null : Number(val(id)));
   const sp = {
     ..._record.species,
@@ -599,8 +641,8 @@ async function saveSpecies(btn, species, redrawList) {
     combat: { ac: n('admSpAC'), hitDie: n('admSpHD'), baseHP: n('admSpHP'), vitalityDie: n('admSpVD'), baseVP: n('admSpVP') },
     baseStats: Object.fromEntries(STATS.map(([k]) => [k, n(`admSpStat_${k}`)])),
     savingThrows: readMultiSelect('admSpSaves'), skills: readMultiSelect('admSpSkills'),
-    abilities: Object.fromEntries(SLOTS.map(([slot]) => [slot, val(`admSpAb_${slot}`).trim() || null])),
-    moves: Object.fromEntries(MOVE_LEVELS.map(l => [l, splitNames(val(`admSpMoves_${l}`))])),
+    abilities: Object.fromEntries(SLOTS.map(([slot]) => [slot, abilityAt(slot) || null])),
+    moves: Object.fromEntries(MOVE_LEVELS.map(l => [l, levelMoves(l)])),
     movement: Object.fromEntries(MOVEMENT.map(k => [k, n(`admSpMove_${k}`) || 0])),
     senses: Object.fromEntries(SENSES.map(k => [k, val(`admSpSense_${k}`).trim() || null])),
     evolvesInto: [...document.querySelectorAll('#admSpEvos .dm-adm-evo')].map(row => ({
@@ -610,7 +652,7 @@ async function saveSpecies(btn, species, redrawList) {
     })).filter(e => e.species),
   };
   // A description written for an ability -- kept for that ability (a new one needs it)
-  const abilityDescriptions = Object.fromEntries(SLOTS.map(([slot]) => [val(`admSpAb_${slot}`).trim(), val(`admSpAbDesc_${slot}`).trim()])
+  const abilityDescriptions = Object.fromEntries(SLOTS.map(([slot]) => [abilityAt(slot), val(`admSpAbDesc_${slot}`).trim()])
     .filter(([name, desc]) => name && desc && _record.abilityDescriptions?.[name] !== desc));
   const unknownEvo = sp.evolvesInto.filter(e => !species.some(s => s.name.toLowerCase() === e.species.toLowerCase()) && e.species.toLowerCase() !== sp.name.toLowerCase());
   if (unknownEvo.length && !await showCombatConfirm(`${unknownEvo.map(e => e.species).join(', ')} isn't a Pokémon in the game yet. Save anyway?`, { title: 'Evolves into', yesLabel: 'Save', noLabel: 'Cancel' })) return;

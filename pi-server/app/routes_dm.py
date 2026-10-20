@@ -32,7 +32,11 @@ _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclu
                # The Admin module's world (js/dm/admin-world.js, the user's call, 2026-10-20): planned events, the region's
                # locations, and the DM's own status conditions (their battle triggers run in routes_combat.py)
                'events', 'locations', 'status-conditions',
-               'battle-reminders'}  # the Battle module's DM-only reminders: {logFile, list: [...]} (js/dm/battle-live.js)
+               'battle-reminders',  # the Battle module's DM-only reminders: {logFile, list: [...]} (js/dm/battle-live.js)
+               'region-map'}  # the region map's own record: {townsSeeded} -- places.json's towns made locations once (js/dm/admin-world.js)
+# Saved here and heard of live by other screens ({'type': 'dm-state', 'key'}): the locations are the board screen's
+# region map's names (js/pages/battle-map.js), the user's call, 2026-10-20.
+_LIVE_STATE_KEYS = {'locations'}
 # The species the players have ever caught (lowercase names) -- see caught_species.
 _CAUGHT_KEY = 'pokedex-caught'
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and
@@ -564,6 +568,9 @@ def save_state(conn, key, data):
     conn.execute('INSERT OR REPLACE INTO dm_state (key, json, updated_at) VALUES (?, ?, ?)',
                  (key, json.dumps(data, ensure_ascii=False) if data is not None else None, datetime.now(timezone.utc).isoformat()))
     conn.commit()
+    if key in _LIVE_STATE_KEYS:
+        from . import live
+        live.publish({'type': 'dm-state', 'key': key})
 
 
 def save_display_scene(conn, scene):

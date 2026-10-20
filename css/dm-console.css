@@ -1210,13 +1210,15 @@ span.dm-trap-pick { cursor: default; }
 .dm-adm-critmenu button:hover { background: rgba(255, 215, 0, 0.12); }
 .dm-adm-critmenu b { font-size: 0.86rem; }
 .dm-adm-critmenu small { font-size: 0.7rem; color: var(--dm-muted); }
-.dm-adm-pics { display: flex; flex-direction: column; gap: 0.6rem; }
-.dm-adm-picslot { display: flex; gap: 0.7rem; align-items: center; }
-.dm-adm-picslot .dm-btn { margin-top: 0.3rem; }
+/* the four pictures side by side: still, still shiny, animated, animated shiny (the user's call, 2026-10-20) */
+.dm-adm-piccard { grid-column: 1 / -1; }
+.dm-adm-pics { display: grid; grid-template-columns: repeat(4, minmax(0, 170px)); gap: 0.8rem; }
+.dm-adm-picslot { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; text-align: center; font-size: 0.8rem; }
+.dm-adm-picslot .dm-adm-picbox { width: 100%; height: auto; aspect-ratio: 1; }
+.dm-adm-picbox.missing span { font-size: 2rem; font-weight: 800; color: var(--dm-muted); }
 .dm-adm-picbox { width: 72px; height: 72px; flex: none; border-radius: 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--dm-line);
   display: flex; align-items: center; justify-content: center; overflow: hidden; font-size: 0.7rem; color: var(--dm-muted); text-align: center; }
 .dm-adm-picbox img, .dm-adm-picbox video { width: 100%; height: 100%; object-fit: contain; }
-.dm-adm-shiny { display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.5rem; font-size: 0.85rem; }
 .dm-adm-splashes { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .dm-adm-splashgrid { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.8rem; align-content: start; }
 .dm-adm-splash { border: 1px solid var(--dm-line); border-radius: 12px; overflow: hidden; background: var(--dm-panel); }
@@ -1471,3 +1473,46 @@ span.dm-trap-pick { cursor: default; }
 .dm-nav-locview { display: flex; flex-direction: column; gap: 0.5rem; }
 .dm-nav-locimg { width: 100%; max-height: 260px; object-fit: cover; border-radius: 10px; }
 .dm-world [hidden] { display: none !important; }
+
+/* Admin › Locations: a location on the map (js/dm/location-map.js), the user's call, 2026-10-20 */
+.dm-world-map { display: flex; gap: 0.8rem; align-items: stretch; margin-bottom: 0.4rem; }
+.dm-world-mapprev, .dm-world-mapnone { width: 300px; height: 170px; flex: none; border-radius: 10px; border: 1px solid var(--dm-line); background: #0c2240; }
+.dm-world-mapnone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem; font-size: 1.8rem; color: var(--dm-muted); cursor: pointer; }
+.dm-world-mapnone span { font-size: 0.8rem; font-weight: 700; }
+.dm-world-mapnone:hover { border-color: var(--dm-gold); }
+.dm-world-mapside { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; min-width: 0; }
+.dm-world-mapside strong { font-size: 0.92rem; }
+
+/* the editor, full screen */
+.dm-lme-overlay { position: fixed; inset: 0; z-index: 10030; display: flex; flex-direction: column; background: rgba(3, 4, 12, 0.97); }
+.dm-lme-head { display: flex; align-items: center; gap: 0.7rem; padding: 0.6rem 1rem; border-bottom: 1px solid var(--dm-line); background: var(--dm-panel); }
+.dm-lme-head h3 { margin: 0; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-lme-spacer { flex: 1; }
+.dm-lme-seg { display: inline-flex; border: 1px solid var(--dm-line); border-radius: 999px; overflow: hidden; flex: none; }
+.dm-lme-seg button { border: none; background: none; color: var(--dm-muted); font: inherit; font-weight: 700; font-size: 0.86rem; padding: 0.4rem 0.9rem; cursor: pointer; }
+.dm-lme-seg button.active { background: rgba(255, 215, 0, 0.16); color: var(--dm-gold); }
+.dm-lme-body { flex: 1; min-height: 0; display: flex; }
+.dm-lme-tools { width: 270px; flex: none; overflow-y: auto; padding: 0.9rem; display: flex; flex-direction: column; gap: 0.6rem; border-right: 1px solid var(--dm-line); background: var(--dm-panel); }
+.dm-lme-tools input[type="range"] { width: 100%; }
+.dm-lme-toolgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; }
+.dm-lme-toolgrid .dm-btn.active { background: rgba(255, 215, 0, 0.16); border-color: rgba(255, 215, 0, 0.55); color: var(--dm-gold); }
+.dm-lme-stat { padding: 0.45rem 0.6rem; border-radius: 8px; background: var(--dm-panel-2); font-weight: 700; font-size: 0.86rem; }
+.dm-lme-stage { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+.dm-lme-stage canvas { display: block; cursor: crosshair; touch-action: none; }
+.dm-lme-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+.dm-lme-zoom .dm-btn { width: 2.2rem; padding: 0.3rem 0; font-size: 1rem; }
+
+/* PokéNav's locations: one row per location, ⓘ beside it */
+.dm-nav-locrow { display: flex; gap: 0.25rem; align-items: stretch; }
+.dm-nav-locrow .dm-nav-loc { flex: 1; min-width: 0; }
+.dm-nav-loc.lit { border-color: var(--dm-gold); background: rgba(255, 215, 0, 0.12); color: var(--dm-gold); }
+.dm-nav-loc.off-map { opacity: 0.6; }
+
+/* Admin › Pokédex entries: the moves learned as chips, added from a dropdown */
+.dm-adm-movechips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.3rem; }
+.dm-adm-movechips:empty { display: none; }
+.dm-adm-movechip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.2rem 0.15rem 0.55rem; border-radius: 999px; font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid var(--dm-line); }
+.dm-adm-movechip.unknown { border-color: #e67e22; color: #f5b041; }
+.dm-adm-movechip button { border: none; background: none; color: var(--dm-muted); cursor: pointer; font-size: 0.75rem; padding: 0 0.25rem; }
+.dm-adm-movechip button:hover { color: #ff8a80; }

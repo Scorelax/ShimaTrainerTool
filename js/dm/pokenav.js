@@ -87,6 +87,7 @@ export async function renderPokenav(section, { session } = {}) {
       slow.title = 'Turn on hardware acceleration in the browser\'s settings (System), then restart it';
     }
     if (saved) _map.setView(saved); // (for the map style it was left in)
+    loadLocations().then(list => _map?.setLocations(list)).catch(() => {});
     await _map.ready;
     // Every start opens on the default view -- the compass's: straight down, north to the right, filling the screen
     // (the user's call, 2026-10-19) -- and the board screen follows (the move is sent like any other).
@@ -97,27 +98,47 @@ export async function renderPokenav(section, { session } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Locations (the user's call, 2026-10-20): the Admin module's locations, by type -- one clicked shows what's kept on it.
-// (Tying them to places on the map comes later.)
+// Locations (the user's call, 2026-10-20): the Admin module's locations, by type, and the map's names. One that's marked
+// on the map, clicked: the map flies there and it's drawn onto the land (here only -- the table's map follows the
+// flight); clicked again, it's let go. ⓘ shows what's kept on it.
 // ---------------------------------------------------------------------------
+
+let _lit = null;   // the location drawn onto the map here
 
 async function drawLocations() {
   const box = document.getElementById('navLocations');
   if (!box) return;
-  const [locations, events] = await Promise.all([loadLocations(), loadEvents()]).catch(() => [[], []]);
+  let locations, events;
+  try {
+    [locations, events] = await Promise.all([loadLocations(), loadEvents()]);
+  } catch (err) {
+    box.innerHTML = `<div class="dm-card-title"><span>📍 Locations</span></div><div class="dm-hint">Couldn't load them: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  _map?.setLocations(locations);
+  if (_lit && !locations.some(l => l.id === _lit && l.shape)) { _lit = null; _map?.highlight(null); }
+  const row = l => `<div class="dm-nav-locrow"><button class="dm-nav-loc${l.id === _lit ? ' lit' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
+      title="${l.shape ? 'Show it on the map' : 'Not marked on the map yet (Admin › Locations)'}">
+      <span>${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
+      <small>${[!l.shape && 'not on the map', events.some(e => e.locationId === l.id) && `${events.filter(e => e.locationId === l.id).length} event(s)`].filter(Boolean).join(' · ')}</small></button>
+    <button class="dm-icon-btn" data-info="${escapeHtml(l.id)}" title="What's kept on it">ⓘ</button></div>`;
   box.innerHTML = `<div class="dm-card-title"><span>📍 Locations</span></div>
     ${Object.entries(LOCATION_TYPES).map(([k, label]) => {
       const here = locations.filter(l => (l.type || 'city') === k).sort((a, b) => String(a.name).localeCompare(String(b.name)));
       return `<div class="dm-nav-locgroup"><div class="dm-cs-group-title">${label} <small>${here.length}</small></div>
-        ${here.map(l => `<button class="dm-nav-loc" data-loc="${escapeHtml(l.id)}">${escapeHtml(l.name || 'Unnamed')}
-          ${events.some(e => e.locationId === l.id) ? `<small>${events.filter(e => e.locationId === l.id).length} event(s)</small>` : ''}</button>`).join('')
-          || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
+        ${here.map(row).join('') || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
     }).join('')}
-    <div class="dm-hint">Locations are added in the Admin module (📍 Locations).</div>`;
+    <div class="dm-hint">Locations are added and marked on the map in the Admin module (📍 Locations).</div>`;
   box.onclick = (e) => {
+    const info = e.target.closest('[data-info]');
     const b = e.target.closest('[data-loc]');
-    const l = b && locations.find(x => x.id === b.dataset.loc);
-    if (l) showLocation(l, events.filter(ev => ev.locationId === l.id));
+    const l = locations.find(x => x.id === (info || b)?.dataset[info ? 'info' : 'loc']);
+    if (!l) return;
+    if (info || !l.shape) { showLocation(l, events.filter(ev => ev.locationId === l.id)); return; }
+    _lit = _lit === l.id ? null : l.id;
+    _map?.highlight(_lit);
+    if (_lit) _map?.flyToLocation(l.id);
+    box.querySelectorAll('.dm-nav-loc').forEach(x => x.classList.toggle('lit', x.dataset.loc === _lit));
   };
 }
 

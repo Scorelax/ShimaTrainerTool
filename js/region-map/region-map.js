@@ -9,11 +9,15 @@
 // Self-contained so it can live in its own page (region-map.html) or be mounted elsewhere -- the DM console's PokeNav
 // steers it (onView) and the table's board screen (battle-map.html) shows it view only, following along (setView):
 // mountRegionMap(root, { onBack, viewOnly, title, rememberStyle, onView }) -> { ready, destroy, getView, setView, home,
-// graphics: {renderer, software} }.
+// setLocations, highlight, flyToLocation, graphics: {renderer, software} }.
+// Its names are the DM's locations (setLocations -- the Admin module's Locations tab, each with a `shape` on the map,
+// js/dm/location-map.js) once it's given them, the towns in places.json until then; a highlighted location is drawn
+// onto the land (a glowing line along a route, a forest shaded and outlined, a ring round a town).
 // A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
+import { shapeBounds } from './map-features.js';
 
 const BASE = 'assets/region-map/';
 const KM_PER_PX = 0.12;      // one pixel of the painting is 120 m: the island is ~110 x 200 km
@@ -151,6 +155,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   let frame = 0;
   let destroyed = false;
   const labels = [];
+  let locations = null;     // the DM's locations (setLocations), or null: the towns in places.json
+  let highlighted = null;   // the id of the location drawn onto the land
+  let overlay = null;       // ...drawn here: { canvas, ctx, tex, mesh } -- the land's surface again, see-through
 
   // Painting pixel -> world: x to the east, z to the south, y up (metres scaled by vert).
   const toWorld = (x, y, metres = 0) => new THREE.Vector3(x - land.W / 2, Math.max(metres, 0) * land.vert, y - land.H / 2);
@@ -234,18 +241,143 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   // ---------------------------------------------------------------------------
 
   function buildLabels() {
-    const add = (kind, name, x, y, lift) => {
-      const el = document.createElement(kind === 'town' ? 'button' : 'div');
-      el.className = `rmap-label ${kind}`;
-      if (kind === 'town') { el.innerHTML = `<span class="rmap-pin"></span><span class="rmap-name">${esc(name)}</span>`; el.dataset.fly = labels.length; }
+    labels.forEach(l => l.el.remove());
+    labels.length = 0;
+    const add = (kind, name, x, y, lift, { locId = null, extra = '' } = {}) => {
+      const el = document.createElement(kind === 'town' || kind === 'region' ? 'button' : 'div');
+      el.className = `rmap-label ${kind}${extra}`;
+      if (kind === 'town') el.innerHTML = `<span class="rmap-pin"></span><span class="rmap-name">${esc(name)}</span>`;
       else if (kind === 'spot') el.innerHTML = '<span class="rmap-spot"></span>';
       else el.textContent = name;
+      if (kind === 'town' || kind === 'region') el.dataset.fly = labels.length;
       labelLayer.appendChild(el);
-      labels.push({ el, kind, x, y, at: toWorld(x, y, heightAt(x, y) + lift) });
+      labels.push({ el, kind, x, y, locId, at: toWorld(x, y, heightAt(x, y) + lift) });
     };
-    places.towns.forEach(t => add('town', t.name, t.x, t.y, 40));
+    if (locations) {
+      // A spot (a city, a cave) as a town's pin; a route's or a forest's name on its middle, in closer (like the sea's).
+      // A town the painting already names (one of places.json's, where it is) keeps only its pin on the painted map.
+      const painted = (l, b) => places.towns.some(t => t.name.toLowerCase() === String(l.name || '').trim().toLowerCase() && Math.hypot(t.x - b.mid[0], t.y - b.mid[1]) < 40);
+      locations.forEach((l) => {
+        const b = shapeBounds(l.shape);
+        if (!b) return;
+        if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], 40, { locId: l.id, extra: `${l.type === 'cave' ? ' cave' : ''}${painted(l, b) ? ' on-painting' : ''}` });
+        else add('region', l.name || '', b.mid[0], b.mid[1], 30, { locId: l.id, extra: ` ${l.shape.kind}` });
+      });
+    } else {
+      places.towns.forEach(t => add('town', t.name, t.x, t.y, 40, { extra: ' on-painting' }));
+    }
     places.spots.forEach(s => add('spot', '', s.x, s.y, 25));
     places.water.forEach(w => add('water', w.name, w.x, w.y, 0));
+    labels.forEach(l => l.el.classList.toggle('lit', !!highlighted && l.locId === highlighted));
+    dirty = true;
+    wake();
+  }
+
+  // ---------------------------------------------------------------------------
+  // A location drawn onto the land: a picture the painting's shape (twice its size, like the map pictures), laid over
+  // the land's surface
+  // ---------------------------------------------------------------------------
+
+  function buildOverlay() {
+    const c = document.createElement('canvas');
+    c.width = land.W * 2;
+    c.height = land.H * 2;
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    const m = new THREE.Mesh(mesh.geometry, new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    }));
+    m.renderOrder = 1;
+    m.visible = false;
+    scene.add(m);
+    overlay = { canvas: c, ctx: c.getContext('2d'), tex, mesh: m };
+    drawOverlay();
+  }
+
+  function drawOverlay() {
+    labels.forEach(l => l.el.classList.toggle('lit', !!highlighted && l.locId === highlighted));
+    if (!overlay) return;
+    const { canvas: c, ctx } = overlay;
+    ctx.clearRect(0, 0, c.width, c.height);
+    const loc = highlighted && locations?.find(l => l.id === highlighted);
+    const shape = loc?.shape;
+    overlay.mesh.visible = !!shapeBounds(shape);
+    if (overlay.mesh.visible) {
+      const k = c.width / (land.W - 1);   // painting pixel -> picture pixel (the land's uv runs 0..W-1)
+      ctx.save();
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      if (shape.kind === 'area') {
+        ctx.beginPath();
+        shape.rings.forEach((r) => { r.forEach(([x, y], i) => (i ? ctx.lineTo(x * k, y * k) : ctx.moveTo(x * k, y * k))); ctx.closePath(); });
+        ctx.fillStyle = 'rgba(255, 214, 70, 0.3)';
+        ctx.fill('evenodd');
+        ctx.lineWidth = 9;
+        ctx.strokeStyle = 'rgba(30, 20, 0, 0.55)';
+        ctx.stroke();
+        ctx.lineWidth = 4.5;
+        ctx.strokeStyle = '#ffd23f';
+        ctx.stroke();
+      } else if (shape.kind === 'path') {
+        ctx.beginPath();
+        shape.points.forEach(([x, y], i) => (i ? ctx.lineTo(x * k, y * k) : ctx.moveTo(x * k, y * k)));
+        ctx.lineWidth = 16;
+        ctx.strokeStyle = 'rgba(30, 20, 0, 0.55)';
+        ctx.stroke();
+        ctx.lineWidth = 8;
+        ctx.strokeStyle = '#ffd23f';
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(shape.x * k, shape.y * k, 30, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 214, 70, 0.28)';
+        ctx.fill();
+        ctx.lineWidth = 7;
+        ctx.strokeStyle = '#ffd23f';
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    overlay.tex.needsUpdate = true;
+    dirty = true;
+    wake();
+  }
+
+  /** The DM's locations as the map's names ([] or a list: theirs; null: the towns in places.json again). */
+  function setLocations(list) {
+    locations = Array.isArray(list) ? list : null;
+    if (highlighted && !locations?.some(l => l.id === highlighted)) highlighted = null;
+    if (!land) return; // put in place once loaded
+    buildLabels();
+    drawOverlay();
+  }
+
+  /** One location drawn onto the land (null: none). */
+  function highlight(id) {
+    highlighted = id || null;
+    if (land) drawOverlay();
+  }
+
+  /** Flies to a location: in close over a town, far enough back over a route or a forest to see all of it. */
+  function flyToLocation(id, ms = 900) {
+    const loc = locations?.find(l => l.id === id);
+    const b = shapeBounds(loc?.shape);
+    if (!b || !land) return false;
+    const az = controls.getAzimuthalAngle();
+    if (loc.shape.kind === 'pin') {
+      flyTo(toWorld(b.mid[0], b.mid[1]), land.fit * 0.28, 0.85, az, ms);
+      return true;
+    }
+    // the box turned the way the camera is, fitted to the screen (a little tilted, so a little extra up and down)
+    const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const c = Math.abs(Math.cos(az)), s = Math.abs(Math.sin(az));
+    const w = b.x1 - b.x0, h = b.y1 - b.y0;
+    const spanX = w * c + h * s + 60, spanZ = (w * s + h * c + 60) * 1.15;
+    const dist = Math.max(spanZ / (2 * tanV), spanX / (2 * tanV * camera.aspect)) * 1.1;
+    const goal = Math.max(land.fit * 0.18, Math.min(land.fit, dist));
+    flyTo(new THREE.Vector3((b.x0 + b.x1) / 2 - land.W / 2, 0, (b.y0 + b.y1) / 2 - land.H / 2), goal, 0.5, az, ms);
+    return true;
   }
 
   const v = new THREE.Vector3();
@@ -491,6 +623,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const { ratio, coarse } = LEVELS[n];
     if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio);
     if (mesh) mesh.geometry = coarse ? geometries.coarse : geometries.fine;
+    if (overlay) overlay.mesh.geometry = mesh.geometry;
   }
   function wake() {
     quiet = 0;
@@ -543,7 +676,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const town = t.closest('[data-fly]');
     if (town) {
       const l = labels[Number(town.dataset.fly)];
-      flyTo(toWorld(l.x, l.y), land.fit * 0.28, 0.85, controls.getAzimuthalAngle());
+      if (!l.locId || !flyToLocation(l.locId)) flyTo(toWorld(l.x, l.y), land.fit * 0.28, 0.85, controls.getAzimuthalAngle());
     }
   });
 
@@ -571,6 +704,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     buildMesh(texture);
     if (style !== first) setStyle(style); // a view with the other style came in while loading
     buildLabels();
+    buildOverlay();
     observer.observe(root);
     resize();
     if (!land.fit) {
@@ -598,6 +732,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     scene.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
     Object.values(geometries).forEach(g => g.dispose());
     Object.values(textures).forEach(t => t.dispose());
+    overlay?.tex.dispose();
     renderer.dispose();
   }
 
@@ -606,5 +741,5 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (box) box.textContent = `Couldn't load the map: ${err.message}`;
     throw err;
   });
-  return { ready, destroy, getView, setView, home, graphics: gpu };
+  return { ready, destroy, getView, setView, home, setLocations, highlight, flyToLocation, graphics: gpu };
 }

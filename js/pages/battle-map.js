@@ -49,6 +49,17 @@ async function mountRegion() {
       DmAPI.getState('region-map-view').catch(() => null),
     ]);
     const map = mountRegionMap(document.getElementById('mapRegionMap'), { viewOnly: true, rememberStyle: false });
+    // Its names: the DM's locations marked on the map (not the secret ones), fetched again when the DM changes them; the
+    // towns the map was made with until any are marked.
+    const showLocations = async () => {
+      const list = await DmAPI.getState('locations').catch(() => undefined);
+      if (list === undefined) return;
+      const marked = Array.isArray(list) ? list.filter(l => l && l.shape && !l.secret) : [];
+      map.setLocations(marked.length ? marked : null);
+    };
+    showLocations();
+    window.addEventListener('app:dm-state', (e) => { if (e.detail?.key === 'locations') showLocations(); });
+    window.addEventListener('app:live-resync', showLocations);
     let steered = !!view;
     if (view) map.setView(view);
     window.addEventListener('app:region-map-view', (e) => {

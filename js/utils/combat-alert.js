@@ -50,20 +50,44 @@ function _ensureDom() {
       <button class="combat-alert-ok" id="combatAlertOk">OK</button>
     </div>`;
   document.body.appendChild(_overlay);
-  const close = () => { _overlay.style.display = 'none'; if (_resolve) { _resolve(); _resolve = null; } };
+  const close = () => {
+    _overlay.style.display = 'none';
+    if (_resolve) { _resolve(); _resolve = null; }
+    _showNextQueued();
+  };
   document.getElementById('combatAlertOk').addEventListener('click', close);
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) close(); });
 }
 
 /** Shows a styled, non-blocking "OK" popup and resolves once dismissed --
- * drop-in replacement for `alert(message)` in the combat tool's own pages. */
+ * drop-in replacement for `alert(message)` in the combat tool's own pages. Another alert already up is replaced -- and
+ * counts as closed, so whatever waits on it carries on instead of waiting for good. */
 export function showCombatAlert(message, { title = '' } = {}) {
   _ensureDom();
+  if (_resolve) { const before = _resolve; _resolve = null; before(); }
   document.getElementById('combatAlertTitle').textContent = title;
   document.getElementById('combatAlertTitle').style.display = title ? 'block' : 'none';
   document.getElementById('combatAlertMessage').textContent = message;
   _overlay.style.display = 'flex';
   return new Promise((resolve) => { _resolve = resolve; });
+}
+
+// Alerts that wait their turn instead of replacing the one up (the user's call, 2026-10-20: a status condition going
+// off, a reminder coming due and an encounter event can all land on the same End Turn -- none may be lost).
+const _queued = [];
+
+/** showCombatAlert, but after whatever alert is up now (and any queued before it) has been closed. */
+export function queueCombatAlert(message, opts = {}) {
+  _ensureDom();
+  return new Promise((resolve) => {
+    _queued.push({ message, opts, resolve });
+    if (_overlay.style.display === 'none') _showNextQueued();
+  });
+}
+
+function _showNextQueued() {
+  const next = _queued.shift();
+  if (next) showCombatAlert(next.message, next.opts).then(next.resolve);
 }
 
 function _ensureConfirmDom() {

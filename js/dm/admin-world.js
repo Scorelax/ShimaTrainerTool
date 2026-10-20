@@ -364,7 +364,7 @@ export async function drawStatuses(body) {
         <h3 class="dm-cs-title">📖 ${escapeHtml(rule.name)}</h3>
         ${field('What it does', `<div class="dm-world-text">${escapeHtml(rule.summary) || '—'}</div>`)}
         ${rule.note ? field('How the app handles it', `<div class="dm-world-text dm-hint">${escapeHtml(rule.note)}</div>`) : ''}
-        <div class="dm-hint">One of the rulebook's conditions -- it's added from a creature's card in a battle (or by a move).</div></div>`;
+        <div class="dm-hint">One of the rulebook's conditions -- it's added from a creature's card in a battle, with 🌀 Give a status in the Battle module, or by a move.</div></div>`;
       return;
     }
     const d = custom.find(x => x.id === _selected.statuses);

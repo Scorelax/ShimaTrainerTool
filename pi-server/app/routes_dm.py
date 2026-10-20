@@ -32,7 +32,7 @@ _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclu
                # The Admin module's world (js/dm/admin-world.js, the user's call, 2026-10-20): planned events, the region's
                # locations, and the DM's own status conditions (their battle triggers run in routes_combat.py)
                'events', 'locations', 'status-conditions',
-               'battle-reminders'}  # the Battle module's DM-only reminders: {logFile, reminders: [...]} (js/dm/reminders.js)
+               'battle-reminders'}  # the Battle module's DM-only reminders: {logFile, list: [...]} (js/dm/battle-live.js)
 # The species the players have ever caught (lowercase names) -- see caught_species.
 _CAUGHT_KEY = 'pokedex-caught'
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and

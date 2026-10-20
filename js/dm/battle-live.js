@@ -17,7 +17,7 @@
 import { CombatAPI, DmAPI, GameDataAPI, setHideBattleLog } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { VISIBILITY_DEFAULTS } from '../utils/combat-visibility.js';
-import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
+import { showCombatAlert, showCombatConfirm, queueCombatAlert } from '../utils/combat-alert.js';
 import { renderCombatWip, attachCombatWipListeners, startDmPlacement, setOnDmFocusChange, setDmMapOpener, focusParticipant, forgetLocalCombatant, setDmEventsTab, refreshDmEventsTab } from '../pages/combat-wip.js';
 import { showBattleMap, hideBattleMap } from '../utils/battle-map-popup.js';
 import { footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
@@ -30,6 +30,7 @@ import { renderMapEditor, editorShownIn } from './map-editor.js';
 import { setLiveSession } from './live-map-store.js';
 import * as liveMapStore from './live-map-store.js';
 import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
+import { sceneHasContent } from '../utils/display-scene.js';
 import { renderEncounters, monConfig } from './encounters.js';
 import { pickMoves } from './move-picker.js';
 import { openPicker } from './picker.js';
@@ -86,10 +87,15 @@ export function updateLive(currentSession) {
 
 let reminders = null; // {logFile, list: [{id, title, description, rounds, startRound, eventId, firedAt, done}]}
 let remSaveTimer = null;
+let remLoading = null; // the log file whose reminders are being fetched
 
 async function loadReminders() {
   const logFile = session.logFile || '';
+  if (remLoading === logFile) return;
+  remLoading = logFile;
   const saved = await DmAPI.getState('battle-reminders').catch(() => null);
+  remLoading = null;
+  if ((session.logFile || '') !== logFile) return; // another battle meanwhile -- its own load follows
   reminders = saved && saved.logFile === logFile && Array.isArray(saved.list) ? saved : { logFile, list: [] };
   renderReminders();
 }
@@ -124,7 +130,7 @@ function remindersNewRound(round) {
   due.forEach((r) => { r.firedAt = round; });
   if (!due.length) return;
   saveRemindersSoon();
-  showCombatAlert(due.map(r => `⏰ ${r.title}${r.description ? `\n${r.description}` : ''}`).join('\n\n'), { title: `Round ${round}: ${due.length > 1 ? 'reminders' : 'a reminder'} due` });
+  queueCombatAlert(due.map(r => `⏰ ${r.title}${r.description ? `\n${r.description}` : ''}`).join('\n\n'), { title: `Round ${round}: ${due.length > 1 ? 'reminders' : 'a reminder'} due` });
 }
 
 function remindersHtml() {
@@ -256,7 +262,7 @@ function newRound(round) {
     if (ev.trigger === 'recurring') every.push(`${ev.icon || '⚡'} ${ev.name}`);
     if (ev.trigger === 'countdown' && !st.firedAt && round >= dueRound(ev)) {
       st.firedAt = round;
-      showCombatAlert(`${ev.description || ''}${currentStageText(ev)}`.trim() || ev.name, { title: `${ev.icon || '⚡'} ${ev.name || 'Event'} -- round ${round}` });
+      queueCombatAlert(`${ev.description || ''}${currentStageText(ev)}`.trim() || ev.name, { title: `${ev.icon || '⚡'} ${ev.name || 'Event'} -- round ${round}` });
     }
   });
   if (every.length) toast(`Round ${round}: ${every.join(' · ')}`);
@@ -645,11 +651,21 @@ function renderTools(el) {
   document.getElementById('dmGiveStatus').addEventListener('click', () => giveStatus());
   // The display screen: this battle on it, or the regular scene (display-scene.js's hideBattle -- just this battle).
   const showBox = document.getElementById('dmShowBattle');
-  const syncShowBox = () => { if (showBox.isConnected) showBox.checked = !(getScene().hideBattle && getScene().hideBattle === session?.logFile); };
+  const syncShowBox = () => {
+    if (!showBox.isConnected) return;
+    const sc = getScene();
+    const hidden = !!sc.hideBattle && sc.hideBattle === session?.logFile;
+    const covered = !!sc.override || (!!sc.overBattle && sceneHasContent(sc)); // display.html's overScene()
+    showBox.checked = !hidden && !covered;
+    showBox.title = covered && !hidden ? 'A Display scene with Override on is over the battle -- tick to bring the battle back' : '';
+  };
   loadScene().then(syncShowBox).catch(() => {});
   onSceneChange(syncShowBox);
   showBox.addEventListener('change', () => {
-    updateScene((s) => { s.hideBattle = showBox.checked ? '' : (session?.logFile || ''); });
+    updateScene((s) => {
+      s.hideBattle = showBox.checked ? '' : (session?.logFile || '');
+      if (showBox.checked) { s.overBattle = false; s.override = null; }
+    });
   });
 }
 

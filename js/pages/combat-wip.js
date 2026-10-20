@@ -30,7 +30,7 @@ import { pickRepositionCell } from '../utils/reposition-picker.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells, mapObjectsHtml } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
 import { visibleToViewer, setViewerSeesEverything } from '../utils/combat-visibility.js';
-import { showCombatAlert, showCombatConfirm, showCombatPrompt } from '../utils/combat-alert.js';
+import { showCombatAlert, showCombatConfirm, showCombatPrompt, queueCombatAlert } from '../utils/combat-alert.js';
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
@@ -40,6 +40,7 @@ import { pickOneStatus, pickOneMoveName, pickOneAbility } from '../utils/status-
 import { promptHealRoll, promptDrainRoll, promptValueRoll, promptDamageRoll } from '../utils/heal-popup.js';
 import { abandonMove, pendingMove, commitMove, setOnMovePaid } from '../utils/move-commit.js';
 import { showStatusDetail } from '../utils/status-popup.js';
+import { describeCustomInPlay } from '../utils/custom-status.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler, moveCover } from '../utils/targetability.js';
 import { coverText } from '../utils/cover.js';
@@ -1396,7 +1397,7 @@ const LEGACY_BADGE_NAMES = { poisoned: 'Poison', burned: 'Burn', confused: 'Conf
 function _statusToBadge(st, round) {
   const name = (st.kind === 'condition' && LEGACY_BADGE_NAMES[st.apply]) || statusLabel(st);
   const holder = isConcentrationHolder(st); // concentrating on / charging up a move -- the card's Concentration section
-  return { name, description: describeStatusEnds(st, round), duration: -1, serverStatusId: st.id, concentration: isConcentration(st),
+  return { name, description: st.custom ? describeCustomInPlay(st.custom) : describeStatusEnds(st, round), duration: -1, serverStatusId: st.id, concentration: isConcentration(st),
     ...(holder ? { concentrationHolder: true, charging: st.apply === 'charging', moveName: st.moveName || '?' } : {}) };
 }
 
@@ -7187,15 +7188,8 @@ function _showStatusNotices(s) {
   _statusNoticesShown.add(n.id);
   _statusNoticeOpen = n.id;
   const text = [n.effect ? `${n.name} ${n.effect}.` : '', n.description].filter(Boolean).join(String.fromCharCode(10, 10));
-  // (Another alert taking the popup over closes this one with it -- the watch notices it's gone.)
-  const shown = showCombatAlert(text || `${n.name}'s ${n.status} went off.`, { title: `🌀 ${n.name}: ${n.status}` });
-  const gone = new Promise((resolve) => {
-    const t = setInterval(() => {
-      const el = document.getElementById('combatAlertPopup');
-      if (!el || el.style.display === 'none' || document.getElementById('combatAlertTitle')?.textContent !== `🌀 ${n.name}: ${n.status}`) { clearInterval(t); resolve(); }
-    }, 500);
-  });
-  Promise.race([shown, gone])
+  // Queued: an alert already up (a roll's result, a reminder) is read first, never replaced.
+  queueCombatAlert(text || `${n.name}'s ${n.status} went off.`, { title: `🌀 ${n.name}: ${n.status}` })
     .finally(() => {
       _statusNoticeOpen = null;
       CombatAPI.dismissNotice(n.id).catch(() => {});

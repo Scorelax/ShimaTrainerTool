@@ -18,3 +18,20 @@ export function describeTrigger(d) {
   const eff = d.effect && STATUS_EFFECTS[d.effect] ? ` · ${STATUS_EFFECTS[d.effect]} ${Number(d.amount) || 0}` : '';
   return `${t}${d.recurring ? ' · recurring' : ''}${eff}`;
 }
+
+/** A custom status in play (its stored `custom`, routes_combat.py's _prime_custom_status): when it goes off next and
+ * what happens after -- for the creature card's badge and its detail popup, where "until removed" would be wrong. */
+export function describeCustomInPlay(c) {
+  if (!c || !STATUS_TRIGGERS[c.trigger]) return '';
+  const left = Math.max(1, Number(c.left) || Number(c.turns) || 1);
+  const when = {
+    turn_start: 'at the start of its next turn',
+    turn_end: 'at the end of its next turn',
+    round_start: 'at the top of the initiative order',
+    round_end: 'at the end of the initiative order',
+    turns_start: `at the start of its turn ${left === 1 ? 'next time' : `in ${left} turns`}`,
+    turns_end: `at the end of its turn ${left === 1 ? 'next time' : `in ${left} turns`}`,
+  }[c.trigger];
+  const eff = c.effect && STATUS_EFFECTS[c.effect] && Number(c.amount) > 0 ? ` (${STATUS_EFFECTS[c.effect]} ${Number(c.amount)})` : '';
+  return `Goes off ${when}${eff}${c.recurring ? ', every time' : ', then wears off'}`;
+}

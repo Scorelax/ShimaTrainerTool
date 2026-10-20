@@ -3285,7 +3285,10 @@ def _prime_custom_status(state, target_id, c):
     out = {'trigger': c['trigger'], 'turns': turns, 'left': turns, 'recurring': bool(c.get('recurring')),
            'effect': c.get('effect') if c.get('effect') in _CUSTOM_EFFECTS else '',
            'amount': max(0, js_parse_int(c.get('amount')) or 0), 'description': str(c.get('description') or '')[:600]}
-    out['skip'] = c['trigger'] in ('turn_end', 'turns_end') and target_id == _active_participant_id(state)
+    # Only a turn that's really under way -- not the first one in the order before the battle has started, nor a
+    # creature taking a reaction or a turn the DM gave it (those end without its turn-end hooks)
+    turn_of = state['turnOrder'][state['turnIndex']] if state.get('started') and state['turnOrder'] else None
+    out['skip'] = c['trigger'] in ('turn_end', 'turns_end') and target_id == turn_of
     return out
 
 
@@ -3294,7 +3297,8 @@ def _custom_status_point(state, point, pid=None):
     the custom statuses waiting on it go off -- the "X turns" ones when their count runs out."""
     holders = [state['participants'].get(pid)] if pid else list(state['participants'].values())
     for p in holders:
-        if not p or p.get('status') != 'participating':
+        # Fainted: nothing goes off (a Heal would bring it back, a Damage hit it again) -- it waits, countdown and all
+        if not p or p.get('status') != 'participating' or (js_parse_int(p.get('currentHP')) or 0) <= 0:
             continue
         for st in list(_statuses_of(p)):
             c = st.get('custom')

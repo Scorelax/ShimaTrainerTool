@@ -5,6 +5,7 @@
 // (closed); combat-wip.js does the actual save popup / server call.
 import { statusLabel, describeStatusEnds } from './move-effects.js';
 import { CONDITION_RULES } from './condition-rules.js';
+import { describeCustomInPlay } from './custom-status.js';
 
 function _injectStyles() {
   if (document.getElementById('status-popup-styles')) return;
@@ -49,7 +50,8 @@ export function showStatusDetail(holderName, status, round) {
     const rows = [
       ['On', holderName],
       ['From', from],
-      ['Ends', describeStatusEnds(status, round)],
+      // The DM's own status condition: when it goes off (and whether it wears off after) instead of "until removed"
+      status.custom ? ['When', describeCustomInPlay(status.custom)] : ['Ends', describeStatusEnds(status, round)],
       status.dc ? ['Move DC', status.dc] : null,
       status.note ? ['Note', status.note] : null,
     ].filter(Boolean).map(([k, v]) => `<div class="status-popup-row"><span class="status-popup-key">${k}</span><span>${esc(v)}</span></div>`).join('');

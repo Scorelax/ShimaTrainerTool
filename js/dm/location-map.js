@@ -72,7 +72,7 @@ function loadImage(url) {
 
 /** One shape onto a 2D canvas: `tf` = { s (canvas pixels per painting pixel), ox, oy }. `faint`: another location,
  * there for reference. */
-export function drawShape(ctx, shape, tf, { faint = false, name = '' } = {}) {
+export function drawShape(ctx, shape, tf, { faint = false, name = '', below = 0 } = {}) {
   if (!shape) return;
   const X = x => tf.ox + x * tf.s, Y = y => tf.oy + y * tf.s;
   const gold = faint ? 'rgba(255, 255, 255, 0.75)' : '#ffd23f';
@@ -111,9 +111,12 @@ export function drawShape(ctx, shape, tf, { faint = false, name = '' } = {}) {
       ctx.textAlign = 'center';
       ctx.lineWidth = 3;
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.strokeText(name, X(at[0]), Y(at[1]) - 9);
+      // over the spot -- or, with an icon round it (`below`: half its height on the canvas), under the picture, as on the
+      // PokéNav (the user's call, 2026-10-20: never hidden behind the icon)
+      const ny = below > 0 ? Y(at[1]) + below + 11 : Y(at[1]) - 9;
+      ctx.strokeText(name, X(at[0]), ny);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.fillText(name, X(at[0]), Y(at[1]) - 9);
+      ctx.fillText(name, X(at[0]), ny);
     }
   }
   ctx.restore();
@@ -313,8 +316,15 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(P.shown, ox, oy, W * s, H * s);
     const tf = { s, ox, oy };
-    if (showOthers) others.forEach(o => drawShape(ctx, o.shape, tf, { faint: true, name: o.name || '' }));
+    // the others' icons first, then their marks and names over them: the pin in the middle of its picture, the name under
+    // it (never behind it)
     if (showOthers) otherIcons.forEach(({ o, im }) => { const at = F.iconSpot(o.shape); if (at) drawIcon(ctx, im, { ...o.icon, x: at[0], y: at[1] }, tf, { faint: true }); });
+    if (showOthers) {
+      others.forEach((o) => {
+        const withIcon = otherIcons.some(x => x.o === o);
+        drawShape(ctx, o.shape, tf, { faint: true, name: o.name || '', below: withIcon ? ((o.icon.size || ICON_SIZE.first) / kmPerPx()) * s / 2 : 0 });
+      });
+    }
     const at = icon && iconImg && markSpot();
     // (over an area's fill, under the lines and the tools' marks)
     if (at && kind !== 'area') drawIcon(ctx, iconImg, { ...icon, x: at[0], y: at[1] }, tf, { faint: true });

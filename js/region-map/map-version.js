@@ -1,0 +1,137 @@
+// Which painting the region map is made from (the user's call, 2026-10-20): Shima's map isn't finished, so the DM can
+// upload a new painting from the Admin module's Locations tab (js/dm/map-upload.js) -- lined up with the one in use by a
+// few landmarks, its 3D land built in the browser (make-terrain.js) -- and go back to an older one at any time. Every
+// location's shape is moved onto whichever map is in use, so what's marked on one stays where it is on the next.
+//
+// Kept in the 'region-map' state (with townsSeeded, admin-world.js):
+//   current   the id of the map in use (none: the first one, the files in assets/)
+//   versions  [{ id, name, at (when it was made), W, H (its painting's pixels -- the locations' coordinates while it's
+//             in use), kmPerPx, toBase (the affine [a, b, c, d, e, f] from its pixels to the first painting's: x' = ax +
+//             by + c, y' = dx + ey + f), files: { painting, height, topo, painted } (URLs on the Pi), places: { seaOffset,
+//             scale, towns, spots, water } (as places.json) }]
+// Every map knows where it sits on the first one (toBase), so going from any map to any other is one transform
+// (between()), and going back puts the shapes back where they were.
+import { DmAPI } from '../api.js';
+
+export const FIRST_ID = 'original';
+
+/** The map the 3D region map was first made with (tools/region-map/make_terrain.py, the files in assets/). */
+export const FIRST_MAP = Object.freeze({
+  id: FIRST_ID, name: 'The first map', at: '', W: 941, H: 1672, kmPerPx: 0.12, toBase: [1, 0, 0, 0, 1, 0],
+  files: {
+    painting: 'assets/Shiman Federation.png',
+    height: 'assets/region-map/height.png',
+    topo: 'assets/region-map/topo.jpg',
+    painted: 'assets/region-map/painted.jpg',
+  },
+  places: null,  // assets/region-map/places.json, loaded with it
+});
+
+let _state = null;     // the 'region-map' state's promise
+let _places = null;    // places.json's promise
+let _now = FIRST_MAP;  // the last map in use known here (for kmPerPx(), which can't wait)
+
+// The DM switched maps (here or in another console tab): asked again next time.
+if (typeof window !== 'undefined') {
+  window.addEventListener('app:dm-state', (e) => { if (e.detail?.key === 'region-map') _state = null; });
+  window.addEventListener('app:live-resync', () => { _state = null; });
+}
+
+/** The 'region-map' state ({ townsSeeded, current, versions }), fetched once until it changes. Not reached: thrown,
+ * and asked again next time. */
+export function loadMapState({ fresh = false } = {}) {
+  if (fresh) _state = null;
+  if (!_state) {
+    _state = DmAPI.getState('region-map').then(s => ({ versions: [], ...(s || {}) }));
+    _state.catch(() => { _state = null; });
+  }
+  return _state;
+}
+
+function firstPlaces() {
+  if (!_places) {
+    _places = fetch('assets/region-map/places.json').then((r) => { if (!r.ok) throw new Error("Couldn't load the map's places"); return r.json(); });
+    _places.catch(() => { _places = null; });
+  }
+  return _places;
+}
+
+/** Every map there is, the first one first, each with its places. */
+export async function allMaps(state) {
+  const s = state || await loadMapState();
+  return [{ ...FIRST_MAP, places: await firstPlaces() }, ...(s.versions || [])];
+}
+
+/** The map in use, with its places. The 'region-map' state not reached: the first map (what the board showed before
+ * there were others). */
+export async function currentMap({ fresh = false } = {}) {
+  let s = null;
+  try { s = await loadMapState({ fresh }); } catch (err) { /* the first map */ }
+  const v = s?.current && s.versions?.find(x => x.id === s.current);
+  _now = v || { ...FIRST_MAP, places: await firstPlaces() };
+  return _now;
+}
+
+/** How many km one pixel of the map in use is (the last one loaded). */
+export const kmPerPx = () => _now.kmPerPx || 0.12;
+
+// ---------------------------------------------------------------------------
+// Transforms: [a, b, c, d, e, f] -> x' = a x + b y + c, y' = d x + e y + f
+// ---------------------------------------------------------------------------
+
+export const IDENTITY = [1, 0, 0, 0, 1, 0];
+
+/** m2 after m1. */
+export function compose(m2, m1) {
+  const [a, b, c, d, e, f] = m1;
+  const [A, B, C, D, E, F] = m2;
+  return [A * a + B * d, A * b + B * e, A * c + B * f + C, D * a + E * d, D * b + E * e, D * c + E * f + F];
+}
+
+export function invert(m) {
+  const [a, b, c, d, e, f] = m;
+  const det = a * e - b * d;
+  return [e / det, -b / det, (b * f - c * e) / det, -d / det, a / det, (c * d - a * f) / det];
+}
+
+export const apply = (m, x, y) => [m[0] * x + m[1] * y + m[2], m[3] * x + m[4] * y + m[5]];
+
+/** How much bigger a length gets. */
+export const scaleOf = m => Math.sqrt(Math.abs(m[0] * m[4] - m[1] * m[3]));
+
+/** From one map's pixels to another's. */
+export const between = (from, to) => compose(invert(to.toBase || IDENTITY), from.toBase || IDENTITY);
+
+/** A location's shape moved by `m` (a new object; points kept to a tenth of a pixel). */
+export function transformShape(shape, m) {
+  if (!shape) return shape;
+  const r = v => Math.round(v * 10) / 10;
+  const pt = ([x, y]) => apply(m, x, y).map(r);
+  if (shape.kind === 'pin') { const [x, y] = pt([shape.x, shape.y]); return { ...shape, x, y }; }
+  if (shape.kind === 'path') return { ...shape, anchors: shape.anchors?.map(pt), points: (shape.points || []).map(pt) };
+  if (shape.kind === 'area') return { ...shape, rings: (shape.rings || []).map(ring => ring.map(pt)) };
+  return shape;
+}
+
+/** The turn, size and shift that best lay the `from` points onto the `to` points (least squares; nothing sheared or
+ * stretched one way only) -> { m, error (the points' average miss, in `to` pixels) }. Needs two pairs or more. */
+export function fitSimilarity(from, to) {
+  const n = Math.min(from.length, to.length);
+  if (n < 2) return null;
+  let mx = 0, my = 0, nx = 0, ny = 0;
+  for (let i = 0; i < n; i++) { mx += from[i][0]; my += from[i][1]; nx += to[i][0]; ny += to[i][1]; }
+  mx /= n; my /= n; nx /= n; ny /= n;
+  let sxx = 0, sa = 0, sb = 0;
+  for (let i = 0; i < n; i++) {
+    const x = from[i][0] - mx, y = from[i][1] - my, u = to[i][0] - nx, v = to[i][1] - ny;
+    sxx += x * x + y * y;
+    sa += x * u + y * v;
+    sb += x * v - y * u;
+  }
+  if (sxx < 1e-6) return null;
+  const a = sa / sxx, b = sb / sxx;
+  const m = [a, -b, nx - (a * mx - b * my), b, a, ny - (b * mx + a * my)];
+  let miss = 0;
+  for (let i = 0; i < n; i++) { const [x, y] = apply(m, from[i][0], from[i][1]); miss += Math.hypot(x - to[i][0], y - to[i][1]); }
+  return { m, error: miss / n };
+}

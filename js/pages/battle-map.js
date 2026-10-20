@@ -40,15 +40,18 @@ async function init() {
   mountRegion();
 }
 
-/** The region map, loaded once and kept (put away during a battle, drawn nothing meanwhile), following the DM. */
+/** The region map, loaded once and kept (put away during a battle, drawn nothing meanwhile), following the DM. Made
+ * again on the new map when the DM switches maps (the Admin module's Locations tab, js/dm/map-upload.js, the user's
+ * call, 2026-10-20). */
 async function mountRegion() {
   const box = document.getElementById('mapRegion');
   try {
-    const [{ mountRegionMap }, view] = await Promise.all([
+    const [{ mountRegionMap }, { currentMap }, view] = await Promise.all([
       import('../region-map/region-map.js'),
+      import('../region-map/map-version.js'),
       DmAPI.getState('region-map-view').catch(() => null),
     ]);
-    const map = mountRegionMap(document.getElementById('mapRegionMap'), { viewOnly: true, rememberStyle: false });
+    let map = mountRegionMap(document.getElementById('mapRegionMap'), { viewOnly: true, rememberStyle: false });
     // Its names: the DM's locations marked on the map (not the secret ones), fetched again when the DM changes them; the
     // towns the map was made with until any are marked.
     const showLocations = async () => {
@@ -64,11 +67,22 @@ async function mountRegion() {
     };
     showLocations();
     showParty();
+    const remount = async () => {
+      const next = await currentMap({ fresh: true });
+      if (next.id === map.mapId) return;
+      map.destroy();
+      map = mountRegionMap(document.getElementById('mapRegionMap'), { viewOnly: true, rememberStyle: false });
+      showLocations();
+      showParty();
+      await map.ready;
+      map.home({ ms: 0, azimuth: Math.PI / 2, fill: true });
+    };
     window.addEventListener('app:dm-state', (e) => {
       if (e.detail?.key === 'locations') showLocations();
       if (e.detail?.key === 'party-location') showParty();
+      if (e.detail?.key === 'region-map') remount().catch(err => console.warn('[BattleMap] The new map could not be shown:', err));
     });
-    window.addEventListener('app:live-resync', () => { showLocations(); showParty(); });
+    window.addEventListener('app:live-resync', () => { showLocations(); showParty(); remount().catch(() => {}); });
     let steered = !!view;
     if (view) map.setView(view);
     window.addEventListener('app:region-map-view', (e) => {

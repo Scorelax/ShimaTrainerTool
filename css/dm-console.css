@@ -1528,3 +1528,28 @@ span.dm-trap-pick { cursor: default; }
 .dm-nav-event small { color: var(--dm-muted); font-size: 0.72rem; }
 .dm-nav-loc.party { border-color: rgba(255, 215, 0, 0.55); }
 .dm-nav-loc.lit { border-color: #8fd8ff; background: rgba(143, 216, 255, 0.12); color: #8fd8ff; }
+
+/* Admin › Locations › 🗺 The region map: its paintings, a new one lined up and built (js/dm/map-upload.js, the user's call, 2026-10-20) */
+.dm-mup-list { flex: 1; overflow-y: auto; padding: 1.2rem; max-width: 900px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 0.9rem; }
+.dm-mup-intro { margin: 0; line-height: 1.5; }
+.dm-mup-upload { align-self: flex-start; }
+.dm-mup-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.8rem; }
+.dm-mup-card { display: flex; flex-direction: column; border: 1px solid var(--dm-line); border-radius: 12px; overflow: hidden; background: var(--dm-panel); }
+.dm-mup-card.in-use { border-color: var(--dm-gold); box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.35); }
+.dm-mup-card img { width: 100%; height: 220px; object-fit: contain; background: #0c2240; }
+.dm-mup-cardtext { padding: 0.55rem 0.7rem 0.2rem; display: flex; flex-direction: column; gap: 0.15rem; }
+.dm-mup-cardtext small { color: var(--dm-muted); }
+.dm-mup-cardbtns { display: flex; gap: 0.4rem; align-items: center; padding: 0.4rem 0.7rem 0.7rem; }
+.dm-mup-panes { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: var(--dm-line); }
+.dm-mup-pane { position: relative; display: flex; flex-direction: column; min-height: 0; background: #0c2240; }
+.dm-mup-pane .dm-lme-stage { flex: 1; }
+.dm-mup-cap { padding: 0.35rem 0.7rem; font-weight: 700; font-size: 0.85rem; background: var(--dm-panel); color: var(--dm-muted); }
+.dm-mup .dm-lme-stage canvas { cursor: crosshair; }
+.dm-mup-pairs { display: flex; flex-direction: column; gap: 0.3rem; }
+.dm-mup-pair { display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; }
+.dm-mup-pair span:nth-child(2) { flex: 1; }
+.dm-mup-dot { width: 0.8rem; height: 0.8rem; border-radius: 50%; flex: none; }
+.dm-mup-same { color: #7ee787; }
+.dm-mup-build { flex: 1; overflow-y: auto; padding: 1.2rem; max-width: 760px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 0.8rem; }
+.dm-mup-build .dm-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.dm-mup-preview { align-self: center; max-width: 100%; border-radius: 10px; border: 1px solid var(--dm-line); }

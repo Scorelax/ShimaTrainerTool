@@ -7,7 +7,8 @@
 // A location can be marked on the region map (`shape`, js/dm/location-map.js) -- the 3D map's names and highlights
 // come from these (region-map.js's setLocations; the board screen hears of a change live, routes_dm.save_state).
 // The towns the map was made with (assets/region-map/places.json) are added as locations the first time, already
-// marked ('region-map' state: townsSeeded).
+// marked ('region-map' state: townsSeeded). The tab's 🗺 The region map opens the map's paintings: a new one uploaded,
+// lined up and built, or an older one put back in use (js/dm/map-upload.js, the user's call, 2026-10-20).
 import { DmAPI } from '../api.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
@@ -15,6 +16,7 @@ import { escapeHtml, newId, toast, stepperHtml } from './dm-common.js';
 import { prepareImage } from './display.js';
 import { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger } from '../utils/custom-status.js';
 import { editLocationShape, drawShapePreview, describeShape } from './location-map.js';
+import { currentMap } from '../region-map/map-version.js';
 
 export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
 
@@ -57,7 +59,7 @@ async function seedTowns(list) {
     return; // not known whether it was done: not now
   }
   if (flags.townsSeeded) return;
-  const places = await fetch('assets/region-map/places.json').then(r => r.json()).catch(() => null);
+  const places = (await currentMap().catch(() => null))?.places;
   if (!places?.towns) return;
   places.towns.forEach((t) => {
     const same = list.find(l => String(l.name || '').trim().toLowerCase() === t.name.toLowerCase());
@@ -299,8 +301,18 @@ function wireLocationCombo(box, e, locations, onChange) {
 
 export async function drawLocations(body) {
   let locations, events;
-  try { [locations, events] = await Promise.all([loadLocations(), loadEvents()]); } catch (err) { loadFailed(body, err, drawLocations); return; }
+  try { [locations, events] = await Promise.all([loadLocations(), loadEvents(), currentMap()]); } catch (err) { loadFailed(body, err, drawLocations); return; }
   shell(body, { title: '📍 Locations', newLabel: '＋ New location', searchPh: 'Find a location…' });
+  // the map's paintings (a new one, an older one back): every location moves onto the one in use
+  const maps = document.createElement('button');
+  maps.className = 'dm-btn';
+  maps.textContent = '🗺 The region map';
+  maps.title = 'Upload a new painting of the map, or go back to an older one';
+  document.getElementById('worldNew').after(maps);
+  maps.addEventListener('click', async () => {
+    const { openRegionMaps } = await import('./map-upload.js');
+    openRegionMaps({ locations, onChanged: () => { list(); form(); } });
+  });
   const list = () => {
     const q = document.getElementById('worldSearch').value.trim().toLowerCase();
     const shown = locations.filter(l => !q || `${l.name} ${l.description} ${(l.pois || []).join(' ')}`.toLowerCase().includes(q));

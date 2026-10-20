@@ -31,6 +31,41 @@ export function readFeatures(rgba, W, H) {
   return { W, H, rgba, road, water, forest, density };
 }
 
+/** Everything make_terrain.py's classify() reads from the colours, for building the 3D land from a new painting
+ * (js/region-map/make-terrain.js): { water, white (foam, snow, white walls), cream (the name boxes), snow, red (the red
+ * dots and the roofs), forest, rock, road } -- each a Uint8Array of W x H. */
+export function readColours(rgba, W, H) {
+  const n = W * H;
+  const out = {};
+  ['water', 'white', 'cream', 'snow', 'red', 'forest', 'rock', 'road'].forEach((k) => { out[k] = new Uint8Array(n); });
+  for (let i = 0; i < n; i++) {
+    const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const sat = (mx - mn) / Math.max(mx, 1);
+    const val = mx / 255;
+    const d = Math.max(mx - mn, 1e-3);
+    let hue = mx === r ? (((g - b) / d) % 6 + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    hue *= 60;
+    const water = hue > 185 && hue < 240 && sat > 0.35 && val > 0.2;
+    const white = sat < 0.16 && val > 0.8;
+    const cream = r > 200 && g > 180 && b > 140 && r - b > 18 && sat < 0.35;
+    out.water[i] = water ? 1 : 0;
+    out.white[i] = white ? 1 : 0;
+    out.cream[i] = cream ? 1 : 0;
+    out.snow[i] = white && b >= r - 6 ? 1 : 0;
+    out.red[i] = r > 170 && g < 80 && b < 80 ? 1 : 0;
+    out.forest[i] = hue > 55 && hue < 170 && sat > 0.25 && val < 0.5 ? 1 : 0;
+    const road = val < 0.3 && hue > 0 && hue < 50 && !water;
+    out.road[i] = road ? 1 : 0;
+    const rock = (sat < 0.3 && val > 0.25 && !water && !cream) || (hue > 10 && hue < 45 && sat > 0.2 && sat < 0.6 && val > 0.3 && val < 0.75);
+    out.rock[i] = rock ? 1 : 0;
+  }
+  // the tree shadows are specks: only road lines of some length are kept, and the rock is what isn't road
+  dropSmall(out.road, W, H, 40);
+  for (let i = 0; i < n; i++) if (out.road[i]) out.rock[i] = 0;
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Mask tools
 // ---------------------------------------------------------------------------
@@ -75,7 +110,7 @@ export function erode(mask, W, H, r) {
 }
 
 /** The connected patches (4 ways round) of `mask`: a label per pixel (0 = not in it) and each label's size. */
-function components(mask, W, H) {
+export function components(mask, W, H) {
   const label = new Int32Array(W * H);
   const sizes = [0];
   const stack = new Int32Array(W * H);

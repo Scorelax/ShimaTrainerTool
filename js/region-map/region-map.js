@@ -1,7 +1,8 @@
 // The region map in 3D: the Shiman Federation as a block of land you can turn, tilt, zoom and move -- our own take on
 // the 3D map in Benjakronk's Nynorsk course. Shima is invented, so its heights come from his painted map
 // (tools/region-map/make_terrain.py writes assets/region-map/: the height map, the topographic and the painted map
-// pictures, and places.json with the towns and the red spots).
+// pictures, and places.json with the towns and the red spots) -- or from a newer painting the DM uploaded (the user's
+// call, 2026-10-20: js/region-map/map-version.js says which map is in use, js/dm/map-upload.js makes them).
 //
 // Drag to turn, scroll / pinch to zoom, right-drag / two fingers to move. Only drawn while something moves, so it
 // costs nothing while it's left alone.
@@ -9,7 +10,7 @@
 // Self-contained so it can live in its own page (region-map.html) or be mounted elsewhere -- the DM console's PokeNav
 // steers it (onView) and the table's board screen (battle-map.html) shows it view only, following along (setView):
 // mountRegionMap(root, { onBack, viewOnly, title, rememberStyle, onView }) -> { ready, destroy, getView, setView, home,
-// setLocations, highlight, setParty, flyToLocation, graphics: {renderer, software} }.
+// setLocations, highlight, setParty, flyToLocation, mapId (the map it shows, once ready), graphics: {renderer, software} }.
 // Its names are the DM's locations (setLocations -- the Admin module's Locations tab, each with a `shape` on the map,
 // js/dm/location-map.js) once it's given them, the towns in places.json until then; a highlighted location is drawn
 // onto the land (a glowing line along a route, a forest shaded and outlined, a ring round a town). Where the party is
@@ -20,13 +21,14 @@
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds } from './map-features.js';
+import { currentMap } from './map-version.js';
 
 const BASE = 'assets/region-map/';
-const KM_PER_PX = 0.12;      // one pixel of the painting is 120 m: the island is ~110 x 200 km
+// (one pixel of the first painting is 120 m: the island is ~110 x 200 km -- each map says its own, kmPerPx)
 const EXAG = 3;              // the heights exaggerated, so the mountains read from the air
 const STEP = 3;              // one corner of the land's mesh every this many pixels
 const BLOCK = 60;            // how deep the block of land goes under the sea
-const STYLES = { topo: 'topo.jpg', painted: 'painted.jpg' };
+const STYLES = { topo: 'topo', painted: 'painted' };   // ...the map's files
 const STYLE_KEY = 'rmapStyle';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -34,8 +36,10 @@ const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
 
 /** The height map as tables: metres and what's there (0 sea, 1 land, 2 lake, 3 river) per painting pixel. */
-async function loadHeights(seaOffset) {
-  const blob = await (await fetch(`${BASE}height.png`)).blob();
+async function loadHeights(url, seaOffset) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Couldn't load the map's heights");
+  const blob = await res.blob();
   const bitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
   const canvas = document.createElement('canvas');
   canvas.width = bitmap.width;
@@ -53,15 +57,15 @@ async function loadHeights(seaOffset) {
   return { W: bitmap.width, H: bitmap.height, metres, kind };
 }
 
-function loadTexture(renderer, file) {
+function loadTexture(renderer, url) {
   return new Promise((resolve, reject) => {
-    new THREE.TextureLoader().load(`${BASE}${file}`, (tex) => {
+    new THREE.TextureLoader().load(url, (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
       tex.generateMipmaps = true;
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       resolve(tex);
-    }, undefined, () => reject(new Error(`Couldn't load ${file}`)));
+    }, undefined, () => reject(new Error("Couldn't load the map's picture")));
   });
 }
 
@@ -146,6 +150,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
 
   let land = null;          // { W, H, metres, kind, vert }
   let places = null;
+  let version = null;       // the map shown (map-version.js)
   let mesh = null;
   const geometries = {};    // the land's surface: fine, and coarse (while moving on a slow device)
   const textures = {};
@@ -686,7 +691,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     }
     root.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === next));
     root.classList.toggle('painted', next === 'painted'); // the painting has its own names and red dots
-    if (!textures[next]) textures[next] = await loadTexture(renderer, STYLES[next]);
+    if (!textures[next]) textures[next] = await loadTexture(renderer, version.files[STYLES[next]]);
     if (style !== next || !mesh) return;
     mesh.material.map = textures[next];
     mesh.material.needsUpdate = true;
@@ -722,12 +727,13 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const observer = new ResizeObserver(resize);
 
   async function load() {
-    places = await (await fetch(`${BASE}places.json`)).json();
+    version = await currentMap();
+    places = version.places;
     const first = style;
-    const [heights, texture] = await Promise.all([loadHeights(places.seaOffset), loadTexture(renderer, STYLES[first])]);
+    const [heights, texture] = await Promise.all([loadHeights(version.files.height, places.seaOffset), loadTexture(renderer, version.files[STYLES[first]])]);
     if (destroyed) return;
     textures[first] = texture;
-    land = { ...heights, vert: EXAG / (KM_PER_PX * 1000) };
+    land = { ...heights, vert: EXAG / ((version.kmPerPx || 0.12) * 1000) };
     // the land's middle and how far back the camera has to be to see all of it
     let minX = heights.W, maxX = 0, minY = heights.H, maxY = 0;
     for (let y = 0; y < heights.H; y += 4) {
@@ -780,5 +786,5 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (box) box.textContent = `Couldn't load the map: ${err.message}`;
     throw err;
   });
-  return { ready, destroy, getView, setView, home, setLocations, highlight, setParty, flyToLocation, graphics: gpu };
+  return { ready, destroy, getView, setView, home, setLocations, highlight, setParty, flyToLocation, graphics: gpu, get mapId() { return version?.id || null; } };
 }

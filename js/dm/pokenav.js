@@ -12,6 +12,7 @@ import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, toast, openDmModal } from './dm-common.js';
 import { loadLocations, loadEvents, LOCATION_TYPES } from './admin-world.js';
 import { shapeDistance } from '../region-map/map-features.js';
+import { currentMap, kmPerPx } from '../region-map/map-version.js';
 import { getClock, formatDate, formatTime } from './world-clock.js';
 import { renderAdventure, startAdventure } from './adventure.js';
 
@@ -38,7 +39,19 @@ const TAB_KEY = 'dmPokenavTab'; // the tab open last (this browser only)
 let _tab = 'region';
 
 // Another console tab (or this one's own save coming back) moved the party: shown again when it's this tab's news.
+// The DM switched to another map (the Admin module's Locations tab, js/dm/map-upload.js, the user's call, 2026-10-20):
+// the PokeNav is made again on it.
 if (typeof window !== 'undefined') {
+  window.addEventListener('app:dm-state', async (e) => {
+    if (e.detail?.key !== 'region-map' || !_section || !_map) return;
+    const map = await currentMap({ fresh: true });
+    if (!_map || map.id === _map.mapId || !_section) return;
+    const section = _section;
+    _map.destroy();
+    _map = null;
+    _section = null;
+    renderPokenav(section, { session: _session });
+  });
   window.addEventListener('app:dm-state', async (e) => {
     if (e.detail?.key !== 'party-location' || !_section) return;
     const was = JSON.stringify(_party);
@@ -121,7 +134,6 @@ export async function renderPokenav(section, { session } = {}) {
 // ---------------------------------------------------------------------------
 
 const NEAR_KM = 30;
-const KM_PER_PX = 0.12;   // as region-map.js
 
 let _lit = null;     // the location drawn onto the map here
 let _party = null;   // { locationId, onBoard, at (the world clock's date and time), recent: [ids] }
@@ -167,7 +179,7 @@ async function setPartyAt(id) {
 function nearby(here, locations) {
   if (!here?.shape) return [];
   return locations.filter(l => l.id !== here.id && l.shape)
-    .map(l => ({ l, km: shapeDistance(here.shape, l.shape) * KM_PER_PX }))
+    .map(l => ({ l, km: shapeDistance(here.shape, l.shape) * kmPerPx() }))
     .filter(x => x.km <= NEAR_KM)
     .sort((a, b) => a.km - b.km);
 }

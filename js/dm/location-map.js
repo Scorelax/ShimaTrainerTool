@@ -3,18 +3,19 @@
 // in between, and it follows the road on its own), a Forest an area (one click fills the forest it's in; a brush, an
 // eraser and an outline to tidy it up). Any location can be any of the three.
 //
-// What's kept on the location (`shape`, painting pixels of assets/Shiman Federation.png -- the 3D map's own
-// coordinates, so js/region-map/region-map.js draws it as it is):
+// What's kept on the location (`shape`, painting pixels of the map in use -- assets/Shiman Federation.png, or a newer
+// painting the DM uploaded (js/region-map/map-version.js moves every shape onto it) -- the 3D map's own coordinates, so
+// js/region-map/region-map.js draws it as it is):
 //   { kind: 'pin', x, y }
 //   { kind: 'path', anchors: [[x, y], ...] (the DM's clicks), follow (along the roads), points: [[x, y], ...] (the line) }
 //   { kind: 'area', rings: [[[x, y], ...], ...] (outlines; a hole runs the other way round) }
 // The painting's roads and forests are read from its colours (js/region-map/map-features.js).
 import { escapeHtml, toast } from './dm-common.js';
 import * as F from '../region-map/map-features.js';
+import { currentMap, kmPerPx } from '../region-map/map-version.js';
 
-const SOURCE = 'assets/Shiman Federation.png';     // what the roads and forests are read from
-const SHOWN = 'assets/region-map/painted.jpg';     // what the DM sees (the same painting, twice the size, shaded)
-const KM_PER_PX = 0.12;                            // as region-map.js: one painting pixel is 120 m
+// The map in use's files: its painting (what the roads and forests are read from) and its painted picture (what the DM
+// sees -- the same painting, twice the size, shaded). One painting pixel is kmPerPx() km (120 m on the first map).
 
 export const SHAPE_KINDS = { pin: '📍 One spot', path: '〰️ A line', area: '⬚ An area' };
 
@@ -28,18 +29,22 @@ export function describeShape(s) {
   if (s.kind === 'path') {
     const pts = s.points || [];
     const px = pts.slice(1).reduce((a, p, i) => a + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
-    return `A line, about ${Math.max(1, Math.round(px * KM_PER_PX))} km`;
+    return `A line, about ${Math.max(1, Math.round(px * kmPerPx()))} km`;
   }
   const px = Math.abs((s.rings || []).reduce((a, r) => a + F.ringArea(r), 0));
-  return `An area of about ${Math.max(1, Math.round(px * KM_PER_PX * KM_PER_PX))} km²`;
+  return `An area of about ${Math.max(1, Math.round(px * kmPerPx() * kmPerPx()))} km²`;
 }
 
 let _painting = null;
-/** The painting, loaded once: { W, H (painting pixels), shown (the picture drawn), features (map-features.js) }. */
-export function loadPainting() {
+let _paintingOf = null;
+/** The map in use's painting, loaded once (again after the DM switches maps): { W, H (painting pixels), shown (the
+ * picture drawn), features (map-features.js) }. */
+export async function loadPainting() {
+  const map = await currentMap();
+  if (_paintingOf !== map.id) { _painting = null; _paintingOf = map.id; }
   if (!_painting) {
     _painting = (async () => {
-      const [src, shown] = await Promise.all([loadImage(SOURCE), loadImage(SHOWN)]);
+      const [src, shown] = await Promise.all([loadImage(map.files.painting), loadImage(map.files.painted)]);
       const W = src.naturalWidth, H = src.naturalHeight;
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
@@ -66,7 +71,7 @@ function loadImage(url) {
 
 /** One shape onto a 2D canvas: `tf` = { s (canvas pixels per painting pixel), ox, oy }. `faint`: another location,
  * there for reference. */
-function drawShape(ctx, shape, tf, { faint = false, name = '' } = {}) {
+export function drawShape(ctx, shape, tf, { faint = false, name = '' } = {}) {
   if (!shape) return;
   const X = x => tf.ox + x * tf.s, Y = y => tf.oy + y * tf.s;
   const gold = faint ? 'rgba(255, 255, 255, 0.75)' : '#ffd23f';
@@ -356,7 +361,7 @@ export async function editLocationShape(loc, others = []) {
   function areaText() {
     let n = 0;
     for (let i = 0; i < mask.length; i++) n += mask[i];
-    return n ? `An area of about ${Math.max(1, Math.round(n * KM_PER_PX * KM_PER_PX))} km²` : 'Nothing filled in yet';
+    return n ? `An area of about ${Math.max(1, Math.round(n * kmPerPx() * kmPerPx()))} km²` : 'Nothing filled in yet';
   }
 
   // ---- the pointer ----
@@ -408,7 +413,7 @@ export async function editLocationShape(loc, others = []) {
       remember();
       for (let i = 0; i < mask.length; i++) if (got.mask[i]) mask[i] = e.altKey ? 0 : 1;
       paintMask();
-      if (!e.altKey) toast(`Filled in ${got.kind === 'forest' ? 'the forest' : got.kind === 'water' ? 'the water' : 'the patch'} -- about ${Math.max(1, Math.round(got.size * KM_PER_PX * KM_PER_PX))} km²`);
+      if (!e.altKey) toast(`Filled in ${got.kind === 'forest' ? 'the forest' : got.kind === 'water' ? 'the water' : 'the patch'} -- about ${Math.max(1, Math.round(got.size * kmPerPx() * kmPerPx()))} km²`);
     } else if (areaTool === 'outline') {
       if (lasso.length >= 3 && near(lasso[0], p, 10)) { closeLasso(e.altKey); return; }
       lasso.push(p.map(v => Math.round(v * 10) / 10));

@@ -502,11 +502,14 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     if (!drag) { if (kind === 'area') draw(); return; }
     if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) {
       drag.moved = true;
-      if (drag.mode === 'pin' || drag.mode?.anchor !== undefined) remember();
+      if (drag.mode === 'pin' || Number.isInteger(drag.mode?.anchor)) remember();
     }
     if (!drag.moved) return;
+    // (a line's point dragged is { anchor: its number } -- checked as a number: the brush's mode is the word 'paint', and
+    // every word has an old .anchor() of its own, which made the brush move a line's point instead of painting, the user's
+    // call, 2026-10-20: the brush has to paint while it's dragged)
     if (drag.mode === 'pin') pin = p;
-    else if (drag.mode?.anchor !== undefined) {
+    else if (Number.isInteger(drag.mode?.anchor)) {
       anchors[drag.mode.anchor] = p;
       // straight lines while dragging, along the road again when it's let go
       const i = drag.mode.anchor;
@@ -523,7 +526,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     const d = drag;
     drag = null;
     const p = toPaint(e);
-    if (d.mode?.anchor !== undefined && d.moved) {
+    if (Number.isInteger(d.mode?.anchor) && d.moved) {
       anchors[d.mode.anchor] = snap(p);
       retrace(d.mode.anchor - 1, d.mode.anchor);
     } else if (d.mode === 'pin' && d.moved) {

@@ -1557,3 +1557,20 @@ span.dm-trap-pick { cursor: default; }
 .dm-mup-build { flex: 1; overflow-y: auto; padding: 1.2rem; max-width: 760px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 0.8rem; }
 .dm-mup-build .dm-field { display: flex; flex-direction: column; gap: 0.3rem; }
 .dm-mup-preview { align-self: center; max-width: 100%; border-radius: 10px; border: 1px solid var(--dm-line); }
+
+/* Admin › Locations › 🏰 Location icons: the icons on the Pi, many uploaded at once (js/dm/location-icon.js, the user's call, 2026-10-20) */
+.dm-icl { display: flex; flex-direction: column; gap: 0.8rem; }
+.dm-icl-bar { display: flex; align-items: center; gap: 0.8rem; }
+.dm-icl-bar .dm-btn { flex: none; }
+.dm-icl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; margin-bottom: 0.4rem; }
+.dm-icl-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.5rem; text-align: center;
+  border: 1px solid var(--dm-line); border-radius: 10px; background: var(--dm-panel-2); }
+.dm-icl-card strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.88rem; }
+.dm-icl-card small { color: var(--dm-muted); font-size: 0.74rem; }
+.dm-icl-card .dm-icon-btn { position: absolute; top: 0.35rem; right: 0.35rem; }
+.dm-icl-stage { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.7rem; border: 1px dashed rgba(255, 215, 0, 0.45); border-radius: 10px; }
+.dm-icl-row { display: grid; grid-template-columns: 56px 170px 1fr 170px auto; gap: 0.5rem; align-items: center; }
+.dm-icl-status { font-size: 0.8rem; color: var(--dm-muted); }
+.dm-icl-status.ok { color: #7ee787; }
+.dm-icl-status.bad { color: #ff8a80; }
+.dm-world-icon.small { width: 56px; height: 56px; font-size: 1.2rem; }

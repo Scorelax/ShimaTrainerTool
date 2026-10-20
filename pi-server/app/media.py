@@ -106,6 +106,14 @@ DISPLAY_IMAGE_URL_PREFIX = '/display-images/'
 ADMIN_IMAGE_DIR = os.path.expanduser(os.environ.get('ADMIN_IMAGE_DIR', '~/pokemon-dnd/images/admin'))
 ADMIN_IMAGE_URL_PREFIX = '/admin-images/'
 
+# The locations' icons on the region map (the user's call, 2026-10-20): little models of the places, named
+# "<LocationType>-<LocationName>" -- "Town-Havneby.png", "Cave-Mossy Cave.png" (Town and City are both a city) -- so they
+# can be copied in by hand or uploaded from the DM console's Admin module, one for a location or many at once before the
+# locations are made (routes_dm.save_location_icon). A file can be replaced under the same name, so they're revalidated,
+# not cached hard (main.py). Served at /location-images/.
+LOCATION_IMAGE_DIR = os.path.expanduser(os.environ.get('LOCATION_IMAGE_DIR', '~/pokemon-dnd/images/locations'))
+LOCATION_IMAGE_URL_PREFIX = '/location-images/'
+
 # The item pictures (the user's call, 2026-10-19): named after the item itself, "Frost Ball.png" -- the user adds them by
 # hand, and the DM console's Admin module uploads them the same way (admin.save_item_image). Served at /item-images/.
 ITEM_IMAGE_DIR = os.path.expanduser(os.environ.get('ITEM_IMAGE_DIR', '~/pokemon-dnd/images/items'))

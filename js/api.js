@@ -1506,6 +1506,22 @@ export class DmAPI {
     return (await DmAPI._post('display-image', image, 'Uploading the picture')).data;
   }
 
+  /** The locations' icons on the Pi (~/pokemon-dnd/images/locations, "<Type>-<Name>"): [{file, type, name, url}]. */
+  static async locationIcons() {
+    return (await API.request('dm', 'location-icons', {}, { useCache: false })).data || [];
+  }
+
+  /** A location's icon uploaded ({type, name, data: a data: URL}) -- one with the same type and name replaced. */
+  static async saveLocationIcon(icon) {
+    return (await DmAPI._post('location-icon', icon, 'Uploading the icon')).data;
+  }
+
+  static async deleteLocationIcon(file) {
+    const res = await API.request('dm', 'delete-location-icon', { file }, { useCache: false });
+    if (res.status !== 'success') throw new Error(res.error || "Couldn't delete the icon");
+    return res;
+  }
+
   static async deleteDisplayImage(id) {
     return API.request('dm', 'delete-display-image', { id }, { useCache: false });
   }

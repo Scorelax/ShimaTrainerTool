@@ -46,7 +46,8 @@ _VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', media.CHARACTER_IMA
 # version (their filenames stay constant even when the content behind them
 # changes), so they can't be cached hard the same way -- they keep
 # revalidating every load instead, same as before.
-_REVALIDATED_MEDIA_PREFIXES = (media.SPLASH_URL_PREFIX, media.BADGE_URL_PREFIX, '/assets/', '/battle-images/')
+_REVALIDATED_MEDIA_PREFIXES = (media.SPLASH_URL_PREFIX, media.BADGE_URL_PREFIX, '/assets/', '/battle-images/',
+                               media.LOCATION_IMAGE_URL_PREFIX)
 
 
 @app.middleware('http')
@@ -327,6 +328,12 @@ def dm_admin_picture(payload: dict):
     return _admin(lambda: routes_dm.save_admin_picture(payload))
 
 
+@app.post('/api/dm/location-icon')
+def dm_location_icon(payload: dict):
+    """A location's icon for the region map ({type, name, data}) into the locations' icon folder -> the icon."""
+    return _admin(lambda: routes_dm.save_location_icon(payload))
+
+
 @app.post('/api/dm/npc-image')
 def dm_save_npc_image(payload: dict):
     """A picture for an NPC uploaded from the DM's computer, into the NPC pictures folder (routes_dm.save_npc_image)."""
@@ -461,6 +468,7 @@ for _folder, _prefix, _name in ((media.POKEMON_IMAGE_DIR, media.POKEMON_IMAGE_UR
                                 (media.NPC_IMAGE_DIR, media.NPC_IMAGE_URL_PREFIX, 'npc-images'),
                                 (media.ITEM_IMAGE_DIR, media.ITEM_IMAGE_URL_PREFIX, 'item-images'),
                                 (media.ADMIN_IMAGE_DIR, media.ADMIN_IMAGE_URL_PREFIX, 'admin-images'),
+                                (media.LOCATION_IMAGE_DIR, media.LOCATION_IMAGE_URL_PREFIX, 'location-images'),
                                 (media.BADGE_DIR, media.BADGE_URL_PREFIX, 'badges'),
                                 (media.SPLASH_DIR, media.SPLASH_URL_PREFIX, 'splashes')):
     os.makedirs(_folder, exist_ok=True)

@@ -6,6 +6,7 @@ the shared pokedex has unlocked for players -- the DM sets up encounters with Po
 import json
 import os
 import re
+from urllib.parse import quote
 from datetime import datetime, timezone
 
 from . import gamedata, media, owned, routes_combat, trainers
@@ -159,6 +160,13 @@ def handle(conn, action, params):
 
     if action == 'display-images':
         return {'status': 'success', 'data': list_display_images(conn)}
+
+    if action == 'location-icons':
+        return {'status': 'success', 'data': list_location_icons()}
+
+    if action == 'delete-location-icon':
+        delete_location_icon(params.get('file'))
+        return {'status': 'success'}
 
     if action == 'delete-display-image':
         if not params.get('id'):
@@ -636,6 +644,75 @@ def save_admin_picture(payload):
     with open(os.path.join(media.ADMIN_IMAGE_DIR, name), 'wb') as f:
         f.write(raw)
     return {'url': media.ADMIN_IMAGE_URL_PREFIX + name}
+
+
+# The locations' icons (media.LOCATION_IMAGE_DIR, the user's call, 2026-10-20): "<LocationType>-<LocationName>.png".
+# The type as the file says it -> the Admin module's location type (Town and City are both a city).
+_ICON_TYPES = {'city': 'city', 'town': 'city', 'route': 'route', 'cave': 'cave', 'forest': 'forest'}
+# ...and how a new one is named
+_ICON_TYPE_NAMES = {'city': 'City', 'route': 'Route', 'cave': 'Cave', 'forest': 'Forest'}
+_ICON_EXTS = ('.png', '.webp', '.jpg', '.jpeg', '.gif')
+
+
+def _icon_entry(filename):
+    stem = os.path.splitext(filename)[0]
+    kind, sep, name = stem.partition('-')
+    loc_type = _ICON_TYPES.get(kind.strip().lower()) if sep else None
+    return {'file': filename, 'type': loc_type or '', 'name': name.strip() if loc_type else stem,
+            'url': media.LOCATION_IMAGE_URL_PREFIX + quote(filename)}
+
+
+def list_location_icons():
+    """Every icon in the folder, by name: [{file, type ('' when its name doesn't start with a known type), name (the
+    location's), url}]."""
+    try:
+        files = os.listdir(media.LOCATION_IMAGE_DIR)
+    except OSError:
+        return []
+    return sorted((_icon_entry(f) for f in files if f.lower().endswith(_ICON_EXTS)
+                   and os.path.isfile(os.path.join(media.LOCATION_IMAGE_DIR, f))), key=lambda e: (e['type'], e['name'].lower()))
+
+
+def save_location_icon(payload):
+    """POST /api/dm/location-icon: {type (city / route / cave / forest), name (the location's), data: "data:image/..."}
+    -> written as "<Type>-<name>" (one already there under that name -- in any picture format -- replaced) -> the icon."""
+    import base64
+    loc_type = _ICON_TYPES.get(str(payload.get('type') or '').lower())
+    if not loc_type:
+        raise ValueError('Pick a location type for the icon')
+    name = re.sub(r'\s+', ' ', re.sub(r'[\\/:*?"<>|\x00-\x1f]', '', str(payload.get('name') or ''))).strip().strip('.')[:80]
+    if not name:
+        raise ValueError('The icon needs a location name')
+    m = re.match(r'^data:(image/[a-z+.-]+);base64,(.+)$', str(payload.get('data') or ''), re.S)
+    if not m or m.group(1) not in _IMAGE_TYPES:
+        raise ValueError("That isn't a picture (PNG, WebP, JPG or GIF)")
+    raw = base64.b64decode(m.group(2))
+    if len(raw) > _MAX_IMAGE_BYTES:
+        raise ValueError('That picture is too big (15 MB at most)')
+    os.makedirs(media.LOCATION_IMAGE_DIR, exist_ok=True)
+    stem = f'{_ICON_TYPE_NAMES[loc_type]}-{name}'
+    # the same location's icon under another type word or format goes (a "Town-" file for a city, a .jpg for a .png)
+    for e in list_location_icons():
+        if e['type'] == loc_type and e['name'].lower() == name.lower():
+            try:
+                os.remove(os.path.join(media.LOCATION_IMAGE_DIR, e['file']))
+            except OSError:
+                pass
+    filename = stem + _IMAGE_TYPES[m.group(1)]
+    with open(os.path.join(media.LOCATION_IMAGE_DIR, filename), 'wb') as f:
+        f.write(raw)
+    return _icon_entry(filename)
+
+
+def delete_location_icon(filename):
+    """One icon taken out of the folder (a location using it keeps its spot and size, without a picture)."""
+    filename = os.path.basename(str(filename or ''))
+    if not filename or not filename.lower().endswith(_ICON_EXTS):
+        raise ValueError('No such icon')
+    try:
+        os.remove(os.path.join(media.LOCATION_IMAGE_DIR, filename))
+    except OSError:
+        raise ValueError('No such icon')
 
 
 def save_display_image(conn, payload):

@@ -18,14 +18,13 @@ import { openPicker } from './picker.js';
 import { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger } from '../utils/custom-status.js';
 import { editLocationShape, drawShapePreview, describeShape } from './location-map.js';
 import { currentMap } from '../region-map/map-version.js';
-import { placeLocationIcon, ICON_SIZE } from './location-icon.js';
+import { placeLocationIcon, ICON_SIZE, iconFor, uploadIcon, pickLibraryIcon, openIconLibrary } from './location-icon.js';
 
 export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
 
 export const LOCATION_TYPES = { city: '🏙️ City', route: '🛤️ Route', cave: '🕳️ Cave', forest: '🌲 Forest' };
 
 const PICTURE_SIDE = 1600;
-const ICON_SIDE = 600;   // a location's icon on the map: never shown big
 
 // ---------------------------------------------------------------------------
 // The records, kept on the Pi
@@ -208,6 +207,17 @@ async function pickBackground() {
   return key ? images.find(b => b.id === key)?.url || null : null;
 }
 
+/** A picture file picked on the DM's computer (null: none). */
+function pickIconFile() {
+  return new Promise((resolve) => {
+    const el = document.createElement('input');
+    el.type = 'file';
+    el.accept = 'image/png,image/webp,image/jpeg,image/gif';
+    el.addEventListener('change', () => resolve(el.files?.[0] || null));
+    el.click();
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
@@ -335,6 +345,9 @@ function wireLocationCombo(box, e, locations, onChange) {
 export async function drawLocations(body) {
   let locations, events;
   try { [locations, events] = await Promise.all([loadLocations(), loadEvents(), currentMap()]); } catch (err) { loadFailed(body, err, drawLocations); return; }
+  // the icon library on the Pi (location-icon.js): fetched again after an upload, for a location to find its own
+  let library = [];
+  const loadLibrary = () => DmAPI.locationIcons().then((l) => { library = l; }).catch(() => {});
   shell(body, { title: '📍 Locations', newLabel: '＋ New location', searchPh: 'Find a location…' });
   // the map's paintings (a new one, an older one back): every location moves onto the one in use
   const maps = document.createElement('button');
@@ -342,6 +355,17 @@ export async function drawLocations(body) {
   maps.textContent = '🗺 The region map';
   maps.title = 'Upload a new painting of the map, or go back to an older one';
   document.getElementById('worldNew').after(maps);
+  // the icons on the Pi, many uploaded at once (the locations made later find their own)
+  const iconsBtn = document.createElement('button');
+  iconsBtn.className = 'dm-btn';
+  iconsBtn.textContent = '🏰 Location icons';
+  iconsBtn.title = 'The icons on the Pi -- upload many at once, named <Type>-<Location name>';
+  maps.after(iconsBtn);
+  iconsBtn.addEventListener('click', async () => {
+    await openIconLibrary({ locations, onLocationsChanged: () => { saveSoon('locations'); list(); } });
+    await loadLibrary();
+    form();
+  });
   maps.addEventListener('click', async () => {
     const { openRegionMaps } = await import('./map-upload.js');
     openRegionMaps({ locations, onChanged: () => { list(); form(); } });
@@ -385,8 +409,9 @@ export async function drawLocations(body) {
           <span class="dm-world-icon">${l.icon?.url ? `<img src="${escapeHtml(l.icon.url)}" alt="">` : '🏰'}</span>
           <span class="dm-world-mapside">
             <strong>${l.icon?.url ? `Stands on the map, about ${l.icon.size || ICON_SIZE.first} km tall` : 'No icon'}</strong>
-            <span class="dm-row"><button class="dm-btn small" data-w-act="icon-up">⬆ ${l.icon ? 'Another icon' : 'Upload an icon'}</button>
-              <button class="dm-btn small" data-w-act="icon-pick" title="One of the Display module's backgrounds, already on the Pi">🖼️ Select image</button></span>
+            ${!l.icon?.url && iconFor(library, l) ? `<button class="dm-btn small primary" data-w-act="icon-mine">✨ Use ${escapeHtml(iconFor(library, l).file)}</button>` : ''}
+            <span class="dm-row"><button class="dm-btn small" data-w-act="icon-up" title="Stored on the Pi as ${escapeHtml(`${(l.type || 'city') === 'city' ? 'City' : (l.type || '').replace(/^./, c => c.toUpperCase())}-${l.name || ''}`)}">⬆ ${l.icon ? 'Another icon' : 'Upload an icon'}</button>
+              <button class="dm-btn small" data-w-act="icon-pick" title="One of the icons on the Pi (~/pokemon-dnd/images/locations)">🏰 Select icon</button></span>
             ${l.icon?.url ? `<span class="dm-row"><button class="dm-btn small primary" data-w-act="icon-place">📍 Place and size it</button>
               <button class="dm-btn small danger" data-w-act="icon-remove">Remove</button></span>` : ''}
             <span class="dm-hint">A little model of the place, standing on the 3D map like the painted cities -- a PNG with a see-through background looks best.</span>
@@ -445,9 +470,28 @@ export async function drawLocations(body) {
         if (shape === undefined) return;
         l.shape = shape;
         changed(); form();
-      } else if (act === 'icon-up' || act === 'icon-pick') {
-        // a new picture: placed and sized right away (cancelled: the icon it had stays)
-        const url = act === 'icon-up' ? await uploadPicture(ICON_SIDE) : await pickBackground();
+      } else if (act === 'icon-up' || act === 'icon-pick' || act === 'icon-mine') {
+        // a new picture: placed and sized right away (cancelled: the icon it had stays). Uploaded here, it goes into the
+        // icon library as "<Type>-<the location's name>" (one there already under that name replaced).
+        let url = null;
+        if (act === 'icon-mine') url = iconFor(library, l)?.url || null;
+        else if (act === 'icon-pick') url = await pickLibraryIcon(l);
+        else {
+          if (!String(l.name || '').trim()) { toast('Give the location a name first -- the icon is stored under it'); return; }
+          const file = await pickIconFile();
+          if (!file) return;
+          await loadLibrary();
+          if (iconFor(library, l) && !await showCombatConfirm(`There's an icon for ${l.name} on the Pi already (${iconFor(library, l).file}). Replace it?`, { title: 'Upload an icon', yesLabel: 'Replace it', noLabel: 'Cancel' })) return;
+          try {
+            const r = await uploadIcon({ type: l.type || 'city', name: l.name.trim(), file }, library, locations);
+            url = r.entry.url;
+            if (r.moved) changed();
+          } catch (err) {
+            showCombatAlert(err.message, { title: "Couldn't upload the icon" });
+            return;
+          }
+          loadLibrary();
+        }
         if (!url) return;
         const icon = await placeLocationIcon({ ...l, icon: { ...(l.icon || {}), url } }, locations.filter(x => x !== l));
         if (icon === undefined) return;
@@ -474,6 +518,8 @@ export async function drawLocations(body) {
       }
     },
   });
+  // (once the icons on the Pi are known, a location without an icon offers its own)
+  loadLibrary().then(() => { if (document.getElementById('worldForm')) form(); });
 }
 
 // ---------------------------------------------------------------------------

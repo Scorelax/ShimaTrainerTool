@@ -29,19 +29,20 @@ export function iconImage(url) {
   return _images[url];
 }
 
-/** One icon onto a 2D canvas, standing on its spot (`v` = { s (canvas pixels per painting pixel), ox, oy }). */
+/** One icon onto a 2D canvas, its middle on its spot (`v` = { s (canvas pixels per painting pixel), ox, oy }). */
 export function drawIcon(ctx, img, icon, v, { faint = false } = {}) {
   const h = ((icon.size || ICON_SIZE.first) / kmPerPx()) * v.s;
   const w = (h * img.naturalWidth) / Math.max(1, img.naturalHeight);
   const x = v.ox + icon.x * v.s, y = v.oy + icon.y * v.s;
   ctx.save();
   ctx.globalAlpha = faint ? 0.85 : 1;
-  ctx.drawImage(img, x - w / 2, y - h, w, h);
+  // its middle on the spot, as on the 3D map (the user's call, 2026-10-20: the pin in the middle of the picture)
+  ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
   if (!faint) {
     ctx.strokeStyle = 'rgba(255, 210, 63, 0.9)';
     ctx.setLineDash([5, 4]);
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(x - w / 2, y - h, w, h);
+    ctx.strokeRect(x - w / 2, y - h / 2, w, h);
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.arc(x, y, 4, 0, Math.PI * 2);

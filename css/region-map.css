@@ -33,10 +33,16 @@
   /* the pin on the spot, the name under it (the user's call, 2026-10-20: a location's icon stands above) */
   translate: -50% -5px;
 }
+/* Smaller (75 % of before -- the user's call, 2026-10-20: 65 % first, a little small), and a long name over two lines
+   rather than wide -- "Grand Harbour": at most ~6 letters' width a line, never narrower than its longest word, the
+   lines evened out. Under a location's icon (which stands round the pin) it goes down past the picture: --below, set in
+   region-map.js placeLabels. */
 .rmap-name {
   font-family: 'Chakra Petch', 'Outfit', sans-serif;
-  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; white-space: nowrap;
-  padding: 1px 6px; border-radius: 5px;
+  font-size: 0.48rem; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; line-height: 1.15;
+  white-space: normal; text-align: center; text-wrap: balance; max-width: 6.5em; min-width: min-content;
+  margin-top: max(0px, calc(var(--below, 0px) - 8px));
+  padding: 1px 5px; border-radius: 4px;
   /* a little see-through, so the land shows behind it */
   color: #2a1d10; background: linear-gradient(rgba(251, 243, 226, 0.78), rgba(233, 217, 184, 0.78)); border: 1px solid rgba(74, 53, 32, 0.85);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
@@ -69,17 +75,20 @@
 .rmap-label.region {
   margin: 0; padding: 0; border: none; background: none; cursor: pointer; pointer-events: auto;
   translate: -50% -50%;
-  font-family: 'Chakra Petch', 'Outfit', sans-serif; font-size: 0.74rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
+  font-family: 'Chakra Petch', 'Outfit', sans-serif; font-size: 0.56rem; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase;
+  white-space: normal; text-align: center; text-wrap: balance; line-height: 1.15; max-width: 7em; min-width: min-content;
   color: #fff8e6; text-shadow: 0 0 3px #1d1405, 0 1px 3px rgba(0, 0, 0, 0.8);
   transition: opacity 0.25s;
 }
 .rmap-label.region.area { font-style: italic; color: #e9ffd9; }
-/* a route or a forest with an icon standing on its middle: the name just under it, like a town's */
-.rmap-label.region.has-icon { translate: -50% 3px; }
+/* a route or a forest with an icon on its middle: the name just under the picture, like a town's (--below: half the
+   icon's height on the screen) */
+.rmap-label.region.has-icon { translate: -50% calc(var(--below, 0px) + 2px); }
 /* where the party is (setParty): the players' marker, fading out over a second and back in over a second, over and
    over, standing on its location's spot; its size (--mk) set from the screen and the zoom in region-map.js's
    placeLabels */
-.rmap-label.party { translate: -50% -92%; pointer-events: none; z-index: 2; }
+/* (on top of the location's icon when it has one: --above, half the icon's height on the screen) */
+.rmap-label.party { translate: -50% calc(-92% - var(--above, 0px)); pointer-events: none; z-index: 2; }
 .rmap-party-marker {
   display: block; width: var(--mk, 40px); height: var(--mk, 40px); image-rendering: pixelated;
   filter: drop-shadow(0 0 2px #fff) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
@@ -155,7 +164,8 @@
    to a touch, and the names are a size up to read from the chairs. */
 .rmap.view-only, .rmap.view-only * { pointer-events: none !important; }
 .rmap.view-only .rmap-canvas { cursor: default; }
-.rmap.view-only .rmap-name { font-size: 1.05rem; padding: 3px 10px; }
+.rmap.view-only .rmap-name { font-size: 0.79rem; padding: 2px 7px; }
+.rmap.view-only .rmap-label.region { font-size: 0.68rem; }
 .rmap.view-only .rmap-pin { width: 12px; height: 12px; }
 .rmap.view-only.painted .rmap-pin { width: 16px; height: 16px; }
 .rmap.view-only .rmap-spot { width: 16px; height: 16px; }
@@ -164,5 +174,5 @@
 @media (max-width: 520px) {
   .rmap-title { font-size: 1.05rem; }
   .rmap-btn, .rmap-seg button { padding: 7px 10px; font-size: 0.8rem; }
-  .rmap-name { font-size: 0.68rem; padding: 1px 6px; }
+  .rmap-name { font-size: 0.51rem; padding: 1px 5px; }
 }

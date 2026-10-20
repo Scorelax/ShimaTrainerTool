@@ -374,7 +374,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   }
 
   // ---------------------------------------------------------------------------
-  // The locations' icons: a picture standing on its spot, always facing the camera, drawn over the land (never hidden
+  // The locations' icons: a picture with its middle on its spot, always facing the camera, drawn over the land (never hidden
   // in a hillside) like the labels
   // ---------------------------------------------------------------------------
 
@@ -396,12 +396,15 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     icons.length = 0;
     (locations || []).forEach((l) => {
       const ic = l.icon;
-      const at = ic?.url && iconSpot(l.shape);   // standing on its mark (map-features.js)
+      const at = ic?.url && iconSpot(l.shape);   // on its mark (map-features.js)
       if (!at) return;
       const [ix, iy] = at;
       const tall = (ic.size || 5) / land.kmPerPx;   // km -> painting pixels (the world's units across the land)
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false }));
-      sp.center.set(0.5, 0);   // standing on its spot
+      // its middle on the spot, the pin in the middle of the picture (the user's call, 2026-10-20) -- the name goes under
+      // the picture (placeLabels: userData)
+      sp.center.set(0.5, 0.5);
+      sp.userData = { locId: l.id, tall };
       sp.renderOrder = 2;
       sp.visible = false;
       sp.position.copy(toWorld(ix, iy, heightAt(ix, iy)));
@@ -476,6 +479,13 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     // A minor location's name only closer in than 60 % of the whole-island view the compass goes back to (the user's
     // call, 2026-10-20): from far out only the major locations are named.
     const minorAway = dist > fillFor(controls.getAzimuthalAngle()) * 0.6;
+    // Half an icon's height on the screen, by its location: its name goes that far down, under the picture standing
+    // round the pin, and the party's marker that far up, on top of it (region-map.css --below / --above).
+    const halfIcon = new Map();
+    const pxPerUnit = h / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    icons.forEach((sp) => {
+      if (sp.visible) halfIcon.set(sp.userData.locId, (sp.scale.y / 2) * (pxPerUnit / Math.max(1e-6, camera.position.distanceTo(sp.position))));
+    });
     for (const l of labels) {
       v.copy(l.at).project(camera);
       const visible = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
@@ -485,6 +495,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       // from far away only the towns: the spots and the sea names come in closer
       if (l.kind === 'spot' || l.kind === 'water') l.el.classList.toggle('far', dist > land.fit * 0.75);
       if (l.kind === 'town' || l.kind === 'region') l.el.classList.toggle('unnamed', minorAway && l.el.classList.contains('minor'));
+      const half = halfIcon.get(l.kind === 'party' ? partyAt : l.locId);
+      if (l.kind === 'town' || l.kind === 'region') l.el.style.setProperty('--below', `${Math.round(half || 0)}px`);
+      if (l.kind === 'party') l.el.style.setProperty('--above', `${Math.round(half || 0)}px`);
       // The party's marker as big on any screen and at any zoom (the user's call, 2026-10-20): a share of the screen's
       // height, a little bigger closer in -- never lost when the whole island is in view, never huge up close.
       if (l.kind === 'party') {

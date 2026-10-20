@@ -13,7 +13,7 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, newId, toast } from './dm-common.js';
 import { drawShape } from './location-map.js';
 import {
-  FIRST_ID, allMaps, currentMap, loadMapState, between, compose, invert, apply, scaleOf, transformShape, fitSimilarity,
+  FIRST_ID, allMaps, currentMap, loadMapState, between, compose, invert, apply, scaleOf, transformShape, transformIcon, fitSimilarity,
 } from '../region-map/map-version.js';
 import { SEA_OFFSET, paintTexture } from '../region-map/make-terrain.js';
 
@@ -74,7 +74,7 @@ function buildInWorker(rgba, W, H, options, onStep) {
 // A picture you can zoom (wheel, ＋ －) and move (drag) and click on -- in its map's pixels
 // ---------------------------------------------------------------------------
 
-function makePane(stage, { W, H, draw, onClick }) {
+export function makePane(stage, { W, H, draw, onClick }) {
   const canvas = document.createElement('canvas');
   stage.appendChild(canvas);
   const ctx = canvas.getContext('2d');
@@ -192,8 +192,11 @@ export async function openRegionMaps({ locations, onChanged }) {
     const from = await currentMap({ fresh: true });
     const st = await loadMapState({ fresh: true });
     const m = between(from, target);
-    const before = locations.map(l => l.shape);
-    locations.forEach((l) => { if (l.shape) l.shape = transformShape(l.shape, m); });
+    const before = locations.map(l => [l.shape, l.icon]);
+    locations.forEach((l) => {
+      if (l.shape) l.shape = transformShape(l.shape, m);
+      if (l.icon) l.icon = transformIcon(l.icon, m);   // (its size is in km: the same on every map)
+    });
     try {
       await DmAPI.saveState('locations', locations);
       await DmAPI.saveState('region-map', {
@@ -202,7 +205,7 @@ export async function openRegionMaps({ locations, onChanged }) {
         current: target.id === FIRST_ID ? null : target.id,
       });
     } catch (err) {
-      locations.forEach((l, i) => { l.shape = before[i]; });
+      locations.forEach((l, i) => { [l.shape, l.icon] = before[i]; if (!l.shape) delete l.shape; if (!l.icon) delete l.icon; });
       await DmAPI.saveState('locations', locations).catch(() => {});
       throw err;
     }

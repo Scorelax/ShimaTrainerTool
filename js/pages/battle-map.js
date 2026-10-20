@@ -57,7 +57,7 @@ async function mountRegion() {
     const showLocations = async () => {
       const list = await DmAPI.getState('locations').catch(() => undefined);
       if (list === undefined) return;
-      const marked = Array.isArray(list) ? list.filter(l => l && l.shape && !l.secret) : [];
+      const marked = Array.isArray(list) ? list.filter(l => l && (l.shape || l.icon?.url) && !l.secret) : [];
       map.setLocations(marked.length ? marked : null);
     };
     // ...and where the party is (the DM's PokeNav, 'party-location'), unless the DM keeps it off this screen

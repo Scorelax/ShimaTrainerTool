@@ -64,17 +64,21 @@
   transition: opacity 0.25s;
 }
 .rmap-label.region.area { font-style: italic; color: #e9ffd9; }
-/* where the party is (setParty): the players' marker, fading out and back in a second each way, just under its
-   location's point; its size (--mk) set from the screen and the zoom in region-map.js's placeLabels */
+/* where the party is (setParty): the players' marker, fading out over a second and back in over a second, over and
+   over, just under its location's point; its size (--mk) set from the screen and the zoom in region-map.js's
+   placeLabels */
 .rmap-label.party { translate: -50% -30%; pointer-events: none; z-index: 2; }
 .rmap-party-marker {
   display: block; width: var(--mk, 40px); height: var(--mk, 40px); image-rendering: pixelated;
   filter: drop-shadow(0 0 2px #fff) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
   animation: rmap-party 1s ease-in-out infinite alternate;
-  /* kept on a device set to reduce motion too (styles.css stops every animation there): a slow fade, and the point of it */
+  /* kept going on a computer set to reduce motion too -- styles.css cuts every animation there to one short run, which
+     left the marker faded once and then still (the user's call, 2026-10-20: it fades in and out the whole time) */
   animation-duration: 1s !important;
+  animation-iteration-count: infinite !important;
+  animation-direction: alternate !important;
 }
-@keyframes rmap-party { from { opacity: 1; } to { opacity: 0.15; } }
+@keyframes rmap-party { from { opacity: 1; } to { opacity: 0.1; } }
 .rmap-label.party-here .rmap-name { background: linear-gradient(#fff2b8, #ffd23f); border-color: #6b4a00; }
 .rmap-label.region.party-here { color: #ffd23f; opacity: 1; }
 .rmap.painted .rmap-label.party-here .rmap-name { display: block; }

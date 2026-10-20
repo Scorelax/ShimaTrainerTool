@@ -14,15 +14,18 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import { escapeHtml, newId, toast, stepperHtml } from './dm-common.js';
 import { prepareImage } from './display.js';
+import { openPicker } from './picker.js';
 import { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger } from '../utils/custom-status.js';
 import { editLocationShape, drawShapePreview, describeShape } from './location-map.js';
 import { currentMap } from '../region-map/map-version.js';
+import { placeLocationIcon, ICON_SIZE } from './location-icon.js';
 
 export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
 
 export const LOCATION_TYPES = { city: '🏙️ City', route: '🛤️ Route', cave: '🕳️ Cave', forest: '🌲 Forest' };
 
 const PICTURE_SIDE = 1600;
+const ICON_SIDE = 600;   // a location's icon on the map: never shown big
 
 // ---------------------------------------------------------------------------
 // The records, kept on the Pi
@@ -152,11 +155,13 @@ function pictureHtml(url) {
   return `<div class="dm-world-pic">
     <span class="dm-world-picimg">${url ? `<img src="${escapeHtml(url)}" alt="">` : '<span class="dm-hint">No picture</span>'}</span>
     <span class="dm-row"><button class="dm-btn small" data-w-act="pic">⬆ ${url ? 'Another picture' : 'Upload a picture'}</button>
+    <button class="dm-btn small" data-w-act="pic-pick" title="One of the Display module's backgrounds, already on the Pi">🖼️ Select image</button>
     ${url ? '<button class="dm-btn small danger" data-w-act="pic-remove">Remove</button>' : ''}</span></div>`;
 }
 
-/** A picture from the DM's computer onto the Pi -> its URL (null: none picked / it failed, already told). */
-function uploadPicture() {
+/** A picture from the DM's computer onto the Pi -> its URL (null: none picked / it failed, already told). A PNG stays a
+ * PNG (an icon's see-through background kept). */
+function uploadPicture(maxSide = PICTURE_SIDE) {
   return new Promise((resolve) => {
     const el = document.createElement('input');
     el.type = 'file';
@@ -165,7 +170,7 @@ function uploadPicture() {
       const file = el.files?.[0];
       if (!file) { resolve(null); return; }
       try {
-        resolve((await DmAPI.adminPicture(await prepareImage(file, PICTURE_SIDE))).url);
+        resolve((await DmAPI.adminPicture(await prepareImage(file, maxSide))).url);
       } catch (err) {
         showCombatAlert(err.message, { title: "Couldn't upload the picture" });
         resolve(null);
@@ -173,6 +178,34 @@ function uploadPicture() {
     });
     el.click();
   });
+}
+
+/** One of the pictures already uploaded as backgrounds in the Display module (the user's call, 2026-10-20: no need to
+ * upload the same picture twice) -> its URL (null: none picked / it failed, already told). Searchable by name and by
+ * the folder it's in. The event keeps pointing at the background's file, so deleting it there takes it off here too. */
+async function pickBackground() {
+  let images, folders;
+  try {
+    const [res, f] = await Promise.all([DmAPI.displayImages(), DmAPI.getState('display-folders').catch(() => null)]);
+    images = res.data || [];
+    folders = Array.isArray(f) ? f : [];
+  } catch (err) {
+    showCombatAlert(err.message, { title: "Couldn't load the backgrounds" });
+    return null;
+  }
+  const pathOf = (id) => {
+    const names = [];
+    for (let f = folders.find(x => x.id === id), guard = 0; f && guard < 20; f = folders.find(x => x.id === f.parent), guard++) names.unshift(f.name);
+    return names.join(' › ');
+  };
+  const picked = await openPicker({
+    title: '🖼️ Select an image',
+    items: images.map(b => ({ key: b.id, label: b.name || 'Picture', sub: b.folder ? `📁 ${pathOf(b.folder)}` : '', image: b.url })),
+    hint: "The pictures uploaded as backgrounds in the Display module.",
+    emptyText: 'No backgrounds uploaded yet -- the Display module\'s Backgrounds keeps them.',
+  });
+  const key = picked?.keys?.[0];
+  return key ? images.find(b => b.id === key)?.url || null : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -238,8 +271,8 @@ export async function drawEvents(body) {
         events.splice(events.indexOf(e), 1);
         _selected.events = null;
         changed(); form();
-      } else if (act === 'pic' || act === 'pic-remove') {
-        const url = act === 'pic' ? await uploadPicture() : '';
+      } else if (act === 'pic' || act === 'pic-pick' || act === 'pic-remove') {
+        const url = act === 'pic' ? await uploadPicture() : act === 'pic-pick' ? await pickBackground() : '';
         if (url === null) return;
         e.image = url; changed(); form();
       }
@@ -345,7 +378,20 @@ export async function drawLocations(body) {
           </span>
         </div>
         <label class="dm-check"><input type="checkbox" data-w="secret" ${l.secret ? 'checked' : ''}><span>🔒 Secret
-          <small>Only on your PokéNav -- the table's map doesn't show it or its name.</small></span></label>
+          <small>Only on your PokéNav -- the table's map doesn't show it, its name or its icon.</small></span></label>
+      </div>
+      <div class="dm-field"><label>Icon on the map</label>
+        <div class="dm-world-map">
+          <span class="dm-world-icon">${l.icon?.url ? `<img src="${escapeHtml(l.icon.url)}" alt="">` : '🏰'}</span>
+          <span class="dm-world-mapside">
+            <strong>${l.icon?.url ? `Stands on the map, about ${l.icon.size || ICON_SIZE.first} km tall` : 'No icon'}</strong>
+            <span class="dm-row"><button class="dm-btn small" data-w-act="icon-up">⬆ ${l.icon ? 'Another icon' : 'Upload an icon'}</button>
+              <button class="dm-btn small" data-w-act="icon-pick" title="One of the Display module's backgrounds, already on the Pi">🖼️ Select image</button></span>
+            ${l.icon?.url ? `<span class="dm-row"><button class="dm-btn small primary" data-w-act="icon-place">📍 Place and size it</button>
+              <button class="dm-btn small danger" data-w-act="icon-remove">Remove</button></span>` : ''}
+            <span class="dm-hint">A little model of the place, standing on the 3D map like the painted cities -- a PNG with a see-through background looks best.</span>
+          </span>
+        </div>
       </div>
       ${field('Description', area('description', l.description, 'What the place is like', 5))}
       <div class="dm-field"><label>Points of interest</label>
@@ -390,14 +436,30 @@ export async function drawLocations(body) {
       } else if (act === 'poi-del') {
         l.pois.splice(Number(btn.dataset.i), 1);
         changed(); form();
-      } else if (act === 'pic' || act === 'pic-remove') {
-        const url = act === 'pic' ? await uploadPicture() : '';
+      } else if (act === 'pic' || act === 'pic-pick' || act === 'pic-remove') {
+        const url = act === 'pic' ? await uploadPicture() : act === 'pic-pick' ? await pickBackground() : '';
         if (url === null) return;
         l.image = url; changed(); form();
       } else if (act === 'map') {
         const shape = await editLocationShape(l, locations.filter(x => x !== l && x.shape));
         if (shape === undefined) return;
         l.shape = shape;
+        changed(); form();
+      } else if (act === 'icon-up' || act === 'icon-pick') {
+        // a new picture: placed and sized right away (cancelled: the icon it had stays)
+        const url = act === 'icon-up' ? await uploadPicture(ICON_SIDE) : await pickBackground();
+        if (!url) return;
+        const icon = await placeLocationIcon({ ...l, icon: { ...(l.icon || {}), url } }, locations.filter(x => x !== l));
+        if (icon === undefined) return;
+        l.icon = icon;
+        changed(); form();
+      } else if (act === 'icon-place') {
+        const icon = await placeLocationIcon(l, locations.filter(x => x !== l));
+        if (icon === undefined) return;
+        l.icon = icon;
+        changed(); form();
+      } else if (act === 'icon-remove') {
+        delete l.icon;
         changed(); form();
       } else if (act === 'map-remove') {
         if (!await showCombatConfirm(`Take "${l.name}" off the map? It stays a location, just not marked anywhere.`, { title: 'Take it off the map', yesLabel: 'Take it off', noLabel: 'Cancel' })) return;

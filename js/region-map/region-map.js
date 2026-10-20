@@ -4,7 +4,8 @@
 // pictures, and places.json with the towns and the red spots) -- or from a newer painting the DM uploaded (the user's
 // call, 2026-10-20: js/region-map/map-version.js says which map is in use, js/dm/map-upload.js makes them).
 //
-// Drag to turn, scroll / pinch to zoom, right-drag / two fingers to move. Only drawn while something moves, so it
+// Drag to move, scroll / pinch to zoom, right-drag / two fingers to turn and tilt (the user's call, 2026-10-20: moving
+// is what the left button does on any other map). Only drawn while something moves, so it
 // costs nothing while it's left alone.
 //
 // Self-contained so it can live in its own page (region-map.html) or be mounted elsewhere -- the DM console's PokeNav
@@ -14,8 +15,12 @@
 // Its names are the DM's locations (setLocations -- the Admin module's Locations tab, each with a `shape` on the map,
 // js/dm/location-map.js) once it's given them, the towns in places.json until then; a highlighted location is drawn
 // onto the land (a glowing line along a route, a forest shaded and outlined, a ring round a town). Where the party is
-// (setParty, the user's call, 2026-10-20) has the rest of the map dimmed round it, gold, with a 🧭 marker; a location
-// the DM only looks at (highlight) is drawn in light blue over that.
+// (setParty, the user's call, 2026-10-20) is outlined in gold with the players' marker on it -- the map round it kept
+// as bright as ever; a route or a forest the DM only looks at (highlight) is drawn in light blue (a town or a cave
+// isn't: its own pin is enough, and a ring over it looked odd).
+// A location with an icon (the user's call, 2026-10-20: a little model of the place the DM uploads, js/dm/location-icon.js)
+// has it standing on the land where the DM put it, facing the camera like the painted cities, as tall as the DM set in
+// km -- so it grows and shrinks with the land as the map zooms, and keeps to scale with the others.
 // A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
@@ -145,7 +150,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   controls.zoomToCursor = true;
   controls.maxPolarAngle = 1.2;             // never under the horizon
   controls.rotateSpeed = 0.6;
-  controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+  controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
   controls.enabled = !viewOnly;
 
   let land = null;          // { W, H, metres, kind, vert }
@@ -164,8 +170,10 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const labels = [];
   let locations = null;     // the DM's locations (setLocations), or null: the towns in places.json
   let highlighted = null;   // the id of the location drawn onto the land (the DM looking at it)
-  let partyAt = null;       // the id of the location the party is at (lit up, the rest dimmed)
+  let partyAt = null;       // the id of the location the party is at (outlined in gold, marked)
   let overlay = null;       // ...drawn here: { canvas, ctx, tex, mesh } -- the land's surface again, see-through
+  const icons = [];         // the locations' icons standing on the land (sprites)
+  const iconTextures = {};  // their pictures, by URL (a promise each)
 
   // Painting pixel -> world: x to the east, z to the south, y up (metres scaled by vert).
   const toWorld = (x, y, metres = 0) => new THREE.Vector3(x - land.W / 2, Math.max(metres, 0) * land.vert, y - land.H / 2);
@@ -348,26 +356,61 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const find = id => id && locations?.find(l => l.id === id);
     const party = find(partyAt)?.shape;
     const looked = find(highlighted)?.shape;
-    const hasParty = !!shapeBounds(party), hasLook = !!shapeBounds(looked);
+    const hasParty = !!shapeBounds(party);
+    const hasLook = !!shapeBounds(looked) && looked.kind !== 'pin' && highlighted !== partyAt;
     overlay.mesh.visible = hasParty || hasLook;
     const k = c.width / (land.W - 1);   // painting pixel -> picture pixel (the land's uv runs 0..W-1)
-    if (hasParty) {
-      // the rest of the map dimmed, the party's place cut out of it with a soft edge
-      ctx.save();
-      ctx.fillStyle = 'rgba(6, 12, 30, 0.42)';
-      ctx.fillRect(0, 0, c.width, c.height);
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.shadowColor = '#000';
-      ctx.shadowBlur = 40;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      tracePathOf(ctx, party, k, 110);
-      if (party.kind === 'path') { ctx.lineWidth = 70; ctx.stroke(); } else ctx.fill('evenodd');
-      ctx.restore();
-      drawLit(ctx, party, k, '#ffd23f', 'rgba(255, 214, 70, 0.22)');
-    }
-    if (hasLook && highlighted !== partyAt) drawLit(ctx, looked, k, '#8fd8ff', 'rgba(143, 216, 255, 0.28)');
+    // (the map round the party's place isn't dimmed any more -- the user's call, 2026-10-20: the usual brightness
+    // whether the marker is on it or not)
+    if (hasParty) drawLit(ctx, party, k, '#ffd23f', 'rgba(255, 214, 70, 0.22)');
+    if (hasLook) drawLit(ctx, looked, k, '#8fd8ff', 'rgba(143, 216, 255, 0.28)');
     overlay.tex.needsUpdate = true;
+    dirty = true;
+    wake();
+  }
+
+  // ---------------------------------------------------------------------------
+  // The locations' icons: a picture standing on its spot, always facing the camera, drawn over the land (never hidden
+  // in a hillside) like the labels
+  // ---------------------------------------------------------------------------
+
+  function iconTexture(url) {
+    if (!iconTextures[url]) {
+      iconTextures[url] = new Promise((resolve, reject) => {
+        new THREE.TextureLoader().load(url, (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+          resolve(tex);
+        }, undefined, () => { delete iconTextures[url]; reject(new Error("Couldn't load an icon")); });
+      });
+    }
+    return iconTextures[url];
+  }
+
+  function buildIcons() {
+    icons.forEach((sp) => { scene.remove(sp); sp.material.dispose(); });
+    icons.length = 0;
+    (locations || []).forEach((l) => {
+      const ic = l.icon;
+      if (!ic?.url || !Number.isFinite(ic.x) || !Number.isFinite(ic.y)) return;
+      const tall = (ic.size || 5) / land.kmPerPx;   // km -> painting pixels (the world's units across the land)
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false }));
+      sp.center.set(0.5, 0);   // standing on its spot
+      sp.renderOrder = 2;
+      sp.visible = false;
+      sp.position.copy(toWorld(ic.x, ic.y, heightAt(ic.x, ic.y)));
+      scene.add(sp);
+      icons.push(sp);
+      iconTexture(ic.url).then((tex) => {
+        if (!icons.includes(sp)) return;
+        sp.material.map = tex;
+        sp.material.needsUpdate = true;
+        sp.scale.set((tall * tex.image.width) / Math.max(1, tex.image.height), tall, 1);
+        sp.visible = true;
+        dirty = true;
+        wake();
+      }).catch(() => {});
+    });
     dirty = true;
     wake();
   }
@@ -380,6 +423,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     // party can be in one of them: then nothing is shown there until it is)
     if (!land) return; // put in place once loaded
     buildLabels();
+    buildIcons();
     drawOverlay();
   }
 
@@ -389,7 +433,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (land) drawOverlay();
   }
 
-  /** Where the party is (a location's id; null: nowhere shown) -- lit up, the rest of the map dimmed, and marked. */
+  /** Where the party is (a location's id; null: nowhere shown) -- outlined in gold and marked. */
   function setParty(id) {
     partyAt = id || null;
     if (!land) return;
@@ -404,7 +448,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (!b || !land) return false;
     const az = controls.getAzimuthalAngle();
     if (loc.shape.kind === 'pin') {
-      flyTo(toWorld(b.mid[0], b.mid[1]), land.fit * 0.28, 0.85, az, ms);
+      // looked at from fairly high up -- a little tilt for the mountains, mostly from above (the user's call, 2026-10-20)
+      flyTo(toWorld(b.mid[0], b.mid[1]), land.fit * 0.28, 0.6, az, ms);
       return true;
     }
     // the box turned the way the camera is, fitted to the screen (a little tilted, so a little extra up and down)
@@ -414,7 +459,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const spanX = w * c + h * s + 60, spanZ = (w * s + h * c + 60) * 1.15;
     const dist = Math.max(spanZ / (2 * tanV), spanX / (2 * tanV * camera.aspect)) * 1.1;
     const goal = Math.max(land.fit * 0.18, Math.min(land.fit, dist));
-    flyTo(new THREE.Vector3((b.x0 + b.x1) / 2 - land.W / 2, 0, (b.y0 + b.y1) / 2 - land.H / 2), goal, 0.5, az, ms);
+    flyTo(new THREE.Vector3((b.x0 + b.x1) / 2 - land.W / 2, 0, (b.y0 + b.y1) / 2 - land.H / 2), goal, 0.38, az, ms);
     return true;
   }
 
@@ -434,7 +479,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       // height, a little bigger closer in -- never lost when the whole island is in view, never huge up close.
       if (l.kind === 'party') {
         const grow = Math.min(1.7, Math.max(0.85, (land.fit / dist) ** 0.3));
-        l.el.style.setProperty('--mk', `${Math.round(Math.min(150, Math.max(26, h * 0.055 * grow)))}px`);
+        // half the size it was first (the user's call, 2026-10-20)
+        l.el.style.setProperty('--mk', `${Math.round(Math.min(75, Math.max(13, h * 0.0275 * grow)))}px`);
       }
     }
   }
@@ -720,7 +766,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const town = t.closest('[data-fly]');
     if (town) {
       const l = labels[Number(town.dataset.fly)];
-      if (!l.locId || !flyToLocation(l.locId)) flyTo(toWorld(l.x, l.y), land.fit * 0.28, 0.85, controls.getAzimuthalAngle());
+      if (!l.locId || !flyToLocation(l.locId)) flyTo(toWorld(l.x, l.y), land.fit * 0.28, 0.6, controls.getAzimuthalAngle());
     }
   });
 
@@ -733,7 +779,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const [heights, texture] = await Promise.all([loadHeights(version.files.height, places.seaOffset), loadTexture(renderer, version.files[STYLES[first]])]);
     if (destroyed) return;
     textures[first] = texture;
-    land = { ...heights, vert: EXAG / ((version.kmPerPx || 0.12) * 1000) };
+    land = { ...heights, kmPerPx: version.kmPerPx || 0.12, vert: EXAG / ((version.kmPerPx || 0.12) * 1000) };
     // the land's middle and how far back the camera has to be to see all of it
     let minX = heights.W, maxX = 0, minY = heights.H, maxY = 0;
     for (let y = 0; y < heights.H; y += 4) {
@@ -749,6 +795,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     buildMesh(texture);
     if (style !== first) setStyle(style); // a view with the other style came in while loading
     buildLabels();
+    buildIcons();
     buildOverlay();
     observer.observe(root);
     resize();
@@ -778,6 +825,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     Object.values(geometries).forEach(g => g.dispose());
     Object.values(textures).forEach(t => t.dispose());
     overlay?.tex.dispose();
+    Object.values(iconTextures).forEach(p => p.then(t => t.dispose()).catch(() => {}));
     renderer.dispose();
   }
 

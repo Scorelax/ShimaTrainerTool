@@ -10,7 +10,8 @@
 //             by + c, y' = dx + ey + f), files: { painting, height, topo, painted } (URLs on the Pi), places: { seaOffset,
 //             scale, towns, spots, water } (as places.json) }]
 // Every map knows where it sits on the first one (toBase), so going from any map to any other is one transform
-// (between()), and going back puts the shapes back where they were.
+// (between()), and going back puts the shapes back where they were -- the locations' icons too (their spot moves, their
+// size is in km).
 import { DmAPI } from '../api.js';
 
 export const FIRST_ID = 'original';
@@ -111,6 +112,14 @@ export function transformShape(shape, m) {
   if (shape.kind === 'path') return { ...shape, anchors: shape.anchors?.map(pt), points: (shape.points || []).map(pt) };
   if (shape.kind === 'area') return { ...shape, rings: (shape.rings || []).map(ring => ring.map(pt)) };
   return shape;
+}
+
+/** A location's icon on the map ({url, x, y, size}) moved by `m`: its spot only -- its size is in km, the same on
+ * every map. */
+export function transformIcon(icon, m) {
+  if (!icon || !Number.isFinite(icon.x)) return icon;
+  const [x, y] = apply(m, icon.x, icon.y).map(v => Math.round(v * 10) / 10);
+  return { ...icon, x, y };
 }
 
 /** The turn, size and shift that best lay the `from` points onto the `to` points (least squares; nothing sheared or

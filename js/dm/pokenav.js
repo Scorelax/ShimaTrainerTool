@@ -125,10 +125,10 @@ export async function renderPokenav(section, { session } = {}) {
 // ---------------------------------------------------------------------------
 // Locations (the user's call, 2026-10-20): the Admin module's locations, by type, and the map's names. One that's marked
 // on the map, clicked: the map flies there and it's drawn onto the land in light blue (here only -- the table's map
-// follows the flight); clicked again, it's let go. ⓘ shows what's kept on it.
+// follows the flight); clicked again, it's let go. ⓘ shows the location's info.
 //
 // Where the party is (🧭, the 'party-location' state): picked at the top or with a row's 🧭. The map flies there, lights
-// it up gold with the rest dimmed and a marker on it -- on the table's map too, unless the DM unticks that (a secret
+// it up gold with a marker on it -- on the table's map too, unless the DM unticks that (a secret
 // location never shows there). Under it the events planned there, and at the places within NEAR_KM (touching counts:
 // a route running into the town, the town inside the forest), nearest first.
 // ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ async function drawLocations() {
       <span>${l.id === _party?.locationId ? '🧭 ' : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
       <small>${[!l.shape && 'not on the map', events.some(e => e.locationId === l.id) && `${events.filter(e => e.locationId === l.id).length} event(s)`].filter(Boolean).join(' · ')}</small></button>
     <button class="dm-icon-btn" data-party="${escapeHtml(l.id)}" title="The party is here">🧭</button>
-    <button class="dm-icon-btn" data-info="${escapeHtml(l.id)}" title="What's kept on it">ⓘ</button></div>`;
+    <button class="dm-icon-btn" data-info="${escapeHtml(l.id)}" title="Location info">ⓘ</button></div>`;
   box.innerHTML = `${partyHtml(locations, events)}
     <div class="dm-card-title"><span>📍 Locations</span></div>
     ${Object.entries(LOCATION_TYPES).map(([k, label]) => {

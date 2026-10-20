@@ -1514,6 +1514,10 @@ span.dm-trap-pick { cursor: default; }
 /* PokéNav's locations: one row per location, ⓘ beside it */
 .dm-nav-locrow { display: flex; gap: 0.25rem; align-items: stretch; }
 .dm-nav-locrow .dm-nav-loc { flex: 1; min-width: 0; }
+/* a location inside another, under it a step in (the user's call, 2026-10-20) */
+.dm-nav-locrow.sub { padding-left: calc(var(--depth, 1) * 0.9rem); }
+.dm-nav-subarrow, .dm-world-subarrow { color: var(--dm-muted); font-weight: 400; }
+.dm-pdx-row.dm-world-sub { padding-left: calc(0.4rem + var(--depth, 1) * 1rem); }
 .dm-nav-loc.lit { border-color: var(--dm-gold); background: rgba(255, 215, 0, 0.12); color: var(--dm-gold); }
 .dm-nav-loc.off-map { opacity: 0.6; }
 

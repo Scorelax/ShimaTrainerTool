@@ -17,6 +17,7 @@
 // Show puts one on the display, and its Override (the user's call, 2026-10-20) comes along: with it on, the scene stays
 // over everything during a battle -- the turn order too. The live "During a battle" row has the same switch.
 import { DmAPI } from '../api.js';
+import { parentOf } from '../region-map/map-version.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { renderScene, BATTLE_PICTURES, SCREEN_RATIO, battleOnDisplay, normaliseScene } from '../utils/display-scene.js';
 import { escapeHtml, getSpecies, newId, toast, openDmModal } from './dm-common.js';
@@ -1189,6 +1190,16 @@ function syncLocationFolders(locations) {
     if (!f) { _folders.push({ id: newId('fold'), name, parent: LOCATIONS_FOLDER, locId: l.id }); changed = true; return; }
     if (f.name !== name) { f.name = name; changed = true; }
     if (f.parent && !has(f.parent)) { f.parent = LOCATIONS_FOLDER; changed = true; }   // the folder it was in is gone
+  });
+  // a location inside another: its folder inside that one's (the user's call, 2026-10-20) -- unless the DM has put it
+  // in a folder of their own
+  locations.forEach((l) => {
+    const f = l?.id && _folders.find(x => x.locId === l.id);
+    if (!f) return;
+    const p = parentOf(l, locations);
+    const want = (p && _folders.find(x => x.locId === p.id)?.id) || LOCATIONS_FOLDER;
+    const auto = f.parent === LOCATIONS_FOLDER || _folders.some(x => x.id === f.parent && x.locId);
+    if (auto && f.parent !== want && !folderPath(want).some(x => x.id === f.id)) { f.parent = want; changed = true; }
   });
   _folders.filter(f => f.locId && !ids.has(f.locId)).forEach((f) => {
     const used = (_data.backgrounds || []).some(b => b.folder === f.id) || _folders.some(x => x.parent === f.id);

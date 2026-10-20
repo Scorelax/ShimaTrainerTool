@@ -26,7 +26,7 @@
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds, iconSpot } from './map-features.js';
-import { currentMap, isMajor } from './map-version.js';
+import { currentMap, isMajor, partOfChain } from './map-version.js';
 
 const BASE = 'assets/region-map/';
 // (one pixel of the first painting is 120 m: the island is ~110 x 200 km -- each map says its own, kmPerPx)
@@ -318,9 +318,16 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     drawOverlay();
   }
 
+  /** The highlighted location and the ones it's part of (a sawmill and its forest: lit together), itself first. */
+  function litChain() {
+    const l = highlighted && locations?.find(x => x.id === highlighted);
+    return l ? partOfChain(l, locations) : [];
+  }
+
   function markLabels() {
+    const ids = litChain().map(l => l.id);
     labels.forEach((l) => {
-      l.el.classList.toggle('lit', !!highlighted && l.locId === highlighted);
+      l.el.classList.toggle('lit', !!l.locId && ids.includes(l.locId));
     });
   }
 
@@ -353,14 +360,14 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (!overlay) return;
     const { canvas: c, ctx } = overlay;
     ctx.clearRect(0, 0, c.width, c.height);
-    const find = id => id && locations?.find(l => l.id === id);
-    const looked = find(highlighted)?.shape;
-    const hasLook = !!shapeBounds(looked) && looked.kind !== 'pin';
-    overlay.mesh.visible = hasLook;
+    // what's looked at drawn on the land -- and what it's part of: a sawmill's forest outlined round it (the user's call,
+    // 2026-10-20)
+    const looked = litChain().map(l => l.shape).filter(s => shapeBounds(s) && s.kind !== 'pin');
+    overlay.mesh.visible = looked.length > 0;
     const k = c.width / (land.W - 1);   // painting pixel -> picture pixel (the land's uv runs 0..W-1)
     // (the party's place has nothing drawn on it, nor the map round it dimmed -- the user's call, 2026-10-20: the
     // players' marker on it is enough)
-    if (hasLook) drawLit(ctx, looked, k, '#8fd8ff', 'rgba(143, 216, 255, 0.28)');
+    looked.reverse().forEach(s => drawLit(ctx, s, k, '#8fd8ff', 'rgba(143, 216, 255, 0.28)'));
     overlay.tex.needsUpdate = true;
     dirty = true;
     wake();

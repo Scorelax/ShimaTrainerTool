@@ -17,7 +17,8 @@ import { prepareImage } from './display.js';
 import { openPicker } from './picker.js';
 import { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger } from '../utils/custom-status.js';
 import { editLocationShape, drawShapePreview, describeShape } from './location-map.js';
-import { currentMap, isMajor } from '../region-map/map-version.js';
+import { currentMap, isMajor, parentOf, partOfChain, isTopLocation, withInside } from '../region-map/map-version.js';
+import { iconSpot, pointInRings, shapeBounds } from '../region-map/map-features.js';
 import { ICON_SIZE, iconFor, uploadIcon, pickLibraryIcon, openIconLibrary } from './location-icon.js';
 
 export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
@@ -380,13 +381,18 @@ export async function drawLocations(body) {
   const list = () => {
     const q = document.getElementById('worldSearch').value.trim().toLowerCase();
     const shown = locations.filter(l => !q || `${l.name} ${l.description} ${(l.pois || []).join(' ')}`.toLowerCase().includes(q));
-    document.getElementById('worldList').innerHTML = Object.entries(LOCATION_TYPES).map(([k, label]) => {
-      const here = shown.filter(l => (l.type || 'city') === k).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-      return here.length ? `<div class="dm-cs-group-title">${label}</div>${here.map(l => `
-        <button class="dm-pdx-row${l.id === _selected.locations ? ' selected' : ''}" data-id="${escapeHtml(l.id)}">
+    const byName = (a, b) => String(a.name).localeCompare(String(b.name));
+    // A location inside another is listed under it, a step in, whatever its own type (the user's call, 2026-10-20);
+    // searching lists what matches as it is, each saying what it's part of.
+    const row = (l, depth = 0) => `
+        <button class="dm-pdx-row${l.id === _selected.locations ? ' selected' : ''}${depth ? ' dm-world-sub' : ''}" data-id="${escapeHtml(l.id)}" ${depth ? `style="--depth: ${depth}"` : ''}>
           <span class="dm-pdx-thumb">${l.image ? `<img src="${escapeHtml(l.image)}" alt="">` : '📍'}</span>
-          <span class="dm-pdx-main"><strong>${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' <span title="Secret: not on the table\'s map">🔒</span>' : ''}</strong><small>${l.shape ? '🗺 On the map' : '<span class="dm-warn-text">Not on the map</span>'} · ${events.filter(e => e.locationId === l.id).length} event(s)</small></span><span></span>
-        </button>`).join('')}` : '';
+          <span class="dm-pdx-main"><strong>${depth ? '<span class="dm-world-subarrow">⤷</span> ' : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' <span title="Secret: not on the table\'s map">🔒</span>' : ''}</strong><small>${[q && parentOf(l, locations) && `in ${escapeHtml(parentOf(l, locations).name || 'Unnamed')}`, l.shape ? '🗺 On the map' : '<span class="dm-warn-text">Not on the map</span>', `${events.filter(e => e.locationId === l.id).length} event(s)`, !q && locations.some(x => parentOf(x, locations) === l) && `${locations.filter(x => parentOf(x, locations) === l).length} inside`].filter(Boolean).join(' · ')}</small></span><span></span>
+        </button>`;
+    document.getElementById('worldList').innerHTML = Object.entries(LOCATION_TYPES).map(([k, label]) => {
+      const here = q ? shown.filter(l => (l.type || 'city') === k).sort(byName).map(l => ({ l, depth: 0 }))
+        : withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort(byName), locations);
+      return here.length ? `<div class="dm-cs-group-title">${label}</div>${here.map(({ l, depth }) => row(l, depth)).join('')}` : '';
     }).join('') || `<div class="dm-hint">${locations.length ? 'Nothing matches that.' : 'No locations yet.'}</div>`;
   };
   const form = () => {
@@ -398,6 +404,11 @@ export async function drawLocations(body) {
       <div class="dm-world-formhead">${input('name', l.name, 'Name / title').replace('class="dm-input"', 'class="dm-input dm-world-title"')}
         <button class="dm-btn danger" data-w-act="delete">🗑 Delete</button></div>
       ${field('Location type', `<select class="dm-select" data-w="type">${Object.entries(LOCATION_TYPES).map(([k, lab]) => `<option value="${k}" ${(l.type || 'city') === k ? 'selected' : ''}>${lab}</option>`).join('')}</select>`)}
+      ${field('Part of', `<select class="dm-select" data-w="parentId"><option value="">— Not part of another location —</option>${
+        // never itself, nor one that's inside it (a loop)
+        locations.filter(x => x !== l && !partOfChain(x, locations).includes(l)).sort((a, b) => String(a.name).localeCompare(String(b.name)))
+          .map(x => `<option value="${escapeHtml(x.id)}" ${parentOf(l, locations) === x ? 'selected' : ''}>${(LOCATION_TYPES[x.type || 'city'] || '').split(' ')[0]} ${escapeHtml(x.name || 'Unnamed')}</option>`).join('')
+      }</select><div class="dm-hint">A place inside a bigger one -- a sawmill in a forest: listed under it, and on the PokéNav its outline lights up with it.</div>`)}
       <div class="dm-field"><label>On the map</label>
         <div class="dm-world-map">
           ${l.shape ? '<canvas class="dm-world-mapprev" id="worldMapPrev"></canvas>' : '<button class="dm-world-mapnone" data-w-act="map">🗺<span>Not on the map yet</span></button>'}
@@ -418,7 +429,7 @@ export async function drawLocations(body) {
           <span class="dm-world-icon">${l.icon?.url ? `<img src="${escapeHtml(l.icon.url)}" alt="">` : '🏰'}</span>
           <span class="dm-world-mapside">
             <strong>${!l.icon?.url ? 'No icon' : l.shape ? `Stands on its mark, about ${l.icon.size || ICON_SIZE.first} km tall` : 'Shows once it\'s marked on the map'}</strong>
-            ${!l.icon?.url && iconFor(library, l) ? `<button class="dm-btn small primary" data-w-act="icon-mine">✨ Use ${escapeHtml(iconFor(library, l).file)}</button>` : ''}
+            ${!l.icon?.url && iconFor(library, l) ? `<button class="dm-btn small primary" data-w-act="icon-mine">✔ Use ${escapeHtml(iconFor(library, l).file)}</button>` : ''}
             <span class="dm-row"><button class="dm-btn small" data-w-act="icon-up" title="Stored on the Pi as ${escapeHtml(`${(l.type || 'city') === 'city' ? 'City' : (l.type || '').replace(/^./, c => c.toUpperCase())}-${l.name || ''}`)}">⬆ ${l.icon ? 'Another icon' : 'Upload an icon'}</button>
               <button class="dm-btn small" data-w-act="icon-pick" title="One of the icons on the Pi (~/pokemon-dnd/images/locations)">🏰 Select icon</button></span>
             ${l.icon?.url ? '<span class="dm-row"><button class="dm-btn small danger" data-w-act="icon-remove">Remove</button></span>' : ''}
@@ -459,6 +470,8 @@ export async function drawLocations(body) {
         const n = events.filter(e => e.locationId === l.id).length;
         if (!await showCombatConfirm(`Delete the location "${l.name}"?${n ? ` Its ${n} event(s) stay, without a location.` : ''}`, { title: 'Delete location', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
         locations.splice(locations.indexOf(l), 1);
+        // what was inside it is part of what it was part of now
+        locations.forEach((x) => { if (x.parentId === l.id) x.parentId = l.parentId || ''; });
         if (n) { events.forEach((e) => { if (e.locationId === l.id) e.locationId = ''; }); saveSoon('events'); }
         _selected.locations = null;
         changed(); form();
@@ -477,6 +490,14 @@ export async function drawLocations(body) {
         const shape = await editLocationShape(l, locations.filter(x => x !== l && (x.shape || x.icon)), { onIcon: (icon) => { l.icon = icon; } });
         if (shape === undefined) return;
         l.shape = shape;
+        // marked inside a forest (or another area) and never given a Part of: it's put under it -- the smallest one
+        const at = iconSpot(shape);
+        if (l.parentId === undefined && at) {
+          const size = x => { const b = shapeBounds(x.shape); return (b.x1 - b.x0) * (b.y1 - b.y0); };
+          const holder = locations.filter(x => x !== l && x.shape?.kind === 'area' && pointInRings(x.shape.rings, at[0], at[1]) && !partOfChain(x, locations).includes(l))
+            .sort((a, b) => size(a) - size(b))[0];
+          if (holder) { l.parentId = holder.id; toast(`It's inside ${holder.name || 'an area'}, so it's listed under it -- change that in Part of`); }
+        }
         changed(); form();
       } else if (act === 'icon-up' || act === 'icon-pick' || act === 'icon-mine') {
         // a new picture: it stands on the location's mark at the size the old one had (sized in the mark's editor --

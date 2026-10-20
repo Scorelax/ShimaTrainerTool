@@ -77,6 +77,44 @@ export async function currentMap({ fresh = false } = {}) {
  * come in as it zooms in. Ticked by the DM on the location -- until then a city is, the rest aren't. */
 export const isMajor = l => (typeof l?.major === 'boolean' ? l.major : (l?.type || 'city') === 'city');
 
+// A location inside another (the user's call, 2026-10-20: a sawmill in Inex Woods, with its own mark and icon): it keeps
+// the id of the one it's part of (`parentId`; '' = picked "not part of another", missing = never set -- then marking it
+// inside a forest puts it there, admin-world.js). Listed under it in Admin and the PokéNav; picked on the PokéNav map,
+// the outline of what it's part of is lit with it.
+
+/** The location `l` is part of (null: none, or that one's gone). */
+export function parentOf(l, all) {
+  const p = l?.parentId && all.find(x => x.id === l.parentId);
+  return p && p !== l ? p : null;
+}
+
+/** `l` and the locations it's part of, itself first (stops at a loop). */
+export function partOfChain(l, all) {
+  const out = [];
+  for (let x = l; x && !out.includes(x) && out.length < 12; x = parentOf(x, all)) out.push(x);
+  return out;
+}
+
+/** Whether `l` is listed at the top: part of nothing (or of a loop of them, never hidden). */
+export function isTopLocation(l, all) {
+  const chain = partOfChain(l, all);
+  return chain.length === 1 || !!parentOf(chain[chain.length - 1], all);
+}
+
+/** `tops` (in order) each followed by what's inside it, by name, nested -> [{ l, depth }]. */
+export function withInside(tops, all) {
+  const out = [];
+  const seen = new Set();
+  const walk = (l, depth) => {
+    if (seen.has(l.id)) return;
+    seen.add(l.id);
+    out.push({ l, depth });
+    all.filter(x => parentOf(x, all) === l).sort((a, b) => String(a.name).localeCompare(String(b.name))).forEach(x => walk(x, depth + 1));
+  };
+  tops.forEach(l => walk(l, 0));
+  return out;
+}
+
 /** How many km one pixel of the map in use is (the last one loaded). */
 export const kmPerPx = () => _now.kmPerPx || 0.12;
 

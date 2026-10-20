@@ -12,7 +12,7 @@ import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, toast, openDmModal } from './dm-common.js';
 import { loadLocations, loadEvents, LOCATION_TYPES } from './admin-world.js';
 import { shapeDistance } from '../region-map/map-features.js';
-import { currentMap, kmPerPx } from '../region-map/map-version.js';
+import { currentMap, kmPerPx, parentOf, isTopLocation, withInside } from '../region-map/map-version.js';
 import { getClock, formatDate, formatTime } from './world-clock.js';
 import { renderAdventure, startAdventure } from './adventure.js';
 
@@ -198,7 +198,7 @@ function partyHtml(locations, events) {
   const here = locations.find(l => l.id === _party?.locationId);
   const opts = Object.entries(LOCATION_TYPES).map(([k, label]) => {
     const list = locations.filter(l => (l.type || 'city') === k).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-    return list.length ? `<optgroup label="${escapeHtml(label)}">${list.map(l => `<option value="${escapeHtml(l.id)}" ${l.id === here?.id ? 'selected' : ''}>${escapeHtml(l.name || 'Unnamed')}${l.shape ? '' : ' (not on the map)'}${l.secret ? ' 🔒' : ''}</option>`).join('')}</optgroup>` : '';
+    return list.length ? `<optgroup label="${escapeHtml(label)}">${list.map(l => `<option value="${escapeHtml(l.id)}" ${l.id === here?.id ? 'selected' : ''}>${escapeHtml(l.name || 'Unnamed')}${parentOf(l, locations) ? ` (in ${escapeHtml(parentOf(l, locations).name || 'Unnamed')})` : ''}${l.shape ? '' : ' (not on the map)'}${l.secret ? ' 🔒' : ''}</option>`).join('')}</optgroup>` : '';
   }).join('');
   const recent = (_party?.recent || []).map(id => locations.find(l => l.id === id)).filter(Boolean);
   let eventsHtml = '';
@@ -236,18 +236,19 @@ async function drawLocations() {
   _map?.setLocations(locations);
   _map?.setParty(_party?.locationId);
   if (_lit && !locations.some(l => l.id === _lit && l.shape)) { _lit = null; _map?.highlight(null); }
-  const row = l => `<div class="dm-nav-locrow"><button class="dm-nav-loc${l.id === _lit ? ' lit' : ''}${l.id === _party?.locationId ? ' party' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
+  // a location inside another under it, a step in (the user's call, 2026-10-20) -- picked, what it's part of lights up too
+  const row = (l, depth = 0) => `<div class="dm-nav-locrow${depth ? ' sub' : ''}" ${depth ? `style="--depth: ${depth}"` : ''}><button class="dm-nav-loc${l.id === _lit ? ' lit' : ''}${l.id === _party?.locationId ? ' party' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
       title="${l.shape ? 'Show it on the map' : 'Not marked on the map yet (Admin › Locations)'}">
-      <span>${l.id === _party?.locationId ? `${PARTY_ICON} ` : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
+      <span>${depth ? '<span class="dm-nav-subarrow">⤷</span> ' : ''}${l.id === _party?.locationId ? `${PARTY_ICON} ` : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
       <small>${[!l.shape && 'not on the map', events.some(e => e.locationId === l.id) && `${events.filter(e => e.locationId === l.id).length} event(s)`].filter(Boolean).join(' · ')}</small></button>
     <button class="dm-icon-btn" data-party="${escapeHtml(l.id)}" title="The party is here">${PARTY_ICON}</button>
     <button class="dm-icon-btn" data-info="${escapeHtml(l.id)}" title="Location info">ⓘ</button></div>`;
   box.innerHTML = `${partyHtml(locations, events)}
     <div class="dm-card-title"><span>📍 Locations</span></div>
     ${Object.entries(LOCATION_TYPES).map(([k, label]) => {
-      const here = locations.filter(l => (l.type || 'city') === k).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      const here = withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort((a, b) => String(a.name).localeCompare(String(b.name))), locations);
       return `<div class="dm-nav-locgroup"><div class="dm-cs-group-title">${label} <small>${here.length}</small></div>
-        ${here.map(row).join('') || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
+        ${here.map(({ l, depth }) => row(l, depth)).join('') || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
     }).join('')}
     <div class="dm-hint">Locations are added and marked on the map in the Admin module (📍 Locations).</div>`;
   box.querySelector('#navPartyAt').onchange = e => setPartyAt(e.target.value);

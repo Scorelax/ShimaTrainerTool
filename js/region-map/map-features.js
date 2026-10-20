@@ -459,3 +459,47 @@ function areaMiddle(rings) {
   }
   return best?.at || null;
 }
+
+/** Whether (x, y) is inside the outlines (even-odd: inside a hole is out). */
+export function pointInRings(rings, x, y) {
+  let inside = false;
+  for (const r of rings || []) {
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const [xi, yi] = r[i], [xj, yj] = r[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** Points along a shape's line or outline, at most `step` pixels apart (a spot is its one point). */
+function samplePoints(shape, step = 8) {
+  if (!shape) return [];
+  if (shape.kind === 'pin') return [[shape.x, shape.y]];
+  const lines = shape.kind === 'path' ? [shape.points || []] : (shape.rings || []).map(r => [...r, r[0]]);
+  const out = [];
+  lines.forEach(pts => pts.forEach((p, i) => {
+    if (!i) { out.push(p); return; }
+    const q = pts[i - 1];
+    const n = Math.max(1, Math.ceil(Math.hypot(p[0] - q[0], p[1] - q[1]) / step));
+    for (let k = 1; k <= n; k++) out.push([q[0] + ((p[0] - q[0]) * k) / n, q[1] + ((p[1] - q[1]) * k) / n]);
+  }));
+  return out;
+}
+
+/** How far apart two shapes are at their nearest, in painting pixels: 0 when they touch or one is inside the other (a
+ * city inside a forest, a route running into a town). Infinity when either isn't on the map. */
+export function shapeDistance(a, b) {
+  const pa = samplePoints(a), pb = samplePoints(b);
+  if (!pa.length || !pb.length) return Infinity;
+  if (a.kind === 'area' && pb.some(([x, y]) => pointInRings(a.rings, x, y))) return 0;
+  if (b.kind === 'area' && pa.some(([x, y]) => pointInRings(b.rings, x, y))) return 0;
+  let best = Infinity;
+  for (const p of pa) {
+    for (const q of pb) {
+      const d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2;
+      if (d < best) best = d;
+    }
+  }
+  return Math.sqrt(best);
+}

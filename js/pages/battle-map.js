@@ -57,9 +57,18 @@ async function mountRegion() {
       const marked = Array.isArray(list) ? list.filter(l => l && l.shape && !l.secret) : [];
       map.setLocations(marked.length ? marked : null);
     };
+    // ...and where the party is (the DM's PokeNav, 'party-location'), unless the DM keeps it off this screen
+    const showParty = async () => {
+      const p = await DmAPI.getState('party-location').catch(() => undefined);
+      if (p !== undefined) map.setParty(p && p.onBoard !== false ? p.locationId : null);
+    };
     showLocations();
-    window.addEventListener('app:dm-state', (e) => { if (e.detail?.key === 'locations') showLocations(); });
-    window.addEventListener('app:live-resync', showLocations);
+    showParty();
+    window.addEventListener('app:dm-state', (e) => {
+      if (e.detail?.key === 'locations') showLocations();
+      if (e.detail?.key === 'party-location') showParty();
+    });
+    window.addEventListener('app:live-resync', () => { showLocations(); showParty(); });
     let steered = !!view;
     if (view) map.setView(view);
     window.addEventListener('app:region-map-view', (e) => {

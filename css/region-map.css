@@ -64,10 +64,24 @@
   transition: opacity 0.25s;
 }
 .rmap-label.region.area { font-style: italic; color: #e9ffd9; }
-/* the highlighted location's name */
-.rmap-label.lit .rmap-name { background: linear-gradient(#fff2b8, #ffd23f); border-color: #6b4a00; }
-.rmap-label.lit .rmap-pin { background: #ffd23f; }
-.rmap-label.region.lit { color: #ffd23f; opacity: 1; }
+/* where the party is (setParty): the players' marker, fading out and back in a second each way, just under its
+   location's point; its size (--mk) set from the screen and the zoom in region-map.js's placeLabels */
+.rmap-label.party { translate: -50% -30%; pointer-events: none; z-index: 2; }
+.rmap-party-marker {
+  display: block; width: var(--mk, 40px); height: var(--mk, 40px); image-rendering: pixelated;
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+  animation: rmap-party 1s ease-in-out infinite alternate;
+  /* kept on a device set to reduce motion too (styles.css stops every animation there): a slow fade, and the point of it */
+  animation-duration: 1s !important;
+}
+@keyframes rmap-party { from { opacity: 1; } to { opacity: 0.15; } }
+.rmap-label.party-here .rmap-name { background: linear-gradient(#fff2b8, #ffd23f); border-color: #6b4a00; }
+.rmap-label.region.party-here { color: #ffd23f; opacity: 1; }
+.rmap.painted .rmap-label.party-here .rmap-name { display: block; }
+/* the highlighted location's name (the DM looking at it: light blue) */
+.rmap-label.lit .rmap-name { background: linear-gradient(#eef9ff, #8fd8ff); border-color: #0d4a6b; }
+.rmap-label.lit .rmap-pin { background: #8fd8ff; }
+.rmap-label.region.lit { color: #8fd8ff; opacity: 1; }
 /* the painted map has its own names and red dots: only the pins of the towns it names (to fly there) */
 .rmap.painted .on-painting .rmap-name, .rmap.painted .rmap-label.spot, .rmap.painted .rmap-label.water { display: none; }
 .rmap.painted .rmap-label.lit .rmap-name { display: block; }

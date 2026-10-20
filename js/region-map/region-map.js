@@ -9,10 +9,12 @@
 // Self-contained so it can live in its own page (region-map.html) or be mounted elsewhere -- the DM console's PokeNav
 // steers it (onView) and the table's board screen (battle-map.html) shows it view only, following along (setView):
 // mountRegionMap(root, { onBack, viewOnly, title, rememberStyle, onView }) -> { ready, destroy, getView, setView, home,
-// setLocations, highlight, flyToLocation, graphics: {renderer, software} }.
+// setLocations, highlight, setParty, flyToLocation, graphics: {renderer, software} }.
 // Its names are the DM's locations (setLocations -- the Admin module's Locations tab, each with a `shape` on the map,
 // js/dm/location-map.js) once it's given them, the towns in places.json until then; a highlighted location is drawn
-// onto the land (a glowing line along a route, a forest shaded and outlined, a ring round a town).
+// onto the land (a glowing line along a route, a forest shaded and outlined, a ring round a town). Where the party is
+// (setParty, the user's call, 2026-10-20) has the rest of the map dimmed round it, gold, with a 🧭 marker; a location
+// the DM only looks at (highlight) is drawn in light blue over that.
 // A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
@@ -156,7 +158,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   let destroyed = false;
   const labels = [];
   let locations = null;     // the DM's locations (setLocations), or null: the towns in places.json
-  let highlighted = null;   // the id of the location drawn onto the land
+  let highlighted = null;   // the id of the location drawn onto the land (the DM looking at it)
+  let partyAt = null;       // the id of the location the party is at (lit up, the rest dimmed)
   let overlay = null;       // ...drawn here: { canvas, ctx, tex, mesh } -- the land's surface again, see-through
 
   // Painting pixel -> world: x to the east, z to the south, y up (metres scaled by vert).
@@ -248,6 +251,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       el.className = `rmap-label ${kind}${extra}`;
       if (kind === 'town') el.innerHTML = `<span class="rmap-pin"></span><span class="rmap-name">${esc(name)}</span>`;
       else if (kind === 'spot') el.innerHTML = '<span class="rmap-spot"></span>';
+      // the players' marker (assets/MapMarker.png, the user's pixel-art trainer, kept 32 x 32 here and drawn crisp)
+      else if (kind === 'party') el.innerHTML = `<img class="rmap-party-marker" src="${BASE}party-marker.png" alt="The party">`;
       else el.textContent = name;
       if (kind === 'town' || kind === 'region') el.dataset.fly = labels.length;
       labelLayer.appendChild(el);
@@ -268,7 +273,11 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     }
     places.spots.forEach(s => add('spot', '', s.x, s.y, 25));
     places.water.forEach(w => add('water', w.name, w.x, w.y, 0));
-    labels.forEach(l => l.el.classList.toggle('lit', !!highlighted && l.locId === highlighted));
+    // the party's marker: just under its location's pin or name (region-map.css puts it there, whatever the zoom)
+    const party = partyAt && locations?.find(l => l.id === partyAt);
+    const pb = shapeBounds(party?.shape);
+    if (pb) add('party', '', pb.mid[0], pb.mid[1], party.shape.kind === 'pin' ? 40 : 30);
+    markLabels();
     dirty = true;
     wake();
   }
@@ -295,50 +304,64 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     drawOverlay();
   }
 
+  function markLabels() {
+    labels.forEach((l) => {
+      l.el.classList.toggle('lit', !!highlighted && l.locId === highlighted);
+      l.el.classList.toggle('party-here', !!partyAt && l.locId === partyAt);
+    });
+  }
+
+  /** The shape's own path on the overlay picture (scaled `k`): an area's outline, a line, or a ring round a spot. */
+  function tracePathOf(ctx, shape, k, ring = 30) {
+    ctx.beginPath();
+    if (shape.kind === 'area') shape.rings.forEach((r) => { r.forEach(([x, y], i) => (i ? ctx.lineTo(x * k, y * k) : ctx.moveTo(x * k, y * k))); ctx.closePath(); });
+    else if (shape.kind === 'path') shape.points.forEach(([x, y], i) => (i ? ctx.lineTo(x * k, y * k) : ctx.moveTo(x * k, y * k)));
+    else ctx.arc(shape.x * k, shape.y * k, ring, 0, Math.PI * 2);
+  }
+
+  /** One location drawn: shaded and outlined (an area, a spot's ring) or a glowing line (a route), in `colour`. */
+  function drawLit(ctx, shape, k, colour, fill) {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    tracePathOf(ctx, shape, k);
+    if (shape.kind !== 'path') { ctx.fillStyle = fill; ctx.fill('evenodd'); }
+    ctx.lineWidth = shape.kind === 'path' ? 16 : shape.kind === 'pin' ? 12 : 9;
+    ctx.strokeStyle = 'rgba(30, 20, 0, 0.55)';
+    ctx.stroke();
+    ctx.lineWidth = shape.kind === 'path' ? 8 : shape.kind === 'pin' ? 7 : 4.5;
+    ctx.strokeStyle = colour;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function drawOverlay() {
-    labels.forEach(l => l.el.classList.toggle('lit', !!highlighted && l.locId === highlighted));
+    markLabels();
     if (!overlay) return;
     const { canvas: c, ctx } = overlay;
     ctx.clearRect(0, 0, c.width, c.height);
-    const loc = highlighted && locations?.find(l => l.id === highlighted);
-    const shape = loc?.shape;
-    overlay.mesh.visible = !!shapeBounds(shape);
-    if (overlay.mesh.visible) {
-      const k = c.width / (land.W - 1);   // painting pixel -> picture pixel (the land's uv runs 0..W-1)
+    const find = id => id && locations?.find(l => l.id === id);
+    const party = find(partyAt)?.shape;
+    const looked = find(highlighted)?.shape;
+    const hasParty = !!shapeBounds(party), hasLook = !!shapeBounds(looked);
+    overlay.mesh.visible = hasParty || hasLook;
+    const k = c.width / (land.W - 1);   // painting pixel -> picture pixel (the land's uv runs 0..W-1)
+    if (hasParty) {
+      // the rest of the map dimmed, the party's place cut out of it with a soft edge
       ctx.save();
+      ctx.fillStyle = 'rgba(6, 12, 30, 0.42)';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.shadowColor = '#000';
+      ctx.shadowBlur = 40;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      if (shape.kind === 'area') {
-        ctx.beginPath();
-        shape.rings.forEach((r) => { r.forEach(([x, y], i) => (i ? ctx.lineTo(x * k, y * k) : ctx.moveTo(x * k, y * k))); ctx.closePath(); });
-        ctx.fillStyle = 'rgba(255, 214, 70, 0.3)';
-        ctx.fill('evenodd');
-        ctx.lineWidth = 9;
-        ctx.strokeStyle = 'rgba(30, 20, 0, 0.55)';
-        ctx.stroke();
-        ctx.lineWidth = 4.5;
-        ctx.strokeStyle = '#ffd23f';
-        ctx.stroke();
-      } else if (shape.kind === 'path') {
-        ctx.beginPath();
-        shape.points.forEach(([x, y], i) => (i ? ctx.lineTo(x * k, y * k) : ctx.moveTo(x * k, y * k)));
-        ctx.lineWidth = 16;
-        ctx.strokeStyle = 'rgba(30, 20, 0, 0.55)';
-        ctx.stroke();
-        ctx.lineWidth = 8;
-        ctx.strokeStyle = '#ffd23f';
-        ctx.stroke();
-      } else {
-        ctx.beginPath();
-        ctx.arc(shape.x * k, shape.y * k, 30, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 214, 70, 0.28)';
-        ctx.fill();
-        ctx.lineWidth = 7;
-        ctx.strokeStyle = '#ffd23f';
-        ctx.stroke();
-      }
+      tracePathOf(ctx, party, k, 110);
+      if (party.kind === 'path') { ctx.lineWidth = 70; ctx.stroke(); } else ctx.fill('evenodd');
       ctx.restore();
+      drawLit(ctx, party, k, '#ffd23f', 'rgba(255, 214, 70, 0.22)');
     }
+    if (hasLook && highlighted !== partyAt) drawLit(ctx, looked, k, '#8fd8ff', 'rgba(143, 216, 255, 0.28)');
     overlay.tex.needsUpdate = true;
     dirty = true;
     wake();
@@ -348,6 +371,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function setLocations(list) {
     locations = Array.isArray(list) ? list : null;
     if (highlighted && !locations?.some(l => l.id === highlighted)) highlighted = null;
+    // (the party's place is kept even when it isn't in the list -- a board screen leaves the secret ones out, and the
+    // party can be in one of them: then nothing is shown there until it is)
     if (!land) return; // put in place once loaded
     buildLabels();
     drawOverlay();
@@ -357,6 +382,14 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function highlight(id) {
     highlighted = id || null;
     if (land) drawOverlay();
+  }
+
+  /** Where the party is (a location's id; null: nowhere shown) -- lit up, the rest of the map dimmed, and marked. */
+  function setParty(id) {
+    partyAt = id || null;
+    if (!land) return;
+    buildLabels();
+    drawOverlay();
   }
 
   /** Flies to a location: in close over a town, far enough back over a route or a forest to see all of it. */
@@ -391,7 +424,13 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       if (!visible) continue;
       l.el.style.transform = `translate(${((v.x + 1) / 2 * w).toFixed(1)}px, ${((1 - v.y) / 2 * h).toFixed(1)}px)`;
       // from far away only the towns: the spots and the sea names come in closer
-      if (l.kind !== 'town') l.el.classList.toggle('far', dist > land.fit * 0.75);
+      if (l.kind !== 'town' && l.kind !== 'party') l.el.classList.toggle('far', dist > land.fit * 0.75);
+      // The party's marker as big on any screen and at any zoom (the user's call, 2026-10-20): a share of the screen's
+      // height, a little bigger closer in -- never lost when the whole island is in view, never huge up close.
+      if (l.kind === 'party') {
+        const grow = Math.min(1.7, Math.max(0.85, (land.fit / dist) ** 0.3));
+        l.el.style.setProperty('--mk', `${Math.round(Math.min(150, Math.max(26, h * 0.055 * grow)))}px`);
+      }
     }
   }
 
@@ -741,5 +780,5 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (box) box.textContent = `Couldn't load the map: ${err.message}`;
     throw err;
   });
-  return { ready, destroy, getView, setView, home, setLocations, highlight, flyToLocation, graphics: gpu };
+  return { ready, destroy, getView, setView, home, setLocations, highlight, setParty, flyToLocation, graphics: gpu };
 }

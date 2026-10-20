@@ -11,6 +11,8 @@ import { CombatAPI, DmAPI } from '../api.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, toast, openDmModal } from './dm-common.js';
 import { loadLocations, loadEvents, LOCATION_TYPES } from './admin-world.js';
+import { shapeDistance } from '../region-map/map-features.js';
+import { getClock, formatDate, formatTime } from './world-clock.js';
 import { renderAdventure, startAdventure } from './adventure.js';
 
 const SEND_EVERY_MS = 120;
@@ -34,6 +36,16 @@ let _settleTimer = null;
 let _saveNext = false;
 const TAB_KEY = 'dmPokenavTab'; // the tab open last (this browser only)
 let _tab = 'region';
+
+// Another console tab (or this one's own save coming back) moved the party: shown again when it's this tab's news.
+if (typeof window !== 'undefined') {
+  window.addEventListener('app:dm-state', async (e) => {
+    if (e.detail?.key !== 'party-location' || !_section) return;
+    const was = JSON.stringify(_party);
+    await loadParty();
+    if (JSON.stringify(_party) !== was) drawLocations();
+  });
+}
 
 export async function renderPokenav(section, { session } = {}) {
   _session = session;
@@ -87,7 +99,7 @@ export async function renderPokenav(section, { session } = {}) {
       slow.title = 'Turn on hardware acceleration in the browser\'s settings (System), then restart it';
     }
     if (saved) _map.setView(saved); // (for the map style it was left in)
-    loadLocations().then(list => _map?.setLocations(list)).catch(() => {});
+    Promise.all([loadLocations(), _party || loadParty()]).then(([list]) => { _map?.setLocations(list); _map?.setParty(_party?.locationId); }).catch(() => {});
     await _map.ready;
     // Every start opens on the default view -- the compass's: straight down, north to the right, filling the screen
     // (the user's call, 2026-10-19) -- and the board screen follows (the move is sent like any other).
@@ -99,47 +111,163 @@ export async function renderPokenav(section, { session } = {}) {
 
 // ---------------------------------------------------------------------------
 // Locations (the user's call, 2026-10-20): the Admin module's locations, by type, and the map's names. One that's marked
-// on the map, clicked: the map flies there and it's drawn onto the land (here only -- the table's map follows the
-// flight); clicked again, it's let go. ⓘ shows what's kept on it.
+// on the map, clicked: the map flies there and it's drawn onto the land in light blue (here only -- the table's map
+// follows the flight); clicked again, it's let go. ⓘ shows what's kept on it.
+//
+// Where the party is (🧭, the 'party-location' state): picked at the top or with a row's 🧭. The map flies there, lights
+// it up gold with the rest dimmed and a marker on it -- on the table's map too, unless the DM unticks that (a secret
+// location never shows there). Under it the events planned there, and at the places within NEAR_KM (touching counts:
+// a route running into the town, the town inside the forest), nearest first.
 // ---------------------------------------------------------------------------
 
-let _lit = null;   // the location drawn onto the map here
+const NEAR_KM = 30;
+const KM_PER_PX = 0.12;   // as region-map.js
+
+let _lit = null;     // the location drawn onto the map here
+let _party = null;   // { locationId, onBoard, at (the world clock's date and time), recent: [ids] }
+
+async function loadParty() {
+  const saved = await DmAPI.getState('party-location').catch(() => null);
+  _party = { locationId: null, onBoard: true, at: '', recent: [], ...(saved || {}) };
+  return _party;
+}
+
+/** The world clock's date and time now ('' when it isn't loaded). */
+function clockStamp() {
+  try {
+    const c = getClock();
+    return c ? `${formatDate(c)}, ${formatTime(c)}` : '';
+  } catch (e) { return ''; }
+}
+
+async function saveParty(next) {
+  _party = next;
+  try {
+    await DmAPI.saveState('party-location', _party);
+  } catch (err) {
+    toast(`Couldn't save where the party is: ${err.message}`);
+  }
+}
+
+/** The party moves to `id` (null: not set). The map flies there. */
+async function setPartyAt(id) {
+  const prev = _party?.locationId;
+  if ((id || null) === (prev || null)) return;
+  await saveParty({ ..._party, locationId: id || null, at: id ? clockStamp() : '', recent: [prev, ...(_party?.recent || [])].filter((x, i, a) => x && x !== id && a.indexOf(x) === i).slice(0, 5) });
+  _map?.setParty(_party.locationId);
+  if (_party.locationId) {
+    _lit = null;
+    _map?.highlight(null);
+    _map?.flyToLocation(_party.locationId);
+  }
+  drawLocations();
+}
+
+/** How far the party's place is from each other marked location, nearest first, within NEAR_KM. */
+function nearby(here, locations) {
+  if (!here?.shape) return [];
+  return locations.filter(l => l.id !== here.id && l.shape)
+    .map(l => ({ l, km: shapeDistance(here.shape, l.shape) * KM_PER_PX }))
+    .filter(x => x.km <= NEAR_KM)
+    .sort((a, b) => a.km - b.km);
+}
+
+const kmText = km => (km < 1 ? 'right by it' : `~${Math.round(km)} km`);
+
+function eventRowHtml(e, where = '') {
+  return `<button class="dm-nav-event" data-event="${escapeHtml(e.id)}">
+    <strong>${e.image ? '🖼 ' : ''}${escapeHtml(e.title || 'Untitled event')}</strong>
+    <small>${escapeHtml([where, e.timeframe, e.trigger && `Trigger: ${e.trigger}`].filter(Boolean).join(' · ')) || 'No trigger or time yet'}</small></button>`;
+}
+
+function partyHtml(locations, events) {
+  const here = locations.find(l => l.id === _party?.locationId);
+  const opts = Object.entries(LOCATION_TYPES).map(([k, label]) => {
+    const list = locations.filter(l => (l.type || 'city') === k).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    return list.length ? `<optgroup label="${escapeHtml(label)}">${list.map(l => `<option value="${escapeHtml(l.id)}" ${l.id === here?.id ? 'selected' : ''}>${escapeHtml(l.name || 'Unnamed')}${l.shape ? '' : ' (not on the map)'}${l.secret ? ' 🔒' : ''}</option>`).join('')}</optgroup>` : '';
+  }).join('');
+  const recent = (_party?.recent || []).map(id => locations.find(l => l.id === id)).filter(Boolean);
+  let eventsHtml = '';
+  if (here) {
+    const atHere = events.filter(e => e.locationId === here.id);
+    const near = nearby(here, locations).flatMap(({ l, km }) => events.filter(e => e.locationId === l.id).map(e => ({ e, l, km })));
+    eventsHtml = `
+      <div class="dm-cs-group-title">📅 Events here <small>${atHere.length}</small></div>
+      ${atHere.map(e => eventRowHtml(e)).join('') || '<div class="dm-hint dm-nav-locnone">None planned here.</div>'}
+      <div class="dm-cs-group-title">📅 Nearby <small>${near.length}</small></div>
+      ${!here.shape ? '<div class="dm-hint dm-nav-locnone">Mark it on the map to see what\'s near it.</div>'
+        : near.map(({ e, l, km }) => eventRowHtml(e, `${l.name || 'Unnamed'}, ${kmText(km)}`)).join('') || `<div class="dm-hint dm-nav-locnone">Nothing planned within ${NEAR_KM} km.</div>`}`;
+  }
+  return `<div class="dm-card-title"><span>🧭 The party</span></div>
+    <div class="dm-nav-party">
+      <select class="dm-select" id="navPartyAt"><option value="">— Not set —</option>${opts}</select>
+      ${here ? `<div class="dm-hint">${here.shape ? '' : 'Not marked on the map, so it can\'t be shown there. '}${_party.at ? `Since ${escapeHtml(_party.at)}.` : ''}</div>` : '<div class="dm-hint">Pick where the players are -- the map lights it up and shows what\'s planned there and nearby.</div>'}
+      <label class="dm-check"><input type="checkbox" id="navPartyBoard" ${_party?.onBoard !== false ? 'checked' : ''}><span>📺 Show it on the table's map
+        <small>${here?.secret ? '🔒 This location is secret, so the table\'s map doesn\'t show it -- untick Secret in Admin once they\'ve found it.' : 'Untick for a journey the players shouldn\'t see on the map.'}</small></span></label>
+      ${recent.length ? `<div class="dm-nav-recent"><small>Before:</small>${recent.map(l => `<button class="dm-btn small" data-party="${escapeHtml(l.id)}">${escapeHtml(l.name || 'Unnamed')}</button>`).join('')}</div>` : ''}
+      ${eventsHtml}
+    </div>`;
+}
 
 async function drawLocations() {
   const box = document.getElementById('navLocations');
   if (!box) return;
   let locations, events;
   try {
-    [locations, events] = await Promise.all([loadLocations(), loadEvents()]);
+    [locations, events] = await Promise.all([loadLocations(), loadEvents(), _party ? null : loadParty()]);
   } catch (err) {
     box.innerHTML = `<div class="dm-card-title"><span>📍 Locations</span></div><div class="dm-hint">Couldn't load them: ${escapeHtml(err.message)}</div>`;
     return;
   }
   _map?.setLocations(locations);
+  _map?.setParty(_party?.locationId);
   if (_lit && !locations.some(l => l.id === _lit && l.shape)) { _lit = null; _map?.highlight(null); }
-  const row = l => `<div class="dm-nav-locrow"><button class="dm-nav-loc${l.id === _lit ? ' lit' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
+  const row = l => `<div class="dm-nav-locrow"><button class="dm-nav-loc${l.id === _lit ? ' lit' : ''}${l.id === _party?.locationId ? ' party' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
       title="${l.shape ? 'Show it on the map' : 'Not marked on the map yet (Admin › Locations)'}">
-      <span>${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
+      <span>${l.id === _party?.locationId ? '🧭 ' : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
       <small>${[!l.shape && 'not on the map', events.some(e => e.locationId === l.id) && `${events.filter(e => e.locationId === l.id).length} event(s)`].filter(Boolean).join(' · ')}</small></button>
+    <button class="dm-icon-btn" data-party="${escapeHtml(l.id)}" title="The party is here">🧭</button>
     <button class="dm-icon-btn" data-info="${escapeHtml(l.id)}" title="What's kept on it">ⓘ</button></div>`;
-  box.innerHTML = `<div class="dm-card-title"><span>📍 Locations</span></div>
+  box.innerHTML = `${partyHtml(locations, events)}
+    <div class="dm-card-title"><span>📍 Locations</span></div>
     ${Object.entries(LOCATION_TYPES).map(([k, label]) => {
       const here = locations.filter(l => (l.type || 'city') === k).sort((a, b) => String(a.name).localeCompare(String(b.name)));
       return `<div class="dm-nav-locgroup"><div class="dm-cs-group-title">${label} <small>${here.length}</small></div>
         ${here.map(row).join('') || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
     }).join('')}
     <div class="dm-hint">Locations are added and marked on the map in the Admin module (📍 Locations).</div>`;
+  box.querySelector('#navPartyAt').onchange = e => setPartyAt(e.target.value);
+  box.querySelector('#navPartyBoard').onchange = e => saveParty({ ..._party, onBoard: e.target.checked });
   box.onclick = (e) => {
+    const ev = e.target.closest('[data-event]');
+    if (ev) { showEvent(events.find(x => x.id === ev.dataset.event), locations); return; }
+    const party = e.target.closest('[data-party]');
+    if (party) { setPartyAt(party.dataset.party); return; }
     const info = e.target.closest('[data-info]');
     const b = e.target.closest('[data-loc]');
     const l = locations.find(x => x.id === (info || b)?.dataset[info ? 'info' : 'loc']);
     if (!l) return;
-    if (info || !l.shape) { showLocation(l, events.filter(ev => ev.locationId === l.id)); return; }
+    if (info || !l.shape) { showLocation(l, events.filter(x => x.locationId === l.id)); return; }
     _lit = _lit === l.id ? null : l.id;
     _map?.highlight(_lit);
     if (_lit) _map?.flyToLocation(l.id);
     box.querySelectorAll('.dm-nav-loc').forEach(x => x.classList.toggle('lit', x.dataset.loc === _lit));
   };
+}
+
+function showEvent(e, locations) {
+  if (!e) return;
+  const where = e.locationId === '__manual' ? e.locationText : locations.find(l => l.id === e.locationId)?.name;
+  openDmModal({
+    title: `📅 ${e.title || 'Event'}`,
+    wide: true,
+    html: `<div class="dm-nav-locview">
+      ${e.image ? `<img class="dm-nav-locimg" src="${escapeHtml(e.image)}" alt="">` : ''}
+      <div class="dm-hint">${escapeHtml([where && `📍 ${where}`, e.timeframe && `When: ${e.timeframe}`].filter(Boolean).join(' · '))}</div>
+      ${e.description ? `<p class="dm-world-text">${escapeHtml(e.description)}</p>` : ''}
+      ${e.trigger ? `<div class="dm-card-title">Trigger</div><p class="dm-world-text">${escapeHtml(e.trigger)}</p>` : ''}
+    </div>`,
+  });
 }
 
 function showLocation(l, events) {

@@ -1516,3 +1516,15 @@ span.dm-trap-pick { cursor: default; }
 .dm-adm-movechip.unknown { border-color: #e67e22; color: #f5b041; }
 .dm-adm-movechip button { border: none; background: none; color: var(--dm-muted); cursor: pointer; font-size: 0.75rem; padding: 0 0.25rem; }
 .dm-adm-movechip button:hover { color: #ff8a80; }
+
+/* PokéNav: where the party is, and what's planned there and nearby (the user's call, 2026-10-20) */
+.dm-nav-party { display: flex; flex-direction: column; gap: 0.35rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--dm-line); }
+.dm-nav-party .dm-check { margin: 0; }
+.dm-nav-recent { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
+.dm-nav-recent small { color: var(--dm-muted); font-size: 0.72rem; margin-right: 0.15rem; }
+.dm-nav-event { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; text-align: left; padding: 0.4rem 0.55rem; border-radius: 8px;
+  border: 1px solid transparent; background: rgba(255, 215, 0, 0.06); color: var(--dm-text); font: inherit; font-size: 0.86rem; cursor: pointer; }
+.dm-nav-event:hover { border-color: var(--dm-gold); }
+.dm-nav-event small { color: var(--dm-muted); font-size: 0.72rem; }
+.dm-nav-loc.party { border-color: rgba(255, 215, 0, 0.55); }
+.dm-nav-loc.lit { border-color: #8fd8ff; background: rgba(143, 216, 255, 0.12); color: #8fd8ff; }

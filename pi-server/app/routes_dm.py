@@ -33,10 +33,11 @@ _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclu
                # locations, and the DM's own status conditions (their battle triggers run in routes_combat.py)
                'events', 'locations', 'status-conditions',
                'battle-reminders',  # the Battle module's DM-only reminders: {logFile, list: [...]} (js/dm/battle-live.js)
-               'region-map'}  # the region map's own record: {townsSeeded} -- places.json's towns made locations once (js/dm/admin-world.js)
+               'region-map',  # the region map's own record: {townsSeeded} -- places.json's towns made locations once (js/dm/admin-world.js)
+               'party-location'}  # where the party is: {locationId, onBoard, at, recent} (js/dm/pokenav.js)
 # Saved here and heard of live by other screens ({'type': 'dm-state', 'key'}): the locations are the board screen's
-# region map's names (js/pages/battle-map.js), the user's call, 2026-10-20.
-_LIVE_STATE_KEYS = {'locations'}
+# region map's names and the party's place is lit up on it (js/pages/battle-map.js), the user's call, 2026-10-20.
+_LIVE_STATE_KEYS = {'locations', 'party-location'}
 # The species the players have ever caught (lowercase names) -- see caught_species.
 _CAUGHT_KEY = 'pokedex-caught'
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and

@@ -229,6 +229,29 @@ export function seaOf(f) {
   return sea;
 }
 
+/** What a painted ring closes in (the user's call, 2026-10-21: a region's border painted round it with a brush): every
+ * pixel that can't be reached from the painting's edge without crossing `ring` (1 = painted) -- the ring itself not
+ * included. Over the sea or the land alike: it's the ring that has to close. */
+export function enclosedBy(ring, W, H) {
+  const reached = new Uint8Array(W * H);
+  const stack = new Int32Array(W * H);
+  let top = 0;
+  const seed = (i) => { if (!ring[i] && !reached[i]) { reached[i] = 1; stack[top++] = i; } };
+  for (let x = 0; x < W; x++) { seed(x); seed((H - 1) * W + x); }
+  for (let y = 0; y < H; y++) { seed(y * W); seed(y * W + W - 1); }
+  while (top) {
+    const i = stack[--top];
+    const px = i % W;
+    if (px > 0) seed(i - 1);
+    if (px < W - 1) seed(i + 1);
+    if (i >= W) seed(i - W);
+    if (i < W * (H - 1)) seed(i + W);
+  }
+  const inside = new Uint8Array(W * H);
+  for (let i = 0; i < inside.length; i++) inside[i] = reached[i] || ring[i] ? 0 : 1;
+  return inside;
+}
+
 /** The land round a click that's still free (`free`: 1 = land not in another region): all of it reached from there
  * without crossing the sea or another region -- the roads and the painting's lines don't matter (the user's call,
  * 2026-10-21: they never closed a region in). -> { mask, size } (empty when the click isn't on free land). */

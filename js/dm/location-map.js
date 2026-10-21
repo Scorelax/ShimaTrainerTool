@@ -148,9 +148,12 @@ export async function drawShapePreview(canvas, shape) {
 // ---------------------------------------------------------------------------
 
 const AREA_TOOLS = {
+  // (the user's call, 2026-10-21: a hybrid of the brush and the region fill -- the border painted round it, the land
+  // inside filled in)
+  ring: { label: '⭕ Ring', hint: '<b>Paint a ring round the region</b> with the brush -- in as many strokes as you like, zooming and moving the map in between (right-drag), out over the sea is fine. <b>When the ring closes, the land inside fills in by itself</b> -- never the sea, never another region. Using the coast instead? Paint from coast to coast, then <b>click on the side</b> you want. Alt + paint rubs the ring out. The ring goes when you press Done.' },
   // (the user's call, 2026-10-21: the painting's lines never closed a region in -- a region is drawn round roughly instead,
   // and only the land inside counts)
-  region: { label: '🗺 Region', hint: '<b>Drag round the region</b> -- roughly, out over the sea is fine: only the land inside is taken, and none of another region\'s, so draw over the neighbour\'s border and it stops at it. Or <b>click on land</b> to take all the land round there that isn\'t in a region yet (the last one, say). Alt takes away. Right-drag moves the map.' },
+  region: { label: '➰ Loop', hint: '<b>Drag round the region</b> -- roughly, out over the sea is fine: only the land inside is taken, and none of another region\'s, so draw over the neighbour\'s border and it stops at it. Or <b>click on land</b> to take all the land round there that isn\'t in a region yet (the last one, say). Alt takes away. Right-drag moves the map.' },
   wand: { label: '🪄 Fill', hint: 'Click inside a forest (or a lake, or a patch of one colour) and it fills it in. Alt + click takes a patch away again.' },
   brush: { label: '🖌 Paint', hint: 'Paint to add to the area.' },
   erase: { label: '🧽 Erase', hint: 'Paint to take away from the area.' },
@@ -178,7 +181,10 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   let follow = old?.kind === 'path' ? old.follow !== false : true;
   let segs = [];
   let mask = old?.kind === 'area' ? F.ringsToMask(old.rings, W, H) : new Uint8Array(W * H);
-  let areaTool = loc.type === 'region' ? 'region' : 'wand';
+  let areaTool = loc.type === 'region' ? 'ring' : 'wand';
+  // the Ring tool's painted border (1 = painted): only a guide -- what it closes in goes into `mask`, the ring itself is
+  // never saved
+  let ring = new Uint8Array(W * H);
   // A region keeps to the land and out of the other regions (the user's call, 2026-10-21): `free` is that land (1), the
   // lakes and rivers inland included -- worked out when it's first needed. Another location's area keeps to the land
   // only with the Region tool.
@@ -291,6 +297,20 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     mctx.putImageData(mimg, 0, 0, x0, y0, x1 - x0 + 1, y1 - y0 + 1);
   }
   paintMask();
+  const ringCanvas = document.createElement('canvas');
+  ringCanvas.width = W; ringCanvas.height = H;
+  const rctx = ringCanvas.getContext('2d');
+  const rimg = rctx.createImageData(W, H);
+  function paintRing(x0 = 0, y0 = 0, x1 = W - 1, y1 = H - 1) {
+    x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(W - 1, Math.ceil(x1)); y1 = Math.min(H - 1, Math.ceil(y1));
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = y * W + x, o = i * 4;
+        if (ring[i]) { rimg.data[o] = 120; rimg.data[o + 1] = 220; rimg.data[o + 2] = 255; rimg.data[o + 3] = 210; } else rimg.data[o + 3] = 0;
+      }
+    }
+    rctx.putImageData(rimg, 0, 0, x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+  }
 
   // ---- the view: painting pixel -> screen = (x * s + ox, y * s + oy) ----
   let s = 1, ox = 0, oy = 0;
@@ -355,7 +375,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
 
   // ---- undo ----
   function remember() {
-    undos[kind].push(kind === 'pin' ? pin?.slice() || null : kind === 'path' ? anchors.map(p => p.slice()) : mask.slice());
+    undos[kind].push(kind === 'pin' ? pin?.slice() || null : kind === 'path' ? anchors.map(p => p.slice()) : { mask: mask.slice(), ring: ring.slice() });
     if (undos[kind].length > 25) undos[kind].shift();
   }
   function undo() {
@@ -364,7 +384,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     const was = undos[kind].pop();
     if (kind === 'pin') pin = was;
     else if (kind === 'path') { anchors = was; retrace(); }
-    else { mask = was; paintMask(); }
+    else { mask = was.mask; ring = was.ring; paintMask(); paintRing(); }
     tools(); draw();
   }
 
@@ -396,6 +416,11 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       ctx.imageSmoothingEnabled = true;
       if (at) drawIcon(ctx, iconImg, { ...icon, x: at[0], y: at[1] }, tf, { faint: true });
       if (lasso.length > 2 && drag?.mode === 'lasso') drawLassoPreview();
+      if (areaTool === 'ring') {
+        ctx.imageSmoothingEnabled = s < 2;
+        ctx.drawImage(ringCanvas, ox, oy, W * s, H * s);
+        ctx.imageSmoothingEnabled = true;
+      }
       if (lasso.length) {
         ctx.save();
         ctx.beginPath();
@@ -412,11 +437,11 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
         ctx.fill();
         ctx.restore();
       }
-      if (hover && (areaTool === 'brush' || areaTool === 'erase')) {
+      if (hover && (areaTool === 'brush' || areaTool === 'erase' || areaTool === 'ring')) {
         ctx.beginPath();
         ctx.arc(hover[0] * s + ox, hover[1] * s + oy, brush * s, 0, Math.PI * 2);
         ctx.lineWidth = 1.5;
-        ctx.strokeStyle = areaTool === 'erase' ? '#ff8a80' : '#fff';
+        ctx.strokeStyle = areaTool === 'erase' || (areaTool === 'ring' && (drag?.alt || altDown)) ? '#ff8a80' : '#fff';
         ctx.stroke();
       }
     } else if (kind === 'path') {
@@ -467,9 +492,9 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
         <div class="dm-lme-stat">${anchors.length < 2 ? `${anchors.length ? 'The start' : 'No points yet'} -- it needs a start and an end` : describeShape({ kind: 'path', points: pts })}</div>${common}`;
     } else {
       box.innerHTML = `<div class="dm-card-title">⬚ An area</div>
-        <div class="dm-lme-toolgrid">${Object.entries(AREA_TOOLS).filter(([k]) => (k === 'region' ? isRegion : k !== 'wand' || !isRegion)).map(([k, t]) => `<button class="dm-btn small${areaTool === k ? ' active' : ''}" data-tool="${k}">${t.label}</button>`).join('')}</div>
+        <div class="dm-lme-toolgrid">${Object.entries(AREA_TOOLS).filter(([k]) => (k === 'region' || k === 'ring' ? isRegion : k !== 'wand' || !isRegion)).map(([k, t]) => `<button class="dm-btn small${areaTool === k ? ' active' : ''}" data-tool="${k}">${t.label}</button>`).join('')}</div>
         <div class="dm-hint">${AREA_TOOLS[areaTool].hint}${isRegion && areaTool !== 'region' ? ' (Only land, outside the other regions.)' : ''}</div>
-        ${areaTool === 'brush' || areaTool === 'erase' ? `<div class="dm-field"><label>Brush size</label><input type="range" id="lmeBrush" min="2" max="60" value="${brush}"></div>` : ''}
+        ${areaTool === 'brush' || areaTool === 'erase' || areaTool === 'ring' ? `<div class="dm-field"><label>Brush size</label><input type="range" id="lmeBrush" min="2" max="60" value="${brush}"></div>` : ''}
         ${areaTool === 'wand' ? `<div class="dm-field"><label>How alike (for a patch of one colour)</label><input type="range" id="lmeTol" min="0" max="100" value="${tolerance}"></div>` : ''}
         <div class="dm-row"><button class="dm-btn small" data-lme="undo" ${undos.area.length || lasso.length ? '' : 'disabled'}>↶ Undo</button>
           <button class="dm-btn small danger" data-lme="clear">Clear</button></div>
@@ -501,6 +526,46 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     }));
     return best;
   }
+  /** A stroke of the ring (rubbed out with Alt). */
+  function ringStroke(a, b, value) {
+    const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, brush / 3)));
+    for (let i = 0; i <= steps; i++) F.stamp(ring, W, H, a[0] + ((b[0] - a[0]) * i) / steps, a[1] + ((b[1] - a[1]) * i) / steps, brush, value);
+    paintRing(Math.min(a[0], b[0]) - brush - 1, Math.min(a[1], b[1]) - brush - 1, Math.max(a[0], b[0]) + brush + 1, Math.max(a[1], b[1]) + brush + 1);
+  }
+  /** After a stroke: the free land the ring closes in goes into the area -- with the ring's own width round it (the
+   * border runs down its middle, not along its outside), but not a stray stroke of it off somewhere else. */
+  function fillRing() {
+    const inside = F.enclosedBy(ring, W, H);
+    if (!inside.some(v => v)) return 0;
+    const near = F.dilate(inside, W, H, brush + 1);
+    const fr = free();
+    let n = 0;
+    for (let i = 0; i < mask.length; i++) {
+      if ((inside[i] || (ring[i] && near[i])) && fr[i] && !mask[i]) { mask[i] = 1; n++; }
+    }
+    if (n) paintMask();
+    return n;
+  }
+  /** A click with the Ring tool: the free land round it, up to the ring, the coast and the other regions (a ring from
+   * coast to coast). */
+  function fillRingSide(p) {
+    const fr = free();
+    const open = new Uint8Array(W * H);
+    for (let i = 0; i < open.length; i++) open[i] = fr[i] && !ring[i] ? 1 : 0;
+    const got = F.freeLandAt(open, W, H, p[0], p[1]);
+    if (!got.size) {
+      const other = byName(p[0], p[1]);
+      toast(other ? `That's in ${other} already.` : ring[Math.round(p[1]) * W + Math.round(p[0])] ? 'That\'s on the ring -- click inside it.' : 'That\'s the sea -- click on land.');
+      return;
+    }
+    remember();
+    const near = F.dilate(got.mask, W, H, brush + 1);
+    let n = 0;
+    for (let i = 0; i < mask.length; i++) if ((got.mask[i] || (ring[i] && near[i] && fr[i])) && !mask[i]) { mask[i] = 1; n++; }
+    paintMask();
+    toast(n ? `Filled in up to the ring and the coast -- about ${Math.max(1, Math.round(n * kmPerPx() * kmPerPx()))} km² more. Too much? Undo, and close the ring where it ran out.` : 'That\'s in it already.');
+  }
+
   function stroke(a, b) {
     const v = areaTool === 'erase' ? 0 : 1;
     const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, brush / 3)));
@@ -578,6 +643,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     else if (kind === 'path' && anchorAt(p) >= 0) drag.mode = { anchor: anchorAt(p) };
     else if (kind === 'area' && (areaTool === 'brush' || areaTool === 'erase')) { remember(); drag.mode = 'paint'; stroke(p, p); draw(); }
     else if (kind === 'area' && areaTool === 'region') { drag.mode = 'lasso'; drag.alt = e.altKey; lasso = [p]; }
+    else if (kind === 'area' && areaTool === 'ring') { drag.mode = 'ring'; drag.alt = e.altKey; }
   });
   canvas.addEventListener('pointermove', (e) => {
     const p = toPaint(e);
@@ -598,7 +664,11 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       const i = drag.mode.anchor;
       if (i > 0) segs[i - 1] = [anchors[i - 1], p];
       if (i < anchors.length - 1) segs[i] = [p, anchors[i + 1]];
-    } else if (drag.mode === 'paint') { stroke(drag.last, p); drag.last = p; } else if (drag.mode === 'lasso') {
+    } else if (drag.mode === 'paint') { stroke(drag.last, p); drag.last = p; } else if (drag.mode === 'ring') {
+      if (!drag.started) { drag.started = true; remember(); }
+      ringStroke(drag.last, p, drag.alt ? 0 : 1);
+      drag.last = p;
+    } else if (drag.mode === 'lasso') {
       if (Math.hypot(p[0] - drag.last[0], p[1] - drag.last[1]) * s >= 4) { lasso.push(p.map(v => Math.round(v * 10) / 10)); drag.last = p; }
     } else {
       ox = drag.ox + e.clientX - drag.x;
@@ -611,6 +681,15 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     const d = drag;
     drag = null;
     const p = toPaint(e);
+    if (d.mode === 'ring') {
+      if (!d.moved) { if (!e.altKey) fillRingSide(p); tools(); draw(); return; }
+      if (!d.alt) {
+        const n = fillRing();
+        if (n) toast(`The ring's closed -- about ${Math.max(1, Math.round(n * kmPerPx() * kmPerPx()))} km² of land filled in.`);
+      }
+      tools(); draw();
+      return;
+    }
     if (d.mode === 'lasso') {
       if (d.moved) { closeLasso(e.altKey); return; }
       lasso = [];
@@ -634,6 +713,11 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   };
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', () => { if (drag?.mode === 'lasso') lasso = []; drag = null; draw(); });
+  // (Alt held: the brush's ring shows red -- it rubs the ring out)
+  let altDown = false;
+  const onAlt = (e) => { if (altDown !== e.altKey) { altDown = e.altKey; if (areaTool === 'ring') draw(); } };
+  window.addEventListener('keydown', onAlt, true);
+  window.addEventListener('keyup', onAlt, true);
   canvas.addEventListener('pointerleave', () => { hover = null; if (kind === 'area') draw(); });
   canvas.addEventListener('dblclick', (e) => { if (kind === 'area' && areaTool === 'outline') closeLasso(e.altKey); });
   canvas.addEventListener('wheel', (e) => {
@@ -665,6 +749,8 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     const close = (value) => {
       document.removeEventListener('keydown', onKey, true);
       document.removeEventListener('keyup', onKeyUp, true);
+      window.removeEventListener('keydown', onAlt, true);
+      window.removeEventListener('keyup', onAlt, true);
       observer.disconnect();
       overlay.remove();
       resolve(value);
@@ -712,7 +798,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       else if (act === 'fit') { fitAll(); draw(); }
       else if (act === 'clear') {
         remember();
-        if (kind === 'path') { anchors = []; retrace(); } else { mask = new Uint8Array(W * H); lasso = []; paintMask(); }
+        if (kind === 'path') { anchors = []; retrace(); } else { mask = new Uint8Array(W * H); ring = new Uint8Array(W * H); lasso = []; paintMask(); paintRing(); }
         tools(); draw();
       }
     });

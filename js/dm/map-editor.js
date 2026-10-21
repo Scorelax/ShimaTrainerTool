@@ -45,7 +45,7 @@ const getSetup = () => _store.getSetup();
 const updateSetup = (fn) => _store.updateSetup(fn);
 const flushSetup = () => _store.flushSetup();
 const onSetupChange = (fn) => _store.onSetupChange(fn);
-import { mapStageHtml } from './map-view.js';
+import { mapStageHtml, mapUpright, setMapUpright, sizeStage, pointOn, screenStep } from './map-view.js';
 
 // Starting height (ft) for an object the DM places -- changeable before placing. Anything not listed starts at 5ft.
 const DEFAULT_HEIGHTS = { tree: 30, rock: 5, bush: 5, log: 5 };
@@ -323,11 +323,17 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
           <button class="dm-btn small" id="mapClearObjects" title="Take every object off the map">🧹 Clear objects</button>
           <button class="dm-btn small" id="mapClearMarks" title="Make every difficult / blocked square normal ground again">🧹 Clear terrain</button>
         </div>
+        <div class="dm-map-turnpick" id="mapTurnPick" role="group" aria-label="How the map is shown on this screen"
+          title="Only how the map is shown here -- the table TV shows it the same either way">
+          <span>Show the map</span>
+          <button class="dm-btn small" data-map-turn="0">▭ Horizontal</button>
+          <button class="dm-btn small" data-map-turn="1">▯ Vertical</button>
+        </div>
         ${_live && !adventure ? '<div class="dm-hint dm-live-note">The battle\'s map -- every change shows on the players\' screens and the table at once.</div>' : ''}
 
         ${_live ? '' : `<div class="dm-card">
           <div class="dm-card-title">Size</div>
-          <div class="dm-row">
+          <div class="dm-row dm-map-sizes">
             <div class="dm-field"><label for="mapAcross">Squares across</label><input class="dm-input" id="mapAcross" type="number" min="1" max="60" value="${m.rows}"></div>
             <div class="dm-field"><label for="mapDown">Squares down</label><input class="dm-input" id="mapDown" type="number" min="1" max="60" value="${m.cols}"></div>
           </div>
@@ -502,6 +508,13 @@ function selectObjectKind(key) {
 }
 
 function wireStatic() {
+  // Horizontal / Vertical: the map turned at once (map-view.js's mapUpright)
+  document.getElementById('mapTurnPick')?.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-map-turn]');
+    if (!b || (b.dataset.mapTurn === '1') === mapUpright()) return;
+    setMapUpright(b.dataset.mapTurn === '1');
+    renderStage();
+  });
   if (!_live) {
     const across = document.getElementById('mapAcross');
     const down = document.getElementById('mapDown');
@@ -673,7 +686,8 @@ function renderToolPanel() {
     document.getElementById('objMark')?.addEventListener('change', (e) => { ed.objMark = e.target.value; if (ed.selectedId) applyEdit(); });
     document.getElementById('objHidden')?.addEventListener('change', (e) => { ed.objHidden = e.target.checked; if (ed.selectedId) applyEdit(); });
     panel.querySelectorAll('[data-move-obj]').forEach(b => b.addEventListener('click', () => {
-      const [dx, dy] = b.dataset.moveObj.split(',').map(Number);
+      // (the way the arrow points on screen -- turned with the map when it's shown upright)
+      const [dx, dy] = screenStep(...b.dataset.moveObj.split(',').map(Number), mapUpright());
       ed.editCx += dx; ed.editCy += dy;
       if (!applyEdit()) { ed.editCx -= dx; ed.editCy -= dy; }
     }));
@@ -760,16 +774,29 @@ function clampInt(v, lo, hi) {
   return Math.max(lo, Math.min(hi, parseInt(v, 10) || lo));
 }
 
+/** Horizontal / Vertical shown picked, and the size fields named by the way they run on screen. */
+function showTurn() {
+  const up = mapUpright();
+  document.querySelectorAll('#mapTurnPick [data-map-turn]').forEach(b => b.classList.toggle('primary', (b.dataset.mapTurn === '1') === up));
+  const across = document.querySelector('label[for="mapAcross"]'), down = document.querySelector('label[for="mapDown"]');
+  if (across) across.textContent = up ? 'Squares down' : 'Squares across';
+  if (down) down.textContent = up ? 'Squares across' : 'Squares down';
+  document.querySelector('.dm-map-sizes')?.classList.toggle('upright', up);
+}
+
 /** The whole map, the way the table TV shows it. Creatures already placed in the battle setup show, for reference. */
 function renderStage() {
   const wrap = document.getElementById('mapWrap');
   if (!wrap) return;
   const s = getSetup();
   const m = s.map;
-  wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: ed.tool === 'creatures' ? ed.creatureId : null });
+  wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: ed.tool === 'creatures' ? ed.creatureId : null, upright: mapUpright() });
   const stage = wrap.querySelector('.dm-map-stage');
-  // Live mode sits in the DM console's Map tab, under its tab bars -- less height to fill.
-  stage.style.width = `min(100%, calc((100vh - ${_live ? 300 : 190}px) * ${m.rows / m.cols}))`;
+  // As tall as the screen has room for below where the map starts, the legend under it kept in view (measured: the
+  // adventure's and the live Map tab's bars put it lower down -- shown upright, it's the height that runs out first)
+  const top = Math.round(wrap.getBoundingClientRect().top);
+  sizeStage(wrap, m, top > 0 ? `100vh - ${top + 84}px` : `100vh - ${_live ? 300 : 190}px`);
+  showTurn();
   stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
 
   stage.style.touchAction = 'none'; // a held finger turns / paints instead of scrolling the page
@@ -882,8 +909,8 @@ function cellAtPointer(e) {
   const grid = document.querySelector('#mapWrap .dm-map-grid');
   if (!grid) return null;
   const m = getSetup().map;
-  const r = grid.getBoundingClientRect();
-  const sx = Math.floor((e.clientX - r.left) / r.width * m.rows), sy = Math.floor((e.clientY - r.top) / r.height * m.cols);
+  const p = pointOn(grid, e);   // (in the map's own terms, whichever way it's shown)
+  const sx = Math.floor(p.x / p.w * m.rows), sy = Math.floor(p.y / p.h * m.cols);
   if (sx < 0 || sy < 0 || sx >= m.rows || sy >= m.cols) return null;
   return { col: sy, row: m.rows - 1 - sx };
 }
@@ -958,10 +985,9 @@ function turnByPointer(e) {
   const grid = document.querySelector('#mapWrap .dm-map-grid');
   if (!grid) return;
   const m = getSetup().map;
-  const r = grid.getBoundingClientRect();
-  const square = r.width / m.rows;
-  const px = r.left + g.cx * square, py = r.top + g.cy * (r.height / m.cols);
-  const dx = e.clientX - px, dy = e.clientY - py;
+  const p = pointOn(grid, e);   // (in the map's own terms, whichever way it's shown)
+  const square = p.w / m.rows;
+  const dx = p.x - g.cx * square, dy = p.y - g.cy * (p.h / m.cols);
   if (Math.hypot(dx, dy) < square * 0.6) return; // too close to the middle to tell a direction
   const ang = Math.atan2(dy, dx) * 180 / Math.PI;
   if (g.ref === null) { g.ref = ang; return; }
@@ -1019,7 +1045,7 @@ async function addToMap(kind) {
     const res = await openPicker({
       title: '🎒 Items', multi: true, hiddenOption: true, confirmLabel: 'Place', imageFallback: 'assets/Bag.png',
       hint: 'Things lying on the map -- each one shows the item\'s picture (the bag when it has none). Click the map to place each one.',
-      items: items.map(i => ({ key: i.name, label: i.name, sub: i.category, image: i.image || '' })),
+      items: items.map(i => ({ key: i.name, label: i.name, sub: i.category, group: i.category || 'Misc', image: i.image || '' })),
     });
     if (!res?.keys.length) return;
     queueObjects(res.keys.map((name) => {

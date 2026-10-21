@@ -17,7 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import admin, db, gamedata, live, media, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews, battle_image_copies
+from . import admin, db, gamedata, live, media, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews, image_copies
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
 
@@ -68,7 +68,17 @@ async def caching_policy(request: Request, call_next):
     file comes back as an empty 304 instead of retransferring the full body."""
     response = await call_next(request)
     path = request.url.path
-    if path.startswith(_VERSIONED_MEDIA_PREFIXES) and response.status_code in (200, 206, 304):
+    # An item's picture (the user's call, 2026-10-21: item pictures "basically instantly" all through the app): its URL
+    # is stamped like the versioned media's (media.item_image_url's ?t=<mtime>), so kept for good -- except one asked
+    # for without the stamp (the battle map keeps an item lying on it by its bare URL, routes_combat.py) and the
+    # original sent while its small copy is still being made (item_image below), which are checked again each time.
+    pending = response.headers.get('x-copy-pending')
+    if pending is not None:
+        del response.headers['x-copy-pending']
+    if path.startswith(media.ITEM_IMAGE_URL_PREFIX):
+        stamped = 't' in request.query_params and pending is None and response.status_code in (200, 206, 304)
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable' if stamped else 'no-cache'
+    elif path.startswith(_VERSIONED_MEDIA_PREFIXES) and response.status_code in (200, 206, 304):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     elif path.startswith(_REVALIDATED_MEDIA_PREFIXES):
         response.headers['Cache-Control'] = 'no-cache'
@@ -464,6 +474,35 @@ async def live_events(request: Request):
 # catch-all so these paths win. Many species pictures are .jfif, which Python doesn't know as a JPEG -- without this
 # they'd be sent as plain text.
 mimetypes.add_type('image/jpeg', '.jfif')
+
+
+def _webp_or_original(path, copy, request, pending=False):
+    """A picture with a small WebP copy (image_copies.py): the copy (when there is one) to a browser that takes WebP,
+    the original otherwise -- the same URL either way (Vary: Accept), an unchanged one an empty 304. `pending`: the
+    copy is still being made (the caching middleware doesn't keep the original for good then)."""
+    # (given its stat now, so the ETag's there to compare -- otherwise FileResponse only adds it as it sends)
+    response = FileResponse(copy, media_type='image/webp', stat_result=os.stat(copy)) if copy else FileResponse(path, stat_result=os.stat(path))
+    response.headers['Vary'] = 'Accept'
+    etag = response.headers.get('etag')
+    extra = {'x-copy-pending': '1'} if pending else {}
+    if etag and request.headers.get('if-none-match') == etag:
+        return Response(status_code=304, headers={'ETag': etag, 'Vary': 'Accept', **extra})
+    response.headers.update(extra)
+    return response
+
+
+# An item's picture: its small WebP copy (image_copies.py), made no bigger than it's ever shown -- the user's call,
+# 2026-10-21. Before the folders are mounted below, so this path wins over the plain folder.
+@app.get(media.ITEM_IMAGE_URL_PREFIX + '{name}')
+def item_image(name: str, request: Request):
+    path = os.path.join(media.ITEM_IMAGE_DIR, os.path.basename(name))
+    if os.path.basename(name) != name or not os.path.isfile(path):
+        return Response(status_code=404)
+    wants = 'image/webp' in request.headers.get('accept', '')
+    copy = image_copies.items.copy_for(name) if wants else None
+    return _webp_or_original(path, copy, request, pending=wants and copy is None and image_copies.items.paths(name) is not None)
+
+
 for _folder, _prefix, _name in ((media.POKEMON_IMAGE_DIR, media.POKEMON_IMAGE_URL_PREFIX, 'pokemon-images'),
                                 (media.NPC_IMAGE_DIR, media.NPC_IMAGE_URL_PREFIX, 'npc-images'),
                                 (media.ITEM_IMAGE_DIR, media.ITEM_IMAGE_URL_PREFIX, 'item-images'),
@@ -517,7 +556,7 @@ if os.path.isdir(media.CHARACTER_IMAGE_DIR):
     app.mount(media.CHARACTER_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=media.CHARACTER_IMAGE_DIR),
               name='character-images')
 
-# A battle picture (a background or a map object, see battle_image_copies.py) -- its WebP copy, a seventh of the size,
+# A battle picture (a background or a map object, see image_copies.py) -- its WebP copy, a seventh of the size,
 # to a browser that takes WebP, once it's made; the original otherwise. Same URL either way (Vary: Accept), still
 # revalidated every load like the rest of /battle-images/ (an unchanged one comes back as an empty 304).
 @app.get('/battle-images/{name}')
@@ -525,17 +564,12 @@ def battle_image(name: str, request: Request):
     path = os.path.join(media.BATTLE_IMAGE_DIR, os.path.basename(name))
     if os.path.basename(name) != name or not os.path.isfile(path):
         return Response(status_code=404)
-    copy = battle_image_copies.copy_for(name) if 'image/webp' in request.headers.get('accept', '') else None
-    # (given its stat now, so the ETag's there to compare -- otherwise FileResponse only adds it as it sends)
-    response = FileResponse(copy, media_type='image/webp', stat_result=os.stat(copy)) if copy else FileResponse(path, stat_result=os.stat(path))
-    response.headers['Vary'] = 'Accept'
-    etag = response.headers.get('etag')
-    if etag and request.headers.get('if-none-match') == etag:
-        return Response(status_code=304, headers={'ETag': etag, 'Vary': 'Accept'})
-    return response
+    copy = image_copies.battle.copy_for(name) if 'image/webp' in request.headers.get('accept', '') else None
+    return _webp_or_original(path, copy, request)
 
 
-battle_image_copies.queue_missing()
+image_copies.battle.queue_missing()
+image_copies.items.queue_missing()
 
 # Battle-map background images (see media.BATTLE_IMAGE_DIR / routes_combat.py's list-backgrounds)
 if os.path.isdir(media.BATTLE_IMAGE_DIR):

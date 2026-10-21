@@ -10,6 +10,7 @@
 import { CombatAPI, DmAPI, GameDataAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia, useSpritePreviews } from '../utils/sprite-media.js';
+import { warmItemPictures } from '../utils/item-pictures.js';
 
 // Every sprite in the console is shown small (thumbnails, map tokens, the display preview): the Pi's small copies.
 useSpritePreviews(true);
@@ -48,6 +49,8 @@ let starting = false;
 async function init() {
   injectBattleMapStyles(); // the map pieces (objects, difficult / blocked squares) the setup screens draw
   initLiveUpdates();
+  // every item's picture fetched in the background once the console has settled (item-pictures.js)
+  setTimeout(() => DmAPI.adminItems().then(warmItemPictures).catch(() => {}), 5000);
   const view = document.getElementById('dmView');
   try {
     await Promise.all([loadGameData(), loadSetup(), loadClock()]);

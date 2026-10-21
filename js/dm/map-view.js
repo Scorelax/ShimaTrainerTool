@@ -5,6 +5,41 @@ import { mapObjectsHtml, footprintForSize, footprintCells, trapCellsOf, trapCell
 import { isLevitating } from '../utils/move-effects.js';
 import { escapeHtml } from './dm-common.js';
 
+// Horizontal or vertical (the user's call, 2026-10-21): the DM picks, in the map setup, whether the map is shown here
+// the way the table TV shows it (horizontal, the default) or a quarter turn left -- upright, the way the board's own
+// pictures are drawn and the players see the table from their side, like the PokéNav's region map. Only this screen
+// changes: everything is still stored in board coordinates, and the table TV is the same either way. Kept on this
+// computer; the map setup (and the adventure's map, the battle's Edit map) and the battle setup's placement map follow it.
+const UPRIGHT_KEY = 'dm-battle-map-upright';
+export function mapUpright() {
+  try { return localStorage.getItem(UPRIGHT_KEY) === '1'; } catch { return false; }
+}
+export function setMapUpright(on) {
+  try { localStorage.setItem(UPRIGHT_KEY, on ? '1' : '0'); } catch { /* not kept */ }
+}
+
+/** The map's width on the page: as wide as it can be (up to `avail`, a CSS length, tall), its shape kept -- whichever
+ * way it's shown. `wrap` holds what mapStageHtml made. */
+export function sizeStage(wrap, m, avail) {
+  const turned = wrap?.querySelector('.dm-map-turn');
+  const outer = turned || wrap?.querySelector('.dm-map-stage');
+  if (outer) outer.style.width = `min(100%, calc((${avail}) * ${turned ? m.cols / m.rows : m.rows / m.cols}))`;
+}
+
+/** Where pointer event `e` is on `el` (the map's grid or stage), in the map's own unturned terms: { x, y } from its top
+ * left, in a box { w, h } -- the same numbers whichever way the map is shown. */
+export function pointOn(el, e) {
+  const r = el.getBoundingClientRect();
+  if (!el.closest('.dm-map-turn')) return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height };
+  // turned a quarter left: its own right points up the screen, its own down to the right
+  return { x: r.bottom - e.clientY, y: e.clientX - r.left, w: r.height, h: r.width };
+}
+
+/** A step (dx, dy) as it looks on screen -> the same step in the map's own terms. */
+export function screenStep(dx, dy, upright) {
+  return upright ? [-dy, dx] : [dx, dy];
+}
+
 export function boardOf(setup) {
   const m = setup.map;
   return { grid: { cols: m.cols, rows: m.rows }, objects: m.objects || [], marks: m.marks || {}, traps: m.traps || [], cells: {}, tokens: {} };
@@ -18,7 +53,7 @@ export function tokenScreenRect(m, col, row, size) {
 
 /** The whole map: background, grid (cells carry data-cell="col,row" when `interactive`), objects, the creatures that
  * have a starting square (`selectedId` highlighted), and an empty ghost layer for previews. */
-export function mapStageHtml(setup, { interactive = false, selectedId = null, preview = false } = {}) {
+export function mapStageHtml(setup, { interactive = false, selectedId = null, preview = false, upright = false } = {}) {
   const m = setup.map;
   const traps = trapCellsOf(boardOf(setup), true); // the DM's own screen: hidden traps too
   const cells = [];
@@ -36,14 +71,15 @@ export function mapStageHtml(setup, { interactive = false, selectedId = null, pr
     return `<div class="dm-map-token${c.id === selectedId ? ' selected' : ''}${c.hidden || c.heldBack ? ' dm-token-hidden' : ''}" data-token="${c.id}" title="${escapeHtml(c.name)}${c.hidden || c.heldBack ? ' (hidden from the players)' : ''}"
       style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"><div class="dm-map-token-art" data-img="${escapeHtml(c.participant?.image || '')}"></div></div>`;
   }).join('');
-  return `
+  // shown upright: the map in a box of its turned shape, turned a quarter left inside it (dm-console.css)
+  return `${upright ? `<div class="dm-map-turn" style="aspect-ratio:${m.cols} / ${m.rows}">` : ''}
     <div class="dm-map-stage${preview ? ' dm-map-preview' : ''}${m.background ? ' has-bg' : ''}" style="aspect-ratio:${m.rows} / ${m.cols}">
       <div class="dm-map-bg"${m.background ? ` style="background-image:url('${escapeHtml(m.background)}')"` : ''}></div>
       <div class="dm-map-grid" style="grid-template-columns:repeat(${m.rows},1fr);grid-template-rows:repeat(${m.cols},1fr)">${cells.join('')}</div>
       <div class="bmap-objects">${mapObjectsHtml(boardOf(setup), { tv: true, all: true })}</div>
       <div class="dm-map-tokens">${tokens}</div>
       <div class="dm-map-ghost"></div>
-    </div>`;
+    </div>${upright ? '</div>' : ''}`;
 }
 
 /** Why creature `c` can't start at board cell (col, row), or '' -- off the map, on a blocked square (unless it floats:

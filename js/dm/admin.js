@@ -574,7 +574,7 @@ async function pickCriterionValue(type) {
     const items = await DmAPI.adminItems().catch(() => []);
     const res = await openPicker({
       title: '💎 Pick the item', imageFallback: 'assets/Bag.png',
-      items: items.map(i => ({ key: i.name, label: i.name, sub: i.category, image: i.image || '' })),
+      items: items.map(i => ({ key: i.name, label: i.name, sub: i.category, group: i.category || 'Misc', image: i.image || '' })),
     });
     return res?.keys[0] || '';
   }

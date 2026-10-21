@@ -233,7 +233,7 @@ export async function givePokemonPopup(trainer, { ownedSpecies = [] } = {}) {
     const items = await DmAPI.adminItems().catch(() => JSON.parse(sessionStorage.getItem('items') || '[]'));
     const res = await openPicker({
       title: '🎒 A held item', imageFallback: 'assets/Bag.png', hint: 'Search by name or category.',
-      items: items.map(i => ({ key: i.name, label: i.name, sub: i.category || '', image: i.image || '', search: i.category || '' })),
+      items: items.map(i => ({ key: i.name, label: i.name, sub: i.category || '', group: i.category || 'Misc', image: i.image || '', search: i.category || '' })),
     });
     if (!res?.keys?.[0]) return;
     setItem(body, res.keys[0]);

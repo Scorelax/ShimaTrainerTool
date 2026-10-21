@@ -1123,7 +1123,7 @@ async function openEditCreature(p) {
     body.querySelector('#edItemPick')?.addEventListener('click', async () => {
       const items = await DmAPI.adminItems().catch(() => []);
       const res = await openPicker({ title: `🎒 A held item for ${p.name}`, imageFallback: 'assets/Bag.png',
-        items: items.map(i => ({ key: i.name, label: i.name, sub: i.category, image: i.image || '' })) });
+        items: items.map(i => ({ key: i.name, label: i.name, sub: i.category, group: i.category || 'Misc', image: i.image || '' })) });
       if (res?.keys[0]) body.querySelector('#edItem').value = res.keys[0];
     });
   } });

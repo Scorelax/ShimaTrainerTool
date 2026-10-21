@@ -12,10 +12,16 @@ const SHOWN_MAX = 300; // cards drawn at once -- the search narrows it down
  * -> Promise<{ keys: [...], hidden: bool } | null> (null: closed without picking). `image` may be an animated sprite.
  * `compact`: no pictures at all -- a list of names (moves). `extraAction`: {label} -- a button left in the foot that closes
  * the picker with {extra: true} (Create a custom move...).
+ * An item's `group` (an item's category -- the user's call, 2026-10-21: the map's Items popup, on the map setup and the
+ * adventure, sorted by category): with more than one group among them, a box beside the search shows one group at a time
+ * (`groupLabel` names them in it: "All categories").
  */
 export function openPicker({ title, items, multi = false, hiddenOption = false, confirmLabel = null, hint = '',
-  emptyText = 'Nothing to pick from.', imageFallback = 'assets/Pokeball-small.png', compact = false, hiddenDefault = false, extraAction = null }) {
+  emptyText = 'Nothing to pick from.', imageFallback = 'assets/Pokeball-small.png', compact = false, hiddenDefault = false, extraAction = null,
+  groupLabel = 'categories' }) {
   const picked = new Set();
+  const groups = [...new Set(items.map(it => it.group).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+  const groupCount = g => items.filter(it => it.group === g).length;
   let hidden = hiddenDefault;
   return openDmModal({
     title,
@@ -24,6 +30,9 @@ export function openPicker({ title, items, multi = false, hiddenOption = false, 
       <div class="dm-picker${compact ? ' compact' : ''}">
         <div class="dm-picker-bar">
           <input class="dm-input" data-pk-search placeholder="Search…" autocomplete="off">
+          ${groups.length > 1 ? `<select class="dm-input dm-picker-group" data-pk-group title="Show one ${escapeHtml(groupLabel.replace(/ies$/, 'y').replace(/s$/, ''))} at a time">
+            <option value="">All ${escapeHtml(groupLabel)} (${items.length})</option>
+            ${groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)} (${groupCount(g)})</option>`).join('')}</select>` : ''}
           ${hiddenOption ? `<label class="dm-check dm-picker-hidden" title="Put them on hidden -- only you see them until you show them"><input type="checkbox" data-pk-hidden ${hidden ? 'checked' : ''}><span>Add hidden</span></label>` : ''}
         </div>
         ${hint ? `<div class="dm-hint">${hint}</div>` : ''}
@@ -41,10 +50,12 @@ export function openPicker({ title, items, multi = false, hiddenOption = false, 
       const search = body.querySelector('[data-pk-search]');
       const okBtn = body.querySelector('[data-pk-ok]');
       const count = body.querySelector('[data-pk-count]');
+      const groupBox = body.querySelector('[data-pk-group]');
       const done = () => close({ keys: [...picked], hidden });
       const draw = () => {
         const q = search.value.trim().toLowerCase();
-        const hits = items.filter(it => !q || `${it.label} ${it.sub || ''} ${it.search || ''}`.toLowerCase().includes(q));
+        const group = groupBox?.value || '';
+        const hits = items.filter(it => (!group || it.group === group) && (!q || `${it.label} ${it.sub || ''} ${it.search || ''}`.toLowerCase().includes(q)));
         grid.innerHTML = hits.slice(0, SHOWN_MAX).map(it => `
           <button type="button" class="dm-picker-card${picked.has(it.key) ? ' picked' : ''}" data-pk="${escapeHtml(it.key)}" title="${escapeHtml(it.label)}">
             ${compact ? '' : `<span class="dm-picker-img" data-img="${escapeHtml(it.image || '')}"></span>`}
@@ -53,7 +64,7 @@ export function openPicker({ title, items, multi = false, hiddenOption = false, 
             ${multi ? '<span class="dm-picker-tick">✓</span>' : ''}
           </button>`).join('')
           + (hits.length > SHOWN_MAX ? `<div class="dm-hint dm-picker-more">…and ${hits.length - SHOWN_MAX} more -- search to narrow it down.</div>` : '')
-          + (hits.length ? '' : `<div class="dm-hint dm-picker-more">${items.length ? 'Nothing matches that.' : escapeHtml(emptyText)}</div>`);
+          + (hits.length ? '' : `<div class="dm-hint dm-picker-more">${items.length ? `Nothing matches that${group ? ` in ${escapeHtml(group)}` : ''}.` : escapeHtml(emptyText)}</div>`);
         grid.querySelectorAll('[data-img]').forEach((el) => {
           if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, '', { small: true });
           else el.innerHTML = `<img src="${imageFallback}" alt="" style="opacity:0.3">`;
@@ -76,6 +87,7 @@ export function openPicker({ title, items, multi = false, hiddenOption = false, 
       });
       grid.addEventListener('dblclick', (e) => { if (multi && e.target.closest('[data-pk]') && picked.size) done(); });
       search.addEventListener('input', draw);
+      groupBox?.addEventListener('change', () => { draw(); search.focus(); });
       search.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter') return;
         const first = grid.querySelector('[data-pk]');

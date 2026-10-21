@@ -6,6 +6,7 @@ import { prefetchSprite } from '../utils/sprite-media.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { allCachedPokemon, knownMoveNames, storePokemon } from '../utils/owned-pokemon.js';
 import { loadTrainer, storeTrainer } from '../utils/trainer-data.js';
+import { warmItemPictures } from '../utils/item-pictures.js';
 
 // ============================================================================
 // KNOWN MOVES SYNC
@@ -144,6 +145,7 @@ function storeGameDataInSession(trainerClass, actualData) {
     throw new Error('Game data incomplete (server may be having issues, try again): missing ' + missing.join(', '));
   }
   sessionStorage.setItem('items',         JSON.stringify(actualData.itemsData.items));
+  warmItemPictures(actualData.itemsData.items);   // in the background (item-pictures.js)
   sessionStorage.setItem('moves',         JSON.stringify(actualData.moves));
   sessionStorage.setItem('natures',       JSON.stringify(actualData.natures));
   sessionStorage.setItem('pokemonFeats',  JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));

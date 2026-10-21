@@ -16,7 +16,7 @@ import {
   natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect, portraitOptionsHtml, toast,
 } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup, onSetupChange } from './setup-store.js';
-import { mapStageHtml, tokenScreenRect, creatureSpotProblem } from './map-view.js';
+import { mapStageHtml, tokenScreenRect, creatureSpotProblem, mapUpright, sizeStage } from './map-view.js';
 
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
@@ -135,9 +135,9 @@ function renderMap() {
   const s = getSetup();
   const m = s.map;
   const sel = selectedCreature();
-  wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: sel?.id });
+  wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: sel?.id, upright: mapUpright() });   // (as the map setup shows it)
   const stage = wrap.querySelector('.dm-map-stage');
-  stage.style.width = `min(100%, calc(34vh * ${m.rows / m.cols}))`;
+  sizeStage(wrap, m, mapUpright() ? '60vh' : '34vh');
   stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-token-emoji">👤</span>'; });
 
   const hint = document.getElementById('csMapHint');

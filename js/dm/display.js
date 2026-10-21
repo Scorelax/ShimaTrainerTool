@@ -1240,6 +1240,9 @@ function setFolderMode(on) {
  * ordinary folder. -> true when something changed (to be saved). */
 function syncLocationFolders(locations) {
   if (!Array.isArray(locations)) return false;
+  // No folder for a region (the user's call, 2026-10-21): it's a stretch of the map, not a place a scene is set in --
+  // one it had goes like a deleted location's (empty: gone; with pictures in it: kept as an ordinary folder).
+  locations = locations.filter(l => l?.type !== 'region');
   let changed = false;
   const ids = new Set(locations.map(l => l?.id).filter(Boolean));
   const has = id => _folders.some(f => f.id === id);

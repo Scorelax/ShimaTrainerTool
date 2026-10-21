@@ -19,8 +19,9 @@
 // bright as ever. A minor location's name (not ticked Major, map-version.js isMajor) only shows zoomed in. A route or a forest the DM only looks at (highlight) is drawn in light blue (a town or a cave
 // isn't: its own pin is enough, and a ring over it looked odd).
 // A location with an icon (the user's call, 2026-10-20: a little model of the place the DM uploads, js/dm/location-icon.js)
-// has it standing on the land where the DM put it, facing the camera like the painted cities, as tall as the DM set in
-// km -- so it grows and shrinks with the land as the map zooms, and keeps to scale with the others.
+// has it lying on the land on its mark, north up like the painting (the user's call, 2026-10-21: it stays put as the map
+// turns and tilts, never turning to face the viewer), as tall as the DM set in km -- so it grows and shrinks with the
+// land as the map zooms, and keeps to scale with the others.
 // A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
@@ -172,7 +173,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   let highlighted = null;   // the id of the location drawn onto the land (the DM looking at it)
   let partyAt = null;       // the id of the location the party is at (outlined in gold, marked)
   let overlay = null;       // ...drawn here: { canvas, ctx, tex, mesh } -- the land's surface again, see-through
-  const icons = [];         // the locations' icons standing on the land (sprites)
+  const icons = [];         // the locations' icons lying on the land (flat pictures)
+  // one square, lying flat with its top to the north (-z, the painting's up), every icon a copy of it scaled to its picture
+  const iconPlane = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   const iconTextures = {};  // their pictures, by URL (a promise each)
 
   // Painting pixel -> world: x to the east, z to the south, y up (metres scaled by vert).
@@ -383,8 +386,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   }
 
   // ---------------------------------------------------------------------------
-  // The locations' icons: a picture with its middle on its spot, always facing the camera, drawn over the land (never hidden
-  // in a hillside) like the labels
+  // The locations' icons: a picture with its middle on its spot, lying on the land north up -- turning and tilting with
+  // the map, not towards the viewer (the user's call, 2026-10-21) -- drawn over the land (never hidden in a hillside)
+  // like the labels
   // ---------------------------------------------------------------------------
 
   function iconTexture(url) {
@@ -409,10 +413,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       if (!at) return;
       const [ix, iy] = at;
       const tall = (ic.size || 5) / land.kmPerPx;   // km -> painting pixels (the world's units across the land)
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false }));
+      const sp = new THREE.Mesh(iconPlane, new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false }));
       // its middle on the spot, the pin in the middle of the picture (the user's call, 2026-10-20) -- the name goes under
       // the picture (placeLabels: userData)
-      sp.center.set(0.5, 0.5);
       sp.userData = { locId: l.id, tall };
       sp.renderOrder = 2;
       sp.visible = false;
@@ -423,7 +426,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         if (!icons.includes(sp)) return;
         sp.material.map = tex;
         sp.material.needsUpdate = true;
-        sp.scale.set((tall * tex.image.width) / Math.max(1, tex.image.height), tall, 1);
+        sp.scale.set((tall * tex.image.width) / Math.max(1, tex.image.height), 1, tall);   // (x across, z north-south)
+        sp.updateMatrixWorld();
         sp.visible = true;
         dirty = true;
         wake();
@@ -482,19 +486,26 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   }
 
   const v = new THREE.Vector3();
+  const corner = new THREE.Vector3();
   function placeLabels() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     const dist = camera.position.distanceTo(controls.target);
     // A minor location's name only closer in than 60 % of the whole-island view the compass goes back to (the user's
     // call, 2026-10-20): from far out only the major locations are named.
     const minorAway = dist > fillFor(controls.getAzimuthalAngle()) * 0.6;
-    // Half an icon's height on the screen, by its location (a sprite always faces the screen, so its bottom edge is that
-    // far under its middle): its name goes just under it (region-map.css --below); with the icon showing, the location's
-    // white dot is left out and the party's marker sits on the picture (.iconed, .on-icon).
+    // How far an icon reaches down the screen from its middle, by its location -- the lowest of its corners, the way the
+    // map is turned and tilted now (it lies on the land): its name goes just under it (region-map.css --below); with the
+    // icon showing, the location's white dot is left out and the party's marker sits on the picture (.iconed, .on-icon).
     const halfIcon = new Map();
-    const pxPerUnit = h / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
     icons.forEach((sp) => {
-      if (sp.visible) halfIcon.set(sp.userData.locId, (sp.scale.y / 2) * (pxPerUnit / Math.max(1e-6, camera.position.distanceTo(sp.position))));
+      if (!sp.visible) return;
+      const mid = v.copy(sp.position).project(camera).y;
+      let low = 0;
+      for (const [cx, cz] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) {
+        corner.set(cx, 0, cz).applyMatrix4(sp.matrixWorld).project(camera);
+        low = Math.max(low, ((mid - corner.y) / 2) * h);
+      }
+      halfIcon.set(sp.userData.locId, low);
     });
     for (const l of labels) {
       v.copy(l.at).project(camera);

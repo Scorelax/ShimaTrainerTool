@@ -150,10 +150,12 @@ export async function drawShapePreview(canvas, shape) {
 const AREA_TOOLS = {
   // (the user's call, 2026-10-21: a hybrid of the brush and the region fill -- the border painted round it, the land
   // inside filled in)
-  ring: { label: '⭕ Ring', hint: '<b>Paint a ring round the region</b> with the brush -- in as many strokes as you like, zooming and moving the map in between (right-drag), out over the sea is fine. <b>When the ring closes, the land inside fills in by itself</b> -- never the sea, never another region. Using the coast instead? Paint from coast to coast, then <b>click on the side</b> you want. Alt + paint rubs the ring out. The ring goes when you press Done.' },
+  // (`other`: the hint for a forest or any other area -- the user's call, 2026-10-21: the ring and the loop for forests
+  // too; they keep to the land as well, but only a region keeps out of the other regions)
+  ring: { label: '⭕ Ring', other: '<b>Paint a ring round it</b> with the brush -- in as many strokes as you like, zooming and moving the map in between (right-drag), out over the sea is fine. <b>When the ring closes, the land inside fills in by itself</b> -- never the sea. Using the coast? Paint from coast to coast, then <b>click on the side</b> you want. Alt + paint rubs the ring out. The ring goes when you press Done.', hint: '<b>Paint a ring round the region</b> with the brush -- in as many strokes as you like, zooming and moving the map in between (right-drag), out over the sea is fine. <b>When the ring closes, the land inside fills in by itself</b> -- never the sea, never another region. Using the coast instead? Paint from coast to coast, then <b>click on the side</b> you want. Alt + paint rubs the ring out. The ring goes when you press Done.' },
   // (the user's call, 2026-10-21: the painting's lines never closed a region in -- a region is drawn round roughly instead,
   // and only the land inside counts)
-  region: { label: '➰ Loop', hint: '<b>Drag round the region</b> -- roughly, out over the sea is fine: only the land inside is taken, and none of another region\'s, so draw over the neighbour\'s border and it stops at it. Or <b>click on land</b> to take all the land round there that isn\'t in a region yet (the last one, say). Alt takes away. Right-drag moves the map.' },
+  region: { label: '➰ Loop', other: '<b>Drag round it</b> -- roughly, out over the sea is fine: only the land inside is taken. Alt + drag takes away. Right-drag moves the map.', hint: '<b>Drag round the region</b> -- roughly, out over the sea is fine: only the land inside is taken, and none of another region\'s, so draw over the neighbour\'s border and it stops at it. Or <b>click on land</b> to take all the land round there that isn\'t in a region yet (the last one, say). Alt takes away. Right-drag moves the map.' },
   wand: { label: '🪄 Fill', hint: 'Click inside a forest (or a lake, or a patch of one colour) and it fills it in. Alt + click takes a patch away again.' },
   brush: { label: '🖌 Paint', hint: 'Paint to add to the area.' },
   erase: { label: '🧽 Erase', hint: 'Paint to take away from the area.' },
@@ -181,7 +183,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   let follow = old?.kind === 'path' ? old.follow !== false : true;
   let segs = [];
   let mask = old?.kind === 'area' ? F.ringsToMask(old.rings, W, H) : new Uint8Array(W * H);
-  let areaTool = loc.type === 'region' ? 'ring' : 'wand';
+  let areaTool = loc.type === 'region' || loc.type === 'forest' ? 'ring' : 'wand';
   // the Ring tool's painted border (1 = painted): only a guide -- what it closes in goes into `mask`, the ring itself is
   // never saved
   let ring = new Uint8Array(W * H);
@@ -495,8 +497,8 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
         <div class="dm-lme-stat">${anchors.length < 2 ? `${anchors.length ? 'The start' : 'No points yet'} -- it needs a start and an end` : describeShape({ kind: 'path', points: pts })}</div>${common}`;
     } else {
       box.innerHTML = `<div class="dm-card-title">⬚ An area</div>
-        <div class="dm-lme-toolgrid">${Object.entries(AREA_TOOLS).filter(([k]) => (k === 'region' || k === 'ring' ? isRegion : k !== 'wand' || !isRegion)).map(([k, t]) => `<button class="dm-btn small${areaTool === k ? ' active' : ''}" data-tool="${k}">${t.label}</button>`).join('')}</div>
-        <div class="dm-hint">${AREA_TOOLS[areaTool].hint}${isRegion && areaTool !== 'region' ? ' (Only land, outside the other regions.)' : ''}</div>
+        <div class="dm-lme-toolgrid">${Object.entries(AREA_TOOLS).filter(([k]) => k !== 'wand' || !isRegion).map(([k, t]) => `<button class="dm-btn small${areaTool === k ? ' active' : ''}" data-tool="${k}">${t.label}</button>`).join('')}</div>
+        <div class="dm-hint">${(!isRegion && AREA_TOOLS[areaTool].other) || AREA_TOOLS[areaTool].hint}${isRegion && areaTool !== 'region' ? ' (Only land, outside the other regions.)' : ''}</div>
         ${areaTool === 'brush' || areaTool === 'erase' || areaTool === 'ring' ? `<div class="dm-field"><label>Brush size</label><input type="range" id="lmeBrush" min="2" max="60" value="${brush}"></div>` : ''}
         ${areaTool === 'wand' ? `<div class="dm-field"><label>How alike (for a patch of one colour)</label><input type="range" id="lmeTol" min="0" max="100" value="${tolerance}"></div>` : ''}
         <div class="dm-row"><button class="dm-btn small" data-lme="undo" ${undos.area.length || lasso.length ? '' : 'disabled'}>↶ Undo</button>
@@ -630,6 +632,8 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
         paintMask();
       } else {
         if (mask[i0]) { toast('That\'s in it already -- drag round more land to add it, or Alt + click to take this piece away.'); return; }
+        // (only a region takes all the free land round a click -- for a forest that would be the whole island)
+        if (!isRegion) { toast('Hold the button down and drag round it.'); return; }
         const got = F.freeLandAt(free(), W, H, p[0], p[1]);
         if (!got.size) {
           const other = byName(p[0], p[1]);

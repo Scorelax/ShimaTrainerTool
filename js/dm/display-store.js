@@ -77,14 +77,30 @@ let _plans = [];
 let _plansLoaded = false;
 let _planId = null;
 let _planTimer = null;
+let _planSaving = false;
+
+const readPlans = saved => (Array.isArray(saved) ? saved : []).filter(p => p && p.id)
+  .map(p => ({ ...p, name: String(p.name || 'Scene'), folder: String(p.folder || ''), overBattle: !!p.overBattle, scene: normaliseScene(p.scene) }));
 
 export async function loadPlans() {
   if (_plansLoaded) return _plans;
-  const saved = await DmAPI.getState('display-planner').catch(() => null);
-  _plans = (Array.isArray(saved) ? saved : []).filter(p => p && p.id)
-    .map(p => ({ ...p, name: String(p.name || 'Scene'), folder: String(p.folder || ''), overBattle: !!p.overBattle, scene: normaliseScene(p.scene) }));
+  _plans = readPlans(await DmAPI.getState('display-planner').catch(() => null));
   _plansLoaded = true;
   return _plans;
+}
+
+/** The planner saved somewhere else -- the console open on another device too (the user's call, 2026-10-21: one
+ * device's save mustn't undo the other's): loaded again. Not while a change of this one's is waiting to be saved or
+ * being saved (that one goes up as it is), nor when nothing's different (this console's own save coming back). */
+export async function reloadPlans() {
+  if (!_plansLoaded || _planTimer || _planSaving) return;
+  const saved = await DmAPI.getState('display-planner').catch(() => null);
+  if (!Array.isArray(saved) || _planTimer || _planSaving) return;
+  const next = readPlans(saved);
+  if (JSON.stringify(next) === JSON.stringify(_plans)) return;
+  _plans = next;
+  if (_planId && !_plans.some(p => p.id === _planId)) _planId = null;
+  notify();
 }
 
 export function getPlans() {
@@ -125,6 +141,9 @@ export function updatePlans(fn) {
 function savePlansSoon() {
   clearTimeout(_planTimer);
   _planTimer = setTimeout(() => {
-    DmAPI.saveState('display-planner', _plans).catch(err => toast(`Couldn't save the planner: ${err.message}`));
+    _planTimer = null;
+    _planSaving = true;
+    DmAPI.saveState('display-planner', _plans).catch(err => toast(`Couldn't save the planner: ${err.message}`))
+      .finally(() => { _planSaving = false; });
   }, 400);
 }

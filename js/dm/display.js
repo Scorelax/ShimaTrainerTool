@@ -24,13 +24,13 @@ import { escapeHtml, getSpecies, newId, toast, openDmModal } from './dm-common.j
 // getScene / updateScene here are the scene being worked on -- the display's own, or the planned one open in the planner
 import {
   loadScene, onSceneChange, getScene as getLive, updateScene as updateLive, getTarget as getScene, updateTarget as updateScene,
-  loadPlans, getPlans, openPlan, setOpenPlan, updatePlans,
+  loadPlans, reloadPlans, getPlans, openPlan, setOpenPlan, updatePlans,
 } from './display-store.js';
 import { spriteSrc } from '../utils/sprite-media.js';
 
 // (Planned scenes: the user's call, 2026-10-21 -- the planned scenes organised here, in folders, the way the backgrounds
 // are; the queue and the planner only open the folders)
-const SOURCES = { pokemon: '🐾 Pokémon', npcs: '👤 NPCs', trainers: '👥 Trainers', backgrounds: '🖼️ Backgrounds', scenes: '📅 Planned scenes' };
+const SOURCES = { pokemon: '🐾 Pokémon', npcs: '👤 NPCs', trainers: '👥 Trainers', backgrounds: '🖼️ Backgrounds', scenes: '📅 Scenes' };
 const KIND_LABEL = { pokemon: 'Pokémon', npc: 'NPC', trainer: 'Trainer', image: 'Picture' };
 const IS_VIDEO = /\.mp4(\?|$)/i;
 const MAX_RESULTS = 150;
@@ -96,6 +96,7 @@ export async function renderDisplay(root, { session, firstTime } = {}) {
   await Promise.all([loadScene(), loadPlans(), loadPlanFolders()]);
   if (!_listening) {
     _listening = true;
+    window.addEventListener('app:dm-state', e => stateSavedElsewhere(e.detail?.key));
     onSceneChange(() => {
       postToPreview({ scene: getScene() });
       if (_editor) drawEditorStage();
@@ -269,15 +270,40 @@ function previewSession() {
   return _mode === 'plan' ? { active: false, participants: {}, turnOrder: [] } : _session;
 }
 
+/** The folders, the planner and the folder lists saved somewhere else (another device's console, or this one's own save
+ * coming back -- then nothing's different and nothing's drawn): loaded again, so a save here never puts back what was
+ * changed there (the user's call, 2026-10-21). */
+async function stateSavedElsewhere(key) {
+  if (key === 'display-planner') { reloadPlans(); return; }
+  if (key === 'display-plan-folders' && _planFoldersLoaded) {
+    const was = JSON.stringify(_planFolders);
+    _planFoldersLoaded = false;
+    await loadPlanFolders();
+    if (JSON.stringify(_planFolders) !== was && _root?.querySelector('.dm-disp')) drawLayers();
+    return;
+  }
+  const name = Object.keys(FOLDERED).find(k => FOLDERED[k] === key);
+  if (!name || !_data[name] || _dragging) return;
+  _data[name] = null;   // the pictures' / NPCs' folders too: loaded again with the tab
+  if (_source === name && _root?.querySelector('.dm-disp')) drawSource();
+}
+
+// The planned scene last open in the planner: open again when the DM comes back to it from Live (the user's call,
+// 2026-10-21 -- it went back to the folder's first scene, and pictures went into the wrong one)
+let _lastPlanId = null;
+
 async function switchMode(mode, planId = null) {
   _mode = mode;
   if (mode === 'plan') {
     await loadPlans();
     if (!getPlans().length) newPlan({ silent: true });
-    const id = planId || openPlan()?.id || plansIn(_planFolder)[0]?.id || getPlans()[0].id;
+    const last = getPlans().some(p => p.id === _lastPlanId) ? _lastPlanId : null;
+    const id = planId || openPlan()?.id || last || plansIn(_planFolder)[0]?.id || getPlans()[0].id;
     _planFolder = getPlans().find(p => p.id === id)?.folder || '';
     setOpenPlan(id);
+    _lastPlanId = id;
   } else {
+    _lastPlanId = openPlan()?.id || _lastPlanId;
     setOpenPlan(null);
   }
   if (_editor) closeEditor();
@@ -287,6 +313,7 @@ async function switchMode(mode, planId = null) {
 function openPlanned(id) {
   if (id === openPlan()?.id) return;
   setOpenPlan(id);
+  _lastPlanId = id;
   if (_editor) closeEditor();
   draw();
 }
@@ -380,7 +407,7 @@ function planBrowserHtml(row, { manage = false } = {}) {
       </div>`).join('')}
     ${plans.map(row).join('')}
     ${!plans.length && !subs.length ? `<div class="dm-hint">${_planFolder ? 'Nothing in this folder yet -- drag scenes onto it, or 📁 Move one here.' : 'No planned scenes yet.'}</div>` : ''}
-    ${manage ? '' : '<div class="dm-hint dm-disp-planhint">Folders are made and scenes sorted into them in the 📅 Planned scenes tab.</div>'}`;
+    ${manage ? '' : '<div class="dm-hint dm-disp-planhint">Folders are made and scenes sorted into them in the 📅 Scenes tab.</div>'}`;
 }
 
 /** Live: the planned scenes waiting to be shown -- Show, change it in the planner, or delete it. */
@@ -759,8 +786,9 @@ function drawGrid() {
     // pictures
     const every = !!q || !_folderMode;
     const shown = list.filter(b => (q ? b.name.toLowerCase().includes(q) : every || (b.folder || '') === _folder));
-    const folders = every ? [] : _folders.filter(f => (f.parent || '') === _folder).sort((a, b) => (a.locId ? 1 : 0) - (b.locId ? 1 : 0) || a.name.localeCompare(b.name));
-    grid.innerHTML = `${foldersBarHtml(q)}${folders.map(folderCardHtml).join('')}` + (shown.length ? shown.map(b => `
+    const here = every ? [] : _folders.filter(f => (f.parent || '') === _folder).sort((a, b) => a.name.localeCompare(b.name));
+    const folders = here.filter(f => !f.locId);
+    grid.innerHTML = `${foldersBarHtml(q)}${folders.map(folderCardHtml).join('')}${locationFoldersHtml(here.filter(f => f.locId))}` + (shown.length ? shown.map(b => `
       <div class="dm-disp-bg${b.url === current ? ' current' : ''}${_picked.has(b.id) ? ' picked' : ''}" data-bg="${escapeHtml(b.id)}" draggable="true" role="button" tabindex="0" title="Put it on the display as the background -- drag it into a folder, or tick it (Ctrl + click) to move several">
         <span class="dm-disp-bg-img"><img src="${escapeHtml(b.url)}" alt="" loading="lazy" draggable="false"></span>
         <button class="dm-disp-tick" data-pick-bg title="${_picked.has(b.id) ? 'Unpick it' : 'Pick it -- to move several at once'}">✓</button>
@@ -770,7 +798,7 @@ function drawGrid() {
           <button class="dm-icon-btn" data-bgact="rename" title="Rename">✎</button>
           <button class="dm-icon-btn danger" data-bgact="delete" title="Delete it from the Pi">✕</button>
         </span>
-      </div>`).join('') : folders.length ? '' : `<div class="dm-hint dm-disp-empty">${q ? 'No picture matches that.' : _folder ? 'This folder is empty -- drag pictures here, or upload them while it\'s open.' : list.length ? 'No pictures out here -- they\'re all in folders.' : 'No pictures uploaded yet -- upload a few backgrounds (a route, a forest, a city…) and they stay here for next time.'}</div>`);
+      </div>`).join('') : here.length ? '' : `<div class="dm-hint dm-disp-empty">${q ? 'No picture matches that.' : _folder ? 'This folder is empty -- drag pictures here, or upload them while it\'s open.' : list.length ? 'No pictures out here -- they\'re all in folders.' : 'No pictures uploaded yet -- upload a few backgrounds (a route, a forest, a city…) and they stay here for next time.'}</div>`);
     wireFolderDrag(grid);
     drawPickedBar();
     return;
@@ -1242,6 +1270,30 @@ function syncLocationFolders(locations) {
   return changed;
 }
 
+// The locations' folders (the user's call, 2026-10-21: a big card for every location crowded the backgrounds): one
+// section after the DM's own folders, small tiles with the first picture in each, folded up from its title (remembered
+// on this computer). A tile is a folder like any other -- open it, drop pictures on it, drag it into another folder.
+const LOC_FOLDERS_SHUT = 'dm-display-locfolders-shut';
+let _locFoldersShut = (() => { try { return localStorage.getItem(LOC_FOLDERS_SHUT) === '1'; } catch { return false; } })();
+
+function locationFoldersHtml(list) {
+  if (!list.length) return '';
+  const pics = _data.backgrounds || [];
+  const tile = (f) => {
+    const inFolder = pics.filter(b => b.folder === f.id);
+    const inside = inFolder.length + _folders.filter(x => x.parent === f.id).length;
+    return `<div class="dm-disp-locfolder${inside ? '' : ' empty'}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}" data-drag-folder="${escapeHtml(f.id)}" draggable="true" role="button" tabindex="0"
+        title="${escapeHtml(f.name)}: the location's own folder -- named and removed with it in Admin › Locations. Open it, or drop pictures on it">
+      <span class="dm-disp-locfolder-pic">${inFolder[0] ? `<img src="${escapeHtml(inFolder[0].url)}" alt="" loading="lazy" draggable="false">` : '📍'}</span>
+      <span class="dm-disp-locfolder-name">${escapeHtml(f.name)}<small>${inside ? `${inside} inside` : 'empty'}</small></span>
+    </div>`;
+  };
+  return `<div class="dm-disp-locsec${_locFoldersShut ? ' shut' : ''}">
+    <button class="dm-disp-locsec-title" data-loc-folders aria-expanded="${_locFoldersShut ? 'false' : 'true'}">${_locFoldersShut ? '▸' : '▾'} 📍 Locations <small>${list.length}</small></button>
+    ${_locFoldersShut ? '' : `<div class="dm-disp-locsec-tiles">${list.map(tile).join('')}</div>`}
+  </div>`;
+}
+
 function folderCardHtml(f) {
   const inside = (_data[_source] || []).filter(b => b.folder === f.id).length + _folders.filter(x => x.parent === f.id).length;
   // a location's folder comes and goes with its location: no rename or delete here
@@ -1267,6 +1319,12 @@ function saveFolders() {
 /** A click on a folder, a step of the path or New folder -- true when it was one of those. */
 function onFolderClick(e) {
   if (e.target.closest('.dm-disp-foldermode')) return true;   // the box's own change does it (setFolderMode)
+  if (e.target.closest('[data-loc-folders]')) {
+    _locFoldersShut = !_locFoldersShut;
+    try { localStorage.setItem(LOC_FOLDERS_SHUT, _locFoldersShut ? '1' : '0'); } catch { /* not remembered: fine */ }
+    drawGrid();
+    return true;
+  }
   if (e.target.closest('[data-new-folder]')) { newFolder(); return true; }
   const act = e.target.closest('[data-folder-act]');
   if (act) {

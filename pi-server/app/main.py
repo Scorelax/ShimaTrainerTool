@@ -17,7 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import admin, db, gamedata, live, media, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews
+from . import admin, db, gamedata, live, media, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews, battle_image_copies
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
 
@@ -516,6 +516,26 @@ if os.path.isdir(media.BATTLE_ANIMATION_DIR):
 if os.path.isdir(media.CHARACTER_IMAGE_DIR):
     app.mount(media.CHARACTER_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=media.CHARACTER_IMAGE_DIR),
               name='character-images')
+
+# A battle picture (a background or a map object, see battle_image_copies.py) -- its WebP copy, a seventh of the size,
+# to a browser that takes WebP, once it's made; the original otherwise. Same URL either way (Vary: Accept), still
+# revalidated every load like the rest of /battle-images/ (an unchanged one comes back as an empty 304).
+@app.get('/battle-images/{name}')
+def battle_image(name: str, request: Request):
+    path = os.path.join(media.BATTLE_IMAGE_DIR, os.path.basename(name))
+    if os.path.basename(name) != name or not os.path.isfile(path):
+        return Response(status_code=404)
+    copy = battle_image_copies.copy_for(name) if 'image/webp' in request.headers.get('accept', '') else None
+    # (given its stat now, so the ETag's there to compare -- otherwise FileResponse only adds it as it sends)
+    response = FileResponse(copy, media_type='image/webp', stat_result=os.stat(copy)) if copy else FileResponse(path, stat_result=os.stat(path))
+    response.headers['Vary'] = 'Accept'
+    etag = response.headers.get('etag')
+    if etag and request.headers.get('if-none-match') == etag:
+        return Response(status_code=304, headers={'ETag': etag, 'Vary': 'Accept'})
+    return response
+
+
+battle_image_copies.queue_missing()
 
 # Battle-map background images (see media.BATTLE_IMAGE_DIR / routes_combat.py's list-backgrounds)
 if os.path.isdir(media.BATTLE_IMAGE_DIR):

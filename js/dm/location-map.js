@@ -197,6 +197,46 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     }
     return freeLand;
   }
+  // the free land as a picture (see-through elsewhere): what a loop being drawn would take is shown through it
+  let freeCanvas = null;
+  function freePicture() {
+    if (freeCanvas) return freeCanvas;
+    const fr = free();
+    freeCanvas = document.createElement('canvas');
+    freeCanvas.width = W; freeCanvas.height = H;
+    const fc = freeCanvas.getContext('2d');
+    const img = fc.createImageData(W, H);
+    for (let i = 0; i < fr.length; i++) if (fr[i]) img.data[i * 4 + 3] = 255;
+    fc.putImageData(img, 0, 0);
+    return freeCanvas;
+  }
+  let previewCanvas = null;
+  /** While a loop is dragged round with the Region tool (the user's call, 2026-10-21): the land it would take, filled in
+   * green as it's drawn -- only the free land inside it, as letting go will take; red, all of it, with Alt (taken away). */
+  function drawLassoPreview() {
+    previewCanvas = previewCanvas || document.createElement('canvas');
+    const pv = previewCanvas;
+    if (pv.width !== canvas.width || pv.height !== canvas.height) { pv.width = canvas.width; pv.height = canvas.height; }
+    const pc = pv.getContext('2d');
+    pc.setTransform(1, 0, 0, 1, 0, 0);
+    pc.clearRect(0, 0, pv.width, pv.height);
+    pc.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pc.beginPath();
+    lasso.forEach(([x, y], i) => (i ? pc.lineTo(x * s + ox, y * s + oy) : pc.moveTo(x * s + ox, y * s + oy)));
+    pc.closePath();
+    pc.fillStyle = drag?.alt ? 'rgba(255, 110, 100, 0.45)' : 'rgba(110, 230, 130, 0.5)';
+    pc.fill();
+    if (!drag?.alt) {
+      pc.globalCompositeOperation = 'destination-in';
+      pc.imageSmoothingEnabled = s < 2;
+      pc.drawImage(freePicture(), ox, oy, W * s, H * s);
+      pc.globalCompositeOperation = 'source-over';
+    }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(pv, 0, 0);
+    ctx.restore();
+  }
   const byName = (x, y) => others.find(o => o.type === 'region' && o.shape?.kind === 'area' && F.pointInRings(o.shape.rings, x, y))?.name;
   let brush = 10;
   let tolerance = 30;
@@ -355,6 +395,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       ctx.drawImage(maskCanvas, ox, oy, W * s, H * s);
       ctx.imageSmoothingEnabled = true;
       if (at) drawIcon(ctx, iconImg, { ...icon, x: at[0], y: at[1] }, tf, { faint: true });
+      if (lasso.length > 2 && drag?.mode === 'lasso') drawLassoPreview();
       if (lasso.length) {
         ctx.save();
         ctx.beginPath();
@@ -536,7 +577,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     if (kind === 'pin' && near(pin, p, 14)) drag.mode = 'pin';
     else if (kind === 'path' && anchorAt(p) >= 0) drag.mode = { anchor: anchorAt(p) };
     else if (kind === 'area' && (areaTool === 'brush' || areaTool === 'erase')) { remember(); drag.mode = 'paint'; stroke(p, p); draw(); }
-    else if (kind === 'area' && areaTool === 'region') { drag.mode = 'lasso'; lasso = [p]; }
+    else if (kind === 'area' && areaTool === 'region') { drag.mode = 'lasso'; drag.alt = e.altKey; lasso = [p]; }
   });
   canvas.addEventListener('pointermove', (e) => {
     const p = toPaint(e);

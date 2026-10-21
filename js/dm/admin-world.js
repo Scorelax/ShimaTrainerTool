@@ -79,19 +79,54 @@ async function seedTowns(list) {
   } catch (err) { /* tried again next time */ }
 }
 
+const _sending = {};
+
 function saveSoon(key) {
   setSaving(true);
   clearTimeout(_timers[key]);
   _timers[key] = setTimeout(async () => {
     _timers[key] = null;
+    _sending[key] = true;
     try {
       await DmAPI.saveState(key, _data[key]);
       setSaving(false);
     } catch (err) {
       setSaving(null);
       toast(`Couldn't save: ${err.message}`);
+    } finally {
+      _sending[key] = false;
     }
   }, 500);
+}
+
+// One of the lists saved somewhere else -- the console open on another device too (the user's call, 2026-10-21: one
+// device's save mustn't undo the other's, which it did: the lists were only fetched once): fetched again and put in
+// place (the same list, so the tab drawn keeps working on it), and the tab drawn again -- its form only when nothing in
+// it is being typed in. Not while a change here is waiting to go or going (this one's goes up as it is), nor when it's
+// this console's own save coming back (nothing different).
+let _shown = null;   // the tab drawn: { body, list, form }
+if (typeof window !== 'undefined') {
+  window.addEventListener('app:dm-state', async (e) => {
+    const key = e.detail?.key;
+    if (!key || !_data[key] || _timers[key] || _sending[key]) return;
+    const saved = await DmAPI.getState(key).catch(() => null);
+    if (!Array.isArray(saved) || _timers[key] || _sending[key]) return;
+    const fresh = saved.filter(x => x && x.id);
+    if (JSON.stringify(fresh) === JSON.stringify(_data[key])) return;
+    // each record kept as the same object, brought up to date (something open on it here -- the map editor on a
+    // location -- still saves into the list)
+    const was = new Map(_data[key].map(x => [x.id, x]));
+    const next = fresh.map((x) => {
+      const o = was.get(x.id);
+      if (!o) return x;
+      Object.keys(o).forEach((k) => { if (!(k in x)) delete o[k]; });
+      return Object.assign(o, x);
+    });
+    _data[key].splice(0, _data[key].length, ...next);
+    if (!_shown?.body.isConnected) return;
+    _shown.list();
+    if (!document.getElementById('worldForm')?.contains(document.activeElement)) _shown.form();
+  });
 }
 
 // Leaving the page (or the tab going to the background) with a change still waiting: it's sent right away.
@@ -365,6 +400,37 @@ function wireLocationCombo(box, e, locations, onChange) {
 // Locations
 // ---------------------------------------------------------------------------
 
+/** Every location inside region `l` put under it (the user's call, 2026-10-21: nothing to add by hand) -- what it's part
+ * of goes under it instead when that's in the region too (a sawmill stays in its forest, the forest goes in the region).
+ * Left as they are: one already in this region, and one in another region that also covers it (overlapping, the DM's
+ * pick). Under this region but outside it now: taken out of it. -> { moved, out } (how many). */
+export function sortIntoRegion(l, locations) {
+  if (l?.type !== 'region' || l.shape?.kind !== 'area') return { moved: 0, out: 0 };
+  const rings = l.shape.rings;
+  const inRegion = x => { const p = iconSpot(x.shape); return !!p && pointInRings(rings, p[0], p[1]); };
+  const moved = new Set();
+  locations.forEach((x) => {
+    if (x === l || (x.type || 'city') === 'region' || !inRegion(x)) return;
+    const chain = partOfChain(x, locations);
+    if (chain.includes(l)) return;
+    const r = chain.findIndex(c => c !== x && (c.type || 'city') === 'region');
+    const other = r >= 0 ? chain[r] : null;
+    const p = iconSpot(x.shape);
+    if (other?.shape?.kind === 'area' && pointInRings(other.shape.rings, p[0], p[1])) return;
+    // the outermost of what it's part of (below any region) that's in this region too
+    const below = r >= 0 ? chain.slice(0, r) : chain;
+    const top = [...below].reverse().find(c => !c.shape || inRegion(c)) || x;
+    if (top.parentId !== l.id) { top.parentId = l.id; moved.add(top); }
+  });
+  let out = 0;
+  locations.forEach((x) => {
+    if (x.parentId !== l.id || inRegion(x) || !iconSpot(x.shape)) return;
+    delete x.parentId;
+    out++;
+  });
+  return { moved: moved.size, out };
+}
+
 export async function drawLocations(body) {
   let locations, events;
   try { [locations, events] = await Promise.all([loadLocations(), loadEvents(), currentMap()]); } catch (err) { loadFailed(body, err, drawLocations); return; }
@@ -384,6 +450,22 @@ export async function drawLocations(body) {
   iconsBtn.textContent = '🏰 Location icons';
   iconsBtn.title = 'The icons on the Pi -- upload many at once, named <Type>-<Location name>';
   maps.after(iconsBtn);
+  // Every region's locations sorted into it at once (the user's call, 2026-10-21: the regions drawn before marking one
+  // did it) -- the smaller regions first, so where two overlap a place goes in the smaller one
+  const sortBtn = document.createElement('button');
+  sortBtn.className = 'dm-btn';
+  sortBtn.textContent = '🗺️ Sort into regions';
+  sortBtn.title = 'Put every location under the region it lies in -- the ones outside a region they were under are taken out of it';
+  iconsBtn.after(sortBtn);
+  sortBtn.addEventListener('click', () => {
+    const area = x => { const b = shapeBounds(x.shape); return b ? (b.x1 - b.x0) * (b.y1 - b.y0) : 0; };
+    const regions = locations.filter(x => x.type === 'region' && x.shape?.kind === 'area').sort((a, b) => area(a) - area(b));
+    if (!regions.length) { toast('No region is marked on the map yet -- mark one first (Location type Region, then Mark it on the map).'); return; }
+    let moved = 0, out = 0;
+    regions.forEach((r) => { const n = sortIntoRegion(r, locations); moved += n.moved; out += n.out; });
+    if (moved || out) { saveSoon('locations'); list(); form(); }
+    toast(moved || out ? `${moved} location${moved === 1 ? '' : 's'} put under ${moved === 1 ? 'its region' : 'their regions'}${out ? `, ${out} taken out of one ${out === 1 ? 'it\'s' : 'they\'re'} no longer in` : ''}.` : 'Every location is in its region already.');
+  });
   iconsBtn.addEventListener('click', async () => {
     await openIconLibrary({ locations, onLocationsChanged: () => { saveSoon('locations'); list(); } });
     await loadLibrary();
@@ -515,33 +597,10 @@ export async function drawLocations(body) {
         const shape = await editLocationShape(l, locations.filter(x => x !== l && (x.shape || x.icon)), { onIcon: (icon) => { l.icon = icon; } });
         if (shape === undefined) return;
         l.shape = shape;
-        // A region marked: every location inside it goes under it (the user's call, 2026-10-21: nothing to add by hand)
-        // -- what it's part of goes under it instead when that's in the region too (a sawmill stays in its forest, the
-        // forest goes in the region). Left as they are: one already in this region, and one in another region that
-        // also covers it (overlapping, the DM's pick). Under this region but outside it now: taken out of it.
+        // A region marked: every location inside it goes under it (sortIntoRegion)
         if (l.type === 'region' && shape.kind === 'area') {
-          const inRegion = x => { const p = iconSpot(x.shape); return !!p && pointInRings(shape.rings, p[0], p[1]); };
-          const moved = new Set();
-          locations.forEach((x) => {
-            if (x === l || (x.type || 'city') === 'region' || !inRegion(x)) return;
-            const chain = partOfChain(x, locations);
-            if (chain.includes(l)) return;
-            const r = chain.findIndex(c => c !== x && (c.type || 'city') === 'region');
-            const other = r >= 0 ? chain[r] : null;
-            const p = iconSpot(x.shape);
-            if (other?.shape?.kind === 'area' && pointInRings(other.shape.rings, p[0], p[1])) return;
-            // the outermost of what it's part of (below any region) that's in this region too
-            const below = r >= 0 ? chain.slice(0, r) : chain;
-            const top = [...below].reverse().find(c => !c.shape || inRegion(c)) || x;
-            if (top.parentId !== l.id) { top.parentId = l.id; moved.add(top); }
-          });
-          let out = 0;
-          locations.forEach((x) => {
-            if (x.parentId !== l.id || inRegion(x) || !iconSpot(x.shape)) return;
-            delete x.parentId;
-            out++;
-          });
-          if (moved.size) toast(`${moved.size} location${moved.size === 1 ? '' : 's'} inside ${l.name || 'the region'} ${moved.size === 1 ? 'is' : 'are'} part of it now${out ? ` -- ${out} outside it now taken out` : ''}`);
+          const { moved, out } = sortIntoRegion(l, locations);
+          if (moved) toast(`${moved} location${moved === 1 ? '' : 's'} inside ${l.name || 'the region'} ${moved === 1 ? 'is' : 'are'} part of it now${out ? ` -- ${out} outside it now taken out` : ''}`);
           else if (out) toast(`${out} location${out === 1 ? '' : 's'} outside ${l.name || 'the region'} now ${out === 1 ? 'is' : 'are'} no longer part of it`);
         }
         // marked inside a forest (or another area, a region) and never given a Part of: it's put under it -- the
@@ -693,6 +752,7 @@ export async function drawStatuses(body) {
 
 /** The list (search, New, pick) and the form's fields and buttons, the same for every tab. */
 function wireShell(body, { list, form, create, pick, current, onField, onAct }) {
+  _shown = { body, list, form };
   document.getElementById('worldSearch').addEventListener('input', list);
   document.getElementById('worldNew').addEventListener('click', create);
   document.getElementById('worldList').addEventListener('click', (e) => {

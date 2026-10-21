@@ -500,6 +500,13 @@ export function ringsToMask(rings, W, H) {
   return mask;
 }
 
+/** Whether (x, y) is in an area location -- a region's `reach` when it has one: its land and the sea the DM drew round
+ * with it, plus a strip of sea along its coast (the user's call, 2026-10-21: a location's marker put a little out at
+ * sea, to look better on the map, is still in the region). The land alone (`rings`) is what's drawn. */
+export function inArea(shape, x, y) {
+  return shape?.kind === 'area' && pointInRings(shape.reach || shape.rings, x, y);
+}
+
 /** Where a shape is: its box and its middle (for the camera to fly to and a name to sit on), in painting pixels. */
 export function shapeBounds(shape) {
   const pts = !shape ? [] : shape.kind === 'pin' ? [[shape.x, shape.y]] : shape.kind === 'path' ? shape.points || [] : (shape.rings || []).flat();

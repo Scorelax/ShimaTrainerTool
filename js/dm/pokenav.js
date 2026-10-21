@@ -198,7 +198,8 @@ function eventRowHtml(e, where = '') {
 
 function partyHtml(locations, events) {
   const here = locations.find(l => l.id === _party?.locationId);
-  const opts = Object.entries(LOCATION_TYPES).map(([k, label]) => {
+  // (a region isn't a place the players can be -- the party is put on a location in it: the user's call, 2026-10-21)
+  const opts = Object.entries(LOCATION_TYPES).filter(([k]) => k !== 'region').map(([k, label]) => {
     const list = locations.filter(l => (l.type || 'city') === k).sort((a, b) => String(a.name).localeCompare(String(b.name)));
     return list.length ? `<optgroup label="${escapeHtml(label)}">${list.map(l => `<option value="${escapeHtml(l.id)}" ${l.id === here?.id ? 'selected' : ''}>${escapeHtml(l.name || 'Unnamed')}${parentOf(l, locations) ? ` (in ${escapeHtml(parentOf(l, locations).name || 'Unnamed')})` : ''}${l.shape ? '' : ' (not on the map)'}${l.secret ? ' 🔒' : ''}</option>`).join('')}</optgroup>` : '';
   }).join('');
@@ -246,7 +247,7 @@ async function drawLocations() {
       title="${l.shape ? 'Show it on the map' : 'Not marked on the map yet (Admin › Locations)'}">
       <span>${depth ? '<span class="dm-nav-subarrow">⤷</span> ' : ''}${l.id === _party?.locationId ? `${PARTY_ICON} ` : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
       <small>${[!l.shape && 'not on the map', events.some(e => e.locationId === l.id) && `${events.filter(e => e.locationId === l.id).length} event(s)`].filter(Boolean).join(' · ')}</small></button>
-    <button class="dm-icon-btn" data-party="${escapeHtml(l.id)}" title="The party is here">${PARTY_ICON}</button>
+    ${l.type === 'region' ? '<span class="dm-icon-btn dm-nav-noparty" aria-hidden="true"></span>' : `<button class="dm-icon-btn" data-party="${escapeHtml(l.id)}" title="The party is here">${PARTY_ICON}</button>`}
     <button class="dm-icon-btn" data-info="${escapeHtml(l.id)}" title="Location info">ⓘ</button></div>`;
   // Two columns side by side, using the room beside the map (the user's call, 2026-10-20): the party and what's planned
   // there, and the locations -- their groups flowing into as many columns as fit. Each scrolls on its own, and keeps its

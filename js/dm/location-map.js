@@ -185,6 +185,9 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   // the Ring tool's painted border (1 = painted): only a guide -- what it closes in goes into `mask`, the ring itself is
   // never saved
   let ring = new Uint8Array(W * H);
+  // a region: what the DM drew round, the sea in it too (a ring closed, a loop) -- the sea part of it is kept with the
+  // region (`reach`) so a location marked a little out at sea is still in it (the user's call, 2026-10-21)
+  let drawn = old?.kind === 'area' && old.reach ? F.ringsToMask(old.reach, W, H) : new Uint8Array(W * H);
   // A region keeps to the land and out of the other regions (the user's call, 2026-10-21): `free` is that land (1), the
   // lakes and rivers inland included -- worked out when it's first needed. Another location's area keeps to the land
   // only with the Region tool.
@@ -375,7 +378,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
 
   // ---- undo ----
   function remember() {
-    undos[kind].push(kind === 'pin' ? pin?.slice() || null : kind === 'path' ? anchors.map(p => p.slice()) : { mask: mask.slice(), ring: ring.slice() });
+    undos[kind].push(kind === 'pin' ? pin?.slice() || null : kind === 'path' ? anchors.map(p => p.slice()) : { mask: mask.slice(), ring: ring.slice(), drawn: drawn.slice() });
     if (undos[kind].length > 25) undos[kind].shift();
   }
   function undo() {
@@ -384,7 +387,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     const was = undos[kind].pop();
     if (kind === 'pin') pin = was;
     else if (kind === 'path') { anchors = was; retrace(); }
-    else { mask = was.mask; ring = was.ring; paintMask(); paintRing(); }
+    else { mask = was.mask; ring = was.ring; drawn = was.drawn; paintMask(); paintRing(); }
     tools(); draw();
   }
 
@@ -541,11 +544,27 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     const fr = free();
     let n = 0;
     for (let i = 0; i < mask.length; i++) {
-      if ((inside[i] || (ring[i] && near[i])) && fr[i] && !mask[i]) { mask[i] = 1; n++; }
+      if (!(inside[i] || (ring[i] && near[i]))) continue;
+      drawn[i] = 1;
+      if (fr[i] && !mask[i]) { mask[i] = 1; n++; }
     }
     if (n) paintMask();
     return n;
   }
+  /** A region's reach: its land, and the sea that goes with it -- what the DM drew round (a ring, a loop) and a strip
+   * about 3 km wide along its coast -- for the locations marked out at sea to be in it (map-features.js inArea). -> {
+   * reach } or nothing (no sea with it). */
+  function regionReach() {
+    const sea = F.seaOf(f);
+    const strip = F.dilate(mask, W, H, Math.max(4, Math.round(3 / kmPerPx())));
+    const reach = mask.slice();
+    let more = 0;
+    for (let i = 0; i < reach.length; i++) if (!reach[i] && sea[i] && (drawn[i] || strip[i])) { reach[i] = 1; more++; }
+    if (!more) return {};
+    const rings = F.maskToRings(reach, W, H);
+    return rings.length ? { reach: rings } : {};
+  }
+
   /** A click with the Ring tool: the free land round it, up to the ring, the coast and the other regions (a ring from
    * coast to coast). */
   function fillRingSide(p) {
@@ -580,7 +599,11 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       // a region (or anything drawn round with the Region tool) takes only the free land inside
       const allow = !take && (isRegion || areaTool === 'region') ? free() : null;
       let n = 0;
-      for (let i = 0; i < mask.length; i++) if (fill[i] && (!allow || allow[i])) { if (!take && !mask[i]) n++; mask[i] = take ? 0 : 1; }
+      for (let i = 0; i < mask.length; i++) {
+        if (!fill[i]) continue;
+        if (isRegion) drawn[i] = take ? 0 : 1;
+        if (!allow || allow[i]) { if (!take && !mask[i]) n++; mask[i] = take ? 0 : 1; }
+      }
       paintMask();
       if (allow && !n) toast('No free land in there -- it\'s all sea or another region already.');
     }
@@ -772,7 +795,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
         if (lasso.length >= 3) closeLasso(false);
         const rings = F.maskToRings(mask, W, H);
         if (!rings.length) { toast('Nothing filled in yet -- click inside the forest, paint it, or draw its outline.'); return; }
-        done({ kind: 'area', rings });
+        done(isRegion ? { kind: 'area', rings, ...regionReach() } : { kind: 'area', rings });
       }
     }
     const onKey = (e) => {
@@ -798,7 +821,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       else if (act === 'fit') { fitAll(); draw(); }
       else if (act === 'clear') {
         remember();
-        if (kind === 'path') { anchors = []; retrace(); } else { mask = new Uint8Array(W * H); ring = new Uint8Array(W * H); lasso = []; paintMask(); paintRing(); }
+        if (kind === 'path') { anchors = []; retrace(); } else { mask = new Uint8Array(W * H); ring = new Uint8Array(W * H); drawn = new Uint8Array(W * H); lasso = []; paintMask(); paintRing(); }
         tools(); draw();
       }
     });

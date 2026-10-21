@@ -1566,6 +1566,8 @@ span.dm-trap-pick { cursor: default; }
 /* a location inside another, under it a step in (the user's call, 2026-10-20) */
 .dm-nav-locrow.sub { padding-left: calc(var(--depth, 1) * 0.9rem); }
 /* fold up what's inside a location (a region, a forest) */
+/* a region's row: no party button (the party is never on a region), its room kept so the rows line up */
+.dm-nav-noparty { visibility: hidden; }
 /* a location type's title folds its list up */
 .dm-nav-grouptoggle { display: flex; align-items: center; gap: 0.3rem; width: 100%; border: none; background: none; cursor: pointer; text-align: left; font: inherit; }
 .dm-nav-grouptoggle:hover { color: var(--dm-gold); }

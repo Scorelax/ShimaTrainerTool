@@ -18,7 +18,7 @@ import { openPicker } from './picker.js';
 import { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger } from '../utils/custom-status.js';
 import { editLocationShape, drawShapePreview, describeShape } from './location-map.js';
 import { currentMap, isMajor, parentOf, partOfChain, isTopLocation, withInside } from '../region-map/map-version.js';
-import { iconSpot, pointInRings, shapeBounds } from '../region-map/map-features.js';
+import { iconSpot, inArea, shapeBounds } from '../region-map/map-features.js';
 import { ICON_SIZE, iconFor, uploadIcon, pickLibraryIcon, openIconLibrary } from './location-icon.js';
 
 export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
@@ -406,8 +406,7 @@ function wireLocationCombo(box, e, locations, onChange) {
  * pick). Under this region but outside it now: taken out of it. -> { moved, out } (how many). */
 export function sortIntoRegion(l, locations) {
   if (l?.type !== 'region' || l.shape?.kind !== 'area') return { moved: 0, out: 0 };
-  const rings = l.shape.rings;
-  const inRegion = x => { const p = iconSpot(x.shape); return !!p && pointInRings(rings, p[0], p[1]); };
+  const inRegion = x => { const p = iconSpot(x.shape); return !!p && inArea(l.shape, p[0], p[1]); };
   const moved = new Set();
   locations.forEach((x) => {
     if (x === l || (x.type || 'city') === 'region' || !inRegion(x)) return;
@@ -416,7 +415,7 @@ export function sortIntoRegion(l, locations) {
     const r = chain.findIndex(c => c !== x && (c.type || 'city') === 'region');
     const other = r >= 0 ? chain[r] : null;
     const p = iconSpot(x.shape);
-    if (other?.shape?.kind === 'area' && pointInRings(other.shape.rings, p[0], p[1])) return;
+    if (inArea(other?.shape, p[0], p[1])) return;
     // the outermost of what it's part of (below any region) that's in this region too
     const below = r >= 0 ? chain.slice(0, r) : chain;
     const top = [...below].reverse().find(c => !c.shape || inRegion(c)) || x;
@@ -608,10 +607,10 @@ export async function drawLocations(body) {
         // now, or under none.
         const at = iconSpot(shape);
         const was = parentOf(l, locations);
-        const movedOut = !!(at && was?.shape?.kind === 'area' && !pointInRings(was.shape.rings, at[0], at[1]));
+        const movedOut = !!(at && was?.shape?.kind === 'area' && !inArea(was.shape, at[0], at[1]));
         if ((l.parentId === undefined || movedOut) && l.type !== 'region' && at) {
           const size = x => { const b = shapeBounds(x.shape); return (b.x1 - b.x0) * (b.y1 - b.y0); };
-          const holder = locations.filter(x => x !== l && x.shape?.kind === 'area' && pointInRings(x.shape.rings, at[0], at[1]) && !partOfChain(x, locations).includes(l))
+          const holder = locations.filter(x => x !== l && inArea(x.shape, at[0], at[1]) && !partOfChain(x, locations).includes(l))
             .sort((a, b) => size(a) - size(b))[0];
           if (holder) { l.parentId = holder.id; toast(`It's inside ${holder.name || 'an area'}, so it's listed under it -- change that in Part of`); }
           else if (movedOut) { delete l.parentId; toast(`It's outside ${was.name || 'the area'} now, so it's no longer listed under it`); }

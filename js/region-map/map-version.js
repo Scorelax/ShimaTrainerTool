@@ -154,7 +154,7 @@ export function transformShape(shape, m) {
   const pt = ([x, y]) => apply(m, x, y).map(r);
   if (shape.kind === 'pin') { const [x, y] = pt([shape.x, shape.y]); return { ...shape, x, y }; }
   if (shape.kind === 'path') return { ...shape, anchors: shape.anchors?.map(pt), points: (shape.points || []).map(pt) };
-  if (shape.kind === 'area') return { ...shape, rings: (shape.rings || []).map(ring => ring.map(pt)) };
+  if (shape.kind === 'area') return { ...shape, rings: (shape.rings || []).map(ring => ring.map(pt)), ...(shape.reach ? { reach: shape.reach.map(ring => ring.map(pt)) } : {}) };
   return shape;
 }
 

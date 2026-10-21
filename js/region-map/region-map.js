@@ -19,9 +19,10 @@
 // bright as ever. A minor location's name (not ticked Major, map-version.js isMajor) only shows zoomed in. A route or a forest the DM only looks at (highlight) is drawn in light blue (a town or a cave
 // isn't: its own pin is enough, and a ring over it looked odd).
 // A location with an icon (the user's call, 2026-10-20: a little model of the place the DM uploads, js/dm/location-icon.js)
-// has it lying on the land on its mark, north up like the painting (the user's call, 2026-10-21: it stays put as the map
-// turns and tilts, never turning to face the viewer), as tall as the DM set in km -- so it grows and shrinks with the
-// land as the map zooms, and keeps to scale with the others.
+// has it standing on its mark facing south, the way the painting's towns are drawn (the user's call, 2026-10-21: it stays
+// put as the map turns, never turning round to face the viewer -- only leaning back as the map's tilted towards straight
+// down, so it's still seen from above), as tall as the DM set in km -- so it grows and shrinks with the land as the map
+// zooms, and keeps to scale with the others.
 // A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
@@ -90,7 +91,9 @@ function graphicsInfo() {
   }
 }
 
-export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false } = {}) {
+export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false, onPick } = {}) {
+  // `onPick(locationId)` (the players' PokéNav, the user's call, 2026-10-21): a location's name or icon tapped -- the map
+  // flies there and lights it up, and this is told (to show what's there).
   // `turned` (the DM's PokeNav, the user's call, 2026-10-20): this screen is the table's 16:9 board screen seen from the
   // players' side -- portrait, a quarter turn round. The views it sends and takes stay the board's own (its azimuth and
   // zoom); only this screen shows them turned, and as far back as the board's long side needs.
@@ -173,9 +176,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   let highlighted = null;   // the id of the location drawn onto the land (the DM looking at it)
   let partyAt = null;       // the id of the location the party is at (outlined in gold, marked)
   let overlay = null;       // ...drawn here: { canvas, ctx, tex, mesh } -- the land's surface again, see-through
-  const icons = [];         // the locations' icons lying on the land (flat pictures)
-  // one square, lying flat with its top to the north (-z, the painting's up), every icon a copy of it scaled to its picture
-  const iconPlane = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const icons = [];         // the locations' icons standing on the land (pictures facing south)
+  // one square, standing up facing south (+z, down the painting), every icon a copy of it scaled to its picture
+  const iconPlane = new THREE.PlaneGeometry(1, 1);
   const iconTextures = {};  // their pictures, by URL (a promise each)
 
   // Painting pixel -> world: x to the east, z to the south, y up (metres scaled by vert).
@@ -386,9 +389,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   }
 
   // ---------------------------------------------------------------------------
-  // The locations' icons: a picture with its middle on its spot, lying on the land north up -- turning and tilting with
-  // the map, not towards the viewer (the user's call, 2026-10-21) -- drawn over the land (never hidden in a hillside)
-  // like the labels
+  // The locations' icons: a picture with its middle on its spot, standing facing south -- turning with the map, not
+  // towards the viewer (the user's call, 2026-10-21), leaning back with the camera's tilt (orientIcons) -- drawn over the
+  // land (never hidden in a hillside) like the labels
   // ---------------------------------------------------------------------------
 
   function iconTexture(url) {
@@ -413,7 +416,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       if (!at) return;
       const [ix, iy] = at;
       const tall = (ic.size || 5) / land.kmPerPx;   // km -> painting pixels (the world's units across the land)
-      const sp = new THREE.Mesh(iconPlane, new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false }));
+      // (both sides drawn: from the north it's seen from behind, as a cut-out would be)
+      const sp = new THREE.Mesh(iconPlane, new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
       // its middle on the spot, the pin in the middle of the picture (the user's call, 2026-10-20) -- the name goes under
       // the picture (placeLabels: userData)
       sp.userData = { locId: l.id, tall };
@@ -426,8 +430,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         if (!icons.includes(sp)) return;
         sp.material.map = tex;
         sp.material.needsUpdate = true;
-        sp.scale.set((tall * tex.image.width) / Math.max(1, tex.image.height), 1, tall);   // (x across, z north-south)
-        sp.updateMatrixWorld();
+        sp.scale.set((tall * tex.image.width) / Math.max(1, tex.image.height), tall, 1);
+        orientIcons();
         sp.visible = true;
         dirty = true;
         wake();
@@ -435,6 +439,13 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     });
     dirty = true;
     wake();
+  }
+
+  /** The icons leant back as far as the camera's tilted from level (straight up seen level, flat on the land seen from
+   * straight above -- never edge on), still facing south: so they never turn as the map's turned. */
+  function orientIcons() {
+    const lean = controls.getPolarAngle() - Math.PI / 2;
+    icons.forEach((sp) => { sp.rotation.x = lean; sp.updateMatrixWorld(); });
   }
 
   /** The DM's locations as the map's names ([] or a list: theirs; null: the towns in places.json again). */
@@ -494,15 +505,15 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     // call, 2026-10-20): from far out only the major locations are named.
     const minorAway = dist > fillFor(controls.getAzimuthalAngle()) * 0.6;
     // How far an icon reaches down the screen from its middle, by its location -- the lowest of its corners, the way the
-    // map is turned and tilted now (it lies on the land): its name goes just under it (region-map.css --below); with the
+    // map is turned and tilted now: its name goes just under it (region-map.css --below); with the
     // icon showing, the location's white dot is left out and the party's marker sits on the picture (.iconed, .on-icon).
     const halfIcon = new Map();
     icons.forEach((sp) => {
       if (!sp.visible) return;
       const mid = v.copy(sp.position).project(camera).y;
       let low = 0;
-      for (const [cx, cz] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) {
-        corner.set(cx, 0, cz).applyMatrix4(sp.matrixWorld).project(camera);
+      for (const [cx, cy] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) {
+        corner.set(cx, cy, 0).applyMatrix4(sp.matrixWorld).project(camera);
         low = Math.max(low, ((mid - corner.y) / 2) * h);
       }
       halfIcon.set(sp.userData.locId, low);
@@ -715,6 +726,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     } else if (moved || dirty) {
       if (moved) keepUp(now);
       useLevel(moved ? Math.max(movingLevel, REST) : REST);
+      orientIcons();
       renderer.render(scene, camera);
       placeLabels();
       const az = controls.getAzimuthalAngle();
@@ -813,9 +825,34 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const town = t.closest('[data-fly]');
     if (town) {
       const l = labels[Number(town.dataset.fly)];
+      if (l.locId && onPick) { pickLocation(l.locId); return; }
       if (!l.locId || !flyToLocation(l.locId)) flyTo(toWorld(l.x, l.y), land.fit * 0.28, 0.6, controls.getAzimuthalAngle());
     }
   });
+
+  /** A location picked (its name or icon tapped, with onPick): flown to, lit up, and onPick told. */
+  function pickLocation(id) {
+    flyToLocation(id);
+    highlight(id);
+    onPick?.(id);
+  }
+  // A tap on an icon (not a drag of the map) picks its location, as its name does.
+  if (onPick && !viewOnly) {
+    let downAt = null;
+    const ray = new THREE.Raycaster();
+    const tap = new THREE.Vector2();
+    canvas.addEventListener('pointerdown', (e) => { downAt = e.isPrimary ? [e.clientX, e.clientY] : null; });
+    canvas.addEventListener('pointerup', (e) => {
+      const was = downAt;
+      downAt = null;
+      if (!was || !land || Math.hypot(e.clientX - was[0], e.clientY - was[1]) > 6) return;
+      const r = canvas.getBoundingClientRect();
+      tap.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(tap, camera);
+      const hit = ray.intersectObjects(icons.filter(sp => sp.visible), false)[0];
+      if (hit) pickLocation(hit.object.userData.locId);
+    });
+  }
 
   const observer = new ResizeObserver(resize);
 

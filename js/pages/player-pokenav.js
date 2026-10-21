@@ -5,10 +5,18 @@
 // follows the DM there, not this. Opened from the trainer info page (the button beside the Pokédex); kept up to date
 // by the app's live connection (live-updates.js's 'app:dm-state', 'app:live-resync').
 //
+// A location tapped (its name or its icon) opens a panel at the side (the user's call, 2026-10-21): its name, what it's
+// part of, its points of interest as the DM wrote them in Admin › Locations, and the places inside it (each tappable) --
+// not the DM's description, which can hold notes for the DM only.
+//
 // mountPlayerPokenav(root, { onBack }) -> { ready, destroy }.
 import { DmAPI } from '../api.js';
+import { parentOf } from '../region-map/map-version.js';
 
 const PARTY_ICON = 'assets/region-map/party-marker.png';
+// (as the DM console's location types, js/dm/admin-world.js -- not imported: that's the DM's code)
+const TYPES = { region: '🗺️ Region', city: '🏙️ City', route: '🛤️ Route', cave: '🕳️ Cave', forest: '🌲 Forest', landmark: '🗿 Landmark', building: '🏠 Building' };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /** The map's stylesheet, added to the app's page once (the app doesn't load it otherwise). */
 function useMapStyles() {
@@ -26,8 +34,12 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
   const scrollWas = document.documentElement.style.overflow;
   document.documentElement.style.overflow = 'hidden';
   root.innerHTML = `<div class="pnav-map" id="pnavMap"></div>
-    <button class="pnav-party" id="pnavParty" hidden title="Where the party is"><img src="${PARTY_ICON}" alt=""><span>The party</span></button>`;
+    <button class="pnav-party" id="pnavParty" hidden title="Where the party is"><img src="${PARTY_ICON}" alt=""><span>The party</span></button>
+    <aside class="pnav-panel" id="pnavPanel" aria-hidden="true"></aside>`;
   const partyBtn = root.querySelector('#pnavParty');
+  const panel = root.querySelector('#pnavPanel');
+  let shown = [];           // the locations the players may see
+  let openId = null;        // the one in the panel
   let map = null;
   let destroyed = false;
   let partyAt = null;       // where the party is, when the players may see it (null: not shown)
@@ -42,9 +54,45 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
     if (list === undefined || destroyed) return;
     const marked = Array.isArray(list) ? list.filter(l => l && (l.shape || l.icon?.url) && !l.secret) : [];
     shownIds = new Set(marked.filter(l => l.shape).map(l => l.id));
+    shown = marked;
     map?.setLocations(marked.length ? marked : null);
     syncParty();
+    if (openId) openPanel(openId, { fly: false });   // the DM changed it meanwhile (or took it away)
   };
+
+  /** The panel for a location (gone, or a secret one now: closed). */
+  function openPanel(id, { fly = true } = {}) {
+    const l = shown.find(x => x.id === id);
+    if (!l) { closePanel(); return; }
+    openId = id;
+    if (fly) map?.flyToLocation(id);
+    map?.highlight(id);
+    const up = parentOf(l, shown);
+    const pois = (l.pois || []).map(p => String(p).trim()).filter(Boolean);
+    const inside = shown.filter(x => parentOf(x, shown) === l).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    panel.innerHTML = `<div class="pnav-panel-head">
+        <div><div class="pnav-panel-type">${TYPES[l.type || 'city'] || ''}</div><h2>${esc(l.name || 'Unnamed')}</h2>
+          ${up ? `<button class="pnav-panel-up" data-open="${esc(up.id)}">in ${esc(up.name || 'Unnamed')}</button>` : ''}</div>
+        <button class="pnav-panel-close" data-close aria-label="Close">✕</button>
+      </div>
+      ${l.id === partyAt ? `<div class="pnav-panel-here"><img src="${PARTY_ICON}" alt=""> The party is here</div>` : ''}
+      <h3>Points of interest</h3>
+      ${pois.length ? `<ul class="pnav-panel-pois">${pois.map(p => `<li>${esc(p)}</li>`).join('')}</ul>` : '<p class="pnav-panel-none">Nothing noted here yet.</p>'}
+      ${inside.length ? `<h3>Places here</h3><div class="pnav-panel-inside">${inside.map(x => `<button data-open="${esc(x.id)}">${(TYPES[x.type || 'city'] || '').split(' ')[0]} ${esc(x.name || 'Unnamed')}</button>`).join('')}</div>` : ''}`;
+    panel.classList.add('open');
+    panel.setAttribute('aria-hidden', 'false');
+  }
+  function closePanel() {
+    openId = null;
+    panel.classList.remove('open');
+    panel.setAttribute('aria-hidden', 'true');
+    map?.highlight(null);
+  }
+  panel.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close]')) { closePanel(); return; }
+    const b = e.target.closest('[data-open]');
+    if (b) openPanel(b.dataset.open);
+  });
   // ...and where the party is, unless the DM keeps it off the table's map (then off this one too)
   const showParty = async () => {
     const p = await DmAPI.getState('party-location').catch(() => undefined);
@@ -60,7 +108,7 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
   const mount = async () => {
     const { mountRegionMap } = await import('../region-map/region-map.js');
     if (destroyed) return;
-    map = mountRegionMap(root.querySelector('#pnavMap'), { onBack, title: true });
+    map = mountRegionMap(root.querySelector('#pnavMap'), { onBack, title: true, onPick: id => openPanel(id, { fly: false }) });
     showLocations();
     showParty();
     await map.ready;

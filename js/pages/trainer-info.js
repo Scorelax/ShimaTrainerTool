@@ -168,6 +168,12 @@ export function renderTrainerInfo() {
           text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
           z-index: 1000;
+          /* kept clear of the Pokédex and PokéNav at the top right (and the back button, the same either side): a long
+             name goes onto two lines, between its words, and is made smaller until it fits (fitTrainerName) */
+          width: max-content;
+          max-width: calc(100% - 2 * (clamp(54px, 11vw, 66px) + clamp(40px, 8vw, 48px) + 0.8rem));
+          text-align: center;
+          line-height: 1.05;
         }
 
         .left-column {
@@ -1788,13 +1794,14 @@ export function renderTrainerInfo() {
           filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
         }
 
-        /* The PokéNav (the user's call, 2026-10-21), just left of the Pokédex: the same size, the same look */
+        /* The PokéNav (the user's call, 2026-10-21), just left of the Pokédex, a little smaller so a long trainer name
+           has room beside it (the name keeps clear of both, .trainer-info-page h1 max-width) */
         #pokenavButton {
           position: absolute;
-          top: 0;
-          right: calc(clamp(54px, 11vw, 66px) + 0.4rem);
-          width: clamp(54px, 11vw, 66px);
-          height: clamp(54px, 11vw, 66px);
+          top: calc((clamp(54px, 11vw, 66px) - clamp(40px, 8vw, 48px)) / 2);
+          right: calc(clamp(54px, 11vw, 66px) + 0.2rem);
+          width: clamp(40px, 8vw, 48px);
+          height: clamp(40px, 8vw, 48px);
           background: none;
           border: none;
           cursor: pointer;
@@ -2598,7 +2605,42 @@ export function renderTrainerInfo() {
   return html;
 }
 
+/** The trainer's name at the top made smaller until it fits between the buttons (the user's call, 2026-10-21: a long name
+ * ran into the Pokédex and PokéNav): no word wider than its room, and two lines at most. Centred on the page while it
+ * fits there at a fair size; a longer one is centred in the whole gap between the back button and the PokéNav instead. */
+function fitTrainerName() {
+  const h = document.querySelector('.trainer-info-page h1');
+  if (!h) return;
+  for (const k of ['fontSize', 'maxWidth', 'left']) h.style[k] = '';
+  const full = parseFloat(getComputedStyle(h).fontSize);
+  const page = h.offsetParent?.getBoundingClientRect();
+  const right = Math.min(...['pokenavButton', 'pokedexButton'].map(id => document.getElementById(id)?.getBoundingClientRect())
+    .filter(r => r && r.width).map(r => r.left)) - 8;
+  const back = document.getElementById('backButton')?.getBoundingClientRect();
+  const left = back?.width ? back.right + 8 : page?.left + 8;
+  const shrink = (floor) => {
+    let size = full;
+    h.style.fontSize = '';
+    const fits = () => h.scrollWidth <= h.clientWidth + 1 && h.offsetHeight <= size * 1.05 * 2 + 2;
+    while (size > floor && !fits()) { size -= 1; h.style.fontSize = `${size}px`; }
+    return fits();
+  };
+  if (!page || !Number.isFinite(right)) { shrink(14); return; }
+  // centred on the page, kept off the buttons
+  const mid = page.left + page.width / 2;
+  h.style.maxWidth = `${Math.max(60, Math.floor((right - mid) * 2))}px`;
+  if (shrink(full * 0.7)) return;
+  // too long for that: the whole gap
+  h.style.left = `${(left + right) / 2 - page.left}px`;
+  h.style.maxWidth = `${Math.max(60, Math.floor(right - left))}px`;
+  shrink(13);
+}
+let _fitNameOnResize = false;
+
 export function attachTrainerInfoListeners() {
+  fitTrainerName();
+  if (!_fitNameOnResize) { _fitNameOnResize = true; window.addEventListener('resize', fitTrainerName); }
+  document.fonts?.ready.then(fitTrainerName);   // (measured again in the page's own font, once it's in)
   const trainerDataStr = sessionStorage.getItem('trainerData');
   const trainerData = trainerDataStr ? loadTrainer() : null;
 

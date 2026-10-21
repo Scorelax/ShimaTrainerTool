@@ -172,6 +172,12 @@ export function renderTrainerCard() {
           overflow-x: hidden;
         }
 
+        /* the map button sits out in the battle button's column, past the app's padding -- not cut off there (the page
+           itself still never scrolls sideways: body) */
+        .content {
+          overflow-x: visible;
+        }
+
         body::before, .content::before {
           content: '';
           position: absolute;
@@ -491,10 +497,37 @@ export function renderTrainerCard() {
           overflow: hidden;
         }
 
-        /* The adventure map (the DM's Adventure Mode), right under the battle button -- the same round button. */
+        /* The adventure map (the DM's Adventure Mode) and the PokéNav (the user's call, 2026-10-21): a row between the
+           trainer and the party -- the map under the utility slot, in the battle button's column, the PokéNav mirroring
+           it on the left above the first party slot. alignSideButtons puts them in those columns. */
+        .card-side-row {
+          position: relative;
+          width: 100%;
+          height: clamp(45px, 9vw, 60px);
+          margin: calc(-1 * clamp(0.5rem, 1vh, 0.75rem)) 0 clamp(0.5rem, 1vh, 0.75rem);
+        }
+        .card-side-row .combat-corner-btn {
+          position: absolute;
+          top: 0;
+          right: auto;
+        }
         .adventure-corner-btn {
-          top: calc(clamp(15px, 3vh, 25px) + clamp(45px, 9vw, 60px) + clamp(8px, 1.5vh, 12px));
           font-size: clamp(1.4rem, 3.2vw, 2rem);
+        }
+        .pokenav-corner-btn {
+          background: none;
+          border: none;
+          box-shadow: none;
+          overflow: visible;
+          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
+        }
+        .combat-corner-btn.pokenav-corner-btn img {
+          object-fit: contain;
+          border-radius: 0;
+        }
+        .pokenav-corner-btn:hover {
+          box-shadow: none;
+          filter: drop-shadow(0 6px 12px rgba(0,0,0,0.5)) drop-shadow(0 0 10px rgba(255,222,0,0.6));
         }
 
         .combat-corner-btn img {
@@ -904,8 +937,6 @@ export function renderTrainerCard() {
 
       <!-- Combat Button -->
       <button class="combat-corner-btn" id="combatBtn"><img src="assets/VS.png" alt="Combat"></button>
-      <!-- Adventure button: the DM's adventure map -->
-      <button class="combat-corner-btn adventure-corner-btn" id="adventureBtn" title="Adventure map" aria-label="Adventure map">🗺️</button>
 
       <!-- Trainer and Utility Container -->
       <div class="trainer-utility-wrapper">
@@ -941,6 +972,12 @@ export function renderTrainerCard() {
             </div>
           `}
         </div>
+      </div>
+
+      <!-- The PokéNav (left) and the DM's adventure map (right), between the trainer and the party -->
+      <div class="card-side-row">
+        <button class="combat-corner-btn pokenav-corner-btn" id="pokenavBtn" title="PokéNav -- the region map" aria-label="PokéNav"><img src="assets/pokenav-icon.png" alt=""></button>
+        <button class="combat-corner-btn adventure-corner-btn" id="adventureBtn" title="Adventure map" aria-label="Adventure map">🗺️</button>
       </div>
 
       <!-- Party Section -->
@@ -1209,6 +1246,13 @@ export function attachTrainerCardListeners() {
     window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'adventure' } }));
   });
 
+  // The PokéNav: the region map (moved here from the trainer info page, the user's call, 2026-10-21)
+  document.getElementById('pokenavBtn')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'pokenav' } }));
+  });
+  alignSideButtons();
+  window.addEventListener('resize', alignSideButtons);
+
   // Badge tap interaction
   const badgeSlots = document.querySelectorAll('.badge-slot.earned');
   if (badgeSlots.length > 0) {
@@ -1391,6 +1435,20 @@ export function attachTrainerCardListeners() {
 // ============================================================================
 // SHORT REST AND LONG REST FUNCTIONS
 // ============================================================================
+
+/** The map button in the battle button's column (that one is fixed to the screen's corner, the row isn't), and the
+ * PokéNav the same distance in from the left edge. Leaves itself off once the page is gone. */
+function alignSideButtons() {
+  const row = document.querySelector('.card-side-row');
+  const battle = document.getElementById('combatBtn');
+  if (!row || !battle) { window.removeEventListener('resize', alignSideButtons); return; }
+  const r = row.getBoundingClientRect();
+  const b = battle.getBoundingClientRect();
+  const map = document.getElementById('adventureBtn');
+  const nav = document.getElementById('pokenavBtn');
+  if (map) map.style.left = `${b.left - r.left}px`;
+  if (nav) nav.style.left = `${document.documentElement.clientWidth - b.right - r.left}px`;
+}
 
 function handleLongRest() {
   const trainerDataRaw = sessionStorage.getItem('trainerData');

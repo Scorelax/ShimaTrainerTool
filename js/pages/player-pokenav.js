@@ -2,8 +2,11 @@
 // island, the DM's locations (not the secret ones) with their icons and names, and the party's marker where the DM put
 // it -- but on the player's own device, to move round, zoom and turn as they like (js/region-map/region-map.js, not
 // view only). Just to look at: where the party is is still set in the DM console's PokéNav, and the board screen still
-// follows the DM there, not this. Opened from the trainer info page (the button beside the Pokédex); kept up to date
-// by the app's live connection (live-updates.js's 'app:dm-state', 'app:live-resync').
+// follows the DM there, not this. Opened from the trainer card (the button left of the party); kept up to date by the
+// app's live connection (live-updates.js's 'app:dm-state', 'app:live-resync').
+//
+// It opens on the DM console PokéNav's default view, and its compass goes back to it (the user's call, 2026-10-21): the
+// whole island looked at straight down, north up, filling the screen.
 //
 // A location tapped (its name or its icon) opens a panel at the side (the user's call, 2026-10-21): its name, what it's
 // part of, its points of interest as the DM wrote them in Admin › Locations, and the places inside it (each tappable) --
@@ -14,6 +17,7 @@ import { DmAPI } from '../api.js';
 import { parentOf } from '../region-map/map-version.js';
 
 const PARTY_ICON = 'assets/region-map/party-marker.png';
+const HOME_AZIMUTH = 0; // north up -- the DM console PokéNav's default view (js/dm/pokenav.js)
 // (as the DM console's location types, js/dm/admin-world.js -- not imported: that's the DM's code)
 const TYPES = { region: '🗺️ Region', city: '🏙️ City', route: '🛤️ Route', cave: '🕳️ Cave', forest: '🌲 Forest', landmark: '🗿 Landmark', building: '🏠 Building' };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -108,10 +112,11 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
   const mount = async () => {
     const { mountRegionMap } = await import('../region-map/region-map.js');
     if (destroyed) return;
-    map = mountRegionMap(root.querySelector('#pnavMap'), { onBack, title: true, onPick: id => openPanel(id, { fly: false }) });
+    map = mountRegionMap(root.querySelector('#pnavMap'), { onBack, title: true, homeAzimuth: HOME_AZIMUTH, onPick: id => openPanel(id, { fly: false }) });
     showLocations();
     showParty();
     await map.ready;
+    map?.home({ ms: 0, azimuth: HOME_AZIMUTH, fill: true });
   };
 
   // The DM switched to another map (Admin › Locations): made again on it.

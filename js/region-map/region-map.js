@@ -91,6 +91,34 @@ function graphicsInfo() {
   }
 }
 
+/** Whether the box (x0, y0)-(x1, y1) is inside the rings (even-odd, so a hole is outside): its middle inside, and no
+ * edge of the rings through it. */
+function boxInside(rings, x0, y0, x1, y1) {
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+  let inside = false;
+  for (const r of rings) {
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const [ax, ay] = r[i], [bx, by] = r[j];
+      if ((ay > my) !== (by > my) && mx < ((bx - ax) * (my - ay)) / (by - ay) + ax) inside = !inside;
+      if (segmentInBox(ax, ay, bx, by, x0, y0, x1, y1)) return false;
+    }
+  }
+  return inside;
+}
+
+/** Whether the line from (ax, ay) to (bx, by) passes through the box (Liang-Barsky). */
+function segmentInBox(ax, ay, bx, by, x0, y0, x1, y1) {
+  const dx = bx - ax, dy = by - ay;
+  let t0 = 0, t1 = 1;
+  for (const [p, q] of [[-dx, ax - x0], [dx, x1 - ax], [-dy, ay - y0], [dy, y1 - ay]]) {
+    if (p === 0) { if (q < 0) return false; continue; }
+    const t = q / p;
+    if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+    else { if (t < t0) return false; if (t < t1) t1 = t; }
+  }
+  return true;
+}
+
 export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false, onPick } = {}) {
   // `onPick(locationId)` (the players' PokéNav, the user's call, 2026-10-21): a location's name or icon tapped -- the map
   // flies there and lights it up, and this is told (to show what's there).
@@ -294,6 +322,13 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         const minor = isMajor(l) ? '' : ' minor';
         if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], liftOf(l, 40), { locId: l.id, extra: `${['cave', 'landmark', 'building'].includes(l.type) ? ` ${l.type}` : ''}${painted(l, b) ? ' on-painting' : ''}${minor}` });
         else add('region', l.name || '', b.mid[0], b.mid[1], liftOf(l, 30), { locId: l.id, extra: ` ${l.shape.kind}${minor}${l.icon?.url ? ' has-icon' : ''}${l.type === 'region' ? ' realm' : ''}` });
+        // a region's name kept inside the region (fitRealmName): its outline on the land, a few hundred points at most
+        if (l.type === 'region' && l.shape.kind === 'area') {
+          labels[labels.length - 1].border = (l.shape.rings || []).filter(r => r.length > 2).map((r) => {
+            const every = Math.ceil(r.length / 160);
+            return r.filter((_, i) => i % every === 0).map(([x, y]) => toWorld(x, y, heightAt(x, y)));
+          });
+        }
       });
     } else {
       places.towns.forEach(t => add('town', t.name, t.x, t.y, 40, { extra: version?.id === FIRST_ID ? ' on-painting' : '' }));
@@ -570,6 +605,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       if (l.kind === 'town' || l.kind === 'region') l.el.style.setProperty('--below', `${Math.round(half || 0)}px`);
       if (l.kind === 'town') l.el.classList.toggle('iconed', !!half);
       if (l.kind === 'party') l.el.classList.toggle('on-icon', !!half);
+      if (l.border) fitRealmName(l, (v.x + 1) / 2 * w, (1 - v.y) / 2 * h, half || 0, w, h);
       // The party's marker as big on any screen and at any zoom (the user's call, 2026-10-20): a share of the screen's
       // height, a little bigger closer in -- never lost when the whole island is in view, never huge up close.
       if (l.kind === 'party') {
@@ -579,6 +615,37 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       }
     }
   }
+
+  /** A region's name never over its border (the user's call, 2026-10-21): as big as region-map.css makes it, or smaller
+   * until the box round it fits inside the region as it is on the screen now -- and hidden when even small it doesn't. */
+  const MIN_REALM_PX = 6.5;
+  const bv = new THREE.Vector3();
+  function fitRealmName(l, cx, cy, below, w, h) {
+    const el = l.el;
+    if (!l.size) {
+      el.style.fontSize = '';
+      l.size = { base: parseFloat(getComputedStyle(el).fontSize), w: el.offsetWidth, h: el.offsetHeight };
+      if (!l.size.w) { l.size = null; return; } // not laid out yet
+    }
+    const rings = l.border.map(r => r.map((p) => { bv.copy(p).project(camera); return [(bv.x + 1) / 2 * w, (1 - bv.y) / 2 * h]; }));
+    const fits = (k) => {
+      const hw = (l.size.w * k) / 2 + 3, hh = (l.size.h * k) / 2 + 2;
+      // with an icon, the name hangs just under it (region-map.css's .has-icon)
+      const my = el.classList.contains('has-icon') ? cy + below + 2 + (l.size.h * k) / 2 : cy;
+      return boxInside(rings, cx - hw, my - hh, cx + hw, my + hh);
+    };
+    let k = 1;
+    if (!fits(1)) {
+      let lo = 0, hi = 1;
+      for (let i = 0; i < 8; i++) { const m = (lo + hi) / 2; if (fits(m)) lo = m; else hi = m; }
+      k = lo;
+    }
+    const px = l.size.base * k;
+    el.classList.toggle('no-room', px < MIN_REALM_PX);
+    el.style.fontSize = k < 1 ? `${px.toFixed(2)}px` : '';
+  }
+  // the fonts arriving change the names' sizes: measured again
+  document.fonts?.ready.then(() => { labels.forEach((l) => { l.size = null; }); if (land) { dirty = true; wake(); } });
 
   // ---------------------------------------------------------------------------
   // The camera

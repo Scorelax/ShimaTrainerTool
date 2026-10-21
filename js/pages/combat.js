@@ -522,7 +522,7 @@ export function renderSetupPhase({ showWipButton = true, adventure = false } = {
       <style>${COMBAT_CSS}</style>
       <div class="combat-header-bar">
         <button class="combat-back-btn" id="combatBackBtn">← Back</button>
-        <div class="combat-header-title">${adventure ? '🧭 Join the adventure' : '<img src="assets/VS.png" alt="">Battle Setup'}</div>
+        <div class="combat-header-title">${adventure ? 'Adventure' : '<img src="assets/VS.png" alt="">Battle Setup'}</div>
         ${showWipButton ? '<button class="combat-wip-btn" id="combatWipBtn">🛠️ WIP</button>' : '<div></div>'}
       </div>
       <div class="combat-setup-container">

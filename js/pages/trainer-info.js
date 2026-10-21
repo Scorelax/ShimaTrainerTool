@@ -168,10 +168,10 @@ export function renderTrainerInfo() {
           text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
           z-index: 1000;
-          /* kept clear of the Pokédex and PokéNav at the top right (and the back button, the same either side): a long
+          /* kept clear of the Pokédex at the top right (and the back button, the same either side): a long
              name goes onto two lines, between its words, and is made smaller until it fits (fitTrainerName) */
           width: max-content;
-          max-width: calc(100% - 2 * (clamp(54px, 11vw, 66px) + clamp(40px, 8vw, 48px) + 0.8rem));
+          max-width: calc(100% - 2 * (clamp(54px, 11vw, 66px) + 0.6rem));
           text-align: center;
           line-height: 1.05;
         }
@@ -1794,41 +1794,6 @@ export function renderTrainerInfo() {
           filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
         }
 
-        /* The PokéNav (the user's call, 2026-10-21), just left of the Pokédex, a little smaller so a long trainer name
-           has room beside it (the name keeps clear of both, .trainer-info-page h1 max-width) */
-        #pokenavButton {
-          position: absolute;
-          top: calc((clamp(54px, 11vw, 66px) - clamp(40px, 8vw, 48px)) / 2);
-          right: calc(clamp(54px, 11vw, 66px) + 0.2rem);
-          width: clamp(40px, 8vw, 48px);
-          height: clamp(40px, 8vw, 48px);
-          background: none;
-          border: none;
-          cursor: pointer;
-          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), filter 0.3s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1001;
-          padding: 0;
-          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
-        }
-
-        #pokenavButton img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-        }
-
-        #pokenavButton:hover {
-          transform: scale(1.12);
-          filter: drop-shadow(0 6px 12px rgba(0,0,0,0.5)) drop-shadow(0 0 10px rgba(255,222,0,0.6));
-        }
-
-        #pokenavButton:active {
-          transform: scale(1.05);
-        }
-
         #pokedexButton img {
           width: 100%;
           height: 100%;
@@ -2024,8 +1989,6 @@ export function renderTrainerInfo() {
 
       <!-- Pokedex Button -->
       <button id="pokedexButton" aria-label="Pokédex" title="Pokédex"><img src="assets/pokedex.png" alt=""></button>
-      <!-- PokéNav Button: the region map -->
-      <button id="pokenavButton" aria-label="PokéNav" title="PokéNav -- the region map"><img src="assets/pokenav-icon.png" alt=""></button>
 
       <!-- Trainer Name as Title -->
       <h1>${trainerName}</h1>
@@ -2606,15 +2569,15 @@ export function renderTrainerInfo() {
 }
 
 /** The trainer's name at the top made smaller until it fits between the buttons (the user's call, 2026-10-21: a long name
- * ran into the Pokédex and PokéNav): no word wider than its room, and two lines at most. Centred on the page while it
- * fits there at a fair size; a longer one is centred in the whole gap between the back button and the PokéNav instead. */
+ * ran into the Pokédex): no word wider than its room, and two lines at most. Centred on the page while it fits there at
+ * a fair size; a longer one is centred in the whole gap between the back button and the Pokédex instead. */
 function fitTrainerName() {
   const h = document.querySelector('.trainer-info-page h1');
   if (!h) return;
   for (const k of ['fontSize', 'maxWidth', 'left']) h.style[k] = '';
   const full = parseFloat(getComputedStyle(h).fontSize);
   const page = h.offsetParent?.getBoundingClientRect();
-  const right = Math.min(...['pokenavButton', 'pokedexButton'].map(id => document.getElementById(id)?.getBoundingClientRect())
+  const right = Math.min(...['pokedexButton'].map(id => document.getElementById(id)?.getBoundingClientRect())
     .filter(r => r && r.width).map(r => r.left)) - 8;
   const back = document.getElementById('backButton')?.getBoundingClientRect();
   const left = back?.width ? back.right + 8 : page?.left + 8;
@@ -2686,12 +2649,6 @@ export function attachTrainerInfoListeners() {
   document.getElementById('pokedexButton')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'pokedex' }
-    }));
-  });
-
-  document.getElementById('pokenavButton')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('navigate', {
-      detail: { route: 'pokenav' }
     }));
   });
 

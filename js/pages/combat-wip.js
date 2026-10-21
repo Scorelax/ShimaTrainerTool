@@ -19,6 +19,7 @@ import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget, setRemoteSa
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
+import { showAdventureMap, updateAdventureMap } from '../utils/adventure-map.js';
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
 import { lineFtFromRange } from '../utils/line-area.js';
 import { coneFtFromRange } from '../utils/line-area-picker.js';
@@ -204,6 +205,18 @@ const WIP_CSS = `
   .wip-dm-row > #wipBattlePhase { flex: 1; min-width: 0; }
   /* An adventure: the map fills the page under the header (battle-map-popup.js inline). */
   .wip-adventure { height: calc(100vh - 150px); height: calc(100dvh - 150px); min-height: 360px; padding: 0 0.4rem 0.4rem; box-sizing: border-box; }
+  /* ...and in the players' app the whole screen (the user's call, 2026-10-21): a slim bar, the map under it
+     (adventure-map.js) -- over the app, like the PokéNav */
+  .combat-wip-page.wip-adv-page { position: fixed; inset: 0; z-index: 900; width: auto; min-height: 0; margin: 0;
+    display: flex; flex-direction: column; overflow: hidden; }
+  .wip-adv-page .combat-wip-header-bar { flex: 0 0 auto; padding: 0.4rem 0.6rem; min-height: 2.6rem; }
+  .wip-adv-page .combat-wip-title { font-size: 1rem; }
+  .wip-adv-page .combat-wip-header-bar .combat-wip-btn-secondary, .wip-adv-page .combat-wip-header-bar .combat-wip-btn-danger {
+    padding: 0.35rem 0.85rem; font-size: 0.85rem; }
+  .wip-adv-page .combat-wip-layout { flex: 1 1 auto; min-height: 0; padding: 0; display: flex; }
+  .wip-adv-page .combat-wip-turnorder { display: none; }
+  .wip-adv-page .combat-wip-body { flex: 1 1 auto; max-width: none; padding: 0; display: flex; }
+  .wip-adv-page .wip-adventure { flex: 1 1 auto; height: auto; min-height: 0; padding: 0; }
   .wip-foreign-focus-portrait { width: 140px; height: 140px; margin: 0 auto 0.8rem; }
   .wip-foreign-focus-portrait img, .wip-foreign-focus-portrait video { width: 100%; height: 100%; object-fit: contain; }
   /* Centered both ways within the viewport, not just horizontally --
@@ -820,7 +833,7 @@ function _renderCurrentView() {
   if (!session.active) _spectating = false;
 
   return `
-    <div class="combat-wip-page">
+    <div class="combat-wip-page${_isAdventure() && !_dmName ? ' wip-adv-page' : ''}">
       <style>${WIP_CSS}</style>
       <div class="combat-wip-header-bar">
         <div id="wipHeaderLeftBtn"></div>
@@ -2169,7 +2182,7 @@ function renderPlacementPhase(state, currentId) {
       <style>${PLACEMENT_CSS}</style>
       <div class="placement-header-bar">
         <button class="placement-back-btn" id="placementBackBtn">← Back</button>
-        <div class="placement-title">📍 Place Your Team</div>
+        <div class="placement-title">${state.battleType === 'adventure' ? 'Adventure' : '📍 Place Your Team'}</div>
       </div>
       <div class="placement-body">
         <div class="placement-prompt">Click a cell to preview <strong>${current?.name || '…'}</strong>'s position, then confirm it.</div>
@@ -2545,7 +2558,7 @@ function renderBody(state) {
       </div>`;
   }
 
-  // An adventure: only the map, filling the page (attachBodyListeners puts it in -- battle-map-popup.js inline).
+  // An adventure: only the map, filling the page (attachBodyListeners puts it in -- adventure-map.js).
   if (_isAdventure(state)) return '<div class="wip-adventure" id="wipAdventure"></div>';
 
   // The DM console puts its "what the players can see" checkboxes in #dmFocusSide, left of the card (see
@@ -2564,19 +2577,23 @@ function renderBody(state) {
  * outside #combatWipBody, so unlike everything the SSE fast path patches,
  * they need their own explicit refresh call wherever `session` changes. */
 function _syncHeaderBar(state) {
+  // A player's adventure: the page over the whole screen (WIP_CSS's .wip-adv-page) -- and back to normal when it ends.
+  document.querySelector('.combat-wip-page')?.classList.toggle('wip-adv-page', _isAdventure(state) && !_dmName);
   const titleEl = document.getElementById('wipHeaderTitle');
   if (titleEl) {
     const vsIcon = '<img src="assets/VS.png" alt="">';
     titleEl.innerHTML = !state?.active
       ? `${vsIcon}Battle`
-      : _isAdventure(state) ? `🧭 Adventure${state.adventure?.canMove === false && !_dmName ? ' <small class="wip-adv-paused">· moving paused by the DM</small>' : ''}`
+      : _isAdventure(state) ? `Adventure${state.adventure?.canMove === false && !_dmName ? ' <small class="wip-adv-paused">· moving paused by the DM</small>' : ''}`
         : `${vsIcon}${state.battleType === 'pvp' ? 'PvP' : 'PvE'} Battle`;
   }
   const leftBtnEl = document.getElementById('wipHeaderLeftBtn');
   if (leftBtnEl) {
     // The DM console has the map as its own tab instead (battle-live.js) -- no Map button here.
+    // A player's adventure: back to the trainer card, still on the map (the map button comes straight back here).
     leftBtnEl.innerHTML = state?.active
-      ? (_dmName || _isAdventure(state) ? '' : '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button></div>')
+      ? (_dmName ? '' : _isAdventure(state) ? '<button class="combat-wip-btn-secondary" id="wipHeaderBackBtn">←</button>'
+        : '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button></div>')
       : _dmName ? '' : '<button class="combat-wip-btn-secondary" id="wipHeaderBackBtn">← Back</button>';
     document.getElementById('battleMapBtn')?.addEventListener('click', () => {
       showBattleMap(session, _currentTrainerName());
@@ -3421,7 +3438,7 @@ export function attachCombatWipListeners() {
     // An adventure: the map is already on the page and follows the push itself -- only the header to refresh.
     if (_isAdventure() && document.getElementById('wipAdventure')?.firstElementChild) {
       _syncHeaderBar(session);
-      updateBattleMap(session);
+      if (_dmName) updateBattleMap(session); else updateAdventureMap(session);
       return;
     }
 
@@ -3566,10 +3583,13 @@ async function _joinWith(combatants) {
 }
 
 function attachBodyListeners() {
-  // An adventure: the battle map, inside the page (battle-map-popup.js's inline mode -- the same map and moving as in
-  // a battle, minus turns and the movement limit).
+  // An adventure: the players' own adventure map (adventure-map.js -- not the battle map: free walking, nothing else);
+  // the DM console keeps the battle map, inside the page (battle-map-popup.js's inline mode).
   const adv = document.getElementById('wipAdventure');
-  if (adv && !adv.firstElementChild && _isAdventure()) showBattleMap(session, _currentTrainerName(), { container: adv });
+  if (adv && !adv.firstElementChild && _isAdventure()) {
+    if (_dmName) showBattleMap(session, _currentTrainerName(), { container: adv });
+    else showAdventureMap(adv, session, _currentTrainerName());
+  }
   document.getElementById('createSessionBtn')?.addEventListener('click', async () => {
     const battleType = 'pvp'; // PvE battles come from the DM console
     // See _justCreatedSession's own comment -- flags this device (and only this

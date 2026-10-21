@@ -346,13 +346,13 @@ class Router {
   }
 
   // The players' PokéNav (the user's call, 2026-10-21): the table's region map on their own device, to move round and
-  // zoom in -- just to look at (the DM moves the party's marker). Opened from the trainer info page, beside the
-  // Pokédex; its back button returns there.
+  // zoom in -- just to look at (the DM moves the party's marker). Opened from the trainer card (left of the party, the
+  // user's call, 2026-10-21); its back button returns there.
   async renderPokenav() {
     const content = document.getElementById('content');
     content.innerHTML = '<div class="pnav-page" id="pokenavRoot" style="position: fixed; inset: 0; z-index: 900; background: #081423"></div>';
     const nav = mountPlayerPokenav(document.getElementById('pokenavRoot'), {
-      onBack: () => this.navigate('trainer-info'),
+      onBack: () => this.navigate('trainer-card'),
     });
     this.leavePage = () => nav.destroy();
     nav.ready.catch(err => showError(`Couldn't load the PokéNav: ${err.message}`));

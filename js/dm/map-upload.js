@@ -142,6 +142,32 @@ export function makePane(stage, { W, H, draw, onClick }) {
 // The maps: which one is in use, the others to go back to, a new one to upload
 // ---------------------------------------------------------------------------
 
+/** ⬇ Export (the user's call, 2026-10-21): a map's painting saved to the DM's computer as a PNG -- the raw picture it
+ * was made from, no locations, names or marks on it (to paint more of Shima on, say). Sent as it is when it's a PNG
+ * already; another kind of picture is turned into one first. Named after the map. */
+async function exportPainting(map) {
+  const res = await fetch(map.files.painting, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`The Pi didn't send the painting (${res.status}).`);
+  let blob = await res.blob();
+  if (blob.type !== 'image/png') {
+    const bitmap = await createImageBitmap(blob);
+    const c = document.createElement('canvas');
+    c.width = bitmap.width; c.height = bitmap.height;
+    c.getContext('2d').drawImage(bitmap, 0, 0);
+    blob = await new Promise((resolve, reject) => c.toBlob(b => (b ? resolve(b) : reject(new Error('The painting could not be made into a PNG.'))), 'image/png'));
+  }
+  const name = `${String(map.id === FIRST_ID ? 'Shiman Federation' : map.name || 'Region map').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Region map'}.png`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast(`Exported "${name}"`);
+}
+
 /** The region map's paintings. `locations`: the Locations tab's own list (moved onto a map switched to, and saved);
  * `onChanged`: after a switch. */
 export async function openRegionMaps({ locations, onChanged }) {
@@ -172,7 +198,10 @@ export async function openRegionMaps({ locations, onChanged }) {
       <p class="dm-hint dm-mup-intro">When more of Shima is painted, upload the new painting here: you line it up with the map in use by a
         few spots on both, its 3D land is made from its colours, and every location moves onto it. The maps before it stay
         here -- put one back in use at any time, and the locations move back with it.</p>
-      <button class="dm-btn primary dm-mup-upload" data-mup="upload">⬆ Upload a new painting</button>
+      <div class="dm-row dm-mup-topbtns">
+        <button class="dm-btn primary dm-mup-upload" data-mup="upload">⬆ Upload a new painting</button>
+        <button class="dm-btn" data-mup="export" data-id="${escapeHtml(inUse.id)}" title="The painting of the map in use, as it was uploaded -- no locations, names or marks on it">⬇ Export the map (PNG)</button>
+      </div>
       <div class="dm-mup-cards">${maps.slice().reverse().map(m => `
         <div class="dm-mup-card${m.id === inUse.id ? ' in-use' : ''}">
           <img src="${escapeHtml(m.files.topo)}" alt="" loading="lazy">
@@ -180,7 +209,7 @@ export async function openRegionMaps({ locations, onChanged }) {
             <strong>${escapeHtml(m.name || 'A map')}</strong>
             <small>${m.at ? `${escapeHtml(new Date(m.at).toLocaleDateString())} · ` : ''}about ${km(m.W, m.kmPerPx)} × ${km(m.H, m.kmPerPx)} km</small>
           </div>
-          <div class="dm-mup-cardbtns">${m.id === inUse.id ? '<span class="dm-pill ok">In use</span>'
+          <div class="dm-mup-cardbtns"><button class="dm-icon-btn" data-mup="export" data-id="${escapeHtml(m.id)}" title="Export this painting (PNG) -- the raw picture, no locations on it">⬇</button>${m.id === inUse.id ? '<span class="dm-pill ok">In use</span>'
             : `<button class="dm-btn small primary" data-mup="use" data-id="${escapeHtml(m.id)}">Use this map</button>
                ${m.id === FIRST_ID ? '' : `<button class="dm-icon-btn danger" data-mup="delete" data-id="${escapeHtml(m.id)}" title="Delete this map">🗑</button>`}`}</div>
         </div>`).join('')}</div>`;
@@ -230,6 +259,12 @@ export async function openRegionMaps({ locations, onChanged }) {
     else if (act === 'upload') {
       const file = await pickFile();
       if (file) lineUp(file);
+    } else if (act === 'export') {
+      const target = maps.find(m => m.id === b.dataset.id);
+      if (!target) return;
+      b.disabled = true;
+      try { await exportPainting(target); } catch (err) { showCombatAlert(err.message, { title: "Couldn't export the map" }); }
+      b.disabled = false;
     } else if (act === 'use') {
       const target = maps.find(m => m.id === b.dataset.id);
       if (!target || !await showCombatConfirm(`Use "${target.name}" as the region map? The table's map, the PokéNav and every location move onto it.`, { title: 'Switch maps', yesLabel: 'Use it', noLabel: 'Cancel' })) return;

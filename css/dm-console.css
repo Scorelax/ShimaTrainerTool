@@ -1405,6 +1405,23 @@ span.dm-trap-pick { cursor: default; }
 .dm-disp-ovtag { display: inline-block; margin-left: 0.3rem; padding: 0.05rem 0.4rem; border-radius: 999px; font-size: 0.64rem; font-weight: 900;
   color: #1a1205; background: #ff9800; vertical-align: middle; }
 .dm-disp-overbattle { margin-left: 0.4rem; white-space: nowrap; }
+/* Folder mode and Override battle screen: easy to see and hit (the user's call, 2026-10-21) -- a framed switch, not a
+   small tick box */
+.dm-check.dm-disp-foldermode, .dm-check.dm-disp-overbattle {
+  align-items: center; gap: 0.5rem; margin-bottom: 0; padding: 0.35rem 0.7rem; border-radius: 9px; font-size: 0.9rem; font-weight: 700;
+  border: 1px solid var(--dm-line); background: rgba(255, 255, 255, 0.05);
+}
+.dm-check.dm-disp-foldermode:hover, .dm-check.dm-disp-overbattle:hover { border-color: var(--dm-gold); }
+.dm-check.dm-disp-foldermode:has(input:checked), .dm-check.dm-disp-overbattle:has(input:checked) { border-color: #ffb74d; background: rgba(255, 183, 77, 0.14); }
+.dm-disp-foldermode input, .dm-disp-overbattle input { width: 1.15rem; height: 1.15rem; margin: 0; accent-color: #ff9800; cursor: pointer; }
+/* the Planned scenes tab: the scenes as rows, in folders */
+.dm-disp-grid.dm-disp-scenes { display: flex; flex-direction: column; gap: 0.35rem; }
+.dm-disp-scenes-head { align-items: center; gap: 0.6rem; margin-bottom: 0.3rem; flex-wrap: nowrap; }
+.dm-disp-scenes-head .dm-btn { flex: none; }
+/* (a flex row's own display beat [hidden]: the live "During a battle" row showed in the planner, Add hidden in the
+   Planned scenes tab) */
+.dm-disp [hidden] { display: none !important; }
+.dm-disp-planhint { margin-top: 0.3rem; font-size: 0.75rem; }
 .dm-disp-planfolder.drop-here { border: 2px dashed #2ecc71; background: rgba(46, 204, 113, 0.16); }
 /* NPCs in folders: cards with the pick tick, draggable */
 .dm-disp-card.nopic { opacity: 0.45; }
@@ -1530,6 +1547,10 @@ span.dm-trap-pick { cursor: default; }
 /* a location inside another, under it a step in (the user's call, 2026-10-20) */
 .dm-nav-locrow.sub { padding-left: calc(var(--depth, 1) * 0.9rem); }
 /* fold up what's inside a location (a region, a forest) */
+/* a location type's title folds its list up */
+.dm-nav-grouptoggle { display: flex; align-items: center; gap: 0.3rem; width: 100%; border: none; background: none; cursor: pointer; text-align: left; font: inherit; }
+.dm-nav-grouptoggle:hover { color: var(--dm-gold); }
+.dm-nav-grouparrow { width: 0.9rem; font-size: 0.75rem; }
 .dm-nav-fold { flex: none; width: 1.3rem; padding: 0; border: none; background: none; color: var(--dm-muted); font-size: 0.8rem; cursor: pointer; }
 button.dm-nav-fold:hover, .dm-world-fold:hover { color: var(--dm-gold); }
 .dm-world-fold { display: inline-block; width: 1rem; color: var(--dm-muted); cursor: pointer; }
@@ -1550,8 +1571,6 @@ button.dm-nav-fold:hover, .dm-world-fold:hover { color: var(--dm-gold); }
 /* PokéNav: where the party is, and what's planned there and nearby (the user's call, 2026-10-20) */
 .dm-nav-party { display: flex; flex-direction: column; gap: 0.35rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--dm-line); }
 .dm-nav-party .dm-check { margin: 0; }
-.dm-nav-recent { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
-.dm-nav-recent small { color: var(--dm-muted); font-size: 0.72rem; margin-right: 0.15rem; }
 .dm-nav-event { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; text-align: left; padding: 0.4rem 0.55rem; border-radius: 8px;
   border: 1px solid transparent; background: rgba(255, 215, 0, 0.06); color: var(--dm-text); font: inherit; font-size: 0.86rem; cursor: pointer; }
 .dm-nav-event:hover { border-color: var(--dm-gold); }

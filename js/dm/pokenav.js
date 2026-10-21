@@ -135,6 +135,7 @@ export async function renderPokenav(section, { session } = {}) {
 
 const NEAR_KM = 30;
 const NAV_FOLDED = 'dm-nav-folded';
+const NAV_GROUPS_SHUT = 'dm-nav-groups-shut';   // the location types folded up in the list
 // the players' marker (assets/MapMarker.png) as the party's icon here too (the user's call, 2026-10-20)
 const PARTY_ICON = '<img class="dm-nav-partyicon" src="assets/region-map/party-marker.png" alt="">';
 
@@ -201,7 +202,6 @@ function partyHtml(locations, events) {
     const list = locations.filter(l => (l.type || 'city') === k).sort((a, b) => String(a.name).localeCompare(String(b.name)));
     return list.length ? `<optgroup label="${escapeHtml(label)}">${list.map(l => `<option value="${escapeHtml(l.id)}" ${l.id === here?.id ? 'selected' : ''}>${escapeHtml(l.name || 'Unnamed')}${parentOf(l, locations) ? ` (in ${escapeHtml(parentOf(l, locations).name || 'Unnamed')})` : ''}${l.shape ? '' : ' (not on the map)'}${l.secret ? ' 🔒' : ''}</option>`).join('')}</optgroup>` : '';
   }).join('');
-  const recent = (_party?.recent || []).map(id => locations.find(l => l.id === id)).filter(Boolean);
   let eventsHtml = '';
   if (here) {
     const atHere = events.filter(e => e.locationId === here.id);
@@ -219,7 +219,6 @@ function partyHtml(locations, events) {
       ${here ? `<div class="dm-hint">${here.shape ? '' : 'Not marked on the map, so it can\'t be shown there. '}${_party.at ? `Since ${escapeHtml(_party.at)}.` : ''}</div>` : '<div class="dm-hint">Pick where the players are -- the map lights it up and shows what\'s planned there and nearby.</div>'}
       <label class="dm-check"><input type="checkbox" id="navPartyBoard" ${_party?.onBoard !== false ? 'checked' : ''}><span>📺 Show it on the table's map
         <small>${here?.secret ? '🔒 This location is secret, so the table\'s map doesn\'t show it -- untick Secret in Admin once they\'ve found it.' : 'Untick for a journey the players shouldn\'t see on the map.'}</small></span></label>
-      ${recent.length ? `<div class="dm-nav-recent"><small>Before:</small>${recent.map(l => `<button class="dm-btn small" data-party="${escapeHtml(l.id)}">${escapeHtml(l.name || 'Unnamed')}</button>`).join('')}</div>` : ''}
       ${eventsHtml}
     </div>`;
 }
@@ -240,6 +239,7 @@ async function drawLocations() {
   // a location inside another under it, a step in (the user's call, 2026-10-20) -- picked, what it's part of lights up too
   // one with others inside folds up (▾ / ▸, remembered on this computer)
   const folded = readFolded(NAV_FOLDED);
+  const groupsShut = readFolded(NAV_GROUPS_SHUT);
   const fold = l => (locations.some(x => parentOf(x, locations) === l)
     ? `<button class="dm-nav-fold" data-fold="${escapeHtml(l.id)}" title="${folded.has(l.id) ? 'Show' : 'Hide'} what's inside">${folded.has(l.id) ? '▸' : '▾'}</button>` : '<span class="dm-nav-fold"></span>');
   const row = (l, depth = 0) => `<div class="dm-nav-locrow${depth ? ' sub' : ''}" ${depth ? `style="--depth: ${depth}"` : ''}>${fold(l)}<button class="dm-nav-loc${l.id === _lit ? ' lit' : ''}${l.id === _party?.locationId ? ' party' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
@@ -258,8 +258,12 @@ async function drawLocations() {
       <div class="dm-nav-groups">${Object.entries(LOCATION_TYPES).map(([k, label]) => {
         const here = withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort((a, b) => String(a.name).localeCompare(String(b.name))), locations, folded);
         // (the count: the locations of this type -- not what's inside them, listed here under them whatever their type)
-        return `<div class="dm-nav-locgroup"><div class="dm-cs-group-title">${label} <small>${locations.filter(l => (l.type || 'city') === k).length}</small></div>
-          ${here.map(({ l, depth }) => row(l, depth)).join('') || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
+        // A type's list folds up from its title (the user's call, 2026-10-21: no scrolling past every city to the routes),
+        // remembered on this computer.
+        const shut = groupsShut.has(k);
+        return `<div class="dm-nav-locgroup${shut ? ' shut' : ''}"><button class="dm-cs-group-title dm-nav-grouptoggle" data-group="${k}" aria-expanded="${shut ? 'false' : 'true'}" title="${shut ? 'Show' : 'Hide'} them">
+            <span class="dm-nav-grouparrow">${shut ? '▸' : '▾'}</span>${label} <small>${locations.filter(l => (l.type || 'city') === k).length}</small></button>
+          ${shut ? '' : here.map(({ l, depth }) => row(l, depth)).join('') || '<div class="dm-hint dm-nav-locnone">None yet</div>'}</div>`;
       }).join('')}</div>
       <div class="dm-hint">Locations are added and marked on the map in the Admin module (📍 Locations).</div>
     </div>`;
@@ -269,6 +273,8 @@ async function drawLocations() {
   box.onclick = (e) => {
     const fb = e.target.closest('[data-fold]');
     if (fb) { toggleFold(NAV_FOLDED, fb.dataset.fold); drawLocations(); return; }
+    const gb = e.target.closest('[data-group]');
+    if (gb) { toggleFold(NAV_GROUPS_SHUT, gb.dataset.group); drawLocations(); return; }
     const ev = e.target.closest('[data-event]');
     if (ev) { showEvent(events.find(x => x.id === ev.dataset.event), locations); return; }
     const party = e.target.closest('[data-party]');

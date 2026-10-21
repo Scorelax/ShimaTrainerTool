@@ -148,7 +148,9 @@ export async function drawShapePreview(canvas, shape) {
 // ---------------------------------------------------------------------------
 
 const AREA_TOOLS = {
-  region: { label: '🗺 Region', hint: 'Click inside a region: it fills in up to the dark border lines and the coast. If it spills out through a gap in a line, Undo and draw that bit with Outline (or Erase what spilled). Alt + click takes it away again.' },
+  // (the user's call, 2026-10-21: the painting's lines never closed a region in -- a region is drawn round roughly instead,
+  // and only the land inside counts)
+  region: { label: '🗺 Region', hint: '<b>Drag round the region</b> -- roughly, out over the sea is fine: only the land inside is taken, and none of another region\'s, so draw over the neighbour\'s border and it stops at it. Or <b>click on land</b> to take all the land round there that isn\'t in a region yet (the last one, say). Alt takes away. Right-drag moves the map.' },
   wand: { label: '🪄 Fill', hint: 'Click inside a forest (or a lake, or a patch of one colour) and it fills it in. Alt + click takes a patch away again.' },
   brush: { label: '🖌 Paint', hint: 'Paint to add to the area.' },
   erase: { label: '🧽 Erase', hint: 'Paint to take away from the area.' },
@@ -177,6 +179,25 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   let segs = [];
   let mask = old?.kind === 'area' ? F.ringsToMask(old.rings, W, H) : new Uint8Array(W * H);
   let areaTool = loc.type === 'region' ? 'region' : 'wand';
+  // A region keeps to the land and out of the other regions (the user's call, 2026-10-21): `free` is that land (1), the
+  // lakes and rivers inland included -- worked out when it's first needed. Another location's area keeps to the land
+  // only with the Region tool.
+  const isRegion = loc.type === 'region';
+  let freeLand = null;
+  function free() {
+    if (freeLand) return freeLand;
+    const sea = F.seaOf(f);
+    freeLand = new Uint8Array(W * H);
+    for (let i = 0; i < freeLand.length; i++) freeLand[i] = sea[i] ? 0 : 1;
+    if (isRegion) {
+      others.filter(o => o.type === 'region' && o.shape?.kind === 'area').forEach((o) => {
+        const taken = F.ringsToMask(o.shape.rings, W, H);
+        for (let i = 0; i < taken.length; i++) if (taken[i]) freeLand[i] = 0;
+      });
+    }
+    return freeLand;
+  }
+  const byName = (x, y) => others.find(o => o.type === 'region' && o.shape?.kind === 'area' && F.pointInRings(o.shape.rings, x, y))?.name;
   let brush = 10;
   let tolerance = 30;
   let showOthers = true;
@@ -405,8 +426,8 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
         <div class="dm-lme-stat">${anchors.length < 2 ? `${anchors.length ? 'The start' : 'No points yet'} -- it needs a start and an end` : describeShape({ kind: 'path', points: pts })}</div>${common}`;
     } else {
       box.innerHTML = `<div class="dm-card-title">⬚ An area</div>
-        <div class="dm-lme-toolgrid">${Object.entries(AREA_TOOLS).map(([k, t]) => `<button class="dm-btn small${areaTool === k ? ' active' : ''}" data-tool="${k}">${t.label}</button>`).join('')}</div>
-        <div class="dm-hint">${AREA_TOOLS[areaTool].hint}</div>
+        <div class="dm-lme-toolgrid">${Object.entries(AREA_TOOLS).filter(([k]) => (k === 'region' ? isRegion : k !== 'wand' || !isRegion)).map(([k, t]) => `<button class="dm-btn small${areaTool === k ? ' active' : ''}" data-tool="${k}">${t.label}</button>`).join('')}</div>
+        <div class="dm-hint">${AREA_TOOLS[areaTool].hint}${isRegion && areaTool !== 'region' ? ' (Only land, outside the other regions.)' : ''}</div>
         ${areaTool === 'brush' || areaTool === 'erase' ? `<div class="dm-field"><label>Brush size</label><input type="range" id="lmeBrush" min="2" max="60" value="${brush}"></div>` : ''}
         ${areaTool === 'wand' ? `<div class="dm-field"><label>How alike (for a patch of one colour)</label><input type="range" id="lmeTol" min="0" max="100" value="${tolerance}"></div>` : ''}
         <div class="dm-row"><button class="dm-btn small" data-lme="undo" ${undos.area.length || lasso.length ? '' : 'disabled'}>↶ Undo</button>
@@ -442,15 +463,20 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   function stroke(a, b) {
     const v = areaTool === 'erase' ? 0 : 1;
     const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, brush / 3)));
-    for (let i = 0; i <= steps; i++) F.stamp(mask, W, H, a[0] + ((b[0] - a[0]) * i) / steps, a[1] + ((b[1] - a[1]) * i) / steps, brush, v);
+    const allow = v && isRegion ? free() : null;   // a region's brush paints land only
+    for (let i = 0; i <= steps; i++) F.stamp(mask, W, H, a[0] + ((b[0] - a[0]) * i) / steps, a[1] + ((b[1] - a[1]) * i) / steps, brush, v, allow);
     paintMask(Math.min(a[0], b[0]) - brush - 1, Math.min(a[1], b[1]) - brush - 1, Math.max(a[0], b[0]) + brush + 1, Math.max(a[1], b[1]) + brush + 1);
   }
   function closeLasso(take) {
     if (lasso.length >= 3) {
       remember();
       const fill = F.ringsToMask([lasso], W, H);
-      for (let i = 0; i < mask.length; i++) if (fill[i]) mask[i] = take ? 0 : 1;
+      // a region (or anything drawn round with the Region tool) takes only the free land inside
+      const allow = !take && (isRegion || areaTool === 'region') ? free() : null;
+      let n = 0;
+      for (let i = 0; i < mask.length; i++) if (fill[i] && (!allow || allow[i])) { if (!take && !mask[i]) n++; mask[i] = take ? 0 : 1; }
       paintMask();
+      if (allow && !n) toast('No free land in there -- it\'s all sea or another region already.');
     }
     lasso = [];
     tools(); draw();
@@ -465,13 +491,28 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       const seg = anchors.length > 1 ? segmentAt(p) : -1;
       if (seg >= 0) { anchors.splice(seg + 1, 0, snap(p)); retrace(seg, seg + 1); } else { anchors.push(snap(p)); retrace(anchors.length - 2); }
     } else if (areaTool === 'region') {
-      const got = F.regionAt(f, p[0], p[1]);
-      if (!got.size) { toast("That's on a border line or in the sea -- click inside the region."); return; }
-      if (got.spilled) { toast('The lines round there don\'t close it in -- it ran out over most of the island. Draw this region with ✏️ Outline instead.'); return; }
-      remember();
-      for (let i = 0; i < mask.length; i++) if (got.mask[i]) mask[i] = e.altKey ? 0 : 1;
-      paintMask();
-      if (!e.altKey) toast(`Filled in the region -- about ${Math.round(got.size * kmPerPx() * kmPerPx())} km²`);
+      const i0 = Math.round(p[1]) * W + Math.round(p[0]);
+      if (e.altKey) {
+        // Alt + click: the piece of the area clicked taken away
+        const got = F.freeLandAt(mask, W, H, p[0], p[1]);
+        if (!got.size) return;
+        remember();
+        for (let i = 0; i < mask.length; i++) if (got.mask[i]) mask[i] = 0;
+        paintMask();
+      } else {
+        if (mask[i0]) { toast('That\'s in it already -- drag round more land to add it, or Alt + click to take this piece away.'); return; }
+        const got = F.freeLandAt(free(), W, H, p[0], p[1]);
+        if (!got.size) {
+          const other = byName(p[0], p[1]);
+          toast(other ? `That's in ${other} already.` : 'That\'s the sea -- click on land.');
+          return;
+        }
+        remember();
+        let n = 0;
+        for (let i = 0; i < mask.length; i++) if (got.mask[i] && !mask[i]) { mask[i] = 1; n++; }
+        paintMask();
+        toast(`Took all the free land round there -- about ${Math.max(1, Math.round(n * kmPerPx() * kmPerPx()))} km² more. Too much? Undo, and drag round it instead.`);
+      }
     } else if (areaTool === 'wand') {
       const got = F.wandAt(f, p[0], p[1], tolerance);
       if (!got.size) { toast('Nothing to fill there -- try the paint brush or an outline.'); return; }
@@ -495,6 +536,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     if (kind === 'pin' && near(pin, p, 14)) drag.mode = 'pin';
     else if (kind === 'path' && anchorAt(p) >= 0) drag.mode = { anchor: anchorAt(p) };
     else if (kind === 'area' && (areaTool === 'brush' || areaTool === 'erase')) { remember(); drag.mode = 'paint'; stroke(p, p); draw(); }
+    else if (kind === 'area' && areaTool === 'region') { drag.mode = 'lasso'; lasso = [p]; }
   });
   canvas.addEventListener('pointermove', (e) => {
     const p = toPaint(e);
@@ -515,7 +557,9 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       const i = drag.mode.anchor;
       if (i > 0) segs[i - 1] = [anchors[i - 1], p];
       if (i < anchors.length - 1) segs[i] = [p, anchors[i + 1]];
-    } else if (drag.mode === 'paint') { stroke(drag.last, p); drag.last = p; } else {
+    } else if (drag.mode === 'paint') { stroke(drag.last, p); drag.last = p; } else if (drag.mode === 'lasso') {
+      if (Math.hypot(p[0] - drag.last[0], p[1] - drag.last[1]) * s >= 4) { lasso.push(p.map(v => Math.round(v * 10) / 10)); drag.last = p; }
+    } else {
       ox = drag.ox + e.clientX - drag.x;
       oy = drag.oy + e.clientY - drag.y;
     }
@@ -526,6 +570,12 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     const d = drag;
     drag = null;
     const p = toPaint(e);
+    if (d.mode === 'lasso') {
+      if (d.moved) { closeLasso(e.altKey); return; }
+      lasso = [];
+      click(p, e);
+      return;
+    }
     if (Number.isInteger(d.mode?.anchor) && d.moved) {
       anchors[d.mode.anchor] = snap(p);
       retrace(d.mode.anchor - 1, d.mode.anchor);
@@ -542,7 +592,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     tools(); draw();
   };
   canvas.addEventListener('pointerup', up);
-  canvas.addEventListener('pointercancel', () => { drag = null; });
+  canvas.addEventListener('pointercancel', () => { if (drag?.mode === 'lasso') lasso = []; drag = null; draw(); });
   canvas.addEventListener('pointerleave', () => { hover = null; if (kind === 'area') draw(); });
   canvas.addEventListener('dblclick', (e) => { if (kind === 'area' && areaTool === 'outline') closeLasso(e.altKey); });
   canvas.addEventListener('wheel', (e) => {

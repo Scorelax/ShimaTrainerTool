@@ -28,7 +28,9 @@ import {
 } from './display-store.js';
 import { spriteSrc } from '../utils/sprite-media.js';
 
-const SOURCES = { pokemon: '🐾 Pokémon', npcs: '👤 NPCs', trainers: '👥 Trainers', backgrounds: '🖼️ Backgrounds' };
+// (Planned scenes: the user's call, 2026-10-21 -- the planned scenes organised here, in folders, the way the backgrounds
+// are; the queue and the planner only open the folders)
+const SOURCES = { pokemon: '🐾 Pokémon', npcs: '👤 NPCs', trainers: '👥 Trainers', backgrounds: '🖼️ Backgrounds', scenes: '📅 Planned scenes' };
 const KIND_LABEL = { pokemon: 'Pokémon', npc: 'NPC', trainer: 'Trainer', image: 'Picture' };
 const IS_VIDEO = /\.mp4(\?|$)/i;
 const MAX_RESULTS = 150;
@@ -53,9 +55,10 @@ let _folders = [];
 let _folder = ''; // the folder open
 let _picked = new Set(); // pictures / NPCs picked to move together (ids)
 // Every location (Admin › Locations) has a folder of its own in the backgrounds (the user's call, 2026-10-20: easier to
-// keep a place's pictures together), in one called Locations: made, renamed and removed along with the location
-// (syncLocationFolders), so it has no rename or delete of its own -- it can still be dragged elsewhere. A folder keeps
-// its location's id (`locId`); the Locations folder itself has a fixed id.
+// keep a place's pictures together): made, renamed and removed along with the location (syncLocationFolders), so it has
+// no rename or delete of its own -- it can still be dragged elsewhere. A folder keeps its location's id (`locId`) and is
+// marked 📍. They sit with the other folders at the top, not inside each other (the user's call, 2026-10-21: no folder
+// after folder to click through) -- the Locations folder they were in first (this id) is done away with.
 const LOCATIONS_FOLDER = 'fold-locations';
 // Folder mode (the user's call, 2026-10-20): ticked, the backgrounds show the folder open -- its folders and its pictures;
 // unticked, just pictures: every one, the ones inside folders too. Remembered on this computer.
@@ -141,7 +144,7 @@ function draw() {
         <div class="dm-disp-battleinfo" ${_mode === 'plan' ? 'hidden' : ''} title="During a battle the background stays, with the turn order and whoever's turn it is on top">
           <span>⚔️ During a battle</span>
           <div class="dm-seg two" id="dispBattlePictures"></div>
-          <label class="dm-check dm-disp-overbattle" title="The scene stays over everything during a battle -- the turn order too. Showing a planned scene sets it to that scene's Override."><input type="checkbox" id="dispOverBattle"><span>Override</span></label>
+          <label class="dm-check dm-disp-overbattle" title="The scene stays over everything during a battle -- the turn order too. Showing a planned scene sets it to that scene's Override."><input type="checkbox" id="dispOverBattle"><span>Override battle screen</span></label>
         </div>
         <div class="dm-card dm-disp-layers">
           <div class="dm-card-title">
@@ -162,7 +165,7 @@ function draw() {
         <div class="dm-disp-work-body">
           <div class="dm-row dm-disp-searchrow">
             <input class="dm-input" id="dispSearch" placeholder="Search…" autocomplete="off" value="${escapeHtml(_queries[_source] || '')}">
-            <label class="dm-check dm-disp-addhidden" title="Put new pictures on hidden -- they show on the display once you click Show"><input type="checkbox" id="dispAddHidden" ${_addHidden ? 'checked' : ''}><span>Add hidden</span></label>
+            <label class="dm-check dm-disp-addhidden" id="dispAddHiddenBox" title="Put new pictures on hidden -- they show on the display once you click Show"><input type="checkbox" id="dispAddHidden" ${_addHidden ? 'checked' : ''}><span>Add hidden</span></label>
           </div>
           <div id="dispUploadRow" class="dm-disp-upload" hidden>
             <button class="dm-btn primary" id="dispUpload">⬆ Upload pictures</button>
@@ -355,8 +358,10 @@ function planFolderPath(id) {
   return out;
 }
 
-/** The path to the folder open, its folders, then its scenes -- `row(plan)` draws one. */
-function planBrowserHtml(row) {
+/** The path to the folder open, its folders, then its scenes -- `row(plan)` draws one. `manage`: with ＋ Folder and each
+ * folder's ✎ / ✕ (only the Planned scenes tab -- the user's call, 2026-10-21: the queue and the planner just open
+ * them). */
+function planBrowserHtml(row, { manage = false } = {}) {
   if (_planFolder && !_planFolders.some(f => f.id === _planFolder)) _planFolder = '';
   const subs = _planFolders.filter(f => (f.parent || '') === _planFolder).sort((a, b) => a.name.localeCompare(b.name));
   const plans = plansIn(_planFolder);
@@ -364,17 +369,18 @@ function planBrowserHtml(row) {
   return `<div class="dm-disp-crumbs dm-disp-plancrumbs">
       <button class="dm-disp-crumb${_planFolder ? '' : ' here'}" data-plan-open-folder="" data-plan-drop="">📅 All scenes</button>
       ${planFolderPath(_planFolder).map(f => `<span>›</span><button class="dm-disp-crumb${f.id === _planFolder ? ' here' : ''}" data-plan-open-folder="${escapeHtml(f.id)}" data-plan-drop="${escapeHtml(f.id)}">📁 ${escapeHtml(f.name)}</button>`).join('')}
-      <button class="dm-btn small dm-disp-newfolder" data-plan-act="new-folder" title="A folder for scenes, in the one open">＋ Folder</button>
+      ${manage ? '<button class="dm-btn small dm-disp-newfolder" data-plan-act="new-folder" title="A folder for scenes, in the one open">＋ Folder</button>' : ''}
     </div>
     ${subs.map(f => `
       <div class="dm-disp-plan dm-disp-planfolder" data-plan-open-folder="${escapeHtml(f.id)}" data-plan-drop="${escapeHtml(f.id)}" data-plan-folder="${escapeHtml(f.id)}" role="button" tabindex="0" title="Open it -- or drag scenes onto it">
         <span class="dm-disp-plan-thumb empty">📁</span>
         <span class="dm-disp-layer-name"><strong>${escapeHtml(f.name)}</strong><small>${inside(f)} inside</small></span>
-        <button class="dm-icon-btn" data-plan-act="rename-folder" title="Rename">✎</button>
-        <button class="dm-icon-btn danger" data-plan-act="delete-folder" title="Delete the folder (what's in it moves up)">✕</button>
+        ${manage ? `<button class="dm-icon-btn" data-plan-act="rename-folder" title="Rename">✎</button>
+        <button class="dm-icon-btn danger" data-plan-act="delete-folder" title="Delete the folder (what's in it moves up)">✕</button>` : ''}
       </div>`).join('')}
     ${plans.map(row).join('')}
-    ${!plans.length && !subs.length ? `<div class="dm-hint">${_planFolder ? 'Nothing in this folder yet -- drag scenes onto it, or 📁 Move one here.' : 'No planned scenes yet.'}</div>` : ''}`;
+    ${!plans.length && !subs.length ? `<div class="dm-hint">${_planFolder ? 'Nothing in this folder yet -- drag scenes onto it, or 📁 Move one here.' : 'No planned scenes yet.'}</div>` : ''}
+    ${manage ? '' : '<div class="dm-hint dm-disp-planhint">Folders are made and scenes sorted into them in the 📅 Planned scenes tab.</div>'}`;
 }
 
 /** Live: the planned scenes waiting to be shown -- Show, change it in the planner, or delete it. */
@@ -387,7 +393,7 @@ function drawQueue() {
     ${getPlans().length || _planFolders.length ? planBrowserHtml(p => `
       <div class="dm-disp-plan${p.shownAt ? ' shown' : ''}" data-plan="${escapeHtml(p.id)}" draggable="true">
         ${planThumb(p)}
-        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}${p.overBattle ? ' <span class="dm-disp-ovtag" title="Override: over everything during a battle">Override</span>' : ''}</strong><small>${planSummary(p)}</small></span>
+        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}${p.overBattle ? ' <span class="dm-disp-ovtag" title="Override battle screen: over everything during a battle">Override battle screen</span>' : ''}</strong><small>${planSummary(p)}</small></span>
         <button class="dm-btn small primary" data-plan-act="show" title="Put it on the display -- its background and pictures in place of the ones there now${p.overBattle ? ', over the battle too' : ''}">📺 Show</button>
         <button class="dm-icon-btn" data-plan-act="edit" title="Change it in the planner">✎</button>
         <button class="dm-icon-btn danger" data-plan-act="delete" title="Delete it">✕</button>
@@ -410,15 +416,12 @@ function drawPlans() {
         ${planThumb(p)}
         <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}</strong><small>${planSummary(p)}</small></span>
         <button class="dm-btn small dm-disp-ovbtn${p.overBattle ? ' on' : ''}" data-plan-act="override" aria-pressed="${p.overBattle ? 'true' : 'false'}"
-          title="${p.overBattle ? 'Override is on: during a battle this scene stays over everything, the turn order too. Click to turn it off.' : 'Override is off: during a battle the turn order shows over this scene. Click to turn it on.'}">Override</button>
+          title="${p.overBattle ? 'Override battle screen is on: during a battle this scene stays over everything, the turn order too. Click to turn it off.' : 'Override battle screen is off: during a battle the turn order shows over this scene. Click to turn it on.'}">Override battle screen</button>
         <button class="dm-icon-btn" data-plan-act="rename" title="Rename">✎</button>
         <button class="dm-icon-btn" data-plan-act="move" title="Move it to another folder">📁</button>
         <button class="dm-icon-btn danger" data-plan-act="delete" title="Delete it">✕</button>
       </div>`)}
-    ${open ? `<div class="dm-row dm-disp-plan-go">
-      <button class="dm-btn small primary" data-plan-act="show" data-id="${escapeHtml(open.id)}" title="Put it on the display -- its background and pictures in place of the ones there now">📺 Show it on the display</button>
-      <span class="dm-hint">Saved automatically</span></div>
-      <div class="dm-hint">Everything you add here goes into "${escapeHtml(open.name)}" -- the display doesn't change. It waits in the queue (📺 Live) until you show it.</div>` : ''}`;
+    ${open ? `<div class="dm-hint">Everything you add here goes into "${escapeHtml(open.name)}" (saved automatically) -- the display doesn't change. It's shown from the queue in 📺 Live.</div>` : ''}`;
   wirePlanDrag(box);
 }
 
@@ -488,7 +491,7 @@ async function onPlanClick(e) {
     draw();
     return;
   }
-  if (act === 'new-live') { const id = newPlan({ silent: true }); switchMode('plan', id); return; }
+  if (act === 'new-live' || act === 'new-scene') { const id = newPlan({ silent: true }); switchMode('plan', id); return; }
   if (!plan) return;
   if (act === 'show') showPlan(plan);
   else if (act === 'stop') stopOverride();
@@ -597,6 +600,7 @@ function drawLayers() {
   const items = [...scene.items].reverse(); // the top one first
   drawOverride();
   if (_mode === 'plan') drawPlans(); else drawQueue();
+  if (_source === 'scenes') drawScenesTab();
   const putAway = battleOnDisplay(scene, previewSession()) && scene.battlePictures !== 'keep' && items.length;
   box.innerHTML = `
     ${putAway ? '<div class="dm-disp-away">⚔️ Put away during the battle</div>' : ''}
@@ -697,11 +701,14 @@ function refreshSpriteUrls() {
 async function drawSource() {
   const upload = document.getElementById('dispUploadRow');
   if (upload) upload.hidden = _source !== 'backgrounds';
+  const addHidden = document.getElementById('dispAddHiddenBox');
+  if (addHidden) addHidden.hidden = _source === 'scenes';
   const search = document.getElementById('dispSearch');
   if (search) search.value = _queries[_source] || '';
-  if (search) search.placeholder ={ pokemon: 'Search Pokémon by name, type or number…', npcs: 'Search NPCs…', trainers: 'Search trainers…', backgrounds: 'Search pictures…' }[_source];
+  if (search) search.placeholder ={ pokemon: 'Search Pokémon by name, type or number…', npcs: 'Search NPCs…', trainers: 'Search trainers…', backgrounds: 'Search pictures…', scenes: 'Search planned scenes…' }[_source];
   const grid = document.getElementById('dispGrid');
   if (!grid) return;
+  if (_source === 'scenes') { drawScenesTab(); return; }
   grid.className = `dm-disp-grid${_source === 'backgrounds' ? ' wide' : ''}`;
   if (!_data[_source]) grid.innerHTML = '<div class="dm-loading">Loading…</div>';
   useFolderSet(_source);
@@ -714,7 +721,34 @@ async function drawSource() {
   drawGrid();
 }
 
+/** The Planned scenes tab: the scenes in folders, organised here -- ＋ New scene / ＋ Folder in the folder open, drag a
+ * scene (or a folder) onto a folder or a step of the path, ✎ opens it in the planner. A search looks in every folder. */
+function drawScenesTab() {
+  const grid = document.getElementById('dispGrid');
+  if (!grid || _source !== 'scenes') return;
+  grid.className = 'dm-disp-grid dm-disp-scenes';
+  const q = (_queries.scenes || '').trim().toLowerCase();
+  const open = _mode === 'plan' ? openPlan()?.id : null;
+  const row = p => `
+      <div class="dm-disp-plan${p.id === open ? ' open' : ''}${p.shownAt ? ' shown' : ''}" data-plan="${escapeHtml(p.id)}" draggable="true">
+        ${planThumb(p)}
+        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}${p.overBattle ? ' <span class="dm-disp-ovtag" title="Over everything during a battle">Override battle screen</span>' : ''}</strong>
+          <small>${planSummary(p)}${q && p.folder ? ` · 📁 ${escapeHtml(planFolderPath(p.folder).map(f => f.name).join(' › '))}` : ''}</small></span>
+        <button class="dm-btn small" data-plan-act="edit" title="Work on it in the planner">✎ Edit</button>
+        <button class="dm-icon-btn" data-plan-act="rename" title="Rename">Aa</button>
+        <button class="dm-icon-btn" data-plan-act="move" title="Move it to another folder">📁</button>
+        <button class="dm-icon-btn danger" data-plan-act="delete" title="Delete it">✕</button>
+      </div>`;
+  const found = q ? getPlans().filter(p => String(p.name).toLowerCase().includes(q)) : null;
+  grid.innerHTML = `<div class="dm-row dm-disp-scenes-head">
+      <button class="dm-btn small primary" data-plan-act="new-scene" title="An empty scene in the folder open, opened in the planner">＋ New scene</button>
+      <span class="dm-hint">Drag a scene onto a folder to sort it. Scenes are shown from the queue in 📺 Live.</span></div>
+    ${found ? (found.map(row).join('') || '<div class="dm-hint">No planned scene matches that.</div>') : planBrowserHtml(row, { manage: true })}`;
+  wirePlanDrag(grid);
+}
+
 function drawGrid() {
+  if (_source === 'scenes') { drawScenesTab(); return; }
   const grid = document.getElementById('dispGrid');
   const list = _data[_source];
   if (!grid || !list) return;
@@ -725,7 +759,7 @@ function drawGrid() {
     // pictures
     const every = !!q || !_folderMode;
     const shown = list.filter(b => (q ? b.name.toLowerCase().includes(q) : every || (b.folder || '') === _folder));
-    const folders = every ? [] : _folders.filter(f => (f.parent || '') === _folder).sort((a, b) => a.name.localeCompare(b.name));
+    const folders = every ? [] : _folders.filter(f => (f.parent || '') === _folder).sort((a, b) => (a.locId ? 1 : 0) - (b.locId ? 1 : 0) || a.name.localeCompare(b.name));
     grid.innerHTML = `${foldersBarHtml(q)}${folders.map(folderCardHtml).join('')}` + (shown.length ? shown.map(b => `
       <div class="dm-disp-bg${b.url === current ? ' current' : ''}${_picked.has(b.id) ? ' picked' : ''}" data-bg="${escapeHtml(b.id)}" draggable="true" role="button" tabindex="0" title="Put it on the display as the background -- drag it into a folder, or tick it (Ctrl + click) to move several">
         <span class="dm-disp-bg-img"><img src="${escapeHtml(b.url)}" alt="" loading="lazy" draggable="false"></span>
@@ -793,6 +827,7 @@ function addPicture({ kind, label, still = '', animated = '' }) {
 }
 
 async function onGridClick(e) {
+  if (_source === 'scenes') { onPlanClick(e); return; }
   if (FOLDERED[_source] && e.target.closest('[data-picked-act]')) { onPickedBar(e.target.closest('[data-picked-act]').dataset.pickedAct); return; }
   if (FOLDERED[_source] && onFolderClick(e)) return;
   const npcCard = _source === 'npcs' && e.target.closest('[data-entry]');
@@ -1172,34 +1207,32 @@ function setFolderMode(on) {
 }
 
 /** The backgrounds' folders brought in line with the locations (null: couldn't load them -- left as they are): a folder
- * for each one inside Locations, named as it is; a deleted location's folder goes when it's empty, otherwise it stays as
- * an ordinary folder. -> true when something changed (to be saved). */
+ * for each one at the top, named as it is; a deleted location's folder goes when it's empty, otherwise it stays as an
+ * ordinary folder. -> true when something changed (to be saved). */
 function syncLocationFolders(locations) {
   if (!Array.isArray(locations)) return false;
   let changed = false;
   const ids = new Set(locations.map(l => l?.id).filter(Boolean));
   const has = id => _folders.some(f => f.id === id);
-  if (!has(LOCATIONS_FOLDER) && locations.some(l => l?.id && String(l.name || '').trim())) {
-    _folders.push({ id: LOCATIONS_FOLDER, name: 'Locations', parent: '' });
+  // the old Locations folder, and location folders put inside each other by their places: all out at the top (anything
+  // else the DM kept in Locations comes out with them)
+  if (has(LOCATIONS_FOLDER)) {
+    _folders.forEach((f) => { if (f.parent === LOCATIONS_FOLDER) f.parent = ''; });
+    (_data.backgrounds || []).forEach((b) => { if (b.folder === LOCATIONS_FOLDER) moveInto(b, ''); });
+    _folders = _folders.filter(f => f.id !== LOCATIONS_FOLDER);
+    if (_folder === LOCATIONS_FOLDER) _folder = '';
     changed = true;
   }
+  _folders.forEach((f) => {
+    if (f.locId && f.parent && _folders.some(x => x.id === f.parent && x.locId)) { f.parent = ''; changed = true; }
+  });
   locations.forEach((l) => {
     const name = String(l?.name || '').trim();
     if (!l?.id || !name) return;
     const f = _folders.find(x => x.locId === l.id);
-    if (!f) { _folders.push({ id: newId('fold'), name, parent: LOCATIONS_FOLDER, locId: l.id }); changed = true; return; }
+    if (!f) { _folders.push({ id: newId('fold'), name, parent: '', locId: l.id }); changed = true; return; }
     if (f.name !== name) { f.name = name; changed = true; }
-    if (f.parent && !has(f.parent)) { f.parent = LOCATIONS_FOLDER; changed = true; }   // the folder it was in is gone
-  });
-  // a location inside another: its folder inside that one's (the user's call, 2026-10-20) -- unless the DM has put it
-  // in a folder of their own
-  locations.forEach((l) => {
-    const f = l?.id && _folders.find(x => x.locId === l.id);
-    if (!f) return;
-    const p = parentOf(l, locations);
-    const want = (p && _folders.find(x => x.locId === p.id)?.id) || LOCATIONS_FOLDER;
-    const auto = f.parent === LOCATIONS_FOLDER || _folders.some(x => x.id === f.parent && x.locId);
-    if (auto && f.parent !== want && !folderPath(want).some(x => x.id === f.id)) { f.parent = want; changed = true; }
+    if (f.parent && !has(f.parent)) { f.parent = ''; changed = true; }   // the folder it was in is gone
   });
   _folders.filter(f => f.locId && !ids.has(f.locId)).forEach((f) => {
     const used = (_data.backgrounds || []).some(b => b.folder === f.id) || _folders.some(x => x.parent === f.id);
@@ -1211,11 +1244,11 @@ function syncLocationFolders(locations) {
 
 function folderCardHtml(f) {
   const inside = (_data[_source] || []).filter(b => b.folder === f.id).length + _folders.filter(x => x.parent === f.id).length;
-  // a location's folder (and Locations itself) comes and goes with the locations: no rename or delete here
-  const kept = _source === 'backgrounds' && (f.locId || f.id === LOCATIONS_FOLDER);
+  // a location's folder comes and goes with its location: no rename or delete here
+  const kept = _source === 'backgrounds' && !!f.locId;
   return `<div class="dm-disp-folder${f.locId ? ' location' : ''}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}" data-drag-folder="${escapeHtml(f.id)}" draggable="true" role="button" tabindex="0" title="${f.locId ? 'The location\'s own folder -- named and removed with it in Admin › Locations. ' : ''}Open it -- or drop ${_source === 'npcs' ? 'NPCs' : 'pictures'} on it">
-    <span class="dm-disp-folder-icon">${f.locId ? '📍' : f.id === LOCATIONS_FOLDER ? '🗺️' : '📁'}</span>
-    <span class="dm-disp-bg-name">${escapeHtml(f.name)}<small>${inside} inside</small></span>
+    <span class="dm-disp-folder-icon">${f.locId ? '📍' : '📁'}</span>
+    <span class="dm-disp-bg-name">${escapeHtml(f.name)}<small>${f.locId ? 'Location · ' : ''}${inside} inside</small></span>
     ${kept ? '' : `<span class="dm-disp-bg-tools">
       <button class="dm-icon-btn" data-folder-act="rename" title="Rename">✎</button>
       <button class="dm-icon-btn danger" data-folder-act="delete" title="Delete the folder (what's in it moves up)">✕</button>

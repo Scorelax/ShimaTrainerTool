@@ -369,6 +369,45 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     ctx.restore();
   }
 
+  /** A region looked at: the land in it lightly brightened, soft at the edge -- no outline (the user's call, 2026-10-21:
+   * no painted lines, just the land lit a little), and never the sea (the land's own sea, `kind` 0, is cut out). */
+  function drawRegionTint(ctx, shape, k) {
+    const c = ctx.canvas;
+    if (!overlay.landMask) {
+      const m = document.createElement('canvas');
+      m.width = land.W; m.height = land.H;
+      const mc = m.getContext('2d');
+      const img = mc.createImageData(land.W, land.H);
+      for (let i = 0; i < land.kind.length; i++) img.data[i * 4 + 3] = land.kind[i] === 0 ? 0 : 255;
+      mc.putImageData(img, 0, 0);
+      overlay.landMask = m;
+      overlay.tint = document.createElement('canvas');
+    }
+    const t = overlay.tint;
+    if (t.width !== c.width || t.height !== c.height) { t.width = c.width; t.height = c.height; }
+    const tc = t.getContext('2d');
+    tc.clearRect(0, 0, t.width, t.height);
+    // a light wash over all of it, and a soft glow just inside its edge (blurred, so it reads as light, not a line --
+    // without canvas filters, a browser draws it sharp: a faint band, fine)
+    tc.save();
+    tracePathOf(tc, shape, k);
+    tc.clip('evenodd');
+    tc.fillStyle = 'rgba(255, 248, 222, 0.3)';
+    tc.fillRect(0, 0, t.width, t.height);
+    tc.filter = 'blur(12px)';
+    tc.lineJoin = 'round';
+    tc.lineWidth = 34;
+    tc.strokeStyle = 'rgba(255, 250, 232, 0.6)';
+    tracePathOf(tc, shape, k);
+    tc.stroke();
+    tc.restore();
+    tc.globalCompositeOperation = 'destination-in';
+    tc.imageSmoothingEnabled = true;
+    tc.drawImage(overlay.landMask, 0, 0, t.width, t.height);
+    tc.globalCompositeOperation = 'source-over';
+    ctx.drawImage(t, 0, 0);
+  }
+
   function drawOverlay() {
     markLabels();
     if (!overlay) return;
@@ -382,7 +421,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const k = c.width / (land.W - 1);   // painting pixel -> picture pixel (the land's uv runs 0..W-1)
     // (the party's place has nothing drawn on it, nor the map round it dimmed -- the user's call, 2026-10-20: the
     // players' marker on it is enough)
-    looked.reverse().forEach(l => drawLit(ctx, l.shape, k, '#8fd8ff', l.type === 'region' ? 'rgba(143, 216, 255, 0.07)' : 'rgba(143, 216, 255, 0.28)'));
+    looked.reverse().forEach(l => (l.type === 'region' && l.shape.kind === 'area' ? drawRegionTint(ctx, l.shape, k) : drawLit(ctx, l.shape, k, '#8fd8ff', 'rgba(143, 216, 255, 0.28)')));
     overlay.tex.needsUpdate = true;
     dirty = true;
     wake();

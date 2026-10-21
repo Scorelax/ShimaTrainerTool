@@ -515,16 +515,34 @@ export async function drawLocations(body) {
         const shape = await editLocationShape(l, locations.filter(x => x !== l && (x.shape || x.icon)), { onIcon: (icon) => { l.icon = icon; } });
         if (shape === undefined) return;
         l.shape = shape;
-        // A region marked: the locations inside it that aren't part of anything yet go under it (not other regions,
-        // nor one the DM has set to "not part of another location" -- that stays as they set it, however often the
-        // region is marked again).
+        // A region marked: every location inside it goes under it (the user's call, 2026-10-21: nothing to add by hand)
+        // -- what it's part of goes under it instead when that's in the region too (a sawmill stays in its forest, the
+        // forest goes in the region). Left as they are: one already in this region, and one in another region that
+        // also covers it (overlapping, the DM's pick). Under this region but outside it now: taken out of it.
         if (l.type === 'region' && shape.kind === 'area') {
-          const inside = locations.filter((x) => {
-            const p = x !== l && (x.type || 'city') !== 'region' && x.parentId !== '' && !parentOf(x, locations) && iconSpot(x.shape);
-            return p && pointInRings(shape.rings, p[0], p[1]);
+          const inRegion = x => { const p = iconSpot(x.shape); return !!p && pointInRings(shape.rings, p[0], p[1]); };
+          const moved = new Set();
+          locations.forEach((x) => {
+            if (x === l || (x.type || 'city') === 'region' || !inRegion(x)) return;
+            const chain = partOfChain(x, locations);
+            if (chain.includes(l)) return;
+            const r = chain.findIndex(c => c !== x && (c.type || 'city') === 'region');
+            const other = r >= 0 ? chain[r] : null;
+            const p = iconSpot(x.shape);
+            if (other?.shape?.kind === 'area' && pointInRings(other.shape.rings, p[0], p[1])) return;
+            // the outermost of what it's part of (below any region) that's in this region too
+            const below = r >= 0 ? chain.slice(0, r) : chain;
+            const top = [...below].reverse().find(c => !c.shape || inRegion(c)) || x;
+            if (top.parentId !== l.id) { top.parentId = l.id; moved.add(top); }
           });
-          inside.forEach((x) => { x.parentId = l.id; });
-          if (inside.length) toast(`${inside.length} location${inside.length === 1 ? '' : 's'} inside ${l.name || 'the region'} ${inside.length === 1 ? 'is' : 'are'} listed under it now`);
+          let out = 0;
+          locations.forEach((x) => {
+            if (x.parentId !== l.id || inRegion(x) || !iconSpot(x.shape)) return;
+            delete x.parentId;
+            out++;
+          });
+          if (moved.size) toast(`${moved.size} location${moved.size === 1 ? '' : 's'} inside ${l.name || 'the region'} ${moved.size === 1 ? 'is' : 'are'} part of it now${out ? ` -- ${out} outside it now taken out` : ''}`);
+          else if (out) toast(`${out} location${out === 1 ? '' : 's'} outside ${l.name || 'the region'} now ${out === 1 ? 'is' : 'are'} no longer part of it`);
         }
         // marked inside a forest (or another area, a region) and never given a Part of: it's put under it -- the
         // smallest one. Moved out of the area it was part of (into another region, say): it goes under the one it's in

@@ -15,6 +15,7 @@ import { renderEvolution, attachEvolutionListeners } from './pages/evolution.js'
 import { renderCombat, attachCombatListeners } from './pages/combat.js';
 import { renderCombatWip, attachCombatWipListeners, leaveCombatWip } from './pages/combat-wip.js';
 import { mountPlayerPokedex } from './pokedex/player-pokedex.js';
+import { mountPlayerPokenav } from './pages/player-pokenav.js';
 import { showToast, showError } from './utils/notifications.js';
 import { audioManager } from './utils/audio.js';
 import { getSettings } from './utils/settings.js';
@@ -82,7 +83,8 @@ class Router {
       'combat': this.renderCombat.bind(this),
       'combat-wip': this.renderCombatWip.bind(this),
       'adventure': this.renderAdventure.bind(this),
-      'pokedex': this.renderPokedex.bind(this)
+      'pokedex': this.renderPokedex.bind(this),
+      'pokenav': this.renderPokenav.bind(this)
     };
     // A page that has to stop something when it's left (the Pokedex's live listeners) puts that here.
     this.leavePage = null;
@@ -341,6 +343,19 @@ class Router {
     });
     this.leavePage = () => pokedex.destroy();
     pokedex.ready.catch(err => showError(`Couldn't load the Pokédex: ${err.message}`));
+  }
+
+  // The players' PokéNav (the user's call, 2026-10-21): the table's region map on their own device, to move round and
+  // zoom in -- just to look at (the DM moves the party's marker). Opened from the trainer info page, beside the
+  // Pokédex; its back button returns there.
+  async renderPokenav() {
+    const content = document.getElementById('content');
+    content.innerHTML = '<div class="pnav-page" id="pokenavRoot" style="position: fixed; inset: 0; z-index: 900; background: #081423"></div>';
+    const nav = mountPlayerPokenav(document.getElementById('pokenavRoot'), {
+      onBack: () => this.navigate('trainer-info'),
+    });
+    this.leavePage = () => nav.destroy();
+    nav.ready.catch(err => showError(`Couldn't load the PokéNav: ${err.message}`));
   }
 }
 

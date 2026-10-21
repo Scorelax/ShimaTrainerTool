@@ -1788,6 +1788,40 @@ export function renderTrainerInfo() {
           filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
         }
 
+        /* The PokéNav (the user's call, 2026-10-21), just left of the Pokédex: the same size, the same look */
+        #pokenavButton {
+          position: absolute;
+          top: 0;
+          right: calc(clamp(54px, 11vw, 66px) + 0.4rem);
+          width: clamp(54px, 11vw, 66px);
+          height: clamp(54px, 11vw, 66px);
+          background: none;
+          border: none;
+          cursor: pointer;
+          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), filter 0.3s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1001;
+          padding: 0;
+          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
+        }
+
+        #pokenavButton img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+
+        #pokenavButton:hover {
+          transform: scale(1.12);
+          filter: drop-shadow(0 6px 12px rgba(0,0,0,0.5)) drop-shadow(0 0 10px rgba(255,222,0,0.6));
+        }
+
+        #pokenavButton:active {
+          transform: scale(1.05);
+        }
+
         #pokedexButton img {
           width: 100%;
           height: 100%;
@@ -1983,6 +2017,8 @@ export function renderTrainerInfo() {
 
       <!-- Pokedex Button -->
       <button id="pokedexButton" aria-label="Pokédex" title="Pokédex"><img src="assets/pokedex.png" alt=""></button>
+      <!-- PokéNav Button: the region map -->
+      <button id="pokenavButton" aria-label="PokéNav" title="PokéNav -- the region map"><img src="assets/pokenav-icon.png" alt=""></button>
 
       <!-- Trainer Name as Title -->
       <h1>${trainerName}</h1>
@@ -2608,6 +2644,12 @@ export function attachTrainerInfoListeners() {
   document.getElementById('pokedexButton')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'pokedex' }
+    }));
+  });
+
+  document.getElementById('pokenavButton')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'pokenav' }
     }));
   });
 

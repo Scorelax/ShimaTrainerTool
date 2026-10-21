@@ -186,3 +186,18 @@
   .rmap-btn, .rmap-seg button { padding: 7px 10px; font-size: 0.8rem; }
   .rmap-name { font-size: 0.51rem; padding: 1px 5px; }
 }
+
+/* The players' PokéNav (js/pages/player-pokenav.js, the user's call, 2026-10-21): the map over the whole screen of the
+   app, a button at the top right that flies to the party's marker. */
+.pnav-page { position: fixed; inset: 0; z-index: 900; background: #081423; overscroll-behavior: none; }
+.pnav-map { position: absolute; inset: 0; }
+.pnav-party {
+  position: absolute; z-index: 5; right: 16px; top: calc(12px + env(safe-area-inset-top, 0));
+  display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px 0 10px; cursor: pointer;
+  font: 600 0.85rem 'Outfit', system-ui, sans-serif; color: #eef3f8; border-radius: 10px;
+  background: rgba(11, 22, 38, 0.72); border: 1px solid rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.pnav-party[hidden] { display: none; }
+.pnav-party img { width: 22px; height: 22px; image-rendering: pixelated; }
+.pnav-party:active { transform: translateY(1px); }

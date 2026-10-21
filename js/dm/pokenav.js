@@ -15,6 +15,7 @@ import { shapeDistance } from '../region-map/map-features.js';
 import { currentMap, kmPerPx, parentOf, isTopLocation, withInside } from '../region-map/map-version.js';
 import { getClock, formatDate, formatTime } from './world-clock.js';
 import { renderAdventure, startAdventure } from './adventure.js';
+import { regionPicture, wantsRegionPicture } from './region-picture.js';
 
 const SEND_EVERY_MS = 120;
 const SAVE_EVERY_MS = 1000;
@@ -309,10 +310,10 @@ function showEvent(e, locations) {
 
 function showLocation(l, events) {
   openDmModal({
-    title: `📍 ${l.name || 'Location'}`,
+    title: `${l.type === 'region' ? '🗺️' : '📍'} ${l.name || 'Location'}`,
     wide: true,
     html: `<div class="dm-nav-locview">
-      ${l.image ? `<img class="dm-nav-locimg" src="${escapeHtml(l.image)}" alt="">` : ''}
+      ${l.image ? `<img class="dm-nav-locimg" src="${escapeHtml(l.image)}" alt="">` : wantsRegionPicture(l) ? '<img class="dm-nav-locimg region" data-region-img alt="" hidden>' : ''}
       <div class="dm-hint">${escapeHtml(LOCATION_TYPES[l.type || 'city'] || '')}</div>
       ${l.description ? `<p class="dm-world-text">${escapeHtml(l.description)}</p>` : ''}
       ${(l.pois || []).filter(p => String(p).trim()).length ? `<div class="dm-card-title">Points of interest</div><ul>${l.pois.filter(p => String(p).trim()).map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>` : ''}
@@ -321,6 +322,11 @@ function showLocation(l, events) {
         <small>${escapeHtml([e.timeframe && `When: ${e.timeframe}`, e.trigger && `Trigger: ${e.trigger}`].filter(Boolean).join(' · '))}</small>
         ${e.description ? `<span class="dm-world-text" style="font-size:0.84rem">${escapeHtml(e.description)}</span>` : ''}</div>`).join('') || '<div class="dm-hint">No events here.</div>'}
     </div>`,
+    // a region with no picture: its stretch of the map (region-picture.js)
+    onOpen: (body) => {
+      const img = body.querySelector('[data-region-img]');
+      if (img) regionPicture(l).then((url) => { if (url) { img.src = url; img.hidden = false; } });
+    },
   });
 }
 

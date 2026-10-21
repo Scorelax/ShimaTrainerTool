@@ -19,6 +19,7 @@ import { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger } from '../utils/custo
 import { editLocationShape, drawShapePreview, describeShape } from './location-map.js';
 import { currentMap, isMajor, parentOf, partOfChain, isTopLocation, withInside } from '../region-map/map-version.js';
 import { iconSpot, inArea, shapeBounds } from '../region-map/map-features.js';
+import { fillRegionPictures, regionPictureHtml, wantsRegionPicture } from './region-picture.js';
 import { ICON_SIZE, iconFor, uploadIcon, pickLibraryIcon, openIconLibrary } from './location-icon.js';
 
 export { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger };
@@ -190,9 +191,10 @@ const field = (label, html, hint = '') => `<div class="dm-field"><label>${label}
 const input = (k, v, ph = '', max = 120) => `<input class="dm-input" data-w="${k}" value="${escapeHtml(v ?? '')}" placeholder="${escapeHtml(ph)}" maxlength="${max}">`;
 const area = (k, v, ph = '', rows = 4) => `<textarea class="dm-input" data-w="${k}" rows="${rows}" placeholder="${escapeHtml(ph)}">${escapeHtml(v ?? '')}</textarea>`;
 
-function pictureHtml(url) {
+/** `instead`: shown when there's no picture (a region's own, region-picture.js) -- "No picture" otherwise. */
+function pictureHtml(url, instead = '') {
   return `<div class="dm-world-pic">
-    <span class="dm-world-picimg">${url ? `<img src="${escapeHtml(url)}" alt="">` : '<span class="dm-hint">No picture</span>'}</span>
+    <span class="dm-world-picimg">${url ? `<img src="${escapeHtml(url)}" alt="">` : instead || '<span class="dm-hint">No picture</span>'}</span>
     <span class="dm-row"><button class="dm-btn small" data-w-act="pic">⬆ ${url ? 'Another picture' : 'Upload a picture'}</button>
     <button class="dm-btn small" data-w-act="pic-pick" title="One of the Display module's backgrounds, already on the Pi">🖼️ Select image</button>
     ${url ? '<button class="dm-btn small danger" data-w-act="pic-remove">Remove</button>' : ''}</span></div>`;
@@ -491,7 +493,7 @@ export async function drawLocations(body) {
     // searching lists what matches as it is, each saying what it's part of.
     const row = (l, depth = 0) => `
         <button class="dm-pdx-row${l.id === _selected.locations ? ' selected' : ''}${depth ? ' dm-world-sub' : ''}" data-id="${escapeHtml(l.id)}" ${depth ? `style="--depth: ${depth}"` : ''}>
-          <span class="dm-pdx-thumb">${l.image ? `<img src="${escapeHtml(l.image)}" alt="">` : '📍'}</span>
+          <span class="dm-pdx-thumb">${l.image ? `<img src="${escapeHtml(l.image)}" alt="">` : regionPictureHtml(l, '📍')}</span>
           <span class="dm-pdx-main"><strong>${!q && locations.some(x => parentOf(x, locations) === l) ? `<span class="dm-world-fold" data-fold="${escapeHtml(l.id)}" title="${folded.has(l.id) ? 'Show' : 'Hide'} what's inside">${folded.has(l.id) ? '▸' : '▾'}</span> ` : ''}${depth ? '<span class="dm-world-subarrow">⤷</span> ' : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' <span title="Secret: not on the table\'s map">🔒</span>' : ''}</strong><small>${[q && parentOf(l, locations) && `in ${escapeHtml(parentOf(l, locations).name || 'Unnamed')}`, l.shape ? '🗺 On the map' : '<span class="dm-warn-text">Not on the map</span>', `${events.filter(e => e.locationId === l.id).length} event(s)`, !q && locations.some(x => parentOf(x, locations) === l) && `${locations.filter(x => parentOf(x, locations) === l).length} inside`].filter(Boolean).join(' · ')}</small></span><span></span>
         </button>`;
     document.getElementById('worldList').innerHTML = Object.entries(LOCATION_TYPES).map(([k, label]) => {
@@ -521,7 +523,7 @@ export async function drawLocations(body) {
             <strong>${escapeHtml(describeShape(l.shape))}</strong>
             <button class="dm-btn small primary" data-w-act="map">🗺 ${l.shape ? 'Change it on the map' : 'Mark it on the map'}</button>
             ${l.shape ? '<button class="dm-btn small danger" data-w-act="map-remove">Take it off the map</button>' : ''}
-            <span class="dm-hint">A city, a cave, a landmark or a building is one spot, a route a line along the roads, a forest or a region an area (🗺 Region fills one in up to its border lines).</span>
+            <span class="dm-hint">A city, a cave, a landmark or a building is one spot, a route a line along the roads, a forest or a region an area (⭕ Ring: paint round it and the land inside fills in).</span>
           </span>
         </div>
         <label class="dm-check"><input type="checkbox" data-w="major" ${isMajor(l) ? 'checked' : ''}><span>⭐ Major location
@@ -546,7 +548,7 @@ export async function drawLocations(body) {
       <div class="dm-field"><label>Points of interest</label>
         <div class="dm-world-pois">${(l.pois || []).map((p, i) => `<div class="dm-row"><input class="dm-input" data-poi="${i}" value="${escapeHtml(p)}" placeholder="What the players can do here" maxlength="200"><button class="dm-icon-btn danger" data-w-act="poi-del" data-i="${i}" title="Remove">✕</button></div>`).join('')}</div>
         <button class="dm-btn small" data-w-act="poi-add">＋ Point of interest</button></div>
-      ${field('Main picture', pictureHtml(l.image))}
+      ${field('Main picture', pictureHtml(l.image, wantsRegionPicture(l) ? regionPictureHtml(l, '') : ''), wantsRegionPicture(l) ? 'No picture of its own: the region is shown as its stretch of the map. Upload one to use that instead.' : '')}
       <div class="dm-field"><label>Events here</label>
         <div class="dm-world-events">${here.map(e => `<button class="dm-world-event" data-w-act="open-event" data-i="${escapeHtml(e.id)}">
           <strong>${escapeHtml(e.title || 'Untitled event')}</strong><small>${escapeHtml([e.timeframe, e.trigger].filter(Boolean).join(' · ') || 'No trigger or time yet')}</small></button>`).join('')
@@ -558,6 +560,11 @@ export async function drawLocations(body) {
     if (prev) drawShapePreview(prev, l.shape).catch(() => {});
   };
   const changed = () => { saveSoon('locations'); list(); };
+  // a region's own picture (region-picture.js) put in as the list and the form are drawn
+  const fillPics = () => ['worldList', 'worldForm'].forEach(id => fillRegionPictures(document.getElementById(id), locations));
+  const pics = new MutationObserver(fillPics);
+  ['worldList', 'worldForm'].forEach((id) => { const el = document.getElementById(id); if (el) pics.observe(el, { childList: true, subtree: true }); });
+  fillPics();
   wireShell(body, {
     list, form,
     create: () => {

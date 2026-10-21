@@ -271,7 +271,7 @@ export function participantFromTrainer(t) {
   const mods = Object.fromEntries(Object.entries(stats).map(([k, v]) => [`${k}Mod`, abilityMod(v)]));
   const level = Math.max(1, Math.min(20, Number(t.level) || 1));
   const combatant = {
-    type: 'trainer', name: t.name || 'Trainer', speciesName: '', image: t.image || 'assets/Pokeball.png',
+    type: 'trainer', name: t.name || 'Trainer', speciesName: '', image: t.image || 'assets/Pokeball-small.png',
     level, initiativeTotal: mods.dexMod,
     ac: Number(t.ac) || 10, baseAc: Number(t.ac) || 10, critMod: 0,
     maxHp: Number(t.maxHP) || 1, currentHp: Number(t.maxHP) || 1, maxVp: Number(t.maxVP) || 0, currentVp: Number(t.maxVP) || 0,

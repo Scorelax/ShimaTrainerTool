@@ -60,7 +60,9 @@ async function init() {
   if (res?.status === 'success') session = res.data;
   route();
 
-  window.addEventListener('app:combat-updated', (e) => { session = e.detail; route(); displaySessionChanged(session); pokenavSessionChanged(session); adventureSessionChanged(session); });
+  // (the battle setup's home page isn't drawn again for each one -- nothing on it comes from the session, and outside a
+  // battle they come thick and fast in an adventure: every step a player takes)
+  window.addEventListener('app:combat-updated', (e) => { session = e.detail; route({ redraw: false }); displaySessionChanged(session); pokenavSessionChanged(session); adventureSessionChanged(session); });
   window.addEventListener('app:live-resync', async () => {
     const r = await CombatAPI.getState().catch(() => null);
     if (r?.status === 'success') { session = r.data; route(); displaySessionChanged(session); pokenavSessionChanged(session); adventureSessionChanged(session); }
@@ -188,8 +190,9 @@ function battleRunning() {
   return !!session?.active && session.battleType !== 'adventure';
 }
 
-/** Shows whatever fits the current state: the running battle while there is one, otherwise the setup. */
-function route() {
+/** Shows whatever fits the current state: the running battle while there is one, otherwise the setup. `redraw`: the
+ * setup's home page drawn again even when it's already showing (false: only if it isn't, or a battle just ended). */
+function route({ redraw = true } = {}) {
   watchTurns(session);
   renderStatus();
   const view = document.getElementById('dmView');
@@ -231,7 +234,7 @@ function route() {
   document.querySelectorAll('#dmBattleTabs [data-btab]').forEach(b => b.classList.toggle('active', b.dataset.btab === 'setup'));
   view.hidden = false;
   enc.hidden = true;
-  if (setupView === 'home' || !view.dataset.view || view.dataset.view !== setupView || (setupView === 'map' && !editorShownIn(view))) showSetupView(setupView);
+  if ((setupView === 'home' && (redraw || wasLive)) || !view.dataset.view || view.dataset.view !== setupView || (setupView === 'map' && !editorShownIn(view))) showSetupView(setupView);
 }
 
 function showSetupView(name) {
@@ -329,7 +332,7 @@ function renderHome(view) {
         </div>
         <div class="dm-home-card">
           <div class="dm-home-card-head">
-            <h3><img class="dm-tab-icon" src="assets/VS.png" alt="">Who's in it</h3>
+            <h3><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Who's in it</h3>
             <span class="dm-pill ${okBattle ? 'ok' : 'todo'}">${okBattle ? `✓ ${s.creatures.length} ready` : 'Nobody yet'}</span>
           </div>
           <div class="dm-hint" id="homeEncName"></div>
@@ -338,7 +341,7 @@ function renderHome(view) {
           <div class="dm-home-actions">
             <button class="dm-btn primary" id="homeCreatures" ${okMap && okBattle ? '' : 'disabled'} title="${okMap ? '' : 'Set up the map first'}">📍 Place on the map</button>
             <button class="dm-btn primary" id="homeImport" title="An encounter from Encounter setup becomes the next battle -- its creatures, and its map if it has one">📥 Import encounter</button>
-            <button class="dm-btn" id="homeToEnc"><img class="dm-tab-icon" src="assets/VS.png" alt="">Encounter setup</button>
+            <button class="dm-btn" id="homeToEnc"><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Encounter setup</button>
             <button class="dm-btn danger" id="homeResetBattle" ${battleTouched ? '' : 'disabled'} title="Take everyone out of the next battle">Clear</button>
           </div>
         </div>

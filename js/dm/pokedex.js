@@ -209,7 +209,7 @@ function renderList() {
       <span class="dm-pdx-main"><strong>#${escapeHtml(s.dex)} ${escapeHtml(s.name)}</strong><small>${typeBadges(s.type1, s.type2)}</small></span>
       <span class="dm-pdx-flags"></span>
     </button>`).join('');
-  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<img src="assets/Pokeball.png" alt="" style="opacity:.3">'; });
+  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<img src="assets/Pokeball-small.png" alt="" style="opacity:.3">'; });
   refreshListFlags();
   applyFilter();
 }
@@ -222,7 +222,7 @@ function refreshListFlags() {
     const reg = isRegistered(name);
     const caught = _caught.has(name.toLowerCase());
     row.classList.toggle('registered', reg);
-    const html = `${caught ? '<img src="assets/Pokeball.png" alt="Caught" title="The players have caught one">' : ''}${reg ? '<img src="assets/pokedex.png" alt="In the Pokédex" title="In the players\' Pokédex">' : ''}`;
+    const html = `${caught ? '<img src="assets/Pokeball-small.png" alt="Caught" title="The players have caught one">' : ''}${reg ? '<img src="assets/pokedex.png" alt="In the Pokédex" title="In the players\' Pokédex">' : ''}`;
     const flags = row.querySelector('.dm-pdx-flags');
     if (flags._html !== html) { flags.innerHTML = html; flags._html = html; }
   });

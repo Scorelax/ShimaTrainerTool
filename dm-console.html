@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DM Console</title>
-<link rel="icon" href="assets/AppIcon.png">
+<link rel="icon" href="assets/AppIcon-small.png">
 <!-- The player app's stylesheet: the battle screen mounted in the middle (combat-wip.js) and its popups rely on it. -->
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/dm-console.css">
@@ -17,14 +17,14 @@
 <body class="dm-console">
   <div class="dm-app">
     <header class="dm-topbar">
-      <div class="dm-brand"><img src="assets/AppIcon.png" alt=""><span>DM Console</span></div>
+      <div class="dm-brand"><img src="assets/AppIcon-small.png" alt=""><span>DM Console</span></div>
       <div class="dm-status" id="dmStatus">Connecting…</div>
       <!-- The world clock and weather, plus timers that are pinned or done (world-clock.js). -->
       <div class="dm-topbar-widgets" id="dmTopWidgets"></div>
     </header>
 
     <nav class="dm-rail" id="dmRail">
-      <button class="dm-rail-btn active" data-module="battle" title="Battle -- map setup, encounter setup and post battle"><img src="assets/VS.png" alt="">Battle</button>
+      <button class="dm-rail-btn active" data-module="battle" title="Battle -- map setup, encounter setup and post battle"><img src="assets/VS-small.png" alt="">Battle</button>
       <button class="dm-rail-btn" data-module="party" title="Party"><img src="assets/party-icon.png" alt="">Party</button>
       <button class="dm-rail-btn" data-module="pokedex" title="Pokédex"><img src="assets/pokedex.png" alt="">Pokédex</button>
       <button class="dm-rail-btn" data-module="npcs" title="NPCs"><span>👤</span>NPCs</button>
@@ -47,13 +47,13 @@
              rewards. -->
         <div class="dm-enc-tabs" id="dmBattleTabs">
           <button data-btab="setup" class="active">🌿 Map setup</button>
-          <button data-btab="library"><img class="dm-tab-icon" src="assets/VS.png" alt="">Encounter setup</button>
+          <button data-btab="library"><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Encounter setup</button>
           <button data-btab="aftermath">🏁 Post battle<span class="dm-tab-dot" id="dmAfterDot" hidden title="The last battle's post battle isn't done yet"></span></button>
         </div>
         <!-- A battle running: three tabs (battle-live.js) -- the battle itself, its map, and Encounter setup (to build the
              next one meanwhile). -->
         <div class="dm-enc-tabs" id="dmLiveTabs" hidden>
-          <button data-ltab="battle" class="active"><img class="dm-tab-icon" src="assets/VS.png" alt="">Battle</button>
+          <button data-ltab="battle" class="active"><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Battle</button>
           <button data-ltab="map">🗺️ Map</button>
           <button data-ltab="encounters">📋 Encounter setup</button>
         </div>

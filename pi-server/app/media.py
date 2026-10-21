@@ -301,7 +301,7 @@ def trainer_image_url(trainer_name, stored=''):
     """What the app shows for a trainer: the self-made portrait (local_character_image_url), else the NPC picture of
     that name, else the picture the trainer has stored (stored_picture_url), else the Poke Ball."""
     return (local_character_image_url(trainer_name) or local_npc_image_url(trainer_name)
-            or stored_picture_url(stored) or 'assets/Pokeball.png')
+            or stored_picture_url(stored) or 'assets/Pokeball-small.png')   # (512 px: the 3000 px one is 375 KB)
 
 
 def local_battle_animation_url(pokemon_name):

@@ -45,7 +45,7 @@ export async function renderCreatureSetup(root, { onDone }) {
           <button class="dm-btn small" id="csBack">← Map setup</button>
           <h2>Place everyone</h2>
         </div>
-        <button class="dm-btn wide" id="csToEnc" title="Who's in the battle is chosen in Encounter setup"><img class="dm-tab-icon" src="assets/VS.png" alt="">Change who's in it</button>
+        <button class="dm-btn wide" id="csToEnc" title="Who's in the battle is chosen in Encounter setup"><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Change who's in it</button>
         <div id="csList" class="dm-cs-list"></div>
       </aside>
       <section class="dm-editor-canvas dm-cs-work">

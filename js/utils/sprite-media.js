@@ -25,6 +25,9 @@ export function useSpritePreviews(on = true) {
 
 /** The URL to load for a sprite / picture: the small copy of an animated sprite when asked for or this page uses them. */
 export function spriteSrc(url, small = false) {
+  // The Poke Ball stand-in kept in older saves (a trainer or creature with no picture) is the 3000 px original, 375 KB --
+  // shown from its 512 px copy instead (the bug check of 2026-10-21: it was most of what a page loaded for one picture).
+  if (url === 'assets/Pokeball.png') return 'assets/Pokeball-small.png';
   if (!(small || _previews) || !url) return url;
   const m = SPRITE_FILE.exec(String(url));
   return m ? `/sprite-previews/${m[1]}${m[2] || ''}` : url;
@@ -61,7 +64,7 @@ export function keepVideosPlaying() {
 // shared by both tag types for one consistent fallback path.
 function spriteFallback(el) {
   const img = document.createElement('img');
-  img.src = 'assets/Pokeball.png';
+  img.src = 'assets/Pokeball-small.png';
   if (el.className) img.className = el.className;
   if (el.alt) img.alt = el.alt;
   el.replaceWith(img);

@@ -65,7 +65,7 @@ export async function givePokemonPopup(trainer, { ownedSpecies = [] } = {}) {
         <div>
           <div class="dm-field"><label>Species</label>
             <button type="button" class="dm-gp-pick" id="gpSpeciesPick">
-              <span class="dm-cs-head-thumb" id="gpThumb"><img src="assets/Pokeball.png" alt="" style="opacity:0.35"></span>
+              <span class="dm-cs-head-thumb" id="gpThumb"><img src="assets/Pokeball-small.png" alt="" style="opacity:0.35"></span>
               <span class="dm-gp-pick-text"><b id="gpTitle">Pick a species…</b><span class="dm-species-meta" id="gpMeta">Click to search every Pokémon</span></span>
               <span class="dm-gp-pick-go">🔍</span>
             </button></div>
@@ -198,7 +198,7 @@ export async function givePokemonPopup(trainer, { ownedSpecies = [] } = {}) {
     body.querySelector('#gpTitle').textContent = s.name;
     body.querySelector('#gpMeta').innerHTML = `${typeBadges(s.type1, s.type2)} ${escapeHtml(s.size || '')}${s.rarity ? ` · ${escapeHtml(s.rarity)}` : ''}`;
     const thumb = body.querySelector('#gpThumb');
-    if (s.image) patchPortraitMedia(thumb, s.image, s.name, { small: true }); else thumb.innerHTML = '<img src="assets/Pokeball.png" alt="" style="opacity:0.35">';
+    if (s.image) patchPortraitMedia(thumb, s.image, s.name, { small: true }); else thumb.innerHTML = '<img src="assets/Pokeball-small.png" alt="" style="opacity:0.35">';
     body.querySelector('#gpLevel').value = s.level || 1;
     body.querySelector('#gpAbilities').innerHTML = (s.abilities || []).map(a => `
       <label class="dm-check"><input type="checkbox" name="gpAbility" value="${a.slot}" ${a.slot === 0 ? 'checked' : ''}>

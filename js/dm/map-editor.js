@@ -1039,7 +1039,7 @@ async function addToMap(kind) {
   } else if (kind === 'npc') {
     const npcs = (await DmAPI.npcs().catch(() => null))?.data || [];
     const res = await openPicker({
-      title: '👤 NPCs', multi: true, hiddenOption: true, confirmLabel: 'Place', emptyText: 'No NPCs in the NPC library yet.', imageFallback: 'assets/Pokeball.png',
+      title: '👤 NPCs', multi: true, hiddenOption: true, confirmLabel: 'Place', emptyText: 'No NPCs in the NPC library yet.', imageFallback: 'assets/Pokeball-small.png',
       items: npcs.map(n => ({ key: n.id, label: n.name || 'NPC', sub: n.role || n.location || '', image: n.image || '' })),
     });
     if (!res?.keys.length) return;

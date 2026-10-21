@@ -539,7 +539,7 @@ function criterionHtml(c) {
 function wireEvoRow(row, species) {
   const input = row.querySelector('[data-evo-species]');
   attachSuggest(input, () => species.map(s => ({ value: s.name, label: s.name, sub: `#${s.dex ?? '?'} ${[s.type1, s.type2].filter(Boolean).join('/')}`, image: s.picture || s.image || '' })),
-    { imageFallback: 'assets/Pokeball.png', max: 30 });
+    { imageFallback: 'assets/Pokeball-small.png', max: 30 });
 }
 
 /** "Add evolution criteria": a small menu of the kinds, under the button. */

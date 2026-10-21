@@ -14,7 +14,7 @@ const SHOWN_MAX = 300; // cards drawn at once -- the search narrows it down
  * the picker with {extra: true} (Create a custom move...).
  */
 export function openPicker({ title, items, multi = false, hiddenOption = false, confirmLabel = null, hint = '',
-  emptyText = 'Nothing to pick from.', imageFallback = 'assets/Pokeball.png', compact = false, hiddenDefault = false, extraAction = null }) {
+  emptyText = 'Nothing to pick from.', imageFallback = 'assets/Pokeball-small.png', compact = false, hiddenDefault = false, extraAction = null }) {
   const picked = new Set();
   let hidden = hiddenDefault;
   return openDmModal({

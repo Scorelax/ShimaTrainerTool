@@ -577,7 +577,7 @@ function stopOverride() {
 /** A small picture. `still`: shown instead of an animated sprite -- for the little lists redrawn on every change (a video
  * there would start over, and decode, each time). Animated ones load the Pi's small sprite copy. */
 function thumbHtml(src, cls = '', { lazyVideo = false, still = '' } = {}) {
-  if (!src) return `<span class="dm-disp-thumb ${cls}"><img src="assets/Pokeball.png" alt="" style="opacity:.3"></span>`;
+  if (!src) return `<span class="dm-disp-thumb ${cls}"><img src="assets/Pokeball-small.png" alt="" style="opacity:.3"></span>`;
   if (IS_VIDEO.test(src) && still) src = still;
   return IS_VIDEO.test(src)
     ? `<span class="dm-disp-thumb ${cls}"><video src="${escapeHtml(spriteSrc(src))}" muted loop playsinline disablepictureinpicture ${lazyVideo ? 'data-lazy preload="none"' : 'autoplay'}></video></span>`

@@ -1362,7 +1362,7 @@ function _resolveMyPokemonKey(participantName) {
  * a plain-looking card instead of throwing and blanking the battle view. */
 function _standInCombatant(p) {
   return {
-    id: p.id, name: p.name, image: p.image || 'assets/Pokeball.png',
+    id: p.id, name: p.name, image: p.image || 'assets/Pokeball-small.png',
     level: '?', types: [p.type1, p.type2].filter(Boolean),
     ac: '—', baseAc: '—', critMod: 0,
     currentHp: p.currentHP, maxHp: p.maxHP, currentVp: p.currentVP, maxVp: p.maxVP,

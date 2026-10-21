@@ -90,7 +90,7 @@ function pokemonName(p) {
 
 function patchImages(scope) {
   scope.querySelectorAll('[data-img]').forEach(el => {
-    if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<img src="assets/Pokeball.png" alt="" style="opacity:.35">';
+    if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<img src="assets/Pokeball-small.png" alt="" style="opacity:.35">';
   });
 }
 

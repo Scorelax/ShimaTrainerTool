@@ -278,7 +278,7 @@ export function buildTrainerCombatant() {
   return {
     id: 'trainer', type: 'trainer', entityKey: 'trainerData',
     name: trainerData.name || 'Trainer',
-    image: trainerData.image || 'assets/Pokeball.png',
+    image: trainerData.image || 'assets/Pokeball-small.png',
     level, initiativeScore: dexMod, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: dexMod,
     ac, baseAc, critMod: 0, maxHp, currentHp, maxVp, currentVp,
     proficiency: parseInt(trainerData.combat.proficiency) || computeProficiency(level),
@@ -359,7 +359,7 @@ export function buildPokemonCombatant(pokemonKey) {
     id: pokemonKey, type: 'pokemon', entityKey: pokemonKey,
     name: pokemonData.nickname || pokemonData.name || 'Pokemon',
     speciesName: pokemonData.name || '',
-    image: pokemonData.image || 'assets/Pokeball.png',
+    image: pokemonData.image || 'assets/Pokeball-small.png',
     level, initiativeScore: initiative, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: initiative,
     ac: parseInt(combat.ac) || 10, baseAc: parseInt(combat.ac) || 10, critMod: 0,
     maxHp, currentHp, maxVp, currentVp,
@@ -493,14 +493,14 @@ export function renderCombat() {
 export function renderSetupPhase({ showWipButton = true, adventure = false } = {}) {
   const trainerData = loadTrainer();
   const trainerName = trainerData.name || 'Trainer';
-  const trainerImage = trainerData.image || 'assets/Pokeball.png';
+  const trainerImage = trainerData.image || 'assets/Pokeball-small.png';
   const trainerLevel = parseInt(trainerData.level) || 1;
 
   const partyPokemon = [];
   for (const pData of allCachedPokemon()) {
     const slot = parseInt(pData.partySlot, 10);
     if (slot >= 1 && slot <= 6) {
-      partyPokemon.push({ key: pokemonKey(pData.name), name: displayName(pData) || 'Unknown', image: pData.image || 'assets/Pokeball.png', level: parseInt(pData.level) || 1, types: [pData.types?.primary, pData.types?.secondary].filter(Boolean), slot });
+      partyPokemon.push({ key: pokemonKey(pData.name), name: displayName(pData) || 'Unknown', image: pData.image || 'assets/Pokeball-small.png', level: parseInt(pData.level) || 1, types: [pData.types?.primary, pData.types?.secondary].filter(Boolean), slot });
     }
   }
   partyPokemon.sort((a, b) => a.slot - b.slot);
@@ -528,7 +528,7 @@ export function renderSetupPhase({ showWipButton = true, adventure = false } = {
       <div class="combat-setup-container">
         <div class="setup-section-label">TRAINER (always included)</div>
         <div class="setup-trainer-card">
-          <img src="${trainerImage}" alt="${trainerName}" onerror="this.src='assets/Pokeball.png'">
+          <img src="${trainerImage}" alt="${trainerName}" onerror="this.src='assets/Pokeball-small.png'">
           <div class="setup-trainer-info">
             <div class="setup-trainer-name">${trainerName}</div>
             <div class="setup-trainer-level">Level ${trainerLevel}</div>

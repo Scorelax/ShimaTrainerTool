@@ -495,7 +495,7 @@ function decorateCatchable(p) {
     ball.type = 'button';
     ball.className = 'dm-catch-ball';
     ball.title = 'Catchable -- the catch details';
-    ball.innerHTML = '<img src="assets/Pokeball.png" alt="Catch">';
+    ball.innerHTML = '<img src="assets/Pokeball-small.png" alt="Catch">';
     col.prepend(ball);
   }
   ball.onclick = (e) => { e.stopPropagation(); openCapture(session.participants?.[p.id] || p); };
@@ -1151,7 +1151,7 @@ function renderSpeciesResults() {
     </button>`).join('');
   box.querySelectorAll('[data-img]').forEach(el => {
     if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, '');
-    else el.innerHTML = '<img src="assets/Pokeball.png" alt="" style="opacity:0.35">';
+    else el.innerHTML = '<img src="assets/Pokeball-small.png" alt="" style="opacity:0.35">';
   });
 }
 

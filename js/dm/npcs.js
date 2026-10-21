@@ -501,7 +501,7 @@ async function selectPicture(n) {
     ..._portraits.map(p => ({ key: p.url, label: p.name, sub: p.own ? "A player's portrait" : '', image: p.url })),
   ];
   const res = await openPicker({
-    title: `🖼 A picture for ${n.name || 'the NPC'}`, items, extraAction: { label: '⬆ Upload image' }, imageFallback: 'assets/Pokeball.png',
+    title: `🖼 A picture for ${n.name || 'the NPC'}`, items, extraAction: { label: '⬆ Upload image' }, imageFallback: 'assets/Pokeball-small.png',
     hint: 'Click one to use it. Not there yet? Upload image puts a new one on the Pi.',
   });
   if (!res) return;

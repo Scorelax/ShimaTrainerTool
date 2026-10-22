@@ -3,6 +3,7 @@
 // (creature-setup.js) and the setup overview's preview. Everything in the setup is stored in board coordinates.
 import { mapObjectsHtml, footprintForSize, footprintCells, trapCellsOf, trapCellClass } from '../utils/battle-map-grid.js';
 import { isLevitating } from '../utils/move-effects.js';
+import { spriteTransform } from '../utils/battle-map-view.js';
 import { escapeHtml } from './dm-common.js';
 
 // Horizontal or vertical (the user's call, 2026-10-21): the DM picks, in the map setup, whether the map is shown here
@@ -68,8 +69,11 @@ export function mapStageHtml(setup, { interactive = false, selectedId = null, pr
   // A hidden creature with a spot (the adventure's, or one an encounter brought along) is on the map, see-through
   const tokens = setup.creatures.filter(c => c.position).map(c => {
     const r = tokenScreenRect(m, c.position.col, c.position.row, footprintForSize(c.participant?.size));
+    // turned the way it faces, like the table TV (battle-map.js): the board lies a quarter turn right on this screen, so
+    // facing up the board points right here (shown upright, the map's own quarter turn left takes it along)
+    const face = spriteTransform((Number(c.position.facing) || 0) + 90);
     return `<div class="dm-map-token${c.id === selectedId ? ' selected' : ''}${c.hidden || c.heldBack ? ' dm-token-hidden' : ''}" data-token="${c.id}" title="${escapeHtml(c.name)}${c.hidden || c.heldBack ? ' (hidden from the players)' : ''}"
-      style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"><div class="dm-map-token-art" data-img="${escapeHtml(c.participant?.image || '')}"></div></div>`;
+      style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"><div class="dm-map-token-art" data-img="${escapeHtml(c.participant?.image || '')}" style="--face:${face}"></div></div>`;
   }).join('');
   // shown upright: the map in a box of its turned shape, turned a quarter left inside it (dm-console.css)
   return `${upright ? `<div class="dm-map-turn" style="aspect-ratio:${m.cols} / ${m.rows}">` : ''}

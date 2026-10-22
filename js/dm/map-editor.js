@@ -402,6 +402,9 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
   _unsub?.();
   _unsub = onSetupChange(() => {
     if (!document.body.contains(_root)) return;
+    // A running adventure's every push lands here (a player's move, a log line, a setting): the map is only drawn
+    // again when something on it changed
+    if (stageKey() === document.getElementById('mapWrap')?._stageKey) return;
     renderStage();
     // The square counts on the Traps panel follow too -- unless the DM is typing in it (a redraw would lose the text).
     const typing = document.activeElement?.closest?.('#mapToolPanel');
@@ -784,20 +787,39 @@ function showTurn() {
   document.querySelector('.dm-map-sizes')?.classList.toggle('upright', up);
 }
 
+/** What the map shows -- the same text, the same map (renderStage keeps it on the map's box). */
+function stageKey(s = getSetup()) {
+  return JSON.stringify([s.map, s.creatures, ed.tool, ed.creatureId, mapUpright()]);
+}
+
 /** The whole map, the way the table TV shows it. Creatures already placed in the battle setup show, for reference. */
 function renderStage() {
   const wrap = document.getElementById('mapWrap');
   if (!wrap) return;
   const s = getSetup();
   const m = s.map;
+  // The creatures' sprites (looping videos) already showing are kept and moved into the new map, not loaded and
+  // started again on every redraw
+  const shown = new Map(); // picture -> the sprites showing it (several Pidgeys: one each)
+  wrap.querySelectorAll('.dm-map-token-art[data-image]').forEach((el) => {
+    if (!el.firstElementChild) return;
+    if (!shown.has(el.dataset.image)) shown.set(el.dataset.image, []);
+    shown.get(el.dataset.image).push([...el.children]);
+  });
   wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: ed.tool === 'creatures' ? ed.creatureId : null, upright: mapUpright() });
+  wrap._stageKey = stageKey(s);
   const stage = wrap.querySelector('.dm-map-stage');
   // As tall as the screen has room for below where the map starts, the legend under it kept in view (measured: the
   // adventure's and the live Map tab's bars put it lower down -- shown upright, it's the height that runs out first)
   const top = Math.round(wrap.getBoundingClientRect().top);
   sizeStage(wrap, m, top > 0 ? `100vh - ${top + 84}px` : `100vh - ${_live ? 300 : 190}px`);
   showTurn();
-  stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
+  stage.querySelectorAll('[data-img]').forEach((el) => {
+    if (!el.dataset.img) return;
+    const kept = shown.get(el.dataset.img)?.shift();
+    if (kept) { el.dataset.image = el.dataset.img; el.append(...kept); return; }
+    patchPortraitMedia(el, el.dataset.img, '');
+  });
 
   stage.style.touchAction = 'none'; // a held finger turns / paints instead of scrolling the page
   stage.addEventListener('pointerdown', (e) => {
@@ -1130,6 +1152,10 @@ function freeName(base) {
   return `${base} ${newId('').slice(-3)}`;
 }
 
+// Where a creature the DM puts on the map looks at first (the user's call, 2026-10-22): towards the players' side of the
+// board -- left on the map shown horizontally, down shown upright (map-view.js), down on the players' own map too.
+const PLACED_FACING = 180;
+
 /** The adventure: the queue's next Pokemon / NPC stands on the square clicked -- on the running map it joins as one of
  * the DM's creatures (hidden: on no screen but the DM's); on the map being prepared it's kept with the map, and joins
  * when the adventure opens. */
@@ -1156,12 +1182,12 @@ async function placeQueuedCreature(col, row) {
     participant.status = q.hidden ? 'spectating' : 'participating';
     if (_live) {
       await CombatAPI.addParticipant(participant);
-      await CombatAPI.dmPlaceToken(participant.id, { col, row, facing: 0, z: 0 });
+      await CombatAPI.dmPlaceToken(participant.id, { col, row, facing: PLACED_FACING, z: 0 });
     } else {
       const c = { id: participant.id, kind: q.kind, name: participant.name, config, npcId: q.kind === 'npc' ? q.key : null, participant, hidden: !!q.hidden };
       const problem = creatureSpotProblem(getSetup(), c, col, row);
       if (problem) { toast(problem); return; }
-      updateSetup((st) => { st.creatures.push({ ...c, position: { col, row, facing: 0 }, z: 0 }); });
+      updateSetup((st) => { st.creatures.push({ ...c, position: { col, row, facing: PLACED_FACING }, z: 0 }); });
     }
     ed.creatureQueue.shift();
   } catch (err) {

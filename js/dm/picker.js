@@ -52,7 +52,18 @@ export function openPicker({ title, items, multi = false, hiddenOption = false, 
       const count = body.querySelector('[data-pk-count]');
       const groupBox = body.querySelector('[data-pk-group]');
       const done = () => close({ keys: [...picked], hidden });
+      // A card's picture is only loaded once it scrolls into view, and its sprite (a looping video) only plays while it
+      // can be seen -- a whole Pokedex of them playing at once made the DM console crawl (the user's report, 2026-10-22)
+      const seen = new IntersectionObserver((entries) => entries.forEach(({ target, isIntersecting }) => {
+        if (isIntersecting && target.dataset.image === undefined) {
+          if (target.dataset.img) patchPortraitMedia(target, target.dataset.img, '', { small: true });
+          else { target.dataset.image = ''; target.innerHTML = `<img src="${imageFallback}" alt="" style="opacity:0.3">`; }
+        }
+        const video = target.querySelector('video');
+        if (video) { if (isIntersecting) video.play().catch(() => {}); else video.pause(); }
+      }), { root: grid, rootMargin: '120px 0px' });
       const draw = () => {
+        seen.disconnect();
         const q = search.value.trim().toLowerCase();
         const group = groupBox?.value || '';
         const hits = items.filter(it => (!group || it.group === group) && (!q || `${it.label} ${it.sub || ''} ${it.search || ''}`.toLowerCase().includes(q)));
@@ -65,10 +76,7 @@ export function openPicker({ title, items, multi = false, hiddenOption = false, 
           </button>`).join('')
           + (hits.length > SHOWN_MAX ? `<div class="dm-hint dm-picker-more">…and ${hits.length - SHOWN_MAX} more -- search to narrow it down.</div>` : '')
           + (hits.length ? '' : `<div class="dm-hint dm-picker-more">${items.length ? `Nothing matches that${group ? ` in ${escapeHtml(group)}` : ''}.` : escapeHtml(emptyText)}</div>`);
-        grid.querySelectorAll('[data-img]').forEach((el) => {
-          if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, '', { small: true });
-          else el.innerHTML = `<img src="${imageFallback}" alt="" style="opacity:0.3">`;
-        });
+        grid.querySelectorAll('[data-img]').forEach(el => seen.observe(el));
       };
       const refreshCount = () => {
         if (!multi) return;

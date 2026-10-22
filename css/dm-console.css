@@ -224,7 +224,7 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
   width: 100%; height: 100%; border-radius: 14%; background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.14), rgba(8,10,22,0.7) 75%);
   box-shadow: 0 0 0 2px rgba(231, 115, 115, 0.9), 0 0 12px rgba(231, 115, 115, 0.6);
 }
-.dm-map-token-art img, .dm-map-token-art video { width: 100%; height: 100%; object-fit: contain; }
+.dm-map-token-art img, .dm-map-token-art video { width: 100%; height: 100%; object-fit: contain; transform: var(--face, none); }
 .dm-map-token.selected .dm-map-token-art { box-shadow: 0 0 0 3px #ffd700, 0 0 14px rgba(255, 215, 0, 0.7); }
 .dm-map-ghost { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
 .dm-map-ghost .dm-ghost-ok { opacity: 0.65; outline: 2px dashed #ffd700; outline-offset: -2px; }

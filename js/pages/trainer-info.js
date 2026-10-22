@@ -7,7 +7,7 @@ import { audioManager } from '../utils/audio.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { addItem, currentHP, currentVP, featEntries, listText, loadTrainer, storeTrainer } from '../utils/trainer-data.js';
 import { hasName } from '../utils/battle-lists.js';
-import { itemHeadHtml, showItemHead } from '../utils/item-info.js';
+import { itemHeadHtml, itemPictureHtml, showItemHead } from '../utils/item-info.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -695,9 +695,39 @@ export function renderTrainerInfo() {
 
         .money-input-container {
           margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          display: flex;
+          align-items: stretch;
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+        }
+
+        /* − and + either side of the amount: a step of 1, held down it keeps going (faster) */
+        .money-step {
+          flex: none;
+          width: clamp(3rem, 9vw, 3.6rem);
+          border: 2px solid rgba(255,255,255,0.2);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          background: rgba(255,255,255,0.08);
+          color: white;
+          font-size: clamp(1.5rem, 3.2vw, 1.9rem);
+          font-weight: 900;
+          line-height: 1;
+          cursor: pointer;
+          touch-action: manipulation;
+          user-select: none;
+          -webkit-user-select: none;
+        }
+
+        .money-step:hover {
+          border-color: #FFDE00;
+        }
+
+        .money-step:active {
+          background: rgba(255,222,0,0.2);
         }
 
         .money-input {
+          flex: 1;
+          min-width: 0;
           width: 100%;
           padding: clamp(0.75rem, 1.5vh, 1rem);
           background: rgba(0,0,0,0.3);
@@ -2165,6 +2195,7 @@ export function renderTrainerInfo() {
                     <p id="effectText">Item effects will appear here.</p>
                   </div>
                 </div>
+                ${itemPictureHtml()}
               </div>
               <div class="inventory-actions">
                 <div class="inventory-actions-row">
@@ -2514,7 +2545,9 @@ export function renderTrainerInfo() {
               <span class="money-amount" id="moneyPopupAmount">₽${trainerMoney}</span>
             </div>
             <div class="money-input-container">
+              <button type="button" class="money-step" data-step="-1" aria-label="One less">−</button>
               <input type="number" id="moneyInput" class="money-input" placeholder="Enter amount" min="0">
+              <button type="button" class="money-step" data-step="1" aria-label="One more">+</button>
             </div>
             <div class="money-buttons">
               <button class="money-btn money-btn-add" id="addMoneyBtn">+ Add</button>
@@ -4087,6 +4120,27 @@ export function attachTrainerInfoListeners() {
   });
 
   document.getElementById('closeMoneyPopup')?.addEventListener('click', () => closePopup('moneyPopup'));
+
+  // − / + beside the amount: a step of 1 each tap (never under 0); held down, it keeps stepping, faster the longer it's held
+  document.querySelectorAll('#moneyPopup .money-step').forEach((btn) => {
+    const input = document.getElementById('moneyInput');
+    let timer = null;
+    const step = () => {
+      const next = Math.max(0, (parseInt(input.value, 10) || 0) + Number(btn.dataset.step));
+      input.value = next > 0 ? next : ''; // down to nothing: the field's empty again
+    };
+    const stop = () => { clearTimeout(timer); timer = null; };
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); // the field keeps its keyboard closed on a phone
+      step();
+      let delay = 400;
+      const repeat = () => { step(); delay = Math.max(40, delay * 0.8); timer = setTimeout(repeat, delay); };
+      timer = setTimeout(repeat, delay);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(type => btn.addEventListener(type, stop));
+    btn.addEventListener('contextmenu', e => e.preventDefault()); // a long press on a phone
+    btn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); step(); } });
+  });
 
   document.getElementById('addMoneyBtn')?.addEventListener('click', () => {
     const input = document.getElementById('moneyInput');

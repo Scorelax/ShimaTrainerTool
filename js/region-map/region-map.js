@@ -35,6 +35,7 @@ const BASE = 'assets/region-map/';
 const EXAG = 3;              // the heights exaggerated, so the mountains read from the air
 const STEP = 3;              // one corner of the land's mesh every this many pixels
 const BLOCK = 60;            // how deep the block of land goes under the sea
+const PIN_POLAR = 0.5;       // how far from straight down a flight to a town looks (radians)
 const STYLES = { topo: 'topo', painted: 'painted' };   // ...the map's files
 const STYLE_KEY = 'rmapStyle';
 
@@ -491,10 +492,21 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       const [ix, iy] = at;
       const tall = (ic.size || 5) / land.kmPerPx;   // km -> painting pixels (the world's units across the land)
       // (both sides drawn: from the north it's seen from behind, as a cut-out would be)
-      const sp = new THREE.Mesh(iconPlane, new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+      const bias = { value: 0 };
+      const sp = new THREE.Mesh(iconPlane, iconMaterial(bias));
+      // how far the ground round the spot (as far out as the picture reaches) rises above it, in the world's units --
+      // a hillside under the picture mustn't hide it either (orientIcons)
+      const ground = heightAt(ix, iy);
+      let rise = 0;
+      const reach = Math.ceil(tall * 0.6);
+      for (let dy = -reach; dy <= reach; dy += 2) {
+        for (let dx = -reach; dx <= reach; dx += 2) {
+          if (dx * dx + dy * dy <= reach * reach) rise = Math.max(rise, heightAt(ix + dx, iy + dy) - ground);
+        }
+      }
       // its middle on the spot, the pin in the middle of the picture (the user's call, 2026-10-20) -- the name goes under
       // the picture (placeLabels: userData)
-      sp.userData = { locId: l.id, tall };
+      sp.userData = { locId: l.id, tall, bias, rise: rise * land.vert };
       sp.renderOrder = 2;
       sp.visible = false;
       sp.position.copy(toWorld(ix, iy, heightAt(ix, iy)));
@@ -515,11 +527,36 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     wake();
   }
 
+  /** An icon's picture, hidden by the land in front of it like everything else on the map (the user's call, 2026-10-22: a
+   * town behind a mountain stays behind it -- it used to be drawn over everything). Only its own bit of ground mustn't
+   * cut it: with its middle on the spot and leant back, its lower half reaches into the land. So the depth it's tested
+   * at is pulled `bias.value` towards the camera (orientIcons) -- what it covers on the screen stays the same. */
+  function iconMaterial(bias) {
+    const m = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    m.onBeforeCompile = (shader) => {
+      shader.uniforms.iconBias = bias;
+      shader.vertexShader = `uniform float iconBias;
+${shader.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+        vec4 nearer = projectionMatrix * vec4(mvPosition.xy, min(mvPosition.z + iconBias, -1.0), 1.0);
+        gl_Position.z = nearer.z / nearer.w * gl_Position.w;`)}`;
+    };
+    return m;
+  }
+
   /** The icons leant back as far as the camera's tilted from level (straight up seen level, flat on the land seen from
    * straight above -- never edge on), still facing south: so they never turn as the map's turned. */
   function orientIcons() {
-    const lean = controls.getPolarAngle() - Math.PI / 2;
-    icons.forEach((sp) => { sp.rotation.x = lean; sp.updateMatrixWorld(); });
+    const polar = controls.getPolarAngle();
+    const lean = polar - Math.PI / 2;
+    // How far behind the land in front of it the icon's lower edge is, as a share of its height (flatter: further), and a
+    // little more, and the hillside round it -- so its own ground never hides it, and a mountain further in front still does.
+    const under = (0.5 * Math.sin(polar)) / Math.max(Math.cos(polar), 0.25) + 0.25;
+    const slope = 1 / Math.max(Math.cos(polar), 0.5);
+    icons.forEach((sp) => {
+      sp.rotation.x = lean;
+      sp.updateMatrixWorld();
+      sp.userData.bias.value = sp.userData.tall * under + sp.userData.rise * slope;
+    });
   }
 
   /** The DM's locations as the map's names ([] or a list: theirs; null: the towns in places.json again). */
@@ -548,15 +585,17 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     drawOverlay();
   }
 
-  /** Flies to a location: in close over a town, far enough back over a route or a forest to see all of it. */
-  function flyToLocation(id, ms = 900) {
+  /** Flies to a location: in close over a town, far enough back over a route or a forest to see all of it. Turned the way
+   * the map is now, or to `azimuth` (the players' party button: north up). */
+  function flyToLocation(id, { ms = 900, azimuth = controls.getAzimuthalAngle() } = {}) {
     const loc = locations?.find(l => l.id === id);
     const b = shapeBounds(loc?.shape);
     if (!b || !land) return false;
-    const az = controls.getAzimuthalAngle();
+    const az = azimuth;
     if (loc.shape.kind === 'pin') {
-      // looked at from fairly high up -- a little tilt for the mountains, mostly from above (the user's call, 2026-10-20)
-      flyTo(toWorld(b.mid[0], b.mid[1]), land.fit * 0.28, 0.6, az, ms);
+      // looked at from fairly high up -- a little tilt for the mountains, mostly from above (the user's call, 2026-10-20;
+      // a little less tilted since 2026-10-22)
+      flyTo(toWorld(b.mid[0], b.mid[1]), land.fit * 0.28, PIN_POLAR, az, ms);
       return true;
     }
     // the box turned the way the camera is, fitted to the screen (a little tilted, so a little extra up and down)
@@ -566,7 +605,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const spanX = w * c + h * s + 60, spanZ = (w * s + h * c + 60) * 1.15;
     const dist = Math.max(spanZ / (2 * tanV), spanX / (2 * tanV * camera.aspect)) * 1.1;
     const goal = Math.max(land.fit * 0.18, Math.min(land.fit, dist));
-    flyTo(new THREE.Vector3((b.x0 + b.x1) / 2 - land.W / 2, 0, (b.y0 + b.y1) / 2 - land.H / 2), goal, 0.38, az, ms);
+    flyTo(new THREE.Vector3((b.x0 + b.x1) / 2 - land.W / 2, 0, (b.y0 + b.y1) / 2 - land.H / 2), goal, 0.32, az, ms);
     return true;
   }
 
@@ -597,6 +636,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       const visible = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
       l.el.style.display = visible ? '' : 'none';
       if (!visible) continue;
+      // a town (its pin and name) or a red spot behind a mountain stays behind it (the user's call, 2026-10-22)
+      if (l.kind === 'town' || l.kind === 'spot') l.el.classList.toggle('behind', behindLand(l.at));
       l.el.style.transform = `translate(${((v.x + 1) / 2 * w).toFixed(1)}px, ${((1 - v.y) / 2 * h).toFixed(1)}px)`;
       // from far away only the towns: the spots and the sea names come in closer
       if (l.kind === 'spot' || l.kind === 'water') l.el.classList.toggle('far', dist > land.fit * 0.75);
@@ -614,6 +655,25 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         l.el.style.setProperty('--mk', `${Math.round(Math.min(56, Math.max(10, h * 0.0206 * grow)))}px`);
       }
     }
+  }
+
+  /** Whether the land stands between the camera and `p` (a point on the map): stepped along the line of sight, from a
+   * little way off the point (its own hillside doesn't count) up to where the line is higher than any of the land. */
+  function behindLand(p) {
+    const cam = camera.position;
+    const rise = cam.y - p.y;
+    if (rise <= 0) return false;
+    const across = Math.hypot(cam.x - p.x, cam.z - p.z);
+    const end = Math.min(1, (land.topY - p.y) / rise);
+    const start = Math.min(end, 8 / Math.max(1, Math.hypot(across, rise)));
+    if (end <= start) return false;
+    const steps = Math.min(160, Math.ceil(((end - start) * across) / STEP));
+    for (let i = 1; i <= steps; i++) {
+      const t = start + ((end - start) * i) / steps;
+      const ground = Math.max(0, heightAt(p.x + (cam.x - p.x) * t + land.W / 2, p.z + (cam.z - p.z) * t + land.H / 2)) * land.vert;
+      if (ground > p.y + rise * t + 1.5) return true;
+    }
+    return false;
   }
 
   /** A region's name never over its border (the user's call, 2026-10-21): as big as region-map.css makes it, or smaller
@@ -932,7 +992,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (town) {
       const l = labels[Number(town.dataset.fly)];
       if (l.locId && onPick) { pickLocation(l.locId); return; }
-      if (!l.locId || !flyToLocation(l.locId)) flyTo(toWorld(l.x, l.y), land.fit * 0.28, 0.6, controls.getAzimuthalAngle());
+      if (!l.locId || !flyToLocation(l.locId)) flyTo(toWorld(l.x, l.y), land.fit * 0.28, PIN_POLAR, controls.getAzimuthalAngle());
     }
   });
 
@@ -970,6 +1030,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (destroyed) return;
     textures[first] = texture;
     land = { ...heights, kmPerPx: version.kmPerPx || 0.12, vert: EXAG / ((version.kmPerPx || 0.12) * 1000) };
+    let top = 0;
+    for (let i = 0; i < heights.metres.length; i++) if (heights.kind[i] !== 0 && heights.metres[i] > top) top = heights.metres[i];
+    land.topY = top * land.vert;   // the highest land (behindLand looks no higher)
     // the land's middle and how far back the camera has to be to see all of it
     let minX = heights.W, maxX = 0, minY = heights.H, maxY = 0;
     for (let y = 0; y < heights.H; y += 4) {

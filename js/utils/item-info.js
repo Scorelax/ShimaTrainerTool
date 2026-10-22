@@ -1,8 +1,9 @@
 // The inventory popups' item card (trainer info, Pokemon card, the battle -- each has its own copy of the popup): the
-// item's picture as an icon beside its name, with how many and its category on a line under it, and a tighter layout
-// for the description / effect so the card has room for it (the user's call, 2026-10-19). The pictures are the item
-// list's `image` (pi-server/app/routes_gamedata.py: the item pictures folder, files named after the item); an item
-// without one -- or the trainer's own custom items -- shows the bag, faded.
+// item's name with how many and its category on a line under it, a tighter layout for the description / effect (the
+// user's call, 2026-10-19), and the item's picture in a section of its own under them (2026-10-22): a rounded square as
+// big as the room left in the card, smaller for an item with a long text. The pictures are the item list's `image`
+// (pi-server/app/routes_gamedata.py: the item pictures folder, files named after the item); an item without one -- or
+// the trainer's own custom items -- shows the bag, faded.
 
 const PLACEHOLDER = 'assets/Bag.png';
 
@@ -18,21 +19,25 @@ function itemListEntry(name) {
   return _items.byName.get(String(name || '').toLowerCase()) || null;
 }
 
-/** The card's header, in place of its plain name heading: the icon, then the name (`nameId`, the id the page already
- * uses for it) and the line under it. */
+/** The card's header, in place of its plain name heading: the name (`nameId`, the id the page already uses for it) and
+ * the line under it. */
 export function itemHeadHtml(nameId) {
   return `<div class="item-head">
-    <span class="item-icon placeholder"><img src="${PLACEHOLDER}" alt="" draggable="false"></span>
     <div class="item-head-text"><h3 class="item-name" id="${nameId}">Select an item</h3><div class="item-meta"></div></div>
   </div>`;
 }
 
-/** Shows `item` ({name, quantity or qty, isCustom / custom / fullData.isCustom}) in the header around `nameEl`. No item:
- * `title` alone (nothing picked yet, or "Add an item"). */
+/** The card's picture section, last in the card (after the description / effect). */
+export function itemPictureHtml() {
+  return `<div class="item-picture"><span class="item-icon placeholder"><img src="${PLACEHOLDER}" alt="" draggable="false"></span></div>`;
+}
+
+/** Shows `item` ({name, quantity or qty, isCustom / custom / fullData.isCustom}) in the header around `nameEl`, and its
+ * picture in the card's picture section. No item: `title` alone (nothing picked yet, or "Add an item"). */
 export function showItemHead(nameEl, item, title = 'Select an item') {
   if (!nameEl) return;
   const head = nameEl.closest('.item-head');
-  const icon = head?.querySelector('.item-icon');
+  const icon = nameEl.closest('.item-info-card')?.querySelector('.item-picture .item-icon');
   const meta = head?.querySelector('.item-meta');
   if (!item) {
     nameEl.textContent = title;
@@ -62,24 +67,30 @@ const CSS = `
   .inventory-popup-content .inventory-main { padding: clamp(0.7rem, 1.6vw, 1.1rem); }
   .inventory-popup-content .item-info-card { padding: clamp(0.8rem, 1.6vw, 1.15rem); margin-bottom: clamp(0.6rem, 1.2vh, 0.85rem); }
   .item-info-card .item-head {
-    display: flex; align-items: center; gap: clamp(0.6rem, 1.4vw, 0.9rem);
+    display: flex; align-items: center; min-height: clamp(2.6rem, 5vh, 3.2rem);
     /* room on the right for the popup's close button */
     padding: 0 clamp(2.2rem, 4.5vw, 2.8rem) clamp(0.55rem, 1vh, 0.75rem) 0;
     margin-bottom: clamp(0.6rem, 1.2vh, 0.85rem); border-bottom: 2px solid rgba(255, 222, 0, 0.3);
   }
+  .item-info-card .item-head-text { min-width: 0; }
+  .item-info-card .item-name {
+    font-size: clamp(1.2rem, 2.7vw, 1.6rem); line-height: 1.15; margin: 0; padding: 0; border: none;
+    letter-spacing: 0.5px; overflow-wrap: anywhere;
+  }
+  /* The picture: whatever height the card has left under the texts (never under ~90px -- then the card scrolls), the
+     square as big as fits in it */
+  .item-info-card .item-picture {
+    flex: 1 1 0; min-height: clamp(90px, 14vh, 130px); margin-top: clamp(0.7rem, 1.4vh, 1rem);
+    container-type: size; display: flex; align-items: center; justify-content: center;
+  }
   .item-info-card .item-icon {
-    flex: none; width: clamp(52px, 8vw, 72px); height: clamp(52px, 8vw, 72px); border-radius: 12px; overflow: hidden;
+    width: min(100cqw, 100cqh, 280px); aspect-ratio: 1; border-radius: 18px; overflow: hidden;
     display: flex; align-items: center; justify-content: center;
     background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.25));
     border: 1px solid rgba(255, 222, 0, 0.35); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
   }
-  .item-info-card .item-icon img { width: 88%; height: 88%; object-fit: contain; }
-  .item-info-card .item-icon.placeholder img { width: 58%; height: 58%; opacity: 0.35; }
-  .item-info-card .item-head-text { min-width: 0; }
-  .item-info-card .item-name {
-    font-size: clamp(1.05rem, 2.3vw, 1.4rem); line-height: 1.15; margin: 0; padding: 0; border: none;
-    letter-spacing: 0.5px; overflow-wrap: anywhere;
-  }
+  .item-info-card .item-icon img { width: 86%; height: 86%; object-fit: contain; }
+  .item-info-card .item-icon.placeholder img { width: 50%; height: 50%; opacity: 0.35; }
   .item-info-card .item-meta { margin-top: 0.25rem; font-size: clamp(0.72rem, 1.4vw, 0.82rem); font-weight: 700; color: #a8a8a8; letter-spacing: 0.3px; }
   .item-info-card .item-meta:empty { display: none; }
   /* each section as tall as its text (they used to split the card in half, leaving gaps under short texts) */
@@ -96,8 +107,8 @@ const CSS = `
     .inventory-popup-content .inventory-actions .action-btn { width: 100%; padding-left: 0.4rem; padding-right: 0.4rem; }
   }
   @media (max-width: 480px) {
-    .item-info-card .item-icon { width: 40px; height: 40px; border-radius: 9px; }
-    .item-info-card .item-head { padding-right: 1.9rem; gap: 0.5rem; }
+    .item-info-card .item-head { padding-right: 1.9rem; }
+    .item-info-card .item-icon { border-radius: 14px; }
   }
 `;
 

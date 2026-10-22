@@ -24,7 +24,8 @@ function _injectStyles() {
   const style = document.createElement('style');
   style.id = 'adventure-map-styles';
   style.textContent = `
-    .amap { position: relative; width: 100%; height: 100%; display: flex; }
+    /* pinned to its box (combat-wip.js's .wip-adventure), so the map inside can never make it bigger */
+    .amap { position: absolute; inset: 0; display: flex; }
     .amap .amap-viewport { flex: 1 1 auto; min-height: 0; padding: 6px; border-radius: 0; background: none; }
     .amap .bmap-stage { border-radius: 8px; }
     /* the zoom buttons float in the bottom-right corner, over the map */

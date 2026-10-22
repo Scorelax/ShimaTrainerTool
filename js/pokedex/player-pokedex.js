@@ -442,7 +442,10 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
     if (pager && !pager.disabled) {
       state.page += pager.dataset.page === 'next' ? 1 : -1;
       renderPokemon();
-      $('#pdxResults').scrollIntoView({ behavior: 'smooth' });
+      // the page's first entry just under the lid (sticky over the top), not hidden behind it
+      const results = $('#pdxResults');
+      results.style.scrollMarginTop = `${$('.pdx-header').offsetHeight + 10}px`;
+      results.scrollIntoView({ behavior: 'smooth' });
     }
   });
 

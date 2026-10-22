@@ -15,7 +15,7 @@ import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/c
 import { beginMove, commitMove } from '../utils/move-commit.js';
 import { addItem, currentAC as trainerCurrentAC, currentHP as trainerCurrentHP, currentVP as trainerCurrentVP, emptyTrainer, loadTrainer, storeTrainer } from '../utils/trainer-data.js';
 import { abilityList, nameList, skillLists, speedsText } from '../utils/battle-lists.js';
-import { itemHeadHtml, showItemHead } from '../utils/item-info.js';
+import { itemHeadHtml, itemPictureHtml, showItemHead } from '../utils/item-info.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
@@ -780,6 +780,7 @@ export function renderBattlePhase(state, cardOptions = {}) {
                     <p id="combatEffectText">Item effects will appear here.</p>
                   </div>
                 </div>
+                ${itemPictureHtml()}
               </div>
               <div id="combatItemActionArea" class="combat-item-action-area"></div>
             </div>

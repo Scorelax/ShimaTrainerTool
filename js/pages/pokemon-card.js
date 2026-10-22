@@ -10,7 +10,7 @@ import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
 import { addItem, currentHP, currentVP, loadTrainer, storeTrainer } from '../utils/trainer-data.js';
 import { hasName } from '../utils/battle-lists.js';
-import { itemHeadHtml, showItemHead } from '../utils/item-info.js';
+import { itemHeadHtml, itemPictureHtml, showItemHead } from '../utils/item-info.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -2668,6 +2668,7 @@ export function renderPokemonCard(pokemonName) {
                     <p id="effectText">Item effects will appear here.</p>
                   </div>
                 </div>
+                ${itemPictureHtml()}
               </div>
               <div class="inventory-actions">
                 <div class="inventory-actions-row">

@@ -215,8 +215,10 @@ const WIP_CSS = `
     padding: 0.35rem 0.85rem; font-size: 0.85rem; }
   .wip-adv-page .combat-wip-layout { flex: 1 1 auto; min-height: 0; padding: 0; display: flex; }
   .wip-adv-page .combat-wip-turnorder { display: none; }
-  .wip-adv-page .combat-wip-body { flex: 1 1 auto; max-width: none; padding: 0; display: flex; }
-  .wip-adv-page .wip-adventure { flex: 1 1 auto; height: auto; min-height: 0; padding: 0; }
+  /* never taller than the space left (min-height: 0): grown with the map, every zoom step made the map's box bigger,
+     which zoomed it further -- straight to the most, with nothing to scroll and no way back out */
+  .wip-adv-page .combat-wip-body { flex: 1 1 auto; min-height: 0; max-width: none; padding: 0; display: flex; overflow: hidden; }
+  .wip-adv-page .wip-adventure { flex: 1 1 auto; height: auto; min-height: 0; padding: 0; position: relative; }
   .wip-foreign-focus-portrait { width: 140px; height: 140px; margin: 0 auto 0.8rem; }
   .wip-foreign-focus-portrait img, .wip-foreign-focus-portrait video { width: 100%; height: 100%; object-fit: contain; }
   /* Centered both ways within the viewport, not just horizontally --
@@ -735,12 +737,9 @@ async function _prefetchAllBackgrounds() {
   _backgroundOptionsCache.forEach(b => prefetchSprite(b.url).catch(() => {}));
 }
 
-// Opened from the trainer card's map button (main.js's 'adventure' route): join the DM's adventure straight away -- no
-// "join or spectate" question -- or say there's none right now (the user's call, 2026-10-19).
-let _adventureIntent = false;
-
-export async function renderCombatWip({ adventure = false } = {}) {
-  _adventureIntent = adventure;
+// The trainer card's battle button opens this page for battles and the DM's adventure alike (the user's call,
+// 2026-10-22: the separate map button is gone) -- an adventure is joined straight away, no "join or spectate" question.
+export async function renderCombatWip() {
   const result = await CombatAPI.getState();
   session = result.status === 'success' ? result.data : { active: false };
   setAbilitySession(session); // ability-mods.js reads weather, round and positions from it
@@ -790,14 +789,12 @@ function _renderCurrentView() {
   const inJoinFlow = _joinStage === 'setup' || _joinStage === 'initiative' || _joinStage === 'placement';
 
   if (!_dmName) {
-    // The map button with no adventure on: say so (the page carries on by itself once there is one).
-    if (_adventureIntent && !_isAdventure()) return _renderAdventureWait(session.active ? 'battle' : 'none');
-    // The DM hasn't opened the adventure for joining / placing yet: wait for it (from either button).
+    // The DM hasn't opened the adventure for joining / placing yet: wait for it.
     if (_isAdventure() && session.adventure?.canJoin === false && (inJoinFlow || _needsToJoin(session)) && !_spectating) {
       return _renderAdventureWait('closed');
     }
-    // The map button: straight to picking who comes along.
-    if (_adventureIntent && _isAdventure() && _needsToJoin(session) && !inJoinFlow && !_spectating) _joinStage = 'setup';
+    // An adventure on: the battle button joins it -- straight to picking who comes along.
+    if (_isAdventure() && _needsToJoin(session) && !inJoinFlow && !_spectating) _joinStage = 'setup';
   }
 
   // Needs-to-join but hasn't picked a side yet (join vs. just watch) --
@@ -874,12 +871,10 @@ function _renderJoinOrSpectateChoice() {
     </div>`;
 }
 
-/** The map button's page while there's nothing to join: no adventure ('none'), a battle instead ('battle'), or an
- * adventure the DM hasn't opened for joining / placing yet ('closed'). Redrawn on every live push, so it moves on by itself. */
+/** An adventure the DM hasn't opened for joining / placing yet ('closed'). Redrawn on every live push, so it moves on by
+ * itself. */
 function _renderAdventureWait(why) {
   const text = {
-    none: ['🗺️ No adventure right now', "The DM hasn't put an adventure map out. This page opens it as soon as they do."],
-    battle: ['⚔️ A battle is on', 'The adventure map is back once the battle has ended -- the ⚔️ button on the trainer card takes you to the battle.'],
     closed: ['🗺️ The map isn\'t open yet', 'The DM opens the adventure map for you in a moment -- this page carries on by itself.'],
   }[why];
   return `
@@ -2590,7 +2585,7 @@ function _syncHeaderBar(state) {
   const leftBtnEl = document.getElementById('wipHeaderLeftBtn');
   if (leftBtnEl) {
     // The DM console has the map as its own tab instead (battle-live.js) -- no Map button here.
-    // A player's adventure: back to the trainer card, still on the map (the map button comes straight back here).
+    // A player's adventure: back to the trainer card, still on the map (the battle button comes straight back here).
     leftBtnEl.innerHTML = state?.active
       ? (_dmName ? '' : _isAdventure(state) ? '<button class="combat-wip-btn-secondary" id="wipHeaderBackBtn">←</button>'
         : '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button></div>')

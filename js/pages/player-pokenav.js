@@ -38,7 +38,7 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
   const scrollWas = document.documentElement.style.overflow;
   document.documentElement.style.overflow = 'hidden';
   root.innerHTML = `<div class="pnav-map" id="pnavMap"></div>
-    <button class="pnav-party" id="pnavParty" hidden title="Where the party is"><img src="${PARTY_ICON}" alt=""><span>The party</span></button>
+    <button class="pnav-party" id="pnavParty" hidden title="Where the party is" aria-label="Where the party is"><img src="${PARTY_ICON}" alt=""></button>
     <aside class="pnav-panel" id="pnavPanel" aria-hidden="true"></aside>`;
   const partyBtn = root.querySelector('#pnavParty');
   const panel = root.querySelector('#pnavPanel');
@@ -105,9 +105,10 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
     map?.setParty(partyAt);
     syncParty();
   };
-  // the party button: only while the party's marker is on the map (a secret place shows nothing)
+  // the party button: only while the party's marker is on the map (a secret place shows nothing) -- flies there, turning
+  // the map north up on the way (the user's call, 2026-10-22)
   const syncParty = () => { partyBtn.hidden = !(partyAt && shownIds.has(partyAt)); };
-  partyBtn.addEventListener('click', () => { if (partyAt) map?.flyToLocation(partyAt); });
+  partyBtn.addEventListener('click', () => { if (partyAt) map?.flyToLocation(partyAt, { azimuth: HOME_AZIMUTH }); });
 
   const mount = async () => {
     const { mountRegionMap } = await import('../region-map/region-map.js');

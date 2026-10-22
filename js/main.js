@@ -82,7 +82,7 @@ class Router {
       'evolution': this.renderEvolution.bind(this),
       'combat': this.renderCombat.bind(this),
       'combat-wip': this.renderCombatWip.bind(this),
-      'adventure': this.renderAdventure.bind(this),
+      'adventure': this.renderCombatWip.bind(this), // the old map button's route: the battle page joins an adventure itself
       'pokedex': this.renderPokedex.bind(this),
       'pokenav': this.renderPokenav.bind(this)
     };
@@ -321,15 +321,6 @@ class Router {
     content.innerHTML = await renderCombatWip();
     attachCombatWipListeners();
     this.leavePage = leaveCombatWip; // leaving it (a Back swipe too) disconnects it from the old combat page's engine
-  }
-
-  async renderAdventure() {
-    // The DM's adventure map (the trainer card's map button): the same page as the battle, joining the adventure straight
-    // away -- or saying there's none on right now.
-    const content = document.getElementById('content');
-    content.innerHTML = await renderCombatWip({ adventure: true });
-    attachCombatWipListeners();
-    this.leavePage = leaveCombatWip;
   }
 
   // The players' Pokedex (the same view as pokedex.html), as a page of its own over the whole screen -- opened from

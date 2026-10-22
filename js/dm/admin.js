@@ -9,7 +9,7 @@ import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { POKEMON_TYPES } from '../utils/pokemon-types.js';
-import { escapeHtml, toast, openDmModal, getSpecies, forgetSpecies, typeBadges, multiSelectHtml, bindMultiSelects, readMultiSelect, attachSuggest, SAVING_THROWS, SKILLS } from './dm-common.js';
+import { escapeHtml, toast, openDmModal, getSpecies, forgetSpecies, typeBadges, multiSelectHtml, bindMultiSelects, readMultiSelect, attachSuggest, SAVING_THROWS, SKILLS, lazySprites } from './dm-common.js';
 import { prepareImage } from './display.js';
 import { loadMoves } from './move-picker.js';
 import { openPicker } from './picker.js';
@@ -286,7 +286,7 @@ async function drawSpecies(body) {
         <span class="dm-pdx-thumb" data-img="${escapeHtml(s.picture || s.image || '')}"></span>
         <span class="dm-pdx-main"><strong>#${escapeHtml(s.dex ?? '?')} ${escapeHtml(s.name)}</strong><small>${typeBadges(s.type1, s.type2)}</small></span><span></span>
       </button>`).join('') + (hits.length ? '' : '<div class="dm-hint" style="padding:0.4rem">No Pokémon matches.</div>');
-    box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
+    lazySprites(box);
   };
   list();
   document.getElementById('admSpSearch').addEventListener('input', list);

@@ -87,18 +87,22 @@ let _dragging = false;
 let _editor = null; // the big editor while it's open: {overlay, stage, area, selectedId, observer}
 let _previewObserver = null;
 let _mode = 'live'; // 'live': the display itself | 'plan': the planner (a planned scene)
+// Another module is open: the preview (a whole copy of the display screen) isn't sent the battle's every push meanwhile
+// -- it'd draw each one, unseen -- and gets where things are when the module is back.
+let _previewAway = false;
 
 export async function renderDisplay(root, { session, firstTime } = {}) {
   _root = root;
   _session = session || _session;
-  if (!firstTime && root.querySelector('.dm-disp')) { postToPreview({ paused: false }); drawLayers(); return; } // keeps the search, tab and preview as they were
+  _previewAway = false;
+  if (!firstTime && root.querySelector('.dm-disp')) { postToPreview({ paused: false, scene: getScene(), session: previewSession() }); drawLayers(); return; } // keeps the search, tab and preview as they were
   root.innerHTML = '<div class="dm-loading">Loading…</div>';
   await Promise.all([loadScene(), loadPlans(), loadPlanFolders()]);
   if (!_listening) {
     _listening = true;
     window.addEventListener('app:dm-state', e => stateSavedElsewhere(e.detail?.key));
     onSceneChange(() => {
-      postToPreview({ scene: getScene() });
+      if (!_previewAway) postToPreview({ scene: getScene() });
       if (_editor) drawEditorStage();
       if (_dragging) return; // the lists catch up when the picture is let go
       drawLayers();
@@ -112,6 +116,7 @@ export async function renderDisplay(root, { session, firstTime } = {}) {
 /** Another module was opened: the preview stops playing until the module is back. */
 export function displayAway() {
   if (_editor) closeEditor();
+  _previewAway = true;
   postToPreview({ paused: true });
 }
 
@@ -120,7 +125,7 @@ export function displaySessionChanged(session) {
   const what = (s) => (s?.active ? s.battleType || 'battle' : ''); // an adventure and a battle switch straight over too
   const was = what(_session);
   _session = session;
-  postToPreview({ session: previewSession() });
+  if (!_previewAway) postToPreview({ session: previewSession() });
   if (was !== what(session)) drawLayers();
 }
 

@@ -18,6 +18,7 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { DM, escapeHtml, typeBadges, getSpecies, toast, openDmModal } from './dm-common.js';
 import { abilityList } from '../utils/battle-lists.js';
 import { renderMapEditor } from './map-editor.js';
+import { keepSprites } from './map-view.js';
 import { createMapStore } from './map-store.js';
 import { setLiveSession } from './live-map-store.js';
 import { createEncounterWithMap } from './encounters.js';
@@ -307,11 +308,16 @@ function renderPlayers() {
     (byOwner[owner] = byOwner[owner] || []).push(p);
   });
   const owners = Object.keys(byOwner);
-  el.innerHTML = owners.length
+  const html = owners.length
     ? owners.map(o => `<span class="dm-adv-player" title="${escapeHtml(byOwner[o].map(p => `${p.name}${_session.board?.tokens?.[p.id] ? '' : ' (not placed yet)'}`).join(', '))}">
         ${byOwner[o].map(p => `<span class="dm-adv-thumb" data-img="${escapeHtml(p.image || '')}"></span>`).join('')}<b>${escapeHtml(o)}</b></span>`).join('')
     : '<span class="dm-hint">Nobody has joined yet -- the players join from their app (the ⚔️ battle button on the trainer card).</span>';
-  el.querySelectorAll('[data-img]').forEach(x => { if (x.dataset.img) patchPortraitMedia(x, x.dataset.img, ''); });
+  // Drawn on every push (a player's every step): only again when it's changed, and with the sprites kept
+  if (el._html === html) return;
+  el._html = html;
+  const putShown = keepSprites(el);
+  el.innerHTML = html;
+  el.querySelectorAll('[data-img]').forEach(x => { if (x.dataset.img && !putShown(x)) patchPortraitMedia(x, x.dataset.img, ''); });
 }
 
 /** "Start encounter": a new encounter in Encounter setup with this map and everything on it -- the DM's Pokemon (each

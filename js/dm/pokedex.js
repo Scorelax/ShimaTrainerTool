@@ -7,7 +7,7 @@
 import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { escapeHtml, typeBadges, getSpecies } from './dm-common.js';
+import { escapeHtml, typeBadges, getSpecies, lazySprites } from './dm-common.js';
 import { dexQuery } from '../utils/dex-search.js';
 import { prepareImage } from './display.js';
 
@@ -209,7 +209,7 @@ function renderList() {
       <span class="dm-pdx-main"><strong>#${escapeHtml(s.dex)} ${escapeHtml(s.name)}</strong><small>${typeBadges(s.type1, s.type2)}</small></span>
       <span class="dm-pdx-flags"></span>
     </button>`).join('');
-  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<img src="assets/Pokeball-small.png" alt="" style="opacity:.3">'; });
+  lazySprites(box, { empty: '<img src="assets/Pokeball-small.png" alt="" style="opacity:.3">' }); // the whole Pokedex: drawn as it scrolls into view
   refreshListFlags();
   applyFilter();
 }

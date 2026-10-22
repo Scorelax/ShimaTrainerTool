@@ -142,6 +142,7 @@ function showModule(name) {
  * it's back. (The Display workspace's sprites play by their own rule -- only while scrolled into view.) */
 function setVideosPlaying(section, playing) {
   section.querySelectorAll('video').forEach((v) => {
+    if (v.parentElement?.dataset.lazy) return; // a long list's: plays only while it can be seen (dm-common.js's lazySprites)
     if (!playing) v.pause();
     else if (v.paused && v.autoplay) v.play().catch(() => {});
   });

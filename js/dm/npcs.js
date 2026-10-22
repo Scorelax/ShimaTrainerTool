@@ -15,8 +15,7 @@ import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import {
   escapeHtml, typeBadges, getSpecies, newId, toast, natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml,
-  bindMultiSelects, readMultiSelect, abilityMod, trainerHp,
-} from './dm-common.js';
+  bindMultiSelects, readMultiSelect, abilityMod, trainerHp, lazySprites } from './dm-common.js';
 import { MONTHS } from './world-clock.js';
 import { addNpcToSetup } from './creature-setup.js';
 import { prepareImage } from './display.js';
@@ -137,7 +136,7 @@ function renderList() {
           <span class="dm-npc-dot" style="background:${color}" title="${label}"></span>
         </button>`;
     }).join('')}`).join('') || `<div class="dm-hint">${_npcs.length ? 'Nobody matches that.' : 'No NPCs yet. Make one, or import them from the old DM tool.'}</div>`;
-  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">👤</span>'; });
+  lazySprites(box, { empty: '<span class="dm-npc-emoji">👤</span>' });
 }
 
 function select(id) {

@@ -523,7 +523,7 @@ function _renderGrid() {
   const bestRemaining = sel ? _bestRemainingFt(sel.p) : null;
 
   gridEl.setAttribute('style', gridTemplateStyle(_session.board));
-  gridEl.innerHTML = gridCellsHtml(_session.board, 'bmap-cell', (col, row) => {
+  const html = gridCellsHtml(_session.board, 'bmap-cell', (col, row) => {
     const key = `${col},${row}`;
     const classes = [];
     const zone = zones.get(key);
@@ -534,6 +534,11 @@ function _renderGrid() {
     if (_stagedDestination && col === _stagedDestination.col && row === _stagedDestination.row) classes.push('staged');
     return classes.join(' ');
   });
+  // The same squares as last time (most pushes -- someone else's turn, a log line): left as they are, clicks and all
+  // (the clicks read the selection when they happen)
+  if (gridEl._html === html) return;
+  gridEl._html = html;
+  gridEl.innerHTML = html;
 
   gridEl.querySelectorAll('[data-cell]').forEach(cell => {
     const [col, row] = cell.dataset.cell.split(',').map(Number);
@@ -576,6 +581,12 @@ function _renderTokens() {
   const tokens = _session.board.tokens;
   const activeId = _activeParticipantId(_session);
 
+  // The tokens are drawn again on every push, but each one's sprite (a looping video) is carried over to its new token
+  // rather than loaded and started again -- unless its picture changed
+  const shown = new Map();
+  layer.querySelectorAll('.bmap-token[data-id] .bmap-sprite[data-image]').forEach((s) => {
+    if (s.firstElementChild) shown.set(s.closest('.bmap-token').dataset.id, { image: s.dataset.image, nodes: [...s.children] });
+  });
   layer.innerHTML = '';
   Object.entries(tokens).forEach(([id, pos]) => {
     const p = _session.participants[id];
@@ -615,7 +626,9 @@ function _renderTokens() {
     Object.assign(el.style, cellRect(_session.board, shownAt.col, shownAt.row, footprintForSize(p.size)));
     el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite"></div></div>${shownZ > 0 ? `<span class="bmap-alt">↑${shownZ}ft</span>` : shownZ < 0 ? `<span class="bmap-alt">↓${-shownZ}ft</span>` : ''}`;
     const sprite = el.querySelector('.bmap-sprite');
-    patchPortraitMedia(sprite, p.image, name, { small: true });
+    const kept = shown.get(id);
+    if (kept && kept.image === (p.image || '')) { sprite.dataset.image = kept.image; sprite.append(...kept.nodes); }
+    else patchPortraitMedia(sprite, p.image, name, { small: true });
     // The tokens are rebuilt every render, so start at the last drawn angle and let the transition carry it to the new one.
     const previous = _spriteAngles.has(id) ? _spriteAngles.get(id) : (pos.facing || 0);
     const angle = unwrapAngle(previous, pos.facing || 0);

@@ -97,7 +97,7 @@ async function init() {
     if (e.detail?.name) showModule(e.detail.name);
   });
   window.addEventListener('dm:battle-tab', (e) => { if (e.detail?.tab) showBattleTab(e.detail.tab); });
-  window.addEventListener('dm:aftermath-changed', () => { if (!session?.active) renderAftermathBanner(); });
+  window.addEventListener('dm:aftermath-changed', () => { if (!battleRunning()) renderAftermathBanner(); });
 
   // Back where the DM was before the reload.
   let last = null;

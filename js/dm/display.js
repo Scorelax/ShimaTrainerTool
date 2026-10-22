@@ -117,10 +117,11 @@ export function displayAway() {
 
 /** The battle changed (dm-console.js) -- the preview shows the battle just like the TV. */
 export function displaySessionChanged(session) {
-  const wasActive = !!_session?.active;
+  const what = (s) => (s?.active ? s.battleType || 'battle' : ''); // an adventure and a battle switch straight over too
+  const was = what(_session);
   _session = session;
   postToPreview({ session: previewSession() });
-  if (wasActive !== !!session?.active) drawLayers();
+  if (was !== what(session)) drawLayers();
 }
 
 // ---------------------------------------------------------------------------

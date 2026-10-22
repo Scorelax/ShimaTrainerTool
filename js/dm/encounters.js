@@ -1041,10 +1041,15 @@ export async function createEncounterWithMap(map, name, { creatures = [] } = {})
   return enc;
 }
 
+/** A battle (PvE or PvP) is running -- a running adventure isn't one: it pauses when the battle starts. */
+function battleOn(session) {
+  return !!session?.active && session.battleType !== 'adventure';
+}
+
 async function loadIntoSetup(enc) {
   await flushEncounter(enc);
   const state = await CombatAPI.getState().catch(() => null);
-  if (state?.data?.active) {
+  if (battleOn(state?.data)) {
     showCombatAlert('A battle is running -- end it first, or send these in as reinforcements from the battle.', { title: 'Put in play' });
     return;
   }
@@ -1160,7 +1165,7 @@ function syncInPlay(enc) {
 async function doSyncInPlay(enc) {
   if (enc.id !== _runId || !_runLinked) return;
   const state = await CombatAPI.getState().catch(() => null);
-  if (state?.data?.active) return; // the battle has started -- the setup is what it started from
+  if (battleOn(state?.data)) return; // the battle has started -- the setup is what it started from
   const from = () => getSetup().creatures.filter(c => c.encId === enc.id);
   const monKeys = new Set(enc.pokemon.map(p => `mon:${p.id}`));
   const npcKeys = new Set(enc.npcs.map(id => `npc:${id}`));

@@ -272,7 +272,8 @@ function renderStatus() {
   const turn = !session.started
     ? 'Not started yet'
     : active ? `<span class="dm-status-turn">▶ ${escapeHtml(active.name)}${session.reactingParticipantId ? (active.extraActionFrom ? ` (${escapeHtml(active.extraActionFrom)})` : ' (reacting)') : ''}</span>` : '';
-  el.innerHTML = `<strong>${session.battleType === 'pvp' ? 'PvP' : 'PvE'} battle</strong> · Round ${session.round} · ${turn} · ${count} in the battle`;
+  el.innerHTML = `<strong>${session.battleType === 'pvp' ? 'PvP' : 'PvE'} battle</strong> · Round ${session.round} · ${turn} · ${count} in the battle`
+    + (session.adventurePaused ? ' · <span title="It comes back as it was when the battle ends">🧭 adventure paused</span>' : '');
 }
 
 // ---------------------------------------------------------------------------
@@ -415,11 +416,8 @@ async function saveNow() {
 
 async function startBattle() {
   if (starting) return;
-  if (session?.active && session.battleType === 'adventure') {
-    // One thing at a time on the table: the adventure ends for the battle (the players join the battle as usual).
-    if (!await showCombatConfirm('An adventure is running. End it and start the battle?', { title: 'Start battle', yesLabel: 'End it and start', noLabel: 'Cancel' })) return;
-    try { await CombatAPI.endSession(); } catch (err) { showCombatAlert(err.message, { title: 'End the adventure' }); return; }
-  }
+  // A running adventure pauses for the battle and comes back as it was when the battle ends (routes_combat.py's
+  // _pause_adventure, the user's call, 2026-10-22) -- the players join the battle as usual.
   starting = true;
   const btn = document.getElementById('homeStart');
   if (btn) { btn.disabled = true; btn.textContent = 'Starting…'; }

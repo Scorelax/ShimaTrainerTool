@@ -779,7 +779,13 @@ function _abilityToast(text) {
   setTimeout(close, 10000);
 }
 
+// Whether the page was last drawn for an adventure (true), a battle (false) or nothing running (null): a battle pauses
+// a running adventure and the adventure comes back when it ends (routes_combat.py's _pause_adventure, the user's call,
+// 2026-10-22) -- each switch draws the page again for what's on now.
+let _drawnAdventure = null;
+
 function _renderCurrentView() {
+  _drawnAdventure = session?.active ? _isAdventure() : null;
   // An adventure joined earlier but not placed yet (the page was reloaded or left mid-placement): place them first.
   if (_isAdventure() && !_dmName && !_joinStage && !_spectating) {
     const me = _currentTrainerName();
@@ -3389,6 +3395,17 @@ export function attachCombatWipListeners() {
     if (document.getElementById('advWaitScreen')) { _rerenderFull(); return; }
     // The DM closed joining while this trainer was still joining: wait (picked up again when it opens).
     if (_joinStage && _isAdventure() && session.adventure?.canJoin === false && !_dmName) { _rerenderFull(); return; }
+    // A battle took over from the adventure (paused meanwhile), or the adventure is back after it: the page drawn again
+    // for what's on now -- join or watch the battle; the adventure's map (mid-join too: that join was for the other one)
+    if (!_dmName && session.active && _drawnAdventure !== null && _drawnAdventure !== _isAdventure()) {
+      _joinStage = null;
+      _joinState = null;
+      _placementQueue = [];
+      _spectating = false;
+      _exitBattleSync();
+      _rerenderFull();
+      return;
+    }
     _showNewAbilityReminders(session);
     _answerPromptsForMe(session); // another player's attack asking this player to roll (their Sturdy, Rough Skin...)
     _answerConcentrationChecks(session); // one of this player's creatures took damage while concentrating

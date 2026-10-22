@@ -226,14 +226,15 @@ def _handle(conn, action, params):
             raise ValueError('PvE battles are started by the DM -- join it once the DM has started it.')
         if battle_type != 'pvp':
             raise ValueError('battleType must be pvp')
-        if load_state(conn).get('active'):
+        current = load_state(conn)
+        if current.get('active') and current.get('battleType') != 'adventure':
             # One battle at a time -- a new one would silently replace the running one. It ends when its last
             # participant leaves (End Battle), so only the people in it can end it.
-            raise ValueError('An adventure is running -- the DM ends it before a battle can start.' if existing_adventure(conn)
-                             else 'A battle is already in progress -- join it, or wait until its players end it.')
+            raise ValueError('A battle is already in progress -- join it, or wait until its players end it.')
         state = copy.deepcopy(_EMPTY_STATE)  # deep: the board below is edited, never the shared template
         state['active'] = True
         state['battleType'] = battle_type
+        state['adventurePaused'] = _pause_adventure(conn, current)  # back when the battle ends
         if battle_type == 'pvp':
             # PvP starts on an 11x20 forest map (the user's call); still changeable on the placement screen.
             state['board']['grid'] = dict(_PVP_DEFAULT_GRID)
@@ -257,7 +258,21 @@ def _handle(conn, action, params):
             else:
                 _log_event(state, 'session-end', text='Battle ended')
                 _remember_battle(conn, state)
+                return _save_and_publish(conn, _after_battle(conn))  # the adventure it interrupted, back
         return _save_and_publish(conn, dict(_EMPTY_STATE))
+
+    if action == 'drop-paused-adventure':
+        # The DM: the adventure a running battle interrupted isn't to come back. Its last state comes along in the reply
+        # (`paused`), for the DM console to keep its map and creatures as the adventure map for next time.
+        paused = _take_paused_adventure(conn)
+        state = load_state(conn)
+        if state.get('active'):
+            state['adventurePaused'] = False
+            result = _save_and_publish(conn, state)
+        else:
+            conn.commit()
+            result = {'status': 'success', 'data': state}
+        return {**result, 'paused': paused}
 
     if action == 'capture':
         # The DM console's capture helper: a wild Pokemon the players caught leaves the battle (and the turn order),
@@ -781,11 +796,11 @@ def start_prepared_session(conn, setup):
     optional `position` {col, row, facing}."""
     with _SESSION_LOCK:
         current = load_state(conn)
-        if current.get('active'):
-            raise ValueError('An adventure is running -- end it before starting a battle.' if current.get('battleType') == 'adventure'
-                             else 'A battle is already in progress -- end it before starting a new one.')
+        if current.get('active') and current.get('battleType') != 'adventure':
+            raise ValueError('A battle is already in progress -- end it before starting a new one.')
         state = copy.deepcopy(_EMPTY_STATE)
         state.update({'active': True, 'battleType': 'pve', 'round': 1, 'log': [], 'logFile': _new_log_filename('pve')})
+        state['adventurePaused'] = _pause_adventure(conn, current)  # back when the battle ends
         board = state['board']
         _board_from_map(board, setup.get('map') or {})
         cols, rows = board['grid']['cols'], board['grid']['rows']
@@ -876,6 +891,43 @@ def existing_adventure(conn):
     return bool(state.get('active')) and state.get('battleType') == 'adventure'
 
 
+# A running adventure a battle (PvE or PvP) interrupts (the user's call, 2026-10-22): kept aside just as it is -- the map,
+# the players and the DM's creatures where they stood, its settings, its log -- and put back when the battle ends, so the
+# DM never sets it up again. The battle shows on every screen meanwhile (the board screen too). Kept in dm_state, not in
+# the battle's own state, which every push carries to every device.
+_PAUSED_ADVENTURE_KEY = 'paused-adventure'
+
+
+def _pause_adventure(conn, current):
+    """A battle is starting over `current` (the session now): a running adventure in it is kept aside (saved with the
+    battle's own save). Returns whether there was one."""
+    if not (current.get('active') and current.get('battleType') == 'adventure'):
+        return False
+    _log_event(current, 'session-pause', text='Adventure paused for a battle')
+    conn.execute('INSERT INTO dm_state (key, json, updated_at) VALUES (?, ?, ?) '
+                 'ON CONFLICT(key) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at',
+                 (_PAUSED_ADVENTURE_KEY, json.dumps(current), datetime.now(timezone.utc).isoformat()))
+    return True
+
+
+def _take_paused_adventure(conn):
+    """The adventure kept aside (None: there's none), no longer kept."""
+    row = conn.execute('SELECT json FROM dm_state WHERE key = ?', (_PAUSED_ADVENTURE_KEY,)).fetchone()
+    if not row:
+        return None
+    conn.execute('DELETE FROM dm_state WHERE key = ?', (_PAUSED_ADVENTURE_KEY,))
+    return json.loads(row[0]) if row[0] else None
+
+
+def _after_battle(conn):
+    """The session once a battle has ended: the adventure it interrupted, back as it was -- or none."""
+    state = _take_paused_adventure(conn)
+    if not (state and state.get('active') and state.get('battleType') == 'adventure'):
+        return dict(_EMPTY_STATE)
+    _log_event(state, 'session-resume', text='Adventure back after the battle')
+    return state
+
+
 def start_adventure(conn, m, settings=None):
     """The DM console's Adventure module (the user's ask, 2026-10-16): the table's battle map without a battle -- a
     session of battleType 'adventure' on the DM's adventure map. The players join with their trainer and, if they like,
@@ -891,6 +943,7 @@ def start_adventure(conn, m, settings=None):
             raise ValueError('A battle is running -- the adventure can start once it has ended.')
         if not isinstance(m, dict):
             raise ValueError('Make the adventure map first')
+        _take_paused_adventure(conn)  # (one left over from before can't come back over this one)
         state = copy.deepcopy(_EMPTY_STATE)
         state.update({'active': True, 'battleType': 'adventure', 'round': 0, 'log': [], 'logFile': _new_log_filename('adventure'),
                       'adventure': dict(_ADVENTURE_DEFAULTS)})
@@ -1582,7 +1635,7 @@ def _leave_session(conn, owner):
     if not any(p.get('owner') and p.get('owner') != DM_OWNER for p in state['participants'].values()):
         _log_event(state, 'session-end', text='Battle ended (all players left)')
         _remember_battle(conn, state)
-        return _save_and_publish(conn, dict(_EMPTY_STATE))
+        return _save_and_publish(conn, _after_battle(conn))  # the adventure it interrupted, back
     _rebuild_turn_order(state)
     return _save_and_publish(conn, state)
 

@@ -29,6 +29,7 @@ import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds, iconSpot } from './map-features.js';
 import { currentMap, isMajor, partOfChain, FIRST_ID } from './map-version.js';
+import { addLandDetail } from './land-detail.js';
 
 const BASE = 'assets/region-map/';
 // (one pixel of the first painting is 120 m: the island is ~110 x 200 km -- each map says its own, kmPerPx)
@@ -246,6 +247,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geo.setIndex(index);
+    geo.computeVertexNormals(); // the slope, smooth from corner to corner (land-detail.js)
     return { geo, pos, cols, rows };
   }
 
@@ -256,7 +258,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const { geo, pos, cols, rows } = gridGeometry(STEP);
     geometries.fine = geo;
     geometries.coarse = gridGeometry(STEP * 2).geo;
-    mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: texture }));
+    const material = new THREE.MeshBasicMaterial({ map: texture });
+    if (!gpu.software) addLandDetail(material); // made-up detail up close (land-detail.js) -- too costly without the card
+    mesh = new THREE.Mesh(geo, material);
     scene.add(mesh);
 
     // the block: four sides hanging from the mesh's edge (up to the land where the painting cuts through it) and a

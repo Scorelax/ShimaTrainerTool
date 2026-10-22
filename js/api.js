@@ -800,6 +800,12 @@ export class CombatAPI {
     return API.request('combat', 'remove-participant', { id }, { useCache: false });
   }
 
+  /** The DM: the adventure a running battle paused won't come back when the battle ends. The reply's `paused` is its
+   * last state (routes_combat.py's drop-paused-adventure). */
+  static async dropPausedAdventure() {
+    return API.request('combat', 'drop-paused-adventure', {}, { useCache: false });
+  }
+
   static async setStatus(id, status) {
     return API.request('combat', 'set-status', { id, status }, { useCache: false });
   }

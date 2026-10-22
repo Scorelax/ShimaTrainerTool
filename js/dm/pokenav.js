@@ -359,7 +359,7 @@ function renderStatus() {
   const el = document.getElementById('navStatus');
   if (el) {
     el.className = `dm-pill ${shows === 'region' ? 'ok' : 'todo'}`;
-    el.textContent = shows === 'battle' ? 'Battle running -- back on the table screen when it ends'
+    el.textContent = shows === 'battle' ? (_session.adventurePaused ? 'Battle running -- the adventure comes back when it ends' : 'Battle running -- back on the table screen when it ends')
       : shows === 'adventure' ? 'The adventure map is on the table screen' : 'On the table screen';
   }
   const pick = document.getElementById('navOnScreen');

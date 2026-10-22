@@ -32,7 +32,8 @@ let _store = null; // the adventure map, while it's being set up
 
 function state(s) {
   if (!s?.active) return 'setup';
-  return s.battleType === 'adventure' ? 'running' : 'battle';
+  if (s.battleType === 'adventure') return 'running';
+  return s.adventurePaused ? 'paused' : 'battle';
 }
 
 /** Drawn whenever the module is opened (dm-console.js's showModule). */
@@ -64,7 +65,34 @@ async function draw() {
       <div class="dm-adv-body" id="advBody"><div class="dm-loading">Loading…</div></div>
     </div>`;
   if (_shown === 'running') return drawRunning();
+  if (_shown === 'paused') return drawPaused();
   return drawSetup();
+}
+
+/** A battle paused the running adventure (routes_combat.py's _pause_adventure): it comes back just as it was when the
+ * battle ends -- or, if the DM says so, not (its map and creatures then kept as the adventure map, like Close the map). */
+function drawPaused() {
+  document.getElementById('advBar').innerHTML = `
+    <h2>🧭 Adventure <span class="dm-pill todo" title="A battle is on -- the adventure waits">Paused</span></h2>
+    <span class="dm-hint">A battle is running. The adventure comes back just as it was -- the players, your Pokémon and NPCs where they stood -- when the battle ends.</span>
+    <span class="dm-adv-btns">
+      <button class="dm-btn danger" id="advDrop" title="The adventure won't come back when the battle ends -- everything on it stays as the adventure map for next time">■ Don't bring it back</button>
+    </span>`;
+  document.getElementById('advBody').innerHTML = '';
+  document.getElementById('advDrop').addEventListener('click', async () => {
+    if (!await showCombatConfirm("The adventure won't come back when the battle ends. Its map, your Pokémon and NPCs stay as the adventure map for next time.", { title: "Don't bring it back", yesLabel: 'Drop it', noLabel: 'Cancel' })) return;
+    try {
+      const res = await CombatAPI.dropPausedAdventure();
+      if (res?.paused?.board) {
+        const saved = await DmAPI.getState('adventure-map').catch(() => null);
+        const map = boardAsMap(res.paused);
+        await DmAPI.saveState('adventure-map', { ...(saved || {}), ...map, terrain: saved?.terrain || map.terrain, creatures: liveCreatures(res.paused) });
+      }
+      if (res?.data) window.dispatchEvent(new CustomEvent('app:combat-updated', { detail: res.data }));
+    } catch (err) {
+      showCombatAlert(err.message, { title: "Don't bring it back" });
+    }
+  });
 }
 
 /** The adventure's map as a plain map (the board of the running one, or what's being set up). */
@@ -95,7 +123,7 @@ function liveCreatures(session) {
 /** The players' switches: Allow player placement (opens the map, going live if it isn't) and Players can move. */
 function switchesHtml(live, busy) {
   return `<span class="dm-adv-switches" id="advSwitches">
-      <label title="${busy ? 'A battle is running -- the map can be opened once it has ended' : 'The players can put themselves (and their Pokémon) on the map from their app -- the 🗺️ map button on the trainer card'}">
+      <label title="${busy ? 'A battle is running -- the map can be opened once it has ended' : 'The players can put themselves (and their Pokémon) on the map from their app -- the ⚔️ battle button on the trainer card'}">
         <input type="checkbox" id="advCanJoin" ${busy ? 'disabled' : ''}> Allow player placement</label>
       ${live ? '<label title="The players can move and turn their trainer and Pokémon -- you move anyone either way"><input type="checkbox" id="advCanMove"> Players can move</label>' : ''}
     </span>`;
@@ -190,7 +218,7 @@ export async function startAdventure(settings = {}) {
   const res = await DmAPI.startAdventure(settings);
   // The reply itself, not only the live push -- whichever arrives first switches the screen.
   if (res?.data?.active) window.dispatchEvent(new CustomEvent('app:combat-updated', { detail: res.data }));
-  toast(settings.canJoin ? 'The map is open -- the players place themselves from their app (the 🗺️ map button on the trainer card).'
+  toast(settings.canJoin ? 'The map is open -- the players place themselves from their app (the ⚔️ battle button on the trainer card).'
     : 'The adventure map is on the table screen -- tick Allow player placement when the players may join.');
 }
 
@@ -282,7 +310,7 @@ function renderPlayers() {
   el.innerHTML = owners.length
     ? owners.map(o => `<span class="dm-adv-player" title="${escapeHtml(byOwner[o].map(p => `${p.name}${_session.board?.tokens?.[p.id] ? '' : ' (not placed yet)'}`).join(', '))}">
         ${byOwner[o].map(p => `<span class="dm-adv-thumb" data-img="${escapeHtml(p.image || '')}"></span>`).join('')}<b>${escapeHtml(o)}</b></span>`).join('')
-    : '<span class="dm-hint">Nobody has joined yet -- the players join from their app (the 🗺️ map button on the trainer card).</span>';
+    : '<span class="dm-hint">Nobody has joined yet -- the players join from their app (the ⚔️ battle button on the trainer card).</span>';
   el.querySelectorAll('[data-img]').forEach(x => { if (x.dataset.img) patchPortraitMedia(x, x.dataset.img, ''); });
 }
 

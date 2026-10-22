@@ -86,6 +86,36 @@ export function mapStageHtml(setup, { interactive = false, selectedId = null, pr
     </div>${upright ? '</div>' : ''}`;
 }
 
+// Where a creature the DM puts on the map looks at first (the user's call, 2026-10-22): towards the players' side of the
+// board -- left on the map shown horizontally, down shown upright, down on the players' own map too.
+export const PLACED_FACING = 180;
+
+/** What mapStageHtml would draw for `setup` (plus `extra`, the caller's own say in it -- who's selected, the way it's
+ * shown...) as one text: the same text, the same map, so a change elsewhere needn't draw it again. */
+export function stageKey(setup, ...extra) {
+  return JSON.stringify([setup.map, (setup.creatures || []).map(c => [c.id, c.name, c.position, c.z, c.participant?.size,
+    c.participant?.image, !!(c.hidden || c.heldBack)]), ...extra]);
+}
+
+/** The sprites showing in `box`'s picture holders (patchPortraitMedia's), kept before it's drawn again. The returned
+ * `put(holder)` moves one showing the holder's picture (data-img) into it and says whether there was one -- so looping
+ * videos aren't loaded and started again on every redraw (several Pidgeys: one each). */
+export function keepSprites(box) {
+  const shown = new Map();
+  box?.querySelectorAll('[data-image]').forEach((el) => {
+    if (!el.firstElementChild) return;
+    if (!shown.has(el.dataset.image)) shown.set(el.dataset.image, []);
+    shown.get(el.dataset.image).push([...el.children]);
+  });
+  return (el) => {
+    const kept = shown.get(el.dataset.img)?.shift();
+    if (!kept) return false;
+    el.dataset.image = el.dataset.img;
+    el.append(...kept);
+    return true;
+  };
+}
+
 /** Why creature `c` can't start at board cell (col, row), or '' -- off the map, on a blocked square (unless it floats:
  * Levitate, hovering), or on top of another creature. */
 export function creatureSpotProblem(setup, c, col, row) {

@@ -45,7 +45,7 @@ const getSetup = () => _store.getSetup();
 const updateSetup = (fn) => _store.updateSetup(fn);
 const flushSetup = () => _store.flushSetup();
 const onSetupChange = (fn) => _store.onSetupChange(fn);
-import { mapStageHtml, mapUpright, setMapUpright, sizeStage, pointOn, screenStep } from './map-view.js';
+import { mapStageHtml, mapUpright, setMapUpright, sizeStage, pointOn, screenStep, stageKey as drawnKey, keepSprites, PLACED_FACING } from './map-view.js';
 
 // Starting height (ft) for an object the DM places -- changeable before placing. Anything not listed starts at 5ft.
 const DEFAULT_HEIGHTS = { tree: 30, rock: 5, bush: 5, log: 5 };
@@ -789,7 +789,7 @@ function showTurn() {
 
 /** What the map shows -- the same text, the same map (renderStage keeps it on the map's box). */
 function stageKey(s = getSetup()) {
-  return JSON.stringify([s.map, s.creatures, ed.tool, ed.creatureId, mapUpright()]);
+  return drawnKey(s, ed.tool, ed.creatureId, mapUpright());
 }
 
 /** The whole map, the way the table TV shows it. Creatures already placed in the battle setup show, for reference. */
@@ -800,12 +800,7 @@ function renderStage() {
   const m = s.map;
   // The creatures' sprites (looping videos) already showing are kept and moved into the new map, not loaded and
   // started again on every redraw
-  const shown = new Map(); // picture -> the sprites showing it (several Pidgeys: one each)
-  wrap.querySelectorAll('.dm-map-token-art[data-image]').forEach((el) => {
-    if (!el.firstElementChild) return;
-    if (!shown.has(el.dataset.image)) shown.set(el.dataset.image, []);
-    shown.get(el.dataset.image).push([...el.children]);
-  });
+  const putShown = keepSprites(wrap);
   wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: ed.tool === 'creatures' ? ed.creatureId : null, upright: mapUpright() });
   wrap._stageKey = stageKey(s);
   const stage = wrap.querySelector('.dm-map-stage');
@@ -816,9 +811,7 @@ function renderStage() {
   showTurn();
   stage.querySelectorAll('[data-img]').forEach((el) => {
     if (!el.dataset.img) return;
-    const kept = shown.get(el.dataset.img)?.shift();
-    if (kept) { el.dataset.image = el.dataset.img; el.append(...kept); return; }
-    patchPortraitMedia(el, el.dataset.img, '');
+    if (!putShown(el)) patchPortraitMedia(el, el.dataset.img, '');
   });
 
   stage.style.touchAction = 'none'; // a held finger turns / paints instead of scrolling the page
@@ -1151,10 +1144,6 @@ function freeName(base) {
   }
   return `${base} ${newId('').slice(-3)}`;
 }
-
-// Where a creature the DM puts on the map looks at first (the user's call, 2026-10-22): towards the players' side of the
-// board -- left on the map shown horizontally, down shown upright (map-view.js), down on the players' own map too.
-const PLACED_FACING = 180;
 
 /** The adventure: the queue's next Pokemon / NPC stands on the square clicked -- on the running map it joins as one of
  * the DM's creatures (hidden: on no screen but the DM's); on the map being prepared it's kept with the map, and joins

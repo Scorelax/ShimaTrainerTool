@@ -16,7 +16,7 @@ import {
   natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect, portraitOptionsHtml, toast,
 } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup, onSetupChange } from './setup-store.js';
-import { mapStageHtml, tokenScreenRect, creatureSpotProblem, mapUpright, sizeStage } from './map-view.js';
+import { mapStageHtml, tokenScreenRect, creatureSpotProblem, mapUpright, sizeStage, stageKey, keepSprites, PLACED_FACING } from './map-view.js';
 
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
@@ -68,7 +68,13 @@ export async function renderCreatureSetup(root, { onDone }) {
     if (c) edit({ mode: c.kind, id: c.id });
   });
   _unsub?.();
-  _unsub = onSetupChange(() => { if (document.body.contains(_root)) { renderList(); renderMap(); } });
+  // Every change to the setup lands here (a field typed in the form too): the list and the map are drawn again only
+  // when something they show changed
+  _unsub = onSetupChange(() => {
+    if (!document.body.contains(_root)) return;
+    if (listKey() !== document.getElementById('csList')?._key) renderList();
+    if (mapKey() !== document.getElementById('csMap')?._key) renderMap();
+  });
   renderList();
   renderMap();
   edit(_editing && getSetup().creatures.some(c => c.id === _editing.id) ? _editing : null);
@@ -96,9 +102,17 @@ function selectedCreature() {
 // The list on the left: each NPC trainer with their Pokemon under them, then the wild ones.
 // ---------------------------------------------------------------------------
 
+/** What the list shows, as one text (see the setup's change listener above). */
+function listKey() {
+  return JSON.stringify([_editing?.id, getSetup().creatures.map(c => [c.id, c.name, c.kind, c.trainerId, c.participant?.level,
+    c.participant?.maxHP, c.participant?.image, !!c.heldBack, !!c.position])]);
+}
+
 function renderList() {
   const el = document.getElementById('csList');
   if (!el) return;
+  el._key = listKey();
+  const putShown = keepSprites(el); // the thumbnails' sprites carried over, not started again
   const all = getSetup().creatures;
   const trainers = all.filter(c => c.kind === 'trainer');
   const wild = all.filter(c => c.kind === 'pokemon' && !trainers.some(t => t.id === c.trainerId));
@@ -122,12 +136,20 @@ function renderList() {
     ...trainers.map(t => `<div class="dm-cs-group">${row(t)}${all.filter(c => c.kind === 'pokemon' && c.trainerId === t.id).map(c => row(c, true)).join('')}</div>`),
     wild.length ? `<div class="dm-cs-group"><div class="dm-cs-group-title">Wild Pokémon</div>${wild.map(c => row(c)).join('')}</div>` : '',
   ].join('');
-  el.querySelectorAll('[data-img]').forEach(x => { if (x.dataset.img) patchPortraitMedia(x, x.dataset.img, ''); else x.innerHTML = '<span style="font-size:1.5rem">👤</span>'; });
+  el.querySelectorAll('[data-img]').forEach((x) => {
+    if (!x.dataset.img) x.innerHTML = '<span style="font-size:1.5rem">👤</span>';
+    else if (!putShown(x)) patchPortraitMedia(x, x.dataset.img, '');
+  });
 }
 
 // ---------------------------------------------------------------------------
 // The map: click a square to stand the selected creature there; click someone's token to pick them.
 // ---------------------------------------------------------------------------
+
+/** What the map shows, as one text (see the setup's change listener above). */
+function mapKey() {
+  return stageKey(getSetup(), selectedCreature()?.id, mapUpright());
+}
 
 function renderMap() {
   const wrap = document.getElementById('csMap');
@@ -135,10 +157,15 @@ function renderMap() {
   const s = getSetup();
   const m = s.map;
   const sel = selectedCreature();
+  const putShown = keepSprites(wrap); // the tokens' sprites carried over, not started again
   wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: sel?.id, upright: mapUpright() });   // (as the map setup shows it)
+  wrap._key = mapKey();
   const stage = wrap.querySelector('.dm-map-stage');
   sizeStage(wrap, m, mapUpright() ? '60vh' : '34vh');
-  stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-token-emoji">👤</span>'; });
+  stage.querySelectorAll('[data-img]').forEach((el) => {
+    if (!el.dataset.img) el.innerHTML = '<span class="dm-token-emoji">👤</span>';
+    else if (!putShown(el)) patchPortraitMedia(el, el.dataset.img, '');
+  });
 
   const hint = document.getElementById('csMapHint');
   if (hint) {
@@ -186,7 +213,8 @@ function onMapClick(col, row) {
   if (!sel || sel.heldBack || other) return;
   const problem = creatureSpotProblem(getSetup(), sel, col, row);
   if (problem) { showCombatAlert(problem, { title: sel.name }); return; }
-  updateSetup(s => { s.creatures.find(x => x.id === sel.id).position = { col, row, facing: 0 }; });
+  // facing the players' side when first placed; moved, it keeps the way it faces
+  updateSetup(s => { s.creatures.find(x => x.id === sel.id).position = { col, row, facing: sel.position?.facing ?? PLACED_FACING }; });
   renderPlacementLine();
 }
 
@@ -207,8 +235,16 @@ function renderPlacementLine() {
         ${SIZES.map(z => `<option value="${z}" ${c.config?.size === z ? 'selected' : ''}>${z} (${SQUARES[z] || '1 square'})</option>`).join('')}
       </select></div>` : '';
   el.innerHTML = (c.heldBack ? '<span class="dm-hint">Hidden -- not on the map at the start.</span>'
-    : c.position ? `<span>📍 On the map.</span> <button type="button" class="dm-btn small" id="csUnplace">Take off the map</button>`
+    : c.position ? `<span>📍 On the map.</span> <button type="button" class="dm-btn small" id="csUnplace">Take off the map</button>
+      <span class="dm-row" style="flex-wrap:nowrap;white-space:nowrap"><button type="button" class="dm-btn small" data-cs-turn="-45" title="Turn left 45°">⟲ 45°</button>
+        <button type="button" class="dm-btn small" data-cs-turn="45" title="Turn right 45°">⟳ 45°</button></span>`
       : '<span class="dm-warn-text">⚠ Not on the map yet -- click a square on the map above.</span>') + sizeRow;
+  el.querySelectorAll('[data-cs-turn]').forEach(b => b.addEventListener('click', () => {
+    updateSetup((s) => {
+      const x = s.creatures.find(y => y.id === c.id);
+      if (x?.position) x.position = { ...x.position, facing: ((((Number(x.position.facing) || 0) + Number(b.dataset.csTurn)) % 360) + 360) % 360 };
+    });
+  }));
   document.getElementById('csUnplace')?.addEventListener('click', () => {
     updateSetup(s => { s.creatures.find(x => x.id === c.id).position = null; });
     renderPlacementLine();

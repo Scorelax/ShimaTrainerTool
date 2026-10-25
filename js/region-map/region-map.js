@@ -22,7 +22,10 @@
 // has it standing on its mark facing south, the way the painting's towns are drawn (the user's call, 2026-10-21: it stays
 // put as the map turns, never turning round to face the viewer -- only leaning back as the map's tilted towards straight
 // down, so it's still seen from above), as tall as the DM set in km -- so it grows and shrinks with the land as the map
-// zooms, and keeps to scale with the others.
+// zooms, and keeps to scale with the others. A location with a 3D model as well (the user's call, 2026-10-25: a .glb
+// beside its picture on the Pi, "City-Astria.glb" by "City-Astria.png") has the model standing there instead -- the
+// picture stays the fallback, shown while the model loads and wherever there's none.
+// Trees, rocks and peaks stand on the land, made in code (map-objects.js; not without the graphics card).
 // A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
@@ -30,6 +33,7 @@ import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds, iconSpot } from './map-features.js';
 import { currentMap, isMajor, partOfChain, FIRST_ID } from './map-version.js';
 import { addLandDetail } from './land-detail.js';
+import { buildMapObjects, findPlaces } from './map-objects.js';
 
 const BASE = 'assets/region-map/';
 // (one pixel of the first painting is 120 m: the island is ~110 x 200 km -- each map says its own, kmPerPx)
@@ -176,6 +180,12 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   let movingLevel = gpu.software ? 2 : 0;
   let drawnLevel = 0;
   const scene = new THREE.Scene();
+  // The light the objects (map-objects.js, the locations' models) are lit by: from the north-west and high, as the land's
+  // own relief is shaded (land-detail.js) -- the land itself is the painting's colours, not lit.
+  scene.add(new THREE.HemisphereLight(0xfffaf0, 0x5a4e3c, 2.1));
+  const sun = new THREE.DirectionalLight(0xfff3dc, 2.3);
+  sun.position.set(-0.62, 1, -0.55);
+  scene.add(sun);
   const camera = new THREE.PerspectiveCamera(40, 1, 1, 20000);
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
@@ -210,12 +220,33 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   // one square, standing up facing south (+z, down the painting), every icon a copy of it scaled to its picture
   const iconPlane = new THREE.PlaneGeometry(1, 1);
   const iconTextures = {};  // their pictures, by URL (a promise each)
+  const models = [];        // the locations' 3D models standing on the land (in place of their icons' pictures)
+  const modelScenes = {};   // the models, by URL (a promise each: the loaded scene, or why not)
+  let objects = null;       // the trees, rocks and peaks (map-objects.js), once made
 
   // Painting pixel -> world: x to the east, z to the south, y up (metres scaled by vert).
   const toWorld = (x, y, metres = 0) => new THREE.Vector3(x - land.W / 2, Math.max(metres, 0) * land.vert, y - land.H / 2);
   function heightAt(x, y) {
     const i = Math.min(land.H - 1, Math.max(0, Math.round(y))) * land.W + Math.min(land.W - 1, Math.max(0, Math.round(x)));
     return land.kind[i] === 0 ? 0 : land.metres[i];
+  }
+
+  /** The land's surface at painting pixel (x, y) in world units, exactly as the fine mesh has it (its two triangles a
+   * square, gridGeometry) -- what's stood on it neither floats nor sinks between the mesh's corners. */
+  function groundAt(x, y) {
+    const { W, H, kind, metres, vert } = land;
+    const cols = Math.ceil((W - 1) / STEP) + 1, rows = Math.ceil((H - 1) / STEP) + 1;
+    const c = Math.min(cols - 2, Math.max(0, Math.floor(x / STEP)));
+    const r = Math.min(rows - 2, Math.max(0, Math.floor(y / STEP)));
+    const at = (rr, cc) => {
+      const i = Math.min(H - 1, rr * STEP) * W + Math.min(W - 1, cc * STEP);
+      return Math.max(kind[i] === 0 ? 0 : metres[i], 0) * vert;
+    };
+    const x0 = c * STEP, y0 = r * STEP;
+    const fx = Math.min(1, Math.max(0, (x - x0) / (Math.min(W - 1, x0 + STEP) - x0)));
+    const fy = Math.min(1, Math.max(0, (y - y0) / (Math.min(H - 1, y0 + STEP) - y0)));
+    const a = at(r, c), b = at(r, c + 1), d = at(r + 1, c), e = at(r + 1, c + 1);
+    return fx + fy <= 1 ? a + (b - a) * fx + (d - a) * fy : e + (d - e) * (1 - fx) + (b - e) * (1 - fy);
   }
 
   /** The land's surface on a grid every `step` pixels. */
@@ -489,6 +520,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function buildIcons() {
     icons.forEach((sp) => { scene.remove(sp); sp.material.dispose(); });
     icons.length = 0;
+    models.forEach(m => scene.remove(m)); // (their shapes are kept with the loaded scene, for the next time)
+    models.length = 0;
     (locations || []).forEach((l) => {
       const ic = l.icon;
       const at = ic?.url && iconSpot(l.shape);   // on its mark (map-features.js)
@@ -522,13 +555,97 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         sp.material.needsUpdate = true;
         sp.scale.set((tall * tex.image.width) / Math.max(1, tex.image.height), tall, 1);
         orientIcons();
-        sp.visible = true;
+        sp.visible = !sp.userData.model; // (its model came first: that stands there)
         dirty = true;
         wake();
       }).catch(() => {});
+      // its model, when there's one beside the picture: standing there in its place
+      modelScene(ic.url).then((src) => {
+        if (!icons.includes(sp)) return;
+        standModel(sp, src, ix, iy);
+      }).catch(() => {});
     });
+    clearObjects();
     dirty = true;
     wake();
+  }
+
+  /** The model beside an icon's picture ("City-Astria.png" -> "City-Astria.glb"), loaded once -> its scene (rejected:
+   * there's none, or it couldn't be read -- the picture stays). */
+  function modelScene(iconUrl) {
+    const url = String(iconUrl).replace(/\.[a-z0-9]+(\?.*)?$/i, '.glb');
+    if (url === iconUrl) return Promise.reject(new Error('No model'));
+    if (!modelScenes[url]) {
+      modelScenes[url] = import('../vendor/three/GLTFLoader.js')
+        .then(({ GLTFLoader }) => new GLTFLoader().loadAsync(url))
+        .then(gltf => gltf.scene);
+    }
+    return modelScenes[url];
+  }
+
+  /** A location's model on its spot, in place of its icon's picture: its base on the land, facing south as it was made
+   * (a .glb's front is +z), as big as the icon -- its biggest side as long as the picture is tall. */
+  function standModel(sp, src, ix, iy) {
+    const box = new THREE.Box3().setFromObject(src);
+    const size = box.getSize(new THREE.Vector3());
+    const biggest = Math.max(size.x, size.y, size.z);
+    if (!(biggest > 0)) return;
+    const inner = src.clone(true);
+    inner.position.set(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
+    const k = sp.userData.tall / biggest;
+    const model = new THREE.Group();
+    model.add(inner);
+    model.scale.setScalar(k);
+    const at = toWorld(ix, iy);
+    model.position.set(at.x, groundAt(ix, iy) - 0.02 * sp.userData.tall, at.z);
+    model.updateMatrixWorld(true);
+    model.userData = { locId: sp.userData.locId, box: new THREE.Box3().setFromObject(model), reach: (Math.max(size.x, size.z) * k) / 2 };
+    scene.add(model);
+    models.push(model);
+    sp.userData.model = model;
+    sp.visible = false;
+    clearObjects();
+    dirty = true;
+    wake();
+  }
+
+  /** No trees or rocks where a location's icon or model stands. */
+  function clearObjects() {
+    objects?.setClearings(icons.map((sp) => {
+      const p = sp.position;
+      const reach = sp.userData.model ? sp.userData.model.userData.reach + 1 : sp.userData.tall * 0.4;
+      return { x: Math.round(p.x + land.W / 2), y: Math.round(p.z + land.H / 2), r: Math.round(reach) };
+    }));
+  }
+
+  /** The trees, rocks and peaks (map-objects.js), read from the painting once the map's showing: off while the map's
+   * drawn coarse (a slow device keeping up while it moves), and never without the graphics card. */
+  async function buildObjects() {
+    if (gpu.software || objects || destroyed) return;
+    const res = await fetch(version.files.painting);
+    if (!res.ok) throw new Error("Couldn't load the painting");
+    const bitmap = await createImageBitmap(await res.blob());
+    const c = document.createElement('canvas');
+    c.width = land.W;
+    c.height = land.H;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(bitmap, 0, 0, land.W, land.H);
+    const placed = await findPlaces({ rgba: ctx.getImageData(0, 0, land.W, land.H).data, W: land.W, H: land.H, kind: land.kind.slice(), metres: land.metres.slice() });
+    if (destroyed || objects) return;
+    objects = buildMapObjects({ land, placed, groundAt, toWorld });
+    scene.add(objects.group);
+    clearObjects();
+    dirty = true;
+    wake();
+  }
+
+  /** Draws the map as the camera has it now (the objects grown in by their distance from it first). */
+  function render() {
+    if (objects) {
+      objects.group.visible = !LEVELS[drawnLevel].coarse;
+      objects.update(camera, canvas.clientHeight || 600);
+    }
+    renderer.render(scene, camera);
   }
 
   /** An icon's picture, hidden by the land in front of it like everything else on the map (the user's call, 2026-10-22: a
@@ -634,6 +751,17 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
         low = Math.max(low, ((mid - corner.y) / 2) * h);
       }
       halfIcon.set(sp.userData.locId, low);
+    });
+    // a model: how far its box reaches down the screen from its foot
+    models.forEach((m) => {
+      const mid = v.copy(m.position).project(camera).y;
+      const { min, max } = m.userData.box;
+      let low = 0;
+      for (const cx of [min.x, max.x]) for (const cy of [min.y, max.y]) for (const cz of [min.z, max.z]) {
+        corner.set(cx, cy, cz).project(camera);
+        low = Math.max(low, ((mid - corner.y) / 2) * h);
+      }
+      halfIcon.set(m.userData.locId, low);
     });
     for (const l of labels) {
       v.copy(l.at).project(camera);
@@ -897,7 +1025,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       if (moved) keepUp(now);
       useLevel(moved ? Math.max(movingLevel, REST) : REST);
       orientIcons();
-      renderer.render(scene, camera);
+      render();
       placeLabels();
       const az = controls.getAzimuthalAngle();
       $('.rmap-needle').style.transform = `rotate(${(az * 180 / Math.PI).toFixed(1)}deg)`;
@@ -911,7 +1039,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       // come to rest after moving at a lower level: drawn once more at its best
       if (drawnLevel !== REST && root.clientWidth) {
         useLevel(REST);
-        renderer.render(scene, camera);
+        render();
       }
     }
     if (quiet < 30) frame = requestAnimationFrame(tick);
@@ -1019,8 +1147,10 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       const r = canvas.getBoundingClientRect();
       tap.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(tap, camera);
-      const hit = ray.intersectObjects(icons.filter(sp => sp.visible), false)[0];
-      if (hit) pickLocation(hit.object.userData.locId);
+      const hit = ray.intersectObjects([...icons.filter(sp => sp.visible), ...models], true)[0];
+      let o = hit?.object;
+      while (o && !o.userData.locId) o = o.parent; // (a model's part: its location is on the model)
+      if (o) pickLocation(o.userData.locId);
     });
   }
 
@@ -1071,6 +1201,8 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     dirty = true;
     wake();
     $('.rmap-loading').remove();
+    // the objects after the map's first shown (reading the painting takes a moment)
+    setTimeout(() => buildObjects().catch(() => {}), 50);
   }
 
   function destroy() {
@@ -1083,6 +1215,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     Object.values(textures).forEach(t => t.dispose());
     overlay?.tex.dispose();
     Object.values(iconTextures).forEach(p => p.then(t => t.dispose()).catch(() => {}));
+    objects?.dispose();
     renderer.dispose();
   }
 

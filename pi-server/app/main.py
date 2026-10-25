@@ -295,6 +295,18 @@ def dm_admin_item(payload: dict):
     return _admin(lambda: admin.save_item(payload.get('item'), bool(payload.get('isNew'))))
 
 
+@app.post('/api/dm/admin-move')
+def dm_admin_move(payload: dict):
+    """A move added or edited ({move, isNew}) -- marked for a new look when what the automation reads changed."""
+    return _admin(lambda: admin.save_move(payload.get('move'), bool(payload.get('isNew'))))
+
+
+@app.post('/api/dm/admin-move-checked')
+def dm_admin_move_checked(payload: dict):
+    """A move's "needs a look" mark taken off ({name})."""
+    return _admin(lambda: admin.move_checked(payload.get('name')))
+
+
 @app.post('/api/dm/admin-item-image')
 def dm_admin_item_image(payload: dict):
     """An item's picture ({name, data: "data:image/...;base64,..."}), saved as "<Item Name>.<ext>"."""

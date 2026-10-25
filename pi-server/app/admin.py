@@ -405,3 +405,171 @@ def battle_log(filename):
     if not _LOG_NAME.match(str(filename or '')):
         raise ValueError('No such battle log')
     return _read_log(filename)
+
+
+# ---------------------------------------------------------------------------
+# Moves (the user's call, 2026-10-25: the Admin module's Moves tab)
+# ---------------------------------------------------------------------------
+
+# What the DM can change on a move -- what the overlay keeps (gamedata.MOVES_OVERLAY_FILE); its effects and categories
+# stay the file's
+_MOVE_FIELDS = ('name', 'type', 'action', 'range', 'duration', 'reaction', 'moveStat', 'vpCost', 'description', 'scaling',
+                'attackRoll')
+# What the battle's automation reads from a move's text: changed (other than its dice), the move wants a new look --
+# its effects may no longer say what it does. The dice, the VP cost, the type and the move stat are read as they are.
+_REVIEWED = ('description', 'scaling', 'action', 'range', 'duration', 'attackRoll')
+_TIER = re.compile(r'\d+d\d+\s+at\s+level\s+\d+', re.I)
+
+
+def _same_but_dice(a, b, field):
+    """Whether two texts of a move say the same thing but for their dice (the description's "2d8", the higher levels'
+    "3d8 at level 5, 4d8 at level 10, and 6d8 at level 17" -- however many levels)."""
+    def norm(s):
+        s = _TIER.sub('#', str(s or '')) if field == 'scaling' else str(s or '')
+        s = re.sub(r'\d+d\d+', '#', s)
+        s = re.sub(r'#(?:\s*,?\s*(?:and\s+)?#)+', '#', s)
+        return re.sub(r'\s+', ' ', s).strip().rstrip('.')
+    return norm(a) == norm(b)
+
+
+def _duration(raw):
+    """A duration's text as the move file keeps it -- {raw, rounds, concentration, varies} (the same reading as
+    docs/categorize_moves_draft.js's parseDuration)."""
+    s = _text(raw)
+    concentration = bool(re.search(r'concentration', s, re.I))
+    base = re.sub(r',?\s*concentration', '', s, flags=re.I).strip()
+    rounds, varies = None, False
+    if re.fullmatch(r'instantaneous', base, re.I):
+        rounds = 0
+    elif re.fullmatch(r'varies', base, re.I):
+        varies = True
+    else:
+        m = re.fullmatch(r'(\d+)(?:-(\d+))?\s*(round|turn|minute|hour|day)s?', base, re.I)
+        d = re.fullmatch(r'(\d+)d(\d+)\s*(round|turn|minute|hour|day)s?', base, re.I)
+        if d:
+            rounds = {'dice': f'{d.group(1)}d{d.group(2)}', 'unit': d.group(3).lower()}
+        elif m:
+            rounds = int(m.group(1)) * {'round': 1, 'turn': 1, 'minute': 10, 'hour': 600, 'day': 14400}[m.group(3).lower()]
+        else:
+            rounds = {'raw': base}
+    return {'raw': s, 'rounds': rounds, 'concentration': concentration, 'varies': varies}
+
+
+def _move_entry(m, overlay):
+    patch = overlay.get(m['name'].lower()) or {}
+    return {
+        **{k: m.get(k) for k in _MOVE_FIELDS},
+        'duration': (m.get('duration') or {}).get('raw', '') if isinstance(m.get('duration'), dict) else _text(m.get('duration')),
+        'categories': m.get('categories') or [],
+        'effects': len(m.get('effects') or []),
+        'added': bool(patch.get('added')),
+        'edited': any(k in patch for k in _MOVE_FIELDS if k != 'name'),
+        'review': patch.get('review'),
+    }
+
+
+def move_list():
+    """Every move as the app has it, for the Admin module: its fields (duration as its text), its categories and how many
+    effects it has (read only here), whether the DM added or changed it, and its `review` mark ({why: [field, ...] --
+    'new' for an added move --, at}) while it waits for a new look."""
+    overlay = species_data.read_overlay(gamedata.MOVES_OVERLAY_FILE)
+    return [_move_entry(m, overlay) for m in gamedata.move_records()]
+
+
+def save_move(move, is_new=False):
+    """A move added (`is_new`) or edited: {name, type, action, range, duration (its text), moveStat, vpCost, description,
+    scaling, attackRoll}. A new one needs a name no move has; an edited one keeps its name (the Pokemon know their moves
+    by name). Marked for a new look when it's new, or when what the automation reads changed (_REVIEWED) -- a mark
+    already there stays, with this change's reasons added."""
+    if not isinstance(move, dict):
+        raise ValueError('Not a move')
+    name = re.sub(r'\s+', ' ', _text(move.get('name')))
+    if not name:
+        raise ValueError('The move needs a name')
+    records = gamedata.move_records()
+    current = next((m for m in records if m['name'].lower() == name.lower()), None)
+    if is_new and current:
+        raise ValueError(f'There is already a move called {current["name"]}')
+    if not is_new and not current:
+        raise ValueError(f'No move called {name}')
+    base = next((m for m in gamedata.read_file(gamedata.MOVES_FILE).get('moves') or [] if m['name'].lower() == name.lower()), None)
+    before = current or gamedata.NEW_MOVE
+    action = _text(move.get('action')) or '1 action'
+    wanted = {
+        'name': current['name'] if current else name,
+        'type': _text(move.get('type')) or 'Normal',
+        'action': action,
+        'range': _text(move.get('range')),
+        # a reaction by its action -- worked out again only when that changes (Powder's "1 action/ reaction" isn't one)
+        'reaction': before.get('reaction', False) if action == before.get('action') else bool(re.search(r'\breaction\b', action, re.I)),
+        'moveStat': _text(move.get('moveStat')) or 'None',
+        'vpCost': _text(move.get('vpCost')),
+        'description': _text(move.get('description')),
+        'scaling': _text(move.get('scaling')),
+        'attackRoll': bool(move.get('attackRoll')),
+    }
+    raw_duration = _text(move.get('duration')) or 'Instantaneous'
+    old_duration = before.get('duration') if isinstance(before.get('duration'), dict) else {}
+    # (an unchanged duration keeps the file's reading of it -- the same text reads the same, but the file may say more)
+    wanted['duration'] = old_duration if old_duration.get('raw', '') == raw_duration else _duration(raw_duration)
+    if not wanted['description']:
+        raise ValueError('The move needs a description')
+
+    # why it wants a new look now
+    if not current:
+        why = ['new']
+    else:
+        why = []
+        raw = lambda v: ((v or {}).get('raw', '') if isinstance(v, dict) else v)  # (a duration: its text)
+
+        def differs(k, old, new):
+            if k in ('description', 'scaling'):
+                return not _same_but_dice(old, new, k)
+            if k == 'attackRoll':
+                return bool(old) != bool(new)
+            return (raw(old) or '') != (raw(new) or '')
+        for k in _REVIEWED:
+            # (put back as the file has it: what the automation was made for -- nothing to look at)
+            if differs(k, before.get(k), wanted[k]) and (base is None or differs(k, base.get(k), wanted[k])):
+                why.append(k)
+
+    overlay = dict(species_data.read_overlay(gamedata.MOVES_OVERLAY_FILE))
+    key = wanted['name'].lower()
+    old_patch = overlay.get(key) or {}
+    # only what differs from the file's move (an added one: all of it)
+    patch = {k: v for k, v in wanted.items() if base is None or k == 'name' or base.get(k) != v}
+    if base is None:
+        patch['added'] = True
+    review = old_patch.get('review')
+    if why:
+        reasons = list(dict.fromkeys((review or {}).get('why', []) + why))
+        review = {'why': reasons, 'at': _now()}
+    if review:
+        patch['review'] = review
+    if len(patch) == 1 and base is not None:
+        overlay.pop(key, None)  # back to exactly the file's
+    else:
+        overlay[key] = patch
+    _write_json(gamedata.MOVES_OVERLAY_FILE, overlay)
+    return next(_move_entry(m, overlay) for m in gamedata.move_records() if m['name'].lower() == key)
+
+
+def move_checked(name):
+    """A move's `review` mark taken off -- the DM has looked it over (its automation is right)."""
+    overlay = dict(species_data.read_overlay(gamedata.MOVES_OVERLAY_FILE))
+    key = _text(name).lower()
+    patch = dict(overlay.get(key) or {})
+    if not patch.get('review'):
+        raise ValueError(f'{name} isn\'t waiting for a look')
+    patch.pop('review')
+    if set(patch) <= {'name'}:
+        overlay.pop(key)
+    else:
+        overlay[key] = patch
+    _write_json(gamedata.MOVES_OVERLAY_FILE, overlay)
+    return next(_move_entry(m, overlay) for m in gamedata.move_records() if m['name'].lower() == key)
+
+
+def _now():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat(timespec='seconds')

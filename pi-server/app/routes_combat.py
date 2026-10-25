@@ -4210,8 +4210,15 @@ def _load_move_data_file():
     every token move (False Swipe's flag, Pursuit's reaction check), which on a Pi was real, avoidable work. Callers
     treat the result as read-only. {'moves': []} on any read failure -- every caller already treats a miss as "nothing
     special here", never a hard error."""
+    # (the DM's changes in the Admin module laid over the file's: gamedata.move_records)
     data = gamedata.read_file(gamedata.MOVES_FILE)
-    return data if data.get('moves') is not None else {'moves': []}
+    records = gamedata.move_records()
+    if _move_data[0] is not records:
+        _move_data[:] = [records, {**data, 'moves': records}]
+    return _move_data[1]
+
+
+_move_data = [None, {'moves': []}]  # (the records it was made from, the file's data with them)
 
 
 def _list_move_categories():

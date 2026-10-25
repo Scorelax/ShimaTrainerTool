@@ -1,5 +1,5 @@
 // DM console -- the Admin module (the user's call, 2026-10-19): the game's data the DM adds to or changes himself, with
-// their pictures -- the items, the Pokedex entries (species, and the abilities they name), the loading-screen splashes and
+// their pictures -- the items, the moves (admin-moves.js), the Pokedex entries (species, and the abilities they name), the loading-screen splashes and
 // the battle maps' pictures (objects and backgrounds, moved here from the map editor) -- and every battle's log.
 // Everything is saved on the Pi (pi-server/app/admin.py): items and Pokedex entries in the data folder, laid over the files
 // the code comes with (so a `git pull` on the Pi never clashes with them); the pictures where the app already looks for
@@ -15,9 +15,10 @@ import { loadMoves } from './move-picker.js';
 import { openPicker } from './picker.js';
 import { forgetMapAssets } from './map-editor.js';
 import { drawEvents, drawLocations, drawStatuses, setWorldNav } from './admin-world.js';
+import { drawMoves, onReviewCount } from './admin-moves.js';
 
 const TAB_KEY = 'dmAdminTab';
-const TABS = ['items', 'species', 'pictures', 'splashes', 'logs', 'events', 'locations', 'statuses'];
+const TABS = ['items', 'moves', 'species', 'pictures', 'splashes', 'logs', 'events', 'locations', 'statuses'];
 const MOVE_LEVELS = ['1', '2', '6', '10', '14', '18'];
 const MOVEMENT = ['walking', 'climbing', 'flying', 'hovering', 'swimming', 'burrowing'];
 const SENSES = ['sight', 'hearing', 'smell', 'tremorsense', 'echolocation', 'telepathy', 'blindsight', 'darkvision', 'truesight'];
@@ -47,6 +48,7 @@ export function renderAdmin(section) {
     <div class="dm-admin">
       <div class="dm-enc-tabs" id="admTabs">
         <button data-atab="items">🎒 Items</button>
+        <button data-atab="moves">💥 Moves <span class="dm-pill todo" id="admMoveCount" title="Moves that need a look" hidden></span></button>
         <button data-atab="species">📕 Pokédex entries</button>
         <button data-atab="pictures">🌲 Map pictures</button>
         <button data-atab="splashes">🖼️ Splash screens</button>
@@ -62,6 +64,13 @@ export function renderAdmin(section) {
     if (b) showTab(b.dataset.atab);
   });
   setWorldNav(showTab);
+  // how many moves wait for a look (new, or their text changed), on the Moves tab's button
+  onReviewCount((n) => {
+    const el = document.getElementById('admMoveCount');
+    if (!el) return;
+    el.textContent = `🔍 ${n}`;
+    el.hidden = !n;
+  });
   showTab(_tab);
 }
 
@@ -72,6 +81,7 @@ function showTab(name) {
   const body = document.getElementById('admBody');
   body.innerHTML = '<div class="dm-loading">Loading…</div>';
   if (name === 'items') drawItems(body);
+  else if (name === 'moves') drawMoves(body);
   else if (name === 'species') drawSpecies(body);
   else if (name === 'pictures') drawMapPictures(body);
   else if (name === 'logs') drawBattleLogs(body);

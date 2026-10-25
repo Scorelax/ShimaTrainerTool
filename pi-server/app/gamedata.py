@@ -24,8 +24,12 @@ TYPE_CHART_FILE = os.path.join(DOCS, 'DnD_type_chart.json')
 # The items the DM added or edited in the DM console's Admin module (admin.py) -- in the data folder, not docs/ (git keeps
 # docs/, and an edit there would block the next pull): {lowercase name: item}, laid over ITEMS_FILE's.
 ITEMS_OVERLAY_FILE = os.path.join(os.path.dirname(DB_PATH), 'admin_items.json')
+# ...and the moves (the user's call, 2026-10-25: the Admin module's Moves tab): {lowercase name: only what the DM set --
+# the fields he changed (an added move: all of them) and its `review` mark} -- laid over MOVES_FILE's records field by
+# field, so the effects and categories the code comes with (and later fixes to them) still come through.
+MOVES_OVERLAY_FILE = os.path.join(os.path.dirname(DB_PATH), 'admin_moves.json')
 FILES = (ITEMS_FILE, MOVES_FILE, NATURES_FILE, FEATS_FILE, TRAINER_OPTIONS_FILE, CONDUIT_FILE, TYPE_CHART_FILE,
-         ITEMS_OVERLAY_FILE)
+         ITEMS_OVERLAY_FILE, MOVES_OVERLAY_FILE)
 
 _files = {}  # path -> ((mtime_ns, size), parsed file)
 _NOTHING = {}  # what a missing / broken file reads as -- the same object every time (callers compare by identity)
@@ -67,9 +71,27 @@ def items():
     return _items[2]
 
 
+# What a move the DM added has before he's said otherwise (a move in the file has the file's)
+NEW_MOVE = {'type': 'Normal', 'action': '1 action', 'range': '', 'reaction': False, 'categories': [],
+            'duration': {'raw': 'Instantaneous', 'rounds': 0, 'concentration': False, 'varies': False},
+            'description': '', 'moveStat': 'None', 'vpCost': '', 'scaling': '', 'attackRoll': False}
+_move_records = (None, None, [])  # (the file's list, the overlay it was made with, the moves)
+
+
 def move_records():
-    """Every move as the file has it, effects and categories included."""
-    return read_file(MOVES_FILE).get('moves') or []
+    """Every move, effects and categories included: the file's, with what the DM changed laid over (MOVES_OVERLAY_FILE)
+    -- an edited one keeps its place, an added one comes after the file's."""
+    global _move_records
+    base, overlay = read_file(MOVES_FILE).get('moves') or [], read_file(MOVES_OVERLAY_FILE)
+    if _move_records[0] is not base or _move_records[1] is not overlay:
+        extra = {k: v for k, v in (overlay or {}).items() if isinstance(v, dict) and v.get('name')}
+        merged = []
+        for m in base:
+            patch = extra.pop(str(m.get('name', '')).lower(), None)
+            merged.append({**m, **patch, 'name': m['name']} if patch else m)
+        merged += [{**NEW_MOVE, **v} for v in extra.values()]
+        _move_records = (base, overlay, merged)
+    return _move_records[2]
 
 
 _MOVE_FIELDS = ('name', 'type', 'moveStat', 'action', 'vpCost', 'duration', 'range', 'description', 'scaling')

@@ -1578,6 +1578,22 @@ export class DmAPI {
     return API.request('dm', 'give-move', { trainer, pokemon, move, ...(forget ? { forget: '1' } : {}) }, { useCache: false });
   }
 
+  /** Every move for the Admin module's Moves tab -> [{name, type, action, range, duration, reaction, moveStat, vpCost,
+   * description, scaling, attackRoll, categories, effects (how many), added, edited, review: {why, at} | null}]. */
+  static async adminMoves() {
+    return (await API.request('dm', 'admin-moves', {}, { useCache: false, timeout: HEAVY_TIMEOUT })).data || [];
+  }
+
+  /** A move added (`isNew`) or edited -> the move as saved (marked for a new look when its text changed). */
+  static async adminSaveMove(move, isNew) {
+    return (await DmAPI._post('admin-move', { move, isNew }, 'Saving the move')).data;
+  }
+
+  /** A move's "needs a look" mark taken off -> the move. */
+  static async adminMoveChecked(name) {
+    return (await DmAPI._post('admin-move-checked', { name }, 'Saving')).data;
+  }
+
   /** An item's picture ({name, data: a data: URL}) -> {image}. */
   static async adminItemImage(name, data) {
     return (await DmAPI._post('admin-item-image', { name, data }, 'Uploading the picture')).data;

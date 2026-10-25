@@ -1192,6 +1192,21 @@ span.dm-trap-pick { cursor: default; }
 .dm-adm-pic img, .dm-adm-pic video { width: 100%; height: 100%; object-fit: contain; }
 .dm-adm-text { resize: vertical; font-family: inherit; line-height: 1.35; }
 .dm-adm-actions { display: flex; justify-content: flex-end; }
+/* The Moves tab (js/dm/admin-moves.js) */
+.dm-mv-row { grid-template-columns: 1fr auto; }
+.dm-mv-row .dm-pdx-main strong { color: inherit !important; }
+.dm-mv-marks { display: flex; gap: 0.25rem; align-items: center; }
+.dm-mv-marks .dm-pill { padding: 0.1rem 0.45rem; }
+#admTabs .dm-pill { margin-left: 0.25rem; padding: 0.05rem 0.4rem; }
+.dm-mv-vp { max-width: 9rem; }
+.dm-mv-review { display: flex; gap: 0.8rem; align-items: center; justify-content: space-between; border-color: rgba(240, 184, 96, 0.55); background: rgba(240, 184, 96, 0.08); }
+.dm-mv-tiers { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.dm-mv-tier { display: flex; gap: 0.35rem; align-items: center; padding: 0.3rem 0.45rem; border: 1px solid var(--dm-line); border-radius: 8px; }
+.dm-mv-tier > span { font-size: 0.78rem; font-weight: 700; color: var(--dm-muted); white-space: nowrap; }
+.dm-mv-tier input[data-dice] { width: 4.6rem; text-align: center; font-weight: 700; }
+.dm-mv-lvl { width: 3.6rem; }
+.dm-mv-auto { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.dm-mv-cat { font-size: 0.72rem; padding: 0.12rem 0.5rem; border-radius: 999px; background: rgba(255, 255, 255, 0.08); color: var(--dm-muted); }
 .dm-adm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 0.8rem; align-items: start; }
 .dm-adm-scores { flex-wrap: wrap; }
 .dm-adm-scores > .dm-field { flex: 1 1 70px; }

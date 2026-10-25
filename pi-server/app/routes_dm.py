@@ -74,6 +74,10 @@ def handle(conn, action, params):
         from . import admin
         return {'status': 'success', 'data': admin.item_list()}
 
+    if action == 'admin-moves':
+        from . import admin
+        return {'status': 'success', 'data': admin.move_list()}
+
     if action == 'admin-species':
         from . import admin
         if not params.get('name'):

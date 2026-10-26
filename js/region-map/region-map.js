@@ -33,6 +33,7 @@ import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds, iconSpot } from './map-features.js';
 import { currentMap, isMajor, partOfChain, FIRST_ID } from './map-version.js';
 import { addLandDetail } from './land-detail.js';
+import { addSea, seaInfoTexture, LONGEST_WAVE, FADE } from './sea.js';
 import { buildMapObjects, findPlaces, MODEL_KINDS } from './map-objects.js';
 import { DmAPI } from '../api.js';
 
@@ -206,6 +207,10 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const geometries = {};    // the land's surface: fine, and coarse (while moving on a slow device)
   const textures = {};
   let dirty = true;
+  const seaTime = { value: 0 };   // the sea's waves (sea.js): seconds, moved on while they can be seen (seaMoves)
+  let seaTimer = 0;
+  let seaDue = false;
+  let seaInfo = null;             // ...and how far its water is from the coast (a texture)
   let flight = null;
   let follow = null;        // view only: the camera easing towards the last view it was sent
   let lastView = null;      // ... and that view, put back when the screen changes size
@@ -292,6 +297,10 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     geometries.coarse = gridGeometry(STEP * 2).geo;
     const material = new THREE.MeshBasicMaterial({ map: texture });
     if (!gpu.software) addLandDetail(material); // made-up detail up close (land-detail.js) -- too costly without the card
+    if (!gpu.software) {
+      seaInfo = seaInfoTexture(land);
+      addSea(material, { info: seaInfo, size: [land.W, land.H], time: seaTime }); // (sea.js)
+    }
     mesh = new THREE.Mesh(geo, material);
     scene.add(mesh);
 
@@ -663,8 +672,32 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     return out;
   }
 
+  /** Whether the sea's waves move now: close enough in for them to show (sea.js FADE: the longest some 7 screen pixels
+   * long), and the map on show -- not on a device without the graphics card or one too slow to keep up while
+   * moving (they stand still there). Kept going on a computer set to reduce motion, like the party's marker. */
+  function seaMoves() {
+    if (gpu.software || movingLevel >= 2 || !land || !root.clientWidth || document.hidden) return false;
+    const foot = (camera.position.distanceTo(controls.target) * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / root.clientHeight;
+    return foot / LONGEST_WAVE < FADE[1];
+  }
+
+  /** The waves' next step drawn in a moment (about 20 a second) -- the map is otherwise drawn only when it changes;
+   * one frame each, so the loop itself still comes to rest. */
+  function seaNext() {
+    if (seaTimer || destroyed || !seaMoves()) return;
+    seaTimer = setTimeout(() => {
+      seaTimer = 0;
+      seaDue = true;
+      if (!frame && !destroyed) frame = requestAnimationFrame(tick);
+    }, 50);
+  }
+  // (the page shown again: the waves go on)
+  const onVisible = () => { if (!document.hidden) wake(); };
+  document.addEventListener('visibilitychange', onVisible);
+
   /** Draws the map as the camera has it now (the objects grown in by their distance from it first). */
   function render() {
+    if (seaMoves()) seaTime.value = performance.now() / 1000;
     if (objects) {
       objects.group.visible = !LEVELS[drawnLevel].coarse;
       objects.update(camera, canvas.clientHeight || 600);
@@ -1057,6 +1090,9 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       if (moved && onView) onView(getView());
       dirty = false;
       quiet = 0;
+    } else if (seaDue && root.clientWidth) {
+      render(); // only the sea moved: nothing else to place
+      seaDue = false;
     } else {
       quiet++;
       lastDraw = 0;
@@ -1066,6 +1102,8 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
         render();
       }
     }
+    seaDue = false;
+    seaNext();
     if (quiet < 30) frame = requestAnimationFrame(tick);
     else lastTick = 0;
   }
@@ -1232,12 +1270,15 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
   function destroy() {
     destroyed = true;
     cancelAnimationFrame(frame);
+    clearTimeout(seaTimer);
+    document.removeEventListener('visibilitychange', onVisible);
     observer.disconnect();
     controls.dispose();
     scene.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
     Object.values(geometries).forEach(g => g.dispose());
     Object.values(textures).forEach(t => t.dispose());
     overlay?.tex.dispose();
+    seaInfo?.dispose();
     Object.values(iconTextures).forEach(p => p.then(t => t.dispose()).catch(() => {}));
     objects?.dispose();
     renderer.dispose();

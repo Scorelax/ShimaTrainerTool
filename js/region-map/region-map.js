@@ -33,7 +33,8 @@ import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds, iconSpot } from './map-features.js';
 import { currentMap, isMajor, partOfChain, FIRST_ID } from './map-version.js';
 import { addLandDetail } from './land-detail.js';
-import { buildMapObjects, findPlaces } from './map-objects.js';
+import { buildMapObjects, findPlaces, MODEL_KINDS } from './map-objects.js';
+import { DmAPI } from '../api.js';
 
 const BASE = 'assets/region-map/';
 // (one pixel of the first painting is 120 m: the island is ~110 x 200 km -- each map says its own, kmPerPx)
@@ -575,6 +576,11 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function modelScene(iconUrl) {
     const url = String(iconUrl).replace(/\.[a-z0-9]+(\?.*)?$/i, '.glb');
     if (url === iconUrl) return Promise.reject(new Error('No model'));
+    return gltfScene(url);
+  }
+
+  /** A .glb's scene, loaded once. */
+  function gltfScene(url) {
     if (!modelScenes[url]) {
       modelScenes[url] = import('../vendor/three/GLTFLoader.js')
         .then(({ GLTFLoader }) => new GLTFLoader().loadAsync(url))
@@ -630,13 +636,31 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     c.height = land.H;
     const ctx = c.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(bitmap, 0, 0, land.W, land.H);
-    const placed = await findPlaces({ rgba: ctx.getImageData(0, 0, land.W, land.H).data, W: land.W, H: land.H, kind: land.kind.slice(), metres: land.metres.slice() });
+    const [placed, models] = await Promise.all([
+      findPlaces({ rgba: ctx.getImageData(0, 0, land.W, land.H).data, W: land.W, H: land.H, kind: land.kind.slice(), metres: land.metres.slice() }),
+      objectModels(),
+    ]);
     if (destroyed || objects) return;
-    objects = buildMapObjects({ land, placed, groundAt, toWorld });
+    objects = buildMapObjects({ land, placed, groundAt, toWorld, models });
     scene.add(objects.group);
     clearObjects();
     dirty = true;
     wake();
+  }
+
+  /** The DM's models for the trees, rocks and summits ("mapobject-<kind>.glb" beside the icons, map-objects.js
+   * MODEL_KINDS) -> { kind: [{ file, scene }, in file order] } -- one that won't load is left out (the shape made in code stands
+   * in), and none at all when the Pi can't say. */
+  async function objectModels() {
+    let list = [];
+    try { list = await DmAPI.mapObjectModels(); } catch (err) { return {}; }
+    const wanted = new Set(Object.values(MODEL_KINDS).flat());
+    const loaded = await Promise.all(list.filter(m => wanted.has(m.kind)).map(m => gltfScene(m.url)
+      .then(scene => ({ ...m, scene }))
+      .catch((err) => { console.warn(`Map object ${m.file} won't load: ${err.message}`); return null; })));
+    const out = {};
+    loaded.filter(Boolean).sort((a, b) => a.file.localeCompare(b.file)).forEach((m) => { (out[m.kind] ||= []).push({ file: m.file, scene: m.scene }); });
+    return out;
   }
 
   /** Draws the map as the camera has it now (the objects grown in by their distance from it first). */

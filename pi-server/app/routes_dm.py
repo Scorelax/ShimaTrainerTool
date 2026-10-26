@@ -168,6 +168,9 @@ def handle(conn, action, params):
     if action == 'location-icons':
         return {'status': 'success', 'data': list_location_icons()}
 
+    if action == 'map-object-models':
+        return {'status': 'success', 'data': list_map_object_models()}
+
     if action == 'delete-location-icon':
         delete_location_icon(params.get('file'))
         return {'status': 'success'}
@@ -675,8 +678,33 @@ def list_location_icons():
         files = os.listdir(media.LOCATION_IMAGE_DIR)
     except OSError:
         return []
-    return sorted((_icon_entry(f) for f in files if f.lower().endswith(_ICON_EXTS)
+    return sorted((_icon_entry(f) for f in files if f.lower().endswith(_ICON_EXTS) and not f.lower().startswith(_MAP_OBJECT)
                    and os.path.isfile(os.path.join(media.LOCATION_IMAGE_DIR, f))), key=lambda e: (e['type'], e['name'].lower()))
+
+
+# The region map's own models for its trees, rocks and summits (the user's call, 2026-10-26), in the icons' folder:
+# "mapobject-<kind>.glb" -- tree, rock_land, rock_sea, peak (js/region-map/map-objects.js MODEL_KINDS) -- and more of
+# a kind as "mapobject-tree-2.glb" and so on, mixed in. Not icons (a picture named so isn't listed as one).
+_MAP_OBJECT = 'mapobject-'
+
+
+def list_map_object_models():
+    """[{file, kind (lowercase, without a variant's number), url (?v= when it was last changed, so a replaced one is
+    loaded again)}], by file name."""
+    try:
+        files = sorted(os.listdir(media.LOCATION_IMAGE_DIR))
+    except OSError:
+        return []
+    out = []
+    for f in files:
+        path = os.path.join(media.LOCATION_IMAGE_DIR, f)
+        if not (f.lower().startswith(_MAP_OBJECT) and f.lower().endswith('.glb') and os.path.isfile(path)):
+            continue
+        kind = re.sub(r'[\s_-]*\d+$', '', os.path.splitext(f)[0][len(_MAP_OBJECT):]).strip().lower()
+        if kind:
+            out.append({'file': f, 'kind': kind,
+                        'url': f'{media.LOCATION_IMAGE_URL_PREFIX}{quote(f)}?v={int(os.path.getmtime(path))}'})
+    return out
 
 
 def save_location_icon(payload):

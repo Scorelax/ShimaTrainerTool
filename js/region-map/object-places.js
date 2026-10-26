@@ -1,7 +1,7 @@
 // Where the region map's objects stand (map-objects.js draws them; the user's call, 2026-10-25), read from the painting's
 // colours (map-features.js readColours, the same reading the land was built from): pines and a few leafy trees where the
-// forests are painted, the odd lone tree on the fields, rocks on the painted rock up in the hills, and a spire on each of
-// the highest summits. Sizes, turns and shades vary from copy to copy, the same on every screen (a fixed seed).
+// forests are painted, the odd lone tree on the fields, rocks on the painted rock up in the hills, rocks in the shallow
+// sea along the coast (the user's call, 2026-10-26), and a spire on each of the highest summits. Sizes, turns and shades vary from copy to copy, the same on every screen (a fixed seed).
 //
 // Pure maths on pixel arrays (no DOM, no three.js), so it runs in a worker (object-worker.js) -- it takes a moment, and
 // the map shouldn't stop answering meanwhile.
@@ -11,7 +11,7 @@
 // turn (radians), size, tall (its height x this), shade] }.
 import { readColours, boxMean } from './map-features.js';
 
-export const SHAPES = ['pine', 'leafy', 'rock', 'peak'];
+export const SHAPES = ['pine', 'leafy', 'rock', 'searock', 'peak'];
 export const FIELDS = 7;
 export const PEAK_SIZE = 16;  // a peak's height at scale 1 (map-objects.js CLASSES.big)
 const SEED = 20261025;
@@ -76,6 +76,20 @@ export function placeObjects({ rgba, W, H, kind, metres }) {
       const i = Math.round(y) * W + Math.round(x);
       if (colours.snow[i] || metres[i] < hills || rand() > (rock[i] / 255) * 0.3) continue;
       add('rock', x, y, tint(0.5, 1.4), tint(0.7, 1.3), tint(0.85, 1.12));
+    }
+  }
+  // Sea rocks: a few in the sea close to the coast -- not touching it, and not on a name painted over the water
+  const shore = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) shore[i] = kind[i] === 0 ? 0 : 1;
+  const nearShore = boxMean(shore, W, H, 7), onShore = boxMean(shore, W, H, 1);
+  const SR = 6;
+  for (let gy = 0; gy < H / SR; gy++) {
+    for (let gx = 0; gx < W / SR; gx++) {
+      const x = (gx + rand()) * SR, y = (gy + rand()) * SR;
+      if (x >= W - 1 || y >= H - 1) continue;
+      const i = Math.round(y) * W + Math.round(x);
+      if (kind[i] !== 0 || !nearShore[i] || onShore[i] || colours.white[i] || colours.cream[i] || colours.red[i] || rand() > 0.16) continue;
+      add('searock', x, y, tint(0.45, 1.2), tint(0.7, 1.25), tint(0.8, 1.05));
     }
   }
   // Peaks: the highest summits, each the highest point for 30 pixels round, at least 50 apart, 16 at most

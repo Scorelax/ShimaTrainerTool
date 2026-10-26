@@ -2,13 +2,19 @@
 // rocks and snow-capped peaks standing on the 3D land -- made here in code, no model files. Where they stand is read
 // from the painting's colours, in the background (object-places.js, object-worker.js: findPlaces).
 //
+// The DM's own models stand in for them where there are any (the user's call, 2026-10-26): "mapobject-<kind>.glb" in
+// the locations' icon folder (MODEL_KINDS: tree, rock_land, rock_sea, peak), fitted into the box of the shape it
+// replaces, each copy still sized, turned and shaded its own way; more than one of a kind ("mapobject-tree-2.glb") are
+// mixed in. Only light ones (MAX_TRIANGLES) -- a heavier one is left out, the shape made here standing in.
+//
 // Thousands of them, so: a handful of low-poly shapes, each drawn as copies (InstancedMesh) in blocks of land (CHUNK),
 // so only the blocks on screen are drawn; and each object grows in from nothing as the camera comes close enough for it
 // to be a few pixels tall -- from far out the map looks as it did, and nothing flickers into place. Lit by the map's
 // own light from the north-west (region-map.js), shaded flat like a low-poly model.
 //
 // findPlaces({ rgba (the painting, at the land's size), W, H, kind, metres }) -> where they stand, then
-// buildMapObjects({ land, placed, groundAt(x, y) (the land's surface there, world y), toWorld }) -> { group (into the
+// buildMapObjects({ land, placed, groundAt(x, y) (the land's surface there, world y), toWorld, models ({ kind: [{ file,
+// scene } loaded, in file order] }) }) -> { group (into the
 // scene), update(camera, viewHeightPx), setClearings([{ x, y, r }]) (no objects there: the locations' icons and models),
 // dispose() }.
 import * as THREE from '../vendor/three/three.module.min.js';
@@ -22,6 +28,17 @@ const CLASSES = {
   small: { tall: 3.6, from: 2.5, full: 7 },   // trees and rocks
   big: { tall: PEAK_SIZE, from: 4, full: 12 },   // peaks
 };
+
+// Which of the DM's models stands in for each shape -- the first kind there is (a kind without a model: none)
+export const MODEL_KINDS = {
+  pine: ['tree_pine', 'tree'],
+  leafy: ['tree_leafy', 'tree'],
+  rock: ['rock_land', 'rock'],
+  searock: ['rock_sea', 'rock'],
+  peak: ['peak'],
+};
+// The most triangles a model may have: thousands of trees and rocks are drawn at once, and only 16 summits
+const MAX_TRIANGLES = { small: 1500, big: 30000 };
 
 /** A number from -1 to 1 for a point -- so the corners two faces share are moved alike, and the shape stays closed. */
 function hash3(x, y, z) {
@@ -108,7 +125,63 @@ function peakShape() {
 /** The material the copies of one class share: flat-shaded and lit, each copy grown in by its distance from the camera
  * (`range`: { near (full size closer than this), far (nothing further than this) }, set in update). */
 function material(range) {
-  const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  return growIn(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), range);
+}
+
+/** A model's material made like the shapes' -- lit the same way, its colour, picture and see-through parts (leaves) kept
+ * -- and grown in the same way. */
+function modelMaterial(src, range, vertexColours) {
+  return growIn(new THREE.MeshLambertMaterial({
+    color: src?.color ? src.color.clone() : 0xffffff,
+    map: src?.map || null,
+    alphaMap: src?.alphaMap || null,
+    alphaTest: src?.alphaTest || (src?.transparent || src?.alphaMap ? 0.5 : 0),
+    vertexColors: vertexColours,
+    side: src?.side ?? THREE.FrontSide,
+  }), range);
+}
+
+/** A model's meshes as parts to draw copies of ([{ geo, mat }], one per material it uses), fitted into `target` (the
+ * shape it stands in for: { biggest (its biggest side), minY (how far under the ground it reaches) }) -> { parts } --
+ * none when it's too heavy (over `maxTriangles`) or has nothing to draw -- and { triangles }. */
+function modelParts(scene, target, range, maxTriangles) {
+  scene.updateMatrixWorld(true);
+  const byMaterial = new Map();
+  let triangles = 0;
+  scene.traverse((o) => {
+    if (!o.isMesh || !o.geometry?.attributes?.position) return;
+    const src = Array.isArray(o.material) ? o.material[0] : o.material;
+    const g = o.geometry.clone().applyMatrix4(o.matrixWorld);
+    for (const name of Object.keys(g.attributes)) {
+      if (!['position', 'normal', 'uv', 'color'].includes(name) || (name === 'uv' && !src?.map && !src?.alphaMap)
+        || (name === 'color' && !src?.vertexColors)) g.deleteAttribute(name);
+    }
+    g.morphAttributes = {};
+    if (!g.attributes.normal) g.computeVertexNormals();
+    triangles += (g.index ? g.index.count : g.attributes.position.count) / 3;
+    if (!byMaterial.has(src)) byMaterial.set(src, []);
+    byMaterial.get(src).push(g);
+  });
+  triangles = Math.round(triangles);
+  if (!byMaterial.size || triangles > maxTriangles) return { triangles };
+  const box = new THREE.Box3();
+  for (const geos of byMaterial.values()) for (const g of geos) { g.computeBoundingBox(); box.union(g.boundingBox); }
+  const size = box.getSize(new THREE.Vector3());
+  const k = target.biggest / Math.max(size.x, size.y, size.z);
+  if (!(k > 0) || !Number.isFinite(k)) return { triangles };
+  const parts = [];
+  for (const [src, geos] of byMaterial) {
+    // standing in the middle, its foot as far into the ground as the shape's
+    for (const g of geos) g.translate(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2).scale(k, k, k).translate(0, target.minY, 0);
+    const merged = geos.length > 1 ? mergeGeometries(geos.map(g => (g.index ? g.toNonIndexed() : g))) : null;
+    const mat = modelMaterial(src, range, !!src?.vertexColors);
+    for (const geo of merged ? [merged] : geos) parts.push({ geo, mat });
+  }
+  return { parts, triangles };
+}
+
+/** A material grown in by each copy's distance from the camera (`range`, see material). */
+function growIn(m, range) {
   m.onBeforeCompile = (shader) => {
     shader.uniforms.objNear = range.near;
     shader.uniforms.objFar = range.far;
@@ -118,6 +191,12 @@ function material(range) {
   };
   m.customProgramCacheKey = () => 'map-object';
   return m;
+}
+
+/** A number from 0 to 1 for a spot -- which of a kind's models stands there, the same on every screen. */
+function spotHash(x, y) {
+  const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return s - Math.floor(s);
 }
 
 /** Where the objects stand, worked out in a worker (on the page when there's none) -> object-places.js's result. */
@@ -136,27 +215,59 @@ export function findPlaces(input) {
   });
 }
 
-export function buildMapObjects({ land, placed, groundAt, toWorld }) {
+export function buildMapObjects({ land, placed, groundAt, toWorld, models = {} }) {
   const { W, H } = land;
-  // the objects sorted into the blocks of land they stand in
+
+  // The shapes, their class, and the materials (one per class: its own grow-in distances) -- or the DM's models in
+  // their place: shapes[key] = { cls, parts: [{ geo, mat }] }, a shape's keys in variants[shape] (a model each)
+  const ranges = Object.fromEntries(Object.keys(CLASSES).map(k => [k, { near: { value: 1e9 }, far: { value: 2e9 } }]));
+  const mats = Object.fromEntries(Object.keys(CLASSES).map(k => [k, material(ranges[k])]));
+  const made = {
+    pine: ['small', pineShape()],
+    leafy: ['small', leafyShape()],
+    rock: ['small', rockShape()],
+    searock: ['small', rockShape()],
+    peak: ['big', peakShape()],
+  };
+  const shapes = {};
+  const variants = {};
+  const warned = new Set();
+  for (const [name, [cls, geo]] of Object.entries(made)) {
+    geo.computeBoundingBox();
+    const size = geo.boundingBox.getSize(new THREE.Vector3());
+    const target = { biggest: Math.max(size.x, size.y, size.z), minY: geo.boundingBox.min.y };
+    const kind = MODEL_KINDS[name].find(k => models[k]?.length);
+    const fitted = (kind ? models[kind] : []).map(({ file, scene }) => {
+      const r = modelParts(scene, target, ranges[cls], MAX_TRIANGLES[cls]);
+      if (!r.parts && !warned.has(file)) {
+        warned.add(file);
+        console.warn(r.triangles > MAX_TRIANGLES[cls]
+          ? `Map object ${file} has ${r.triangles} triangles -- ${MAX_TRIANGLES[cls]} at most, so it's left out`
+          : `Map object ${file} has nothing to draw -- left out`);
+      }
+      return r.parts;
+    }).filter(Boolean);
+    if (fitted.length) {
+      geo.dispose();
+      variants[name] = fitted.map((parts, n) => { shapes[`${name}#${n}`] = { cls, parts }; return `${name}#${n}`; });
+    } else {
+      shapes[name] = { cls, parts: [{ geo, mat: mats[cls] }] };
+      variants[name] = [name];
+    }
+  }
+
+  // the objects sorted into the blocks of land they stand in (and, a shape with more than one model, by which)
   const chunks = new Map();
   const { shapes: names, data } = placed;
   for (let k = 0; k < data.length; k += FIELDS) {
     const [shape, x, y, turn, size, tall, shade] = data.subarray(k, k + FIELDS);
-    const key = `${Math.floor(x / CHUNK)},${Math.floor(y / CHUNK)}`;
-    if (!chunks.has(key)) chunks.set(key, { x0: Math.floor(x / CHUNK) * CHUNK, y0: Math.floor(y / CHUNK) * CHUNK, items: {}, meshes: {} });
-    (chunks.get(key).items[names[shape]] ||= []).push({ x, y, turn, size, tall, shade });
+    const keys = variants[names[shape]];
+    if (!keys) continue;
+    const at = `${Math.floor(x / CHUNK)},${Math.floor(y / CHUNK)}`;
+    if (!chunks.has(at)) chunks.set(at, { x0: Math.floor(x / CHUNK) * CHUNK, y0: Math.floor(y / CHUNK) * CHUNK, items: {}, meshes: {} });
+    const key = keys.length > 1 ? keys[Math.min(keys.length - 1, Math.floor(spotHash(x, y) * keys.length))] : keys[0];
+    (chunks.get(at).items[key] ||= []).push({ x, y, turn, size, tall, shade });
   }
-
-  // The shapes, their class, and the materials (one per class: its own grow-in distances)
-  const ranges = Object.fromEntries(Object.keys(CLASSES).map(k => [k, { near: { value: 1e9 }, far: { value: 2e9 } }]));
-  const mats = Object.fromEntries(Object.keys(CLASSES).map(k => [k, material(ranges[k])]));
-  const shapes = {
-    pine: { geo: pineShape(), cls: 'small' },
-    leafy: { geo: leafyShape(), cls: 'small' },
-    rock: { geo: rockShape(), cls: 'small' },
-    peak: { geo: peakShape(), cls: 'big' },
-  };
 
   const group = new THREE.Group();
   group.name = 'map-objects';
@@ -191,14 +302,16 @@ export function buildMapObjects({ land, placed, groundAt, toWorld }) {
 
   let count = 0;
   for (const c of chunks.values()) {
-    for (const [shape, items] of Object.entries(c.items)) {
-      const s = shapes[shape];
-      const mesh = new THREE.InstancedMesh(s.geo, mats[s.cls], items.length);
-      mesh.userData.cls = s.cls;
-      mesh.matrixAutoUpdate = false;
-      fill(mesh, items);
-      c.meshes[shape] = mesh;
-      group.add(mesh);
+    for (const [key, items] of Object.entries(c.items)) {
+      const s = shapes[key];
+      c.meshes[key] = s.parts.map((p) => {
+        const mesh = new THREE.InstancedMesh(p.geo, p.mat, items.length);
+        mesh.userData.cls = s.cls;
+        mesh.matrixAutoUpdate = false;
+        fill(mesh, items);
+        group.add(mesh);
+        return mesh;
+      });
       count += items.length;
     }
   }
@@ -220,7 +333,7 @@ export function buildMapObjects({ land, placed, groundAt, toWorld }) {
       const dz = Math.max(z0 - cam.z, 0, cam.z - (z0 + CHUNK));
       const dy = Math.max(0, cam.y - land.topY);
       const d = Math.hypot(dx, dy, dz);
-      for (const mesh of Object.values(c.meshes)) mesh.visible = mesh.count > 0 && d < far[mesh.userData.cls];
+      for (const list of Object.values(c.meshes)) for (const mesh of list) mesh.visible = mesh.count > 0 && d < far[mesh.userData.cls];
     }
   }
 
@@ -229,11 +342,11 @@ export function buildMapObjects({ land, placed, groundAt, toWorld }) {
     const next = (list || []).filter(c => c && c.r > 0);
     if (JSON.stringify(next) === JSON.stringify(clearings)) return;
     clearings = next;
-    for (const c of chunks.values()) for (const [shape, mesh] of Object.entries(c.meshes)) fill(mesh, c.items[shape]);
+    for (const c of chunks.values()) for (const [key, list] of Object.entries(c.meshes)) list.forEach(mesh => fill(mesh, c.items[key]));
   }
 
   function dispose() {
-    Object.values(shapes).forEach(s => s.geo.dispose());
+    Object.values(shapes).forEach(s => s.parts.forEach((p) => { p.geo.dispose(); p.mat.dispose(); }));
     Object.values(mats).forEach(m => m.dispose());
     group.children.forEach(m => m.dispose());
   }

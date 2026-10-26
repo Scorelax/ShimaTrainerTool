@@ -1513,6 +1513,12 @@ export class DmAPI {
   }
 
   /** The locations' icons on the Pi (~/pokemon-dnd/images/locations, "<Type>-<Name>"): [{file, type, name, url}]. */
+  /** The region map's models for its trees, rocks and summits ("mapobject-<kind>.glb" in the icons' folder) ->
+   * [{file, kind, url}]. */
+  static async mapObjectModels() {
+    return (await API.request('dm', 'map-object-models', {}, { useCache: false })).data || [];
+  }
+
   static async locationIcons() {
     return (await API.request('dm', 'location-icons', {}, { useCache: false })).data || [];
   }

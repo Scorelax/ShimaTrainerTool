@@ -366,9 +366,10 @@ def party_overview(conn):
     """Every player trainer with all their Pokemon -- the DM console's Party module: the trainers and their Pokemon as
     objects (trainers.py, owned.py), portraits and animated sprites swapped in, plus the XP only the DM sees: `xp` =
     {trainer, pokemon: [one per Pokemon, in the same order]}, each the stored XP or None when there's none yet (the
-    console counts that as the start of the record's level)."""
+    console counts that as the start of the record's level). And the DM's own `notes` on the trainer."""
     _absorb_old_xp_ledger(conn)
     trainer_xp = dict(conn.execute('SELECT id, dm_xp FROM trainers').fetchall())
+    trainer_notes = dict(conn.execute('SELECT id, dm_notes FROM trainers').fetchall())
     pokemon_xp = dict(conn.execute('SELECT id, dm_xp FROM owned_pokemon').fetchall())
     pokemon = owned.all_owned(conn)
     out = []
@@ -378,8 +379,26 @@ def party_overview(conn):
             'trainer': trainers.with_image(t),
             'pokemon': [owned.with_image(p) for _, p in mine],
             'xp': {'trainer': trainer_xp.get(tid), 'pokemon': [pokemon_xp.get(pid) for pid, _ in mine]},
+            'notes': trainer_notes.get(tid) or '',
         })
     return out
+
+
+NOTES_MAX = 20000  # characters
+
+
+def set_trainer_notes(conn, name, notes):
+    """The DM's notes on a trainer -- POST /api/dm/trainer-notes (the user's call, 2026-10-27). Only the DM sees them:
+    kept beside the XP (the dm_notes column), never in the trainer object the players' app gets, so nothing is pushed."""
+    tid, _ = trainers.find(conn, str(name or ''))
+    if tid is None:
+        raise ValueError('Not found: ' + str(name))
+    text = str(notes or '')
+    if len(text) > NOTES_MAX:
+        raise ValueError(f'The notes are too long (at most {NOTES_MAX:,} characters)')
+    conn.execute('UPDATE trainers SET dm_notes = ? WHERE id = ?', (text, tid))
+    conn.commit()
+    return text
 
 
 def _xp_start(level):

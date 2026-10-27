@@ -41,8 +41,9 @@ LEGACY_POKEMON_COLUMNS = [
 
 # XP (dm_xp) is only the DM's (routes_dm.change_xp): it's deliberately not in the objects, which are sent to the
 # players' app and written back by it -- so it never leaves the Pi through them, no player save touches it, and since it
-# sits on the record itself, a Pokemon keeps its XP when it evolves.
-TRAINERS_TABLE = 'CREATE TABLE IF NOT EXISTS trainers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, json TEXT, dm_xp INTEGER)'
+# sits on the record itself, a Pokemon keeps its XP when it evolves. The DM's notes on a trainer (dm_notes, the user's
+# call, 2026-10-27: routes_dm.set_trainer_notes) are kept the same way.
+TRAINERS_TABLE = 'CREATE TABLE IF NOT EXISTS trainers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, json TEXT, dm_xp INTEGER, dm_notes TEXT)'
 
 _SCHEMA = TRAINERS_TABLE + """;
 CREATE TABLE IF NOT EXISTS owned_pokemon (id INTEGER PRIMARY KEY AUTOINCREMENT, trainer TEXT, name TEXT, json TEXT, dm_xp INTEGER);
@@ -82,3 +83,7 @@ def _migrate(conn):
         conn.execute('ALTER TABLE trainers ADD COLUMN dm_xp INTEGER')
     from . import migrations
     migrations.run(conn)
+    # (after: an old database's trainers table is only made the new way there)
+    trainer_cols = [r[1] for r in conn.execute('PRAGMA table_info(trainers)')]
+    if 'json' in trainer_cols and 'dm_notes' not in trainer_cols:
+        conn.execute('ALTER TABLE trainers ADD COLUMN dm_notes TEXT')

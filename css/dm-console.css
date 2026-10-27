@@ -810,6 +810,12 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-xp-panel-top { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; }
 .dm-xp-panel .dm-hint { margin-top: 0.3rem; }
 .dm-xp-panel .dm-btn { white-space: nowrap; flex: none; }
+/* The DM's notes on a trainer, under the XP (party.js) */
+.dm-notes-panel { margin-top: 0.7rem; padding: 0.6rem 0.7rem; border: 1px solid var(--dm-line); border-radius: 10px; background: rgba(255, 255, 255, 0.03); }
+.dm-notes-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.35rem; }
+.dm-notes-top label { font-weight: 700; color: var(--dm-gold); }
+.dm-notes { width: 100%; box-sizing: border-box; min-height: 8rem; resize: vertical; font: inherit; font-size: 0.9rem; line-height: 1.4; }
+.dm-notes-panel .dm-hint { margin-top: 0.3rem; }
 .dm-xp-total { font-weight: 800; font-size: 1.02rem; color: var(--dm-gold); }
 .dm-xp-private { font-size: 0.72rem; opacity: 0.8; }
 .dm-xp-btn {

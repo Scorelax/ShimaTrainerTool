@@ -1459,6 +1459,11 @@ export class DmAPI {
     return (await DmAPI._post('xp', { changes }, 'Saving the XP')).data;
   }
 
+  /** The DM's own notes on a trainer (only the DM sees them). Resolves to the saved text. */
+  static async saveTrainerNotes(trainer, notes) {
+    return (await DmAPI._post('trainer-notes', { trainer, notes }, 'Saving the notes')).data;
+  }
+
   /** What the table TV shows ({background, items, battlePictures}) -- stored and pushed to the TV at once. */
   static async saveDisplayScene(scene) {
     return DmAPI._post('display-scene', { scene }, 'Updating the TV');

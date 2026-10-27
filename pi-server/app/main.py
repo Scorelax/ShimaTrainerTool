@@ -254,6 +254,19 @@ def dm_change_xp(payload: dict):
     return JSONResponse({'status': 'success', 'data': result})
 
 
+@app.post('/api/dm/trainer-notes')
+def dm_trainer_notes(payload: dict):
+    """The DM's own notes on a trainer, only the DM sees them (routes_dm.set_trainer_notes)."""
+    conn = db.connect()
+    try:
+        result = routes_dm.set_trainer_notes(conn, payload.get('trainer'), payload.get('notes'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success', 'data': result})
+
+
 @app.post('/api/dm/display-scene')
 def dm_save_display_scene(payload: dict):
     """What the table TV shows -- a background and pictures (routes_dm.save_display_scene), pushed to the TV at once."""

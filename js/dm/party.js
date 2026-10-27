@@ -48,6 +48,7 @@ export async function renderParty(root) {
 async function reload() {
   try {
     _party = (await DmAPI.party()).data || [];
+    _party.forEach((e) => { if (_notesSaved.has(e.trainer.name)) e.notes = _notesSaved.get(e.trainer.name); });
   } catch (err) {
     _root.innerHTML = `<div class="dm-loading">Couldn't load the trainers: ${escapeHtml(err.message)}</div>`;
     return;
@@ -151,6 +152,9 @@ function drawTrainer(entry) {
   // The DM-only XP that came with the rows (DmAPI.party), or where each record's level starts.
   const xpFor = p => xpOrStart(entry.xp?.pokemon?.[entry.pokemon.indexOf(p)], p.level);
   const scrollers = [..._root.querySelectorAll('.dm-trainer-col')].map(c => c.scrollTop);
+  // being typed in when the page is drawn again (a player changed something): still typed in, the cursor where it was
+  const typing = document.activeElement?.id === 'trainerNotes' ? document.activeElement : null;
+  const caret = typing ? [typing.selectionStart, typing.selectionEnd, typing.scrollTop] : null;
 
   _root.innerHTML = `
     <div class="dm-trainer">
@@ -161,7 +165,7 @@ function drawTrainer(entry) {
         <span class="dm-hint">Lv ${escapeHtml(t.level)} · ${escapeHtml(t.trainerClass || 'Trainer')}${t.region ? ` · ${escapeHtml(t.region)}` : ''}</span>
       </div>
       <div class="dm-trainer-cols">
-        <div class="dm-trainer-col">${trainerStatsHtml(t)}${xpPanelHtml(xpOrStart(entry.xp?.trainer, t.level), t.level, 'id="trainerXp"')}</div>
+        <div class="dm-trainer-col">${trainerStatsHtml(t)}${xpPanelHtml(xpOrStart(entry.xp?.trainer, t.level), t.level, 'id="trainerXp"')}${notesPanelHtml(entry)}</div>
         <div class="dm-trainer-col">
           <div class="dm-card-title dm-title-with-btn">Pokémon (${all.length})<button class="dm-btn small primary" id="givePokemonBtn">+ Give Pokémon</button></div>
           ${all.map(p => pokemonRowHtml(name, p, xpFor(p))).join('') || '<div class="dm-hint">No Pokémon.</div>'}
@@ -172,6 +176,7 @@ function drawTrainer(entry) {
   patchImages(_root);
   _root.querySelectorAll('.dm-trainer-col').forEach((c, i) => { if (scrollers[i]) c.scrollTop = scrollers[i]; });
   wireTrainer(name, items);
+  wireNotes(entry, caret);
   document.getElementById('givePokemonBtn').addEventListener('click', async () => {
     if (await givePokemonPopup(name, { ownedSpecies: entry.pokemon.map(p => p.name) })) {
       toast(`Gave ${name} a Pokémon`);
@@ -187,6 +192,57 @@ function drawTrainer(entry) {
     if (!p) return;
     if (await giveXpPopup({ label: `${name}'s ${pokemonName(p)}`, trainer: name, pokemon: p.name, xp: xpFor(p), level: p.level }) !== null) reload();
   }));
+}
+
+// ---------------------------------------------------------------------------
+// The DM's notes on a trainer (the user's call, 2026-10-27): under the XP, only the DM sees them (routes_dm.py's
+// set_trainer_notes) -- saved a moment after typing stops and on leaving the box, what's typed kept while the page is
+// drawn again (any change to any trainer redraws it).
+// ---------------------------------------------------------------------------
+
+const _notesDraft = new Map(); // trainer name -> text typed but not saved yet
+const _notesSaved = new Map(); // trainer name -> what this console saved last (a reload that crossed the save shows it)
+let _notesTimer = null;
+
+function notesPanelHtml(entry) {
+  const name = entry.trainer.name;
+  const text = _notesDraft.has(name) ? _notesDraft.get(name) : entry.notes || '';
+  return `
+    <div class="dm-notes-panel">
+      <div class="dm-notes-top"><label for="trainerNotes">📝 Notes</label><span class="dm-hint" id="trainerNotesState">${_notesDraft.has(name) ? 'Saving…' : ''}</span></div>
+      <textarea class="dm-input dm-notes" id="trainerNotes" rows="6" maxlength="20000" placeholder="Anything about ${escapeHtml(name)} you want to remember…">${escapeHtml(text)}</textarea>
+      <div class="dm-hint dm-xp-private">Only you see these notes -- the players never do.</div>
+    </div>`;
+}
+
+function wireNotes(entry, caret) {
+  const box = document.getElementById('trainerNotes');
+  const name = entry.trainer.name;
+  const say = (text) => { const el = document.getElementById('trainerNotesState'); if (el && _selected === name) el.textContent = text; };
+  if (caret) { box.focus(); [box.selectionStart, box.selectionEnd, box.scrollTop] = caret; }
+  const save = async () => {
+    clearTimeout(_notesTimer);
+    _notesTimer = null;
+    if (!_notesDraft.has(name)) return;
+    const text = _notesDraft.get(name);
+    say('Saving…');
+    try {
+      await DmAPI.saveTrainerNotes(name, text);
+      _notesSaved.set(name, text);
+      const e = _party.find(x => x.trainer.name === name);
+      if (e) e.notes = text;
+      if (_notesDraft.get(name) === text) { _notesDraft.delete(name); say('✓ Saved'); }
+    } catch (err) {
+      say(`Not saved: ${err.message}`);
+    }
+  };
+  box.addEventListener('input', () => {
+    _notesDraft.set(name, box.value);
+    say('…');
+    clearTimeout(_notesTimer);
+    _notesTimer = setTimeout(save, 800);
+  });
+  box.addEventListener('blur', save);
 }
 
 function trainerStatsHtml(t) {

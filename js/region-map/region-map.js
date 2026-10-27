@@ -10,7 +10,7 @@
 //
 // Self-contained so it can live in its own page (region-map.html) or be mounted elsewhere -- the DM console's PokeNav
 // steers it (onView) and the table's board screen (battle-map.html) shows it view only, following along (setView):
-// mountRegionMap(root, { onBack, viewOnly, title, rememberStyle, onView }) -> { ready, destroy, getView, setView, home,
+// mountRegionMap(root, { onBack, viewOnly, title, rememberStyle, onView, loadingText }) -> { ready, destroy, getView, setView, home,
 // setLocations, highlight, setParty, flyToLocation, mapId (the map it shows, once ready), graphics: {renderer, software} }.
 // Its names are the DM's locations (setLocations -- the Admin module's Locations tab, each with a `shape` on the map,
 // js/dm/location-map.js) once it's given them, the towns in places.json until then; a highlighted location is drawn
@@ -127,7 +127,7 @@ function segmentInBox(ax, ay, bx, by, x0, y0, x1, y1) {
   return true;
 }
 
-export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false, onPick } = {}) {
+export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false, onPick, loadingText = 'Loading the map…' } = {}) {
   // `onPick(locationId)` (the players' PokéNav, the user's call, 2026-10-21): a location's name or icon tapped -- the map
   // flies there and lights it up, and this is told (to show what's there).
   // `turned` (the DM's PokeNav, the user's call, 2026-10-20): this screen is the table's 16:9 board screen seen from the
@@ -158,7 +158,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     </div>`}
     ${viewOnly ? '<div class="rmap-compass"><span class="rmap-needle"></span></div>'
       : `<button class="rmap-compass" data-act="north" aria-label="${homeAzimuth == null ? 'North up' : 'Back to the default view'}" title="${homeAzimuth == null ? 'North up' : 'Back to the default view'}"><span class="rmap-needle"></span><b>N</b></button>`}
-    <div class="rmap-loading">Loading the map…</div>`;
+    <div class="rmap-loading">${loadingText}</div>`;
   const $ = sel => root.querySelector(sel);
   const canvas = $('.rmap-canvas');
   const labelLayer = $('.rmap-labels');

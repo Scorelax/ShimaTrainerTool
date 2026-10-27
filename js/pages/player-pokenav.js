@@ -113,7 +113,7 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
   const mount = async () => {
     const { mountRegionMap } = await import('../region-map/region-map.js');
     if (destroyed) return;
-    map = mountRegionMap(root.querySelector('#pnavMap'), { onBack, title: true, homeAzimuth: HOME_AZIMUTH, onPick: id => openPanel(id, { fly: false }) });
+    map = mountRegionMap(root.querySelector('#pnavMap'), { onBack, title: true, homeAzimuth: HOME_AZIMUTH, loadingText: 'Starting PokéNav…', onPick: id => openPanel(id, { fly: false }) });
     showLocations();
     showParty();
     await map.ready;

@@ -17,7 +17,8 @@
 // (the running battle's third tab, battle-live.js), an encounter can carry its own map (made here with the map editor --
 // map-store.js), the Battle module imports one (importEncounterDialog: its creatures and its map become the next
 // battle), each wild Pokemon's ℹ️ shows everything its species is known for (species-info.js), and an encounter's NPC
-// opens in the NPC module to change it for good.
+// opens in the NPC module to change it for good. One that's been played can be marked finished (`finished`): it moves
+// into a closed "Finished encounters" box under the list, still there to open again (the user's call, 2026-10-27).
 //
 // Post battle: after a PvE battle ends (routes_combat._remember_battle keeps it as 'last-battle'), what happened -- who
 // was defeated, caught or got away -- and what to hand out. Unlike the old tool, which exported files or called the
@@ -184,11 +185,27 @@ function renderList() {
   if (!box) return;
   const q = (document.getElementById('encSearch')?.value || '').trim().toLowerCase();
   const list = _encounters.filter(e => !q || e.name.toLowerCase().includes(q));
-  box.innerHTML = list.length ? list.map(e => `
+  const row = e => `
     <button class="dm-enc-row${e.id === _selectedId ? ' selected' : ''}" data-enc="${escapeHtml(e.id)}">
       <strong>${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' <span class="dm-enc-live" title="The next battle">● in play</span>' : ''}</strong>
       <small>${escapeHtml(summary(e))}</small>
-    </button>`).join('') : `<div class="dm-hint">${_encounters.length ? 'No encounter matches that.' : 'No encounters yet -- make one with "+ New encounter", or save the next battle as one.'}</div>`;
+    </button>`;
+  // The finished ones (✓ Mark finished) out of the way in a box of their own, closed unless the DM opened it
+  const open = list.filter(e => !e.finished);
+  const done = list.filter(e => e.finished);
+  const doneOpen = done.some(e => e.id === _selectedId) || finishedBoxOpen();
+  box.innerHTML = (open.length ? open.map(row).join('')
+    : `<div class="dm-hint">${_encounters.length ? (q ? 'No encounter matches that.' : 'Every encounter is finished.') : 'No encounters yet -- make one with "+ New encounter", or save the next battle as one.'}</div>`)
+    + (done.length ? `<details class="dm-enc-finished" id="encFinished" ${doneOpen ? 'open' : ''}>
+        <summary>✓ Finished encounters (${done.length})</summary>${done.map(row).join('')}</details>` : '');
+  // (the DM's own open / close only -- not the box opening by itself for a finished one picked)
+  box.querySelector('#encFinished > summary')?.addEventListener('click', (e) => {
+    try { localStorage.setItem('dm-enc-finished-open', e.target.parentElement.open ? '' : '1'); } catch { /* only remembered where it can be */ }
+  });
+}
+
+function finishedBoxOpen() {
+  try { return !!localStorage.getItem('dm-enc-finished-open'); } catch { return false; }
 }
 
 function npcById(id) {
@@ -218,6 +235,8 @@ function renderSheet() {
     <div class="dm-enc-head">
       <input class="dm-input dm-enc-name" id="encName" data-f="name" value="${escapeHtml(enc.name)}" placeholder="Encounter name">
       <div class="dm-enc-actions">
+        ${enc.finished ? '<span class="dm-pill ok" title="Kept under Finished encounters on the left">✓ Finished</span>' : ''}
+        <button class="dm-btn" id="encFinish" title="${enc.finished ? 'Back among the encounters still to come' : 'Done with it -- kept under Finished encounters on the left, out of the way'}">${enc.finished ? '↺ Not finished' : '✓ Mark finished'}</button>
         <button class="dm-btn" id="encSaveBtn" title="Save it on the Pi now (it also saves on its own a moment after each change)">💾 Save encounter</button>
         ${enc.id === _runId
           ? '<span class="dm-enc-live dm-enc-inplay" title="This is the next battle -- changes here go straight into it">● In play</span><button class="dm-btn primary" id="encPlace">📍 Place on the map</button>'
@@ -275,6 +294,13 @@ function renderSheet() {
   if (_adding) { renderMonResults(); document.getElementById('encMonSearch')?.focus(); }
   enc.pokemon.filter(p => _customizing.has(p.id)).forEach(loadCalc);
   document.getElementById('encLoad')?.addEventListener('click', () => loadIntoSetup(enc));
+  document.getElementById('encFinish').addEventListener('click', () => {
+    if (enc.finished) { delete enc.finished; delete enc.finishedAt; } else { enc.finished = true; enc.finishedAt = new Date().toISOString(); }
+    saveNow(enc);
+    renderList();
+    renderSheet();
+    toast(enc.finished ? `"${enc.name}" moved to Finished encounters.` : `"${enc.name}" is back among the encounters.`);
+  });
   document.getElementById('encSaveBtn')?.addEventListener('click', async () => {
     await saveNow(enc); // says so itself if it couldn't
     if (_saveState !== 'error') toast(`"${enc.name}" saved.`);
@@ -348,7 +374,7 @@ function monRowHtml(p) {
           <select class="dm-select" data-k="nature">${natureOptions(p.nature)}</select>
           <input class="dm-input" data-k="item" value="${escapeHtml(p.item || '')}" placeholder="Held item" list="encItems">
           <label title="Shiny"><input type="checkbox" data-k="shiny" ${p.shiny ? 'checked' : ''}>✨</label>
-          <label title="Starts hidden -- not fighting yet, and only you see it"><input type="checkbox" data-k="heldBack" ${p.heldBack ? 'checked' : ''}>Hidden</label>
+          <label title="Starts hidden -- only you see it until it's shown (see-through on the map, or joining later if not placed)"><input type="checkbox" data-k="heldBack" ${p.heldBack ? 'checked' : ''}>Hidden</label>
         </div>
         <div class="dm-enc-mon-sum"><span data-sum="abil">✦ ${escapeHtml(abilityNames(p, sp))}</span>${bonuses.length ? `<span class="dm-enc-bonus-sum">${escapeHtml(bonuses.join(' · '))}</span>` : ''}</div>
       </div>
@@ -1001,8 +1027,8 @@ export async function importEncounterDialog() {
   const id = await openDmModal({
     title: '📥 Import an encounter',
     html: `<input class="dm-input" id="impSearch" placeholder="Search…" autocomplete="off" style="margin-bottom:0.5rem">
-      <div class="dm-enc-savedmaps" id="impList">${_encounters.map(e => `<button class="dm-species-item" data-enc="${escapeHtml(e.id)}" data-search="${escapeHtml(e.name.toLowerCase())}">
-        <span><span class="dm-species-name">${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' · ● in play' : ''}</span>
+      <div class="dm-enc-savedmaps" id="impList">${[..._encounters].sort((a, b) => !!a.finished - !!b.finished).map(e => `<button class="dm-species-item" data-enc="${escapeHtml(e.id)}" data-search="${escapeHtml(e.name.toLowerCase())}">
+        <span><span class="dm-species-name">${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' · ● in play' : ''}${e.finished ? ' · ✓ finished' : ''}</span>
         <span class="dm-species-meta">${escapeHtml(summary(e))}${e.map ? ` · 🗺️ its own map (${e.map.rows} × ${e.map.cols})` : ''}</span></span></button>`).join('')}</div>`,
     buttons: [{ label: 'Cancel', value: null }],
     onOpen: (body, close) => {
@@ -1139,9 +1165,14 @@ function runFields(enc) {
 }
 
 function buildEncounterMon(enc, p, had) {
+  // Hidden as Map setup's Participants left it, unless it's the encounter's Hidden that changed; hidden or not, it keeps
+  // its square (a hidden one on the map is see-through, only the DM sees it)
+  let builtHidden = null;
+  try { builtHidden = JSON.parse(had?.encSig || 'null')?.[3]; } catch { /* built before encSig had it */ }
   return buildPokemonCreature(had?.id || newId(), p.species, p.name || p.species, monConfig(p), {
-    encId: enc.id, encKey: `mon:${p.id}`, encSig: monSig(p), trainerId: null, heldBack: !!p.heldBack,
-    position: p.heldBack && !p.position ? null : had?.position || null, // (a hidden one with a square keeps it)
+    encId: enc.id, encKey: `mon:${p.id}`, encSig: monSig(p), trainerId: null,
+    heldBack: had && builtHidden === !!p.heldBack ? !!had.heldBack : !!p.heldBack,
+    position: had?.position || null,
   });
 }
 

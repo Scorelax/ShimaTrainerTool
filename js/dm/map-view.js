@@ -125,7 +125,7 @@ export function creatureSpotProblem(setup, c, col, row) {
   if (!isLevitating(c.participant) && cells.some(p => m.marks?.[`${p.col},${p.row}`] === 'blocked')) return 'That square is blocked.';
   const taken = new Set();
   setup.creatures.forEach(o => {
-    if (o.id === c.id || !o.position || o.heldBack) return;
+    if (o.id === c.id || !o.position) return; // (a hidden one standing there takes the spot too)
     footprintCells(o.position.col, o.position.row, footprintForSize(o.participant?.size)).forEach(p => taken.add(`${p.col},${p.row}`));
   });
   if (cells.some(p => taken.has(`${p.col},${p.row}`))) return 'Another creature is standing there.';

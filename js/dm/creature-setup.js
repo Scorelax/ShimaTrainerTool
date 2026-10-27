@@ -6,7 +6,9 @@
 // saved with a ready battle participant (setup-store.js), so Start battle only has to send them in.
 //
 // The map sits above the form: pick someone (from the list or by clicking their token) and click a square to stand
-// them there.
+// them there. Map setup's Participants opens it with the one clicked already picked (`select`). A hidden one can stand on
+// the map too -- see-through, only the DM sees it until it's shown; one not placed joins later (the user's call,
+// 2026-10-27; routes_combat.start_prepared_session starts both).
 import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
@@ -35,9 +37,11 @@ let _unsub = null;
 let _previewTimer = null;
 let _previewSeq = 0;
 
-export async function renderCreatureSetup(root, { onDone }) {
+export async function renderCreatureSetup(root, { onDone, select = null }) {
   _root = root;
   _onDone = onDone;
+  const picked = select && getSetup().creatures.find(c => c.id === select);
+  if (picked) _editing = { mode: picked.kind, id: picked.id };
   root.innerHTML = `
     <div class="dm-editor">
       <aside class="dm-editor-tools">
@@ -118,7 +122,7 @@ function renderList() {
   const wild = all.filter(c => c.kind === 'pokemon' && !trainers.some(t => t.id === c.trainerId));
   const row = (c, nested = false) => {
     const p = c.participant || {};
-    const where = c.heldBack ? (c.position ? 'hidden · on the map' : 'hidden') : c.position ? '📍 placed' : '⚠ not placed';
+    const where = c.heldBack ? (c.position ? '🙈 hidden · 📍 placed' : '🙈 hidden · joins later') : c.position ? '📍 placed' : '⚠ not placed';
     return `
       <button class="dm-cs-row${nested ? ' nested' : ''}${_editing?.id === c.id ? ' selected' : ''}" data-creature="${c.id}">
         <span class="dm-cs-thumb" data-img="${escapeHtml(p.image || '')}"></span>
@@ -171,8 +175,7 @@ function renderMap() {
   if (hint) {
     hint.textContent = !sel
       ? 'Pick someone on the left (or click a token) to place them on the map.'
-      : sel.heldBack ? `${sel.name} is hidden -- it joins later (only you see it until then) and doesn't start on the map.`
-        : `Click a square to place ${sel.name}${sel.position ? ' somewhere else' : ''}.`;
+      : `Click a square to place ${sel.name}${sel.position ? ' somewhere else' : ''}${sel.heldBack ? " -- hidden: only you see it until it's shown" : ''}.`;
   }
 
   const grid = stage.querySelector('.dm-map-grid');
@@ -192,7 +195,7 @@ function renderMap() {
 }
 
 function creatureAt(col, row) {
-  return getSetup().creatures.find(c => c.position && !c.heldBack
+  return getSetup().creatures.find(c => c.position
     && footprintCells(c.position.col, c.position.row, footprintForSize(c.participant?.size)).some(p => p.col === col && p.row === row));
 }
 
@@ -200,7 +203,7 @@ function renderGhost() {
   const ghost = document.querySelector('#csMap .dm-map-ghost');
   if (!ghost) return;
   const sel = selectedCreature();
-  if (!_hover || !sel || sel.heldBack || creatureAt(_hover.col, _hover.row)) { ghost.innerHTML = ''; return; }
+  if (!_hover || !sel || creatureAt(_hover.col, _hover.row)) { ghost.innerHTML = ''; return; }
   const s = getSetup();
   const r = tokenScreenRect(s.map, _hover.col, _hover.row, footprintForSize(sel.participant?.size));
   ghost.innerHTML = `<div class="${creatureSpotProblem(s, sel, _hover.col, _hover.row) ? 'dm-ghost-bad' : 'dm-ghost-good'}" style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"></div>`;
@@ -210,7 +213,7 @@ function onMapClick(col, row) {
   const other = creatureAt(col, row);
   const sel = selectedCreature();
   if (other && other.id !== sel?.id) { edit({ mode: other.kind, id: other.id }); return; }
-  if (!sel || sel.heldBack || other) return;
+  if (!sel || other) return;
   const problem = creatureSpotProblem(getSetup(), sel, col, row);
   if (problem) { showCombatAlert(problem, { title: sel.name }); return; }
   // facing the players' side when first placed; moved, it keeps the way it faces
@@ -234,8 +237,8 @@ function renderPlacementLine() {
         <option value="" ${!c.config?.size ? 'selected' : ''}>Its own${own ? ` -- ${escapeHtml(own)}${SQUARES[own] ? ` (${SQUARES[own]})` : ''}` : ''}</option>
         ${SIZES.map(z => `<option value="${z}" ${c.config?.size === z ? 'selected' : ''}>${z} (${SQUARES[z] || '1 square'})</option>`).join('')}
       </select></div>` : '';
-  el.innerHTML = (c.heldBack ? '<span class="dm-hint">Hidden -- not on the map at the start.</span>'
-    : c.position ? `<span>📍 On the map.</span> <button type="button" class="dm-btn small" id="csUnplace">Take off the map</button>
+  el.innerHTML = (!c.position && c.heldBack ? '<span class="dm-hint">🙈 Hidden -- joins later. Click a square on the map above to have it start there, hidden.</span>'
+    : c.position ? `<span>📍 On the map${c.heldBack ? ' -- 🙈 hidden' : ''}.</span> <button type="button" class="dm-btn small" id="csUnplace">Take off the map</button>
       <span class="dm-row" style="flex-wrap:nowrap;white-space:nowrap"><button type="button" class="dm-btn small" data-cs-turn="-45" title="Turn left 45°">⟲ 45°</button>
         <button type="button" class="dm-btn small" data-cs-turn="45" title="Turn right 45°">⟳ 45°</button></span>`
       : '<span class="dm-warn-text">⚠ Not on the map yet -- click a square on the map above.</span>') + sizeRow;
@@ -355,7 +358,7 @@ function renderPokemonForm(box) {
             <div class="dm-field"><label for="csInit">Initiative</label><input class="dm-input" id="csInit" type="number" value="${cfg.initiative ?? ''}" placeholder="Rolled at the start"></div>
             <div class="dm-field dm-field-checks">
               <label class="dm-check"><input type="checkbox" id="csShiny" ${cfg.shiny ? 'checked' : ''}>Shiny</label>
-              <label class="dm-check"><input type="checkbox" id="csHeld" ${c?.heldBack ? 'checked' : ''}>Hidden (joins later -- only you see it)</label>
+              <label class="dm-check"><input type="checkbox" id="csHeld" ${c?.heldBack ? 'checked' : ''}>Hidden (only you see it until it's shown)</label>
             </div>
           </div>
           <div class="dm-cs-placement" id="csPlacement"></div>
@@ -494,7 +497,7 @@ async function savePokemon() {
   if (btn) { btn.disabled = true; btn.textContent = 'Building…'; }
   try {
     const rebuilt = await buildPokemonCreature(c.id, c.config.species, form.name || c.name, form.config,
-      { ...originOf(c), trainerId: form.trainerId, heldBack: form.heldBack, position: form.heldBack ? null : c.position });
+      { ...originOf(c), trainerId: form.trainerId, heldBack: form.heldBack, position: c.position });
     updateSetup(s => { s.creatures[s.creatures.findIndex(x => x.id === c.id)] = rebuilt; });
     edit({ mode: 'pokemon', id: c.id });
   } catch (err) {
@@ -573,7 +576,7 @@ function renderTrainerForm(box) {
           </div>
           <div class="dm-field"><label>Saving throws</label>${multiSelectHtml('ctSaves', SAVING_THROWS, splitList(t.savingThrows, SAVING_THROWS))}</div>
           <div class="dm-field"><label>Skills</label>${multiSelectHtml('ctSkills', SKILLS, splitList(t.skills, SKILLS))}</div>
-          <label class="dm-check"><input type="checkbox" id="ctHeld" ${c?.heldBack ? 'checked' : ''}>Hidden (joins later -- only you see it)</label>
+          <label class="dm-check"><input type="checkbox" id="ctHeld" ${c?.heldBack ? 'checked' : ''}>Hidden (only you see them until they're shown)</label>
           <div class="dm-cs-placement" id="csPlacement"></div>
         </div>
         <div>
@@ -640,7 +643,7 @@ function saveTrainer(existing) {
   const heldBack = document.getElementById('ctHeld').checked;
   const creature = {
     ...originOf(existing), id: existing?.id || newId(), kind: 'trainer', name: config.name, config, participant,
-    initiativeBonus: combatant.initiativeTotal || 0, heldBack, position: heldBack ? null : existing?.position || null,
+    initiativeBonus: combatant.initiativeTotal || 0, heldBack, position: existing?.position || null,
   };
   updateSetup(s => {
     const i = s.creatures.findIndex(x => x.id === creature.id);

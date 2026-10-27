@@ -241,12 +241,12 @@ function route({ redraw = true } = {}) {
   if ((setupView === 'home' && (redraw || wasLive)) || !view.dataset.view || view.dataset.view !== setupView || (setupView === 'map' && !editorShownIn(view))) showSetupView(setupView);
 }
 
-function showSetupView(name) {
+function showSetupView(name, { select = null } = {}) {
   setupView = name;
   const view = document.getElementById('dmView');
   view.dataset.view = name;
   if (name === 'map') renderMapEditor(view, { onDone: () => showSetupView('home') });
-  else if (name === 'creatures') renderCreatureSetup(view, { onDone: () => showSetupView('home') });
+  else if (name === 'creatures') renderCreatureSetup(view, { onDone: () => showSetupView('home'), select });
   else renderHome(view);
 }
 
@@ -299,10 +299,16 @@ function renderHome(view) {
   const weatherOpts = [['world', `The world clock's (${WEATHER[getClock()?.weather]?.name || 'clear'})`],
     ...Object.entries(WEATHER).map(([k, w]) => [k, `${w.icon} ${w.name}`])];
   const battleTouched = s.creatures.length > 0;
+  // Each participant: a click places them (Place on the map, them picked); Placed on map ticks itself, Hidden is the
+  // DM's -- on the map see-through (only the DM sees them), or joining later when not placed (the user's call, 2026-10-27)
   const line = (c) => `
-    <div class="dm-home-creature">
+    <div class="dm-home-creature${okMap ? ' pickable' : ''}" data-part="${escapeHtml(c.id)}" title="${okMap ? `Place ${escapeHtml(c.name)} on the map` : 'Set up the map first'}">
       <span class="dm-home-thumb" data-img="${escapeHtml(c.participant?.image || '')}"></span>
-      <span>${escapeHtml(c.name)} <small>Lv ${c.participant?.level ?? '?'}${c.heldBack ? ' · 🙈 hidden' : ''}${c.kind === 'pokemon' && c.trainerId ? ` · ${escapeHtml(trainers.find(t => t.id === c.trainerId)?.name || '')}'s` : ''}</small></span>
+      <span class="dm-home-name">${escapeHtml(c.name)} <small>Lv ${c.participant?.level ?? '?'}${c.kind === 'pokemon' && c.trainerId ? ` · ${escapeHtml(trainers.find(t => t.id === c.trainerId)?.name || '')}'s` : ''}</small></span>
+      <span class="dm-home-checks">
+        <label class="dm-check" title="Ticks itself once they stand on the map"><input type="checkbox" disabled ${c.position ? 'checked' : ''}><span>Placed on map</span></label>
+        <label class="dm-check" title="Only you see them -- see-through on the map, or joining later if not placed -- until you untick this"><input type="checkbox" data-part-hidden ${c.heldBack ? 'checked' : ''}><span>Hidden</span></label>
+      </span>
     </div>`;
 
   view.innerHTML = `
@@ -337,11 +343,11 @@ function renderHome(view) {
         </div>
         <div class="dm-home-card">
           <div class="dm-home-card-head">
-            <h3><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Who's in it</h3>
+            <h3><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Participants</h3>
             <span class="dm-pill ${okBattle ? 'ok' : 'todo'}">${okBattle ? `✓ ${s.creatures.length} ready` : 'Nobody yet'}</span>
           </div>
           <div class="dm-hint" id="homeEncName"></div>
-          <div class="dm-home-creatures">${s.creatures.length ? s.creatures.map(line).join('') : '<div class="dm-hint">Nobody yet -- import an encounter (📥), or build one under Encounter setup.</div>'}</div>
+          <div class="dm-home-creatures" id="homeParts">${s.creatures.length ? s.creatures.map(line).join('') : '<div class="dm-hint">Nobody yet -- import an encounter (📥), or build one under Encounter setup.</div>'}</div>
           ${unplaced.length && okMap ? `<div class="dm-hint dm-warn">${unplaced.length} not placed on the map yet -- place them here, or from the battle once it starts.</div>` : ''}
           <div class="dm-home-actions">
             <button class="dm-btn primary" id="homeCreatures" ${okMap && okBattle ? '' : 'disabled'} title="${okMap ? '' : 'Set up the map first'}">📍 Place on the map</button>
@@ -370,6 +376,19 @@ function renderHome(view) {
   document.getElementById('homeTerrain').addEventListener('change', (e) => updateSetup((x) => { x.map.terrain = e.target.value; }));
   document.getElementById('homeWeather').addEventListener('change', (e) => updateSetup((x) => { x.map.weather = e.target.value; }));
   document.getElementById('homeCreatures').addEventListener('click', () => showSetupView('creatures'));
+  const parts = document.getElementById('homeParts');
+  parts.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-part]');
+    if (!row || e.target.closest('label')) return;
+    if (!okMap) { showCombatAlert('Set up the map first -- then click someone to place them on it.', { title: 'Place on the map' }); return; }
+    showSetupView('creatures', { select: row.dataset.part });
+  });
+  parts.addEventListener('change', (e) => {
+    if (!e.target.matches('[data-part-hidden]')) return;
+    const id = e.target.closest('[data-part]').dataset.part;
+    updateSetup((x) => { const c = x.creatures.find(y => y.id === id); if (c) c.heldBack = e.target.checked; });
+    renderHome(view); // (what's left to place changes with it)
+  });
   document.getElementById('homeToEnc').addEventListener('click', () => showBattleTab('library'));
   document.getElementById('homeImport').addEventListener('click', async () => {
     await importEncounterDialog(); // brings the DM back here when it's in (dm:show-module)

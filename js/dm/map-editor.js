@@ -701,6 +701,57 @@ async function applySize(across, down) {
   });
 }
 
+// The Objects tool's quick list under Pick objects… (the user's call, 2026-10-27): every object picture in a scrolling
+// list, sorted as the DM likes -- a click and it's being placed, like one picked in the popup.
+const OBJECT_SORTS = { az: 'A → Z', za: 'Z → A', recent: 'Recently used', map: 'On this map first' };
+
+function objectSort() {
+  try { const s = localStorage.getItem('dm-object-sort'); return OBJECT_SORTS[s] ? s : 'az'; } catch { return 'az'; }
+}
+
+function recentObjects() {
+  try { return JSON.parse(localStorage.getItem('dm-recent-objects') || '[]'); } catch { return []; }
+}
+
+function rememberObjectUsed(key) {
+  if (!key) return;
+  try { localStorage.setItem('dm-recent-objects', JSON.stringify([key, ...recentObjects().filter(k => k !== key)].slice(0, 50))); } catch { /* only remembered where it can be */ }
+}
+
+function sortedObjects(sort) {
+  const byName = (a, b) => a.label.localeCompare(b.label);
+  const list = [..._assets.objects].sort(byName);
+  if (sort === 'za') return list.reverse();
+  if (sort === 'recent') {
+    const recent = recentObjects();
+    const at = k => (recent.includes(k) ? recent.indexOf(k) : Infinity);
+    return list.sort((a, b) => at(a.key) - at(b.key) || byName(a, b));
+  }
+  if (sort === 'map') {
+    const count = {};
+    (getSetup().map.objects || []).forEach((o) => { count[o.url] = (count[o.url] || 0) + 1; });
+    return list.sort((a, b) => (count[b.url] || 0) - (count[a.url] || 0) || byName(a, b));
+  }
+  return list;
+}
+
+function quickObjectsHtml() {
+  if (!_assets.objects.length) return '';
+  const sort = objectSort();
+  const now = placing() ? ed.objectKey : '';
+  return `
+      <div class="dm-obj-quick-head">
+        <span>All objects</span>
+        <select class="dm-select" id="objSort" title="Sort the list">
+          ${Object.entries(OBJECT_SORTS).map(([k, l]) => `<option value="${k}" ${k === sort ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="dm-obj-quick" id="objQuick">
+        ${sortedObjects(sort).map(o => `<button type="button" class="dm-obj-quick-item${o.key === now ? ' active' : ''}" data-quick-obj="${escapeHtml(o.key)}" title="Place ${escapeHtml(o.label)}">
+          <img src="${escapeHtml(o.url)}" alt="" loading="lazy"><span>${escapeHtml(o.label)}</span></button>`).join('')}
+      </div>`;
+}
+
 function renderToolPanel() {
   document.querySelectorAll('#mapTools [data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === ed.tool));
   const panel = document.getElementById('mapToolPanel');
@@ -710,6 +761,7 @@ function renderToolPanel() {
     const editing = !!ed.selectedId;
     const missing = editing && !ed.objectKey; // its picture is no longer on the Pi
     const settings = editing || placing();
+    const quickScroll = document.getElementById('objQuick')?.scrollTop || 0; // (drawn again on every change -- kept where it was)
     panel.innerHTML = _assets.objects.length || editing ? `
       ${editing ? `<div class="dm-edit-head"><b>Editing: ${escapeHtml(asset?.label || 'object')}</b><small>Changes apply at once.</small></div>` : ''}
       <div class="dm-object-pick">
@@ -717,6 +769,7 @@ function renderToolPanel() {
         <div><b>${escapeHtml(missing ? `${asset?.label || '?'} (no longer on the Pi)` : settings ? asset?.label || '' : 'Nothing picked')}</b>
           <button class="dm-btn small" id="objPick">${editing ? '↺ Another picture…' : '🌲 Pick objects…'}</button></div>
       </div>
+      ${editing ? '' : quickObjectsHtml()}
       ${settings ? `
       <div class="dm-row">
         <div class="dm-field"><label for="objW">Width (squares)</label>${stepperHtml('objW', ed.objW, { min: 1, max: 20 })}</div>
@@ -752,10 +805,24 @@ function renderToolPanel() {
       ? 'Picked up: click a square to move it there -- hold it to turn it. Click it again (or Esc) to put it down.'
       : placing()
         ? `Click a square to place ${asset?.label || 'it'} -- or hold and move the pointer around to turn it, then let go. Esc: stop placing.`
-        : 'Click a placed object to pick it up (then click a square to move it there) -- hold it to turn it. 🌲 Pick objects… to place new ones.';
+        : 'Click a placed object to pick it up (then click a square to move it there) -- hold it to turn it. 🌲 Pick objects… or one from the list to place new ones.';
     // Editing: every change goes straight onto the object (applyEdit). Placing: it only changes what the next one looks like.
     const changed = () => { if (ed.selectedId) applyEdit(); else renderGhost(); };
     document.getElementById('objPick')?.addEventListener('click', () => (ed.selectedId ? changeObjectPicture() : addToMap('object')));
+    const quick = document.getElementById('objQuick');
+    if (quick) {
+      quick.scrollTop = quickScroll;
+      quick.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-quick-obj]');
+        const asset = b && _assets.objects.find(o => o.key === b.dataset.quickObj);
+        if (asset) queueObjects([{ asset, hidden: false }]);
+      });
+    }
+    document.getElementById('objSort')?.addEventListener('change', (e) => {
+      try { localStorage.setItem('dm-object-sort', e.target.value); } catch { /* only remembered where it can be */ }
+      renderToolPanel();
+      document.getElementById('objQuick')?.scrollTo(0, 0);
+    });
     document.getElementById('objW')?.addEventListener('change', (e) => { ed.objW = clampInt(e.target.value, 1, 20); changed(); });
     document.getElementById('objH')?.addEventListener('change', (e) => { ed.objH = clampInt(e.target.value, 1, 20); changed(); });
     if (!editing) {
@@ -1229,6 +1296,7 @@ async function finishObjectPress(cancelled) {
   }
   o.crop = await cropFor(o.url);
   commitObject(o);
+  if (!ed.queue[0]?.item) rememberObjectUsed(ed.objectKey); // (the quick list's Recently used)
   if (ed.queue.length) nextQueued();
 }
 

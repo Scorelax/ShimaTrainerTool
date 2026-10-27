@@ -191,7 +191,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const camera = new THREE.PerspectiveCamera(40, 1, 1, 20000);
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
-  controls.dampingFactor = 0.09;
+  controls.dampingFactor = 0.25;            // close behind the finger, a short glide after it
   controls.screenSpacePanning = false;     // moving slides over the land, not up into the sky
   controls.zoomToCursor = true;
   controls.maxPolarAngle = 1.2;             // never under the horizon
@@ -1068,7 +1068,9 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
   // Drawn only while something moves: the loop runs while the controls are settling or a flight is on, then stops.
   let quiet = 0;
   function tick(now) {
-    frame = 0;
+    // (running: a wake() from in here -- the controls' 'change' as they move -- mustn't start a second loop; it did, and
+    // while the map moved they multiplied, dozens of draws a frame)
+    frame = -1;
     if (destroyed) return;
     let moved = flight ? stepFlight(now) : follow ? stepFollow(now) : false;
     lastTick = now;
@@ -1079,8 +1081,19 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       dirty = true; // put away (the board screen during a battle): drawn when it's back (the resize wakes it)
       quiet++;
     } else if (moved || dirty) {
-      if (moved) keepUp(now);
-      useLevel(moved ? Math.max(movingLevel, REST) : REST);
+      const shift = screenShift();
+      // A glide all but stopped is ended there and then (the rest of it, under half a pixel, in one go): it went on
+      // unseen for a second more -- after every tap, the hand having moved the map a pixel.
+      if (moved && shift < SETTLED && !held && !flight && !follow) {
+        controls.enableDamping = false;
+        controls.update();
+        controls.enableDamping = true;
+        clampTarget();
+      }
+      // Drawn at the moving level only while the picture moves a good few pixels a frame: a tap, or a glide coming
+      // to rest, is drawn at its best (a slow device's coarse frames blurred the map for a second after every tap).
+      const fast = moved && shift >= SHARP_BELOW;      if (fast) keepUp(now); else lastDraw = 0;
+      useLevel(fast ? Math.max(movingLevel, REST) : REST);
       orientIcons();
       render();
       placeLabels();
@@ -1105,8 +1118,27 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     seaDue = false;
     seaNext();
     if (quiet < 30) frame = requestAnimationFrame(tick);
-    else lastTick = 0;
+    else { frame = 0; lastTick = 0; }
   }
+
+  // How far the picture moved since it was last drawn, in screen pixels (about: the land at the middle of the screen
+  // sliding, or the view turning)
+  const SHARP_BELOW = 3;     // slower than this: drawn at its best even while moving
+  const SETTLED = 0.05;      // slower than this: the glide's ended
+  const lastCam = { pos: new THREE.Vector3(), quat: new THREE.Quaternion() };
+  function screenShift() {
+    const fov = THREE.MathUtils.degToRad(camera.fov);
+    const perPx = (camera.position.distanceTo(controls.target) * 2 * Math.tan(fov / 2)) / (root.clientHeight || 1);
+    const slid = camera.position.distanceTo(lastCam.pos) / perPx;
+    const turned = (2 * Math.acos(Math.min(1, Math.abs(camera.quaternion.dot(lastCam.quat)))) * root.clientHeight) / fov;
+    lastCam.pos.copy(camera.position);
+    lastCam.quat.copy(camera.quaternion);
+    return slid + turned;
+  }
+  // a finger or the mouse on the map (a glide isn't ended under it)
+  let held = false;
+  controls.addEventListener('start', () => { held = true; });
+  controls.addEventListener('end', () => { held = false; });
 
   // Keeping up: the time between frames drawn one after the other while moving. Several in a row slower than ~30 a
   // second: the next level down, for the rest of the visit.

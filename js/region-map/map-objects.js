@@ -1,5 +1,6 @@
-// The region map's objects (the user's call, 2026-10-25: a map of objects, more alive than the painting alone): trees,
-// rocks and snow-capped peaks standing on the 3D land -- made here in code, no model files. Where they stand is read
+// The region map's objects (the user's call, 2026-10-25: a map of objects, more alive than the painting alone): trees
+// and rocks standing on the 3D land -- made here in code, no model files (summits only get one from a DM's model,
+// MODEL_ONLY). Where they stand is read
 // from the painting's colours, in the background (object-places.js, object-worker.js: findPlaces).
 //
 // The DM's own models stand in for them where there are any (the user's call, 2026-10-26): "mapobject-<kind>.glb" in
@@ -37,6 +38,9 @@ export const MODEL_KINDS = {
   searock: ['rock_sea', 'rock'],
   peak: ['peak'],
 };
+// Shapes only shown as a DM's model: the spires made here looked clumsy on the summits (the user's call, 2026-10-27) --
+// a mapobject-peak model still stands there
+const MODEL_ONLY = new Set(['peak']);
 // The most triangles a model may have: thousands of trees and rocks are drawn at once, and only 16 summits
 const MAX_TRIANGLES = { small: 1500, big: 30000 };
 
@@ -250,6 +254,8 @@ export function buildMapObjects({ land, placed, groundAt, toWorld, models = {} }
     if (fitted.length) {
       geo.dispose();
       variants[name] = fitted.map((parts, n) => { shapes[`${name}#${n}`] = { cls, parts }; return `${name}#${n}`; });
+    } else if (MODEL_ONLY.has(name)) {
+      geo.dispose(); // (only its size was needed: what a model's fitted into)
     } else {
       shapes[name] = { cls, parts: [{ geo, mat: mats[cls] }] };
       variants[name] = [name];

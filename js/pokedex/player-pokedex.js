@@ -8,6 +8,7 @@
 // mountPlayerPokedex(root, { onBack }) -- onBack adds a back button to the header. Styles: css/pokedex.css (.pdx-*).
 import { GameDataAPI } from '../api.js';
 import { dexQuery } from '../utils/dex-search.js';
+import { lazySprites } from '../utils/sprite-media.js';
 
 const TYPE_COLORS = {
   normal: '#A8A878', fire: '#F08030', water: '#6890F0', electric: '#F8D030', grass: '#78C850', ice: '#98D8D8',
@@ -178,13 +179,10 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
           <span class="pdx-lcd">Page ${state.page} / ${pages}</span>
           <button class="pdx-pad" data-page="next" aria-label="Next page" ${state.page === pages ? 'disabled' : ''}>▶</button>
         </div>` : ''}`;
+    // the pictures: each loaded as it scrolls into view, its sprite (the Pi's small copy) playing only while it's seen
+    lazySprites(box, { empty: '<div class="pdx-no-image">?</div>', small: true });
   }
 
-  function imageHtml(s) {
-    if (!s.image) return '<div class="pdx-no-image">?</div>';
-    if (/\.mp4(\?|$)/i.test(s.image)) return `<video class="pdx-header-image" src="${esc(s.image)}" autoplay loop muted playsinline></video>`;
-    return `<img class="pdx-header-image" src="${esc(s.image)}" alt="${esc(s.name)}" loading="lazy">`;
-  }
 
   // The picture's screen glows in the Pokemon's type colour(s).
   function screenBg(s) {
@@ -206,7 +204,7 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
     return `
       <div class="pdx-card" data-species="${esc(s.name)}">
         <div class="pdx-card-header">
-          <div class="pdx-bezel"><div class="pdx-card-image" style="${screenBg(s)}">${imageHtml(s)}</div></div>
+          <div class="pdx-bezel"><div class="pdx-card-image" style="${screenBg(s)}" data-img="${esc(s.image || '')}"></div></div>
           <div class="pdx-card-info">
             <span class="pdx-card-number">No. ${esc(dex)}</span>
             <h2 class="pdx-card-name">${esc(s.name)}${s.caught ? '<img class="pdx-caught-ball" src="assets/Pokeball.png" alt="Caught" title="Caught by the players">' : ''}</h2>

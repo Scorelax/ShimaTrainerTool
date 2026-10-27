@@ -152,3 +152,37 @@ export function prefetchSprite(url, { small = false } = {}) {
     img.src = url;
   });
 }
+
+// ---------------------------------------------------------------------------
+// Sprites in a long list (the DM console's Pokedex, its Admin module's Pokedex entries and NPC library; the players'
+// Pokedex): each row's picture is only loaded once it scrolls into view, and its sprite (a looping video) only plays
+// while it can be seen -- a whole Pokedex of them playing at once made the DM console crawl (the bug check of
+// 2026-10-22). A row hidden by a search, or a module put away, counts as out of view. The DM console's module switch
+// leaves these sprites to this.
+// ---------------------------------------------------------------------------
+
+const _lazySeen = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver((entries) => entries.forEach(({ target, isIntersecting }) => {
+  if (isIntersecting && target.dataset.image === undefined) {
+    if (target.dataset.img) patchPortraitMedia(target, target.dataset.img, '', { small: target.dataset.lazy === 'small' });
+    else { target.dataset.image = ''; target.innerHTML = target.dataset.lazyEmpty || ''; }
+  }
+  const video = target.querySelector('video');
+  if (video) { if (isIntersecting) video.play().catch(() => {}); else video.pause(); }
+}), { rootMargin: '200px 0px' });
+
+const _lazyRows = new WeakMap(); // list -> the holders it had: let go when it's drawn again (a search typed in)
+
+/** Every picture holder ([data-img]) in `box` drawn as it comes into view; `empty`: the HTML for one with no picture. */
+export function lazySprites(box, { empty = '', small = false } = {}) {
+  if (!box) return;
+  (_lazyRows.get(box) || []).forEach(el => _lazySeen?.unobserve(el));
+  const holders = [...box.querySelectorAll('[data-img]')];
+  _lazyRows.set(box, holders);
+  holders.forEach((el) => {
+    el.dataset.lazy = small ? 'small' : '1';
+    if (empty) el.dataset.lazyEmpty = empty;
+    if (_lazySeen) _lazySeen.observe(el);
+    else if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, '', { small }); // (no observer: drawn at once, as before)
+    else el.innerHTML = empty;
+  });
+}

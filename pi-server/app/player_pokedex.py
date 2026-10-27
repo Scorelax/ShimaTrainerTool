@@ -91,7 +91,7 @@ def _species_entry(conn, sp, vis, own):
     combat = sp.get('combat') or {}
     entry = {
         'name': name, 'dex': dex,
-        'image': media.local_pokemon_image_url(name, dex) or media.local_sprite_url(name) or '',
+        'image': media.pokemon_image_url(name, dex),  # the animated sprite, else the picture (the user's call, 2026-10-27)
         # Whether there IS a second type shows (as a split header colour) even while it's hidden -- as on his site.
         'dualType': bool(secondary),
         'primaryType': primary if vis['primaryType'] else None,

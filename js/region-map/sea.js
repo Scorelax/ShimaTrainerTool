@@ -9,11 +9,14 @@
 import * as THREE from '../vendor/three/three.module.min.js';
 
 const REACH = 40;   // painting pixels from the coast where the water has darkened all the way (and the info stops)
-// The longest wave, in painting pixels (120 m each) -- the others 2.7 and 7.3 times shorter
+// The longest wave, in painting pixels (120 m each) -- the others 2.7, 7.3, 20 and 53 times shorter
 export const LONGEST_WAVE = 6;
-// A wave starts to show at FADE[1] painting pixels to the screen pixel per pixel of its length (~7 screen pixels
-// long), and is all there at FADE[0] (~20)
-export const FADE = [0.05, 0.15];
+// A wave starts to show at FADE[1] painting pixels to the screen pixel per pixel of its length (~5 screen pixels
+// long), and is all there at FADE[0] (~14)
+export const FADE = [0.07, 0.2];
+// The water's lighter and darker patches come in from PATCHES[1] painting pixels to the screen pixel (the whole
+// island's ~1.4: not there) and are all there at PATCHES[0]
+const PATCHES = [0.4, 0.9];
 
 const GLSL = /* glsl */ `
 uniform sampler2D seaInfo;
@@ -48,18 +51,28 @@ vec3 seaSurface(vec3 colour) {
 
   // deeper further out
   vec3 c = colour * mix(1.08, 0.9, smoothstep(0.0, 1.0, away));
-
-  // the waves: three sizes of moving noise, each faded in once it's a few screen pixels big
   float foot = max(fwidth(p.x), fwidth(p.y));
+
+  // patches of lighter and darker water, some a touch greener, drifting slowly -- from a little way in (PATCHES)
+  float patchy = 1.0 - smoothstep(${PATCHES[0]}, ${PATCHES[1]}, foot);
+  if (patchy > 0.0) {
+    float n = seaNoise(p * 0.05 + seaTime * vec2(0.010, 0.006)) * 0.65 + seaNoise(p * 0.13 - seaTime * vec2(0.008, 0.014) + 17.0) * 0.35;
+    c *= 1.0 + (n - 0.5) * 0.32 * patchy;
+    c *= mix(vec3(1.0), vec3(0.9, 1.05, 1.02), smoothstep(0.55, 0.8, n) * patchy);
+  }
+
+  // the waves: five sizes of moving noise, each faded in once it's a few screen pixels big -- the smallest only close in
   vec2 slope = vec2(0.0);
   float seen = 0.0;
   float scale = ${(1 / LONGEST_WAVE).toFixed(5)};
   float amp = 1.0;
-  vec2 dirs[3];
+  vec2 dirs[5];
   dirs[0] = vec2(0.8, 0.6);
   dirs[1] = vec2(-0.55, 0.83);
   dirs[2] = vec2(0.32, -0.95);
-  for (int i = 0; i < 3; i++) {
+  dirs[3] = vec2(-0.9, -0.43);
+  dirs[4] = vec2(0.6, -0.8);
+  for (int i = 0; i < 5; i++) {
     float w = 1.0 - smoothstep(${FADE[0]}, ${FADE[1]}, foot * scale);
     if (w > 0.0) {
       // each layer turned its own way, so the noise's square grid doesn't line up and show
@@ -70,13 +83,13 @@ vec3 seaSurface(vec3 colour) {
       seen = max(seen, w);
     }
     scale *= 2.7;
-    amp *= 0.6;
+    amp *= 0.72;
   }
   if (seen > 0.0) {
-    vec3 n = normalize(vec3(-slope.x * 0.22, 1.0, -slope.y * 0.22));
+    vec3 n = normalize(vec3(-slope.x * 0.26, 1.0, -slope.y * 0.26));
     vec3 sun = normalize(vec3(-0.62, 1.0, -0.55));   // the map's light, from the north-west
     vec3 eye = normalize(cameraPosition - vSeaPos);
-    float shade = (dot(n, sun) - sun.y) * 0.6;
+    float shade = (dot(n, sun) - sun.y) * 1.1;
     float glint = pow(max(dot(reflect(-sun, n), eye), 0.0), 500.0);
     c = c * (1.0 + shade * seen) + vec3(0.9, 0.95, 1.0) * glint * 0.16 * seen;
     // surf: faint bands running in to the shore, a few pixels out

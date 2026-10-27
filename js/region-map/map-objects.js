@@ -1,5 +1,5 @@
 // The region map's objects (the user's call, 2026-10-25: a map of objects, more alive than the painting alone): trees
-// and rocks standing on the 3D land -- made here in code, no model files (summits only get one from a DM's model,
+// standing on the 3D land -- made here in code, no model files (rocks and summits only get one from a DM's model,
 // MODEL_ONLY). Where they stand is read
 // from the painting's colours, in the background (object-places.js, object-worker.js: findPlaces).
 //
@@ -38,9 +38,9 @@ export const MODEL_KINDS = {
   searock: ['rock_sea', 'rock'],
   peak: ['peak'],
 };
-// Shapes only shown as a DM's model: the spires made here looked clumsy on the summits (the user's call, 2026-10-27) --
-// a mapobject-peak model still stands there
-const MODEL_ONLY = new Set(['peak']);
+// Shapes only shown as a DM's model (the user's calls, 2026-10-27): the spires made here looked clumsy on the summits,
+// and the rocks wait for the DM's own -- a mapobject-peak / rock_land / rock_sea model still stands in their places
+const MODEL_ONLY = new Set(['peak', 'rock', 'searock']);
 // The most triangles a model may have: thousands of trees and rocks are drawn at once, and only 16 summits
 const MAX_TRIANGLES = { small: 1500, big: 30000 };
 

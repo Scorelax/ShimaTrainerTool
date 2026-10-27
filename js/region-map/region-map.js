@@ -210,6 +210,10 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const seaTime = { value: 0 };   // the sea's waves (sea.js): seconds, moved on while they can be seen (seaMoves)
   let seaTimer = 0;
   let seaDue = false;
+  // The waves come to rest once nothing's moved on the map for a while -- the board screen left on the sea all evening
+  // (the user's call, 2026-10-27) -- and go on as soon as anything does
+  const SEA_REST_MS = 3 * 60 * 1000;
+  let lastActive = performance.now();
   let seaInfo = null;             // ...and how far its water is from the coast (a texture)
   let flight = null;
   let follow = null;        // view only: the camera easing towards the last view it was sent
@@ -677,6 +681,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
    * moving (they stand still there). Kept going on a computer set to reduce motion, like the party's marker. */
   function seaMoves() {
     if (gpu.software || movingLevel >= 2 || !land || !root.clientWidth || document.hidden) return false;
+    if (performance.now() - lastActive > SEA_REST_MS) return false;
     const foot = (camera.position.distanceTo(controls.target) * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / root.clientHeight;
     return foot / LONGEST_WAVE < FADE[1];
   }
@@ -1081,6 +1086,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       dirty = true; // put away (the board screen during a battle): drawn when it's back (the resize wakes it)
       quiet++;
     } else if (moved || dirty) {
+      lastActive = performance.now();
       const shift = screenShift();
       // A glide all but stopped is ended there and then (the rest of it, under half a pixel, in one go): it went on
       // unseen for a second more -- after every tap, the hand having moved the map a pixel.
@@ -1166,6 +1172,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
   }
   function wake() {
     quiet = 0;
+    lastActive = performance.now(); // (the waves on again, if they'd come to rest)
     if (!frame && !destroyed) frame = requestAnimationFrame(tick);
   }
   controls.addEventListener('start', wake);

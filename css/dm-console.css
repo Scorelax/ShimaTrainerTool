@@ -236,6 +236,29 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-map-turnpick { display: flex; align-items: center; gap: 0.35rem; margin: 0.1rem 0 0.6rem; font-size: 0.8rem; font-weight: 700; color: var(--dm-muted); }
 .dm-map-turnpick > span { margin-right: auto; }
 .dm-map-sizes.upright { flex-direction: row-reverse; justify-content: flex-end; }
+/* The map editor (map-editor.js): adding to the map and the tools on top, the map's own settings under them -- shown
+   upright on a wide screen, the settings in a column of their own right of the map (the user's call, 2026-10-27). */
+.dm-editor-group { display: flex; flex-direction: column; gap: 0.8rem; }
+.dm-editor-settings { padding-top: 0.8rem; border-top: 1px solid var(--dm-line); }
+@media (min-width: 1100px) {
+  .dm-map-editor.upright { grid-template-columns: 330px minmax(0, 1fr) 300px; }
+  .dm-map-editor.upright > .dm-editor-tools { display: contents; }
+  .dm-map-editor.upright .dm-editor-group { grid-row: 1; min-height: 0; overflow-y: auto; padding: 0.9rem; background: var(--dm-panel); }
+  .dm-map-editor.upright .dm-editor-work { grid-column: 1; border-right: 1px solid var(--dm-line); }
+  .dm-map-editor.upright .dm-editor-canvas { grid-column: 2; grid-row: 1; }
+  .dm-map-editor.upright .dm-editor-settings { grid-column: 3; border-top: none; border-left: 1px solid var(--dm-line); }
+}
+/* Over the map: the hint, Horizontal / Vertical and the zoom */
+.dm-map-viewbar { display: flex; align-items: center; gap: 0.4rem 0.8rem; flex-wrap: wrap; }
+.dm-map-viewbar .dm-editor-hint { flex: 1; min-width: 14rem; }
+.dm-map-viewbar .dm-map-turnpick { margin: 0; }
+.dm-map-editor.upright .dm-map-viewbar .dm-editor-hint { order: 2; flex-basis: 100%; } /* (narrower: the buttons first) */
+.dm-map-zoom { display: flex; gap: 0.25rem; }
+.dm-map-zoom .dm-btn { min-width: 2.2rem; }
+.dm-map-zoom .dm-map-zoom-pct { min-width: 3.8rem; }
+/* zoomed in: a box the height there's room for, scrolled to see the rest */
+.dm-map-wrap.zoomed { flex: none; overflow: auto; justify-content: flex-start; }
+.dm-map-wrap.zoomed > * { flex: none; margin: auto; }
 .dm-edit-head { display: flex; flex-direction: column; gap: 0.1rem; margin-bottom: 0.5rem; padding: 0.4rem 0.6rem; border-radius: 6px;
   background: rgba(255, 215, 0, 0.1); border: 1px solid rgba(255, 215, 0, 0.35); }
 .dm-edit-head small { opacity: 0.7; }

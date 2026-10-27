@@ -26,11 +26,16 @@
 // Later that day: the adventure's Pokemon and NPCs go on while it's still being prepared too (kept with its map,
 // map-store.js's `creatures`), sizes have − / + buttons, and a placed object is moved with a click on it and then a
 // click where it should go (or dragged there) -- held still for a moment, the pointer turns it.
+//
+// 2026-10-27 (the user's call): adding to the map and the tools at the top of the column, the map's settings below
+// (shown upright on a wide screen: a column of their own right of the map); Horizontal / Vertical and the zoom over the
+// map; the Eraser takes the adventure's Pokemon and NPCs off too; the adventure saves its map from its own bar
+// (saveMapDialog) instead of a Saved maps card.
 import { CombatAPI, DmAPI } from '../api.js';
 import { mapObjectHtml, objectScreenRect, objectCells, footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { escapeHtml, newId, toast, getSpecies, participantFromPokemon, participantFromTrainer, npcTrainerConfig, stepperHtml as sharedStepper } from './dm-common.js';
+import { escapeHtml, newId, toast, getSpecies, participantFromPokemon, participantFromTrainer, npcTrainerConfig, openDmModal, stepperHtml as sharedStepper } from './dm-common.js';
 import { creatureSpotProblem } from './map-view.js';
 import { openPicker } from './picker.js';
 import * as setupStore from './setup-store.js';
@@ -71,6 +76,8 @@ const ed = {
   creatureQueue: [], // the adventure's Pokemon / NPCs picked to place: [{kind: 'pokemon' | 'npc', key, label, hidden, level, npc}]
   extraAssets: new Map(), // the items' pictures as object pictures, by key ('item:<name>')
   placingCreature: false,
+  zoom: 1, // the map's size on screen, 1 = all of it in view (the user's call, 2026-10-27)
+  pinch: null, // two fingers on the map: {d, z, x, y} at the start -- zooming and moving it, not using the tool
 };
 
 const SIZES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic'];
@@ -308,84 +315,95 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
     return;
   }
   if (!ed.queue.length && !ed.selectedId) ed.objectKey = '';
+  ed.zoom = 1;
   const m = getSetup().map;
 
+  // What's used all the time first -- adding to the map and the tools -- the map's own settings below (the user's call,
+  // 2026-10-27). Shown upright on a wide screen, the settings get a column of their own right of the map (dm-console.css).
   root.innerHTML = `
-    <div class="dm-editor">
+    <div class="dm-editor dm-map-editor">
       <aside class="dm-editor-tools">
-        <div class="dm-editor-head">
-          ${adventure ? '' : `<button class="dm-btn small" id="mapBack">${escapeHtml(backLabel || (_live ? '← Battle' : '← Map setup'))}</button>`}
-          <h2>${escapeHtml(title || (_live ? 'Battle map' : 'Map'))}</h2>
-          ${adventure ? (_live ? '' : '<span class="dm-hint dm-editor-autosave" title="Every change is kept at once -- there\'s nothing to save">Saved automatically</span>')
-            : '<button class="dm-btn primary small" id="mapDone">✓ Done</button>'}
-        </div>
-        <div class="dm-editor-clear">
-          <button class="dm-btn small" id="mapClearObjects" title="Take every object off the map">🧹 Clear objects</button>
-          <button class="dm-btn small" id="mapClearMarks" title="Make every difficult / blocked square normal ground again">🧹 Clear terrain</button>
-        </div>
-        <div class="dm-map-turnpick" id="mapTurnPick" role="group" aria-label="How the map is shown on this screen"
-          title="Only how the map is shown here -- the table TV shows it the same either way">
-          <span>Show the map</span>
-          <button class="dm-btn small" data-map-turn="0">▭ Horizontal</button>
-          <button class="dm-btn small" data-map-turn="1">▯ Vertical</button>
-        </div>
-        ${_live && !adventure ? '<div class="dm-hint dm-live-note">The battle\'s map -- every change shows on the players\' screens and the table at once.</div>' : ''}
-
-        ${_live ? '' : `<div class="dm-card">
-          <div class="dm-card-title">Size</div>
-          <div class="dm-row dm-map-sizes">
-            <div class="dm-field"><label for="mapAcross">Squares across</label><input class="dm-input" id="mapAcross" type="number" min="1" max="60" value="${m.rows}"></div>
-            <div class="dm-field"><label for="mapDown">Squares down</label><input class="dm-input" id="mapDown" type="number" min="1" max="60" value="${m.cols}"></div>
+        <div class="dm-editor-group dm-editor-work">
+          <div class="dm-editor-head">
+            ${adventure ? '' : `<button class="dm-btn small" id="mapBack">${escapeHtml(backLabel || (_live ? '← Battle' : '← Map setup'))}</button>`}
+            <h2>${escapeHtml(title || (_live ? 'Battle map' : 'Map'))}</h2>
+            ${adventure ? (_live ? '' : '<span class="dm-hint dm-editor-autosave" title="Every change is kept at once -- there\'s nothing to save">Saved automatically</span>')
+              : '<button class="dm-btn primary small" id="mapDone">✓ Done</button>'}
           </div>
-          <label class="dm-check"><input type="checkbox" id="mapLock" ${m.lockRatio ? 'checked' : ''}>
-            <span>Keep the table TV's shape <small>Squares stay square on the TV. Untick to make any shape.</small></span></label>
-          <button class="dm-btn wide" id="mapApplySize">Apply size</button>
-        </div>`}
+          ${_live && !adventure ? '<div class="dm-hint dm-live-note">The battle\'s map -- every change shows on the players\' screens and the table at once.</div>' : ''}
 
-        <div class="dm-card">
-          <div class="dm-card-title">Background</div>
-          <select class="dm-select" id="mapBackground">
-            <option value="">No background</option>
-            ${_assets.backgrounds.map(b => `<option value="${escapeHtml(b.url)}" ${b.url === m.background ? 'selected' : ''}>${escapeHtml(b.label)}</option>`).join('')}
-          </select>
+          <div class="dm-card">
+            <div class="dm-card-title">Add to the map</div>
+            <div class="dm-add-grid" id="mapAdd">
+              ${adventure ? `<button class="dm-btn" data-add="pokemon">🐾 Pokémon</button>
+              <button class="dm-btn" data-add="npc">👤 NPCs</button>` : ''}
+              <button class="dm-btn" data-add="object">🌲 Objects</button>
+              <button class="dm-btn" data-add="item">🎒 Items</button>
+            </div>
+            ${adventure && !_live ? '<div class="dm-hint" style="margin-top:0.35rem">Pokémon and NPCs wait on the map -- the players see them once the map is opened to them (hidden ones only when you show them).</div>' : ''}
+          </div>
+
+          <div class="dm-card">
+            <div class="dm-tool-tabs" id="mapTools">
+              ${_live || adventure ? '<button data-tool="creatures">🧍 Creatures</button>' : ''}
+              <button data-tool="objects">🌲 Objects</button>
+              <button data-tool="terrain">🟫 Terrain</button>
+              <button data-tool="traps">🪤 Traps</button>
+              <button data-tool="erase">🧽 Eraser</button>
+            </div>
+            <div id="mapToolPanel"></div>
+          </div>
         </div>
 
-
-
-        ${_live ? '' : `<div class="dm-card">
-          <div class="dm-card-title">Saved maps</div>
-          <div class="dm-row dm-map-saverow">
-            <input class="dm-input" id="mapSaveName" placeholder="Name this map…" maxlength="60" autocomplete="off">
-            <button class="dm-btn" id="mapSave">💾 Save</button>
+        <div class="dm-editor-group dm-editor-settings">
+          <div class="dm-editor-clear">
+            <button class="dm-btn small" id="mapClearObjects" title="Take every object off the map">🧹 Clear objects</button>
+            <button class="dm-btn small" id="mapClearMarks" title="Make every difficult / blocked square normal ground again">🧹 Clear terrain</button>
           </div>
-          <div class="dm-saved-maps" id="mapSavedList"><div class="dm-hint">Loading…</div></div>
-        </div>`}
 
-        <div class="dm-card">
-          <div class="dm-card-title">Add to the map</div>
-          <div class="dm-add-grid" id="mapAdd">
-            ${adventure ? `<button class="dm-btn" data-add="pokemon">🐾 Pokémon</button>
-            <button class="dm-btn" data-add="npc">👤 NPCs</button>` : ''}
-            <button class="dm-btn" data-add="object">🌲 Objects</button>
-            <button class="dm-btn" data-add="item">🎒 Items</button>
+          ${_live ? '' : `<div class="dm-card">
+            <div class="dm-card-title">Size</div>
+            <div class="dm-row dm-map-sizes">
+              <div class="dm-field"><label for="mapAcross">Squares across</label><input class="dm-input" id="mapAcross" type="number" min="1" max="60" value="${m.rows}"></div>
+              <div class="dm-field"><label for="mapDown">Squares down</label><input class="dm-input" id="mapDown" type="number" min="1" max="60" value="${m.cols}"></div>
+            </div>
+            <label class="dm-check"><input type="checkbox" id="mapLock" ${m.lockRatio ? 'checked' : ''}>
+              <span>Keep the table TV's shape <small>Squares stay square on the TV. Untick to make any shape.</small></span></label>
+            <button class="dm-btn wide" id="mapApplySize">Apply size</button>
+          </div>`}
+
+          <div class="dm-card">
+            <div class="dm-card-title">Background</div>
+            <select class="dm-select" id="mapBackground">
+              <option value="">No background</option>
+              ${_assets.backgrounds.map(b => `<option value="${escapeHtml(b.url)}" ${b.url === m.background ? 'selected' : ''}>${escapeHtml(b.label)}</option>`).join('')}
+            </select>
           </div>
-          ${adventure && !_live ? '<div class="dm-hint" style="margin-top:0.35rem">Pokémon and NPCs wait on the map -- the players see them once the map is opened to them (hidden ones only when you show them).</div>' : ''}
+
+          ${_live || adventure ? '' : `<div class="dm-card">
+            <div class="dm-card-title">Saved maps</div>
+            <div class="dm-row dm-map-saverow">
+              <input class="dm-input" id="mapSaveName" placeholder="Name this map…" maxlength="60" autocomplete="off">
+              <button class="dm-btn" id="mapSave">💾 Save</button>
+            </div>
+            <div class="dm-saved-maps" id="mapSavedList"><div class="dm-hint">Loading…</div></div>
+          </div>`}
         </div>
-
-        <div class="dm-card">
-          <div class="dm-tool-tabs" id="mapTools">
-            ${_live || adventure ? '<button data-tool="creatures">🧍 Creatures</button>' : ''}
-            <button data-tool="objects">🌲 Objects</button>
-            <button data-tool="terrain">🟫 Terrain</button>
-            <button data-tool="traps">🪤 Traps</button>
-            <button data-tool="erase">🧽 Eraser</button>
-          </div>
-          <div id="mapToolPanel"></div>
-        </div>
-
       </aside>
       <section class="dm-editor-canvas">
-        <div class="dm-editor-hint" id="mapHint"></div>
+        <div class="dm-map-viewbar">
+          <div class="dm-editor-hint" id="mapHint"></div>
+          <div class="dm-map-turnpick" id="mapTurnPick" role="group" aria-label="How the map is shown on this screen"
+            title="Only how the map is shown here -- the table TV shows it the same either way">
+            <button class="dm-btn small" data-map-turn="0">▭ Horizontal</button>
+            <button class="dm-btn small" data-map-turn="1">▯ Vertical</button>
+          </div>
+          <div class="dm-map-zoom" id="mapZoom" role="group" aria-label="Zoom" title="Zoom -- or Ctrl + the mouse wheel, or two fingers. The wheel (or the middle button held) moves around.">
+            <button class="dm-btn small" data-mapzoom="out" aria-label="Zoom out">−</button>
+            <button class="dm-btn small dm-map-zoom-pct" data-mapzoom="fit" title="The whole map">Fit</button>
+            <button class="dm-btn small" data-mapzoom="in" aria-label="Zoom in">+</button>
+          </div>
+        </div>
         <div class="dm-map-wrap" id="mapWrap"></div>
         <div class="dm-map-legend">
           <span><i class="mark-difficult"></i>Difficult terrain -- double movement on the ground</span>
@@ -448,10 +466,15 @@ async function saveCurrentMap() {
   const input = document.getElementById('mapSaveName');
   const name = input.value.trim();
   if (!name) { input.focus(); return; }
+  if (await storeSavedMap(name, getSetup().map)) input.value = '';
+}
+
+/** Keeps map `m` as the saved map `name` -- one of the same name replaced (after asking, unless `ask` is false). True
+ * once it's saved. */
+async function storeSavedMap(name, m, { ask = true } = {}) {
   const list = await loadSavedMaps();
   const same = list.find(sm => sm.name.toLowerCase() === name.toLowerCase());
-  if (same && !await showCombatConfirm(`There's already a saved map called "${same.name}". Replace it with this one?`, { title: 'Save map', yesLabel: 'Replace', noLabel: 'Cancel' })) return;
-  const m = getSetup().map;
+  if (same && ask && !await showCombatConfirm(`There's already a saved map called "${same.name}". Replace it with this one?`, { title: 'Save map', yesLabel: 'Replace', noLabel: 'Cancel' })) return false;
   const entry = {
     id: same?.id || newId('map'), name, savedAt: new Date().toISOString(),
     map: JSON.parse(JSON.stringify(Object.fromEntries(SAVED_KEYS.map(k => [k, m[k]])))),
@@ -460,12 +483,67 @@ async function saveCurrentMap() {
   try {
     await DmAPI.saveState('saved-maps', next);
     _savedMaps = next;
-    input.value = '';
     toast(`Saved "${name}"`);
     renderSavedMaps();
+    return true;
   } catch (err) {
     showCombatAlert(err.message, { title: "Couldn't save the map" });
+    return false;
   }
+}
+
+/** "💾 Save map…" on the adventure's bar, beside Load a map (the user's call, 2026-10-27): `map` kept under a name, the
+ * saved maps listed -- one picked to save over it, or deleted (a second press, since a confirm would open under this). */
+export async function saveMapDialog(map) {
+  if (!map?.cols) { showCombatAlert('Make the map first.', { title: 'Save map' }); return; }
+  await loadSavedMaps();
+  let typed = '';
+  const rows = () => (_savedMaps.length ? _savedMaps.map(sm => `
+    <div class="dm-saved-map">
+      <div class="dm-saved-map-preview">${mapStageHtml({ map: sm.map, creatures: [] }, { preview: true })}</div>
+      <div class="dm-saved-map-main">
+        <strong title="${escapeHtml(sm.name)}">${escapeHtml(sm.name)}</strong>
+        <small>${sm.map.rows} × ${sm.map.cols} · ${(sm.map.objects || []).length} object${(sm.map.objects || []).length === 1 ? '' : 's'}</small>
+        <span class="dm-saved-map-btns">
+          <button class="dm-btn small" data-over="${escapeHtml(sm.id)}" title="Save this map in its place">Save over it</button>
+          <button class="dm-btn small danger" data-del="${escapeHtml(sm.id)}" title="Delete this saved map">🗑</button>
+        </span>
+      </div>
+    </div>`).join('') : '<div class="dm-hint">No saved maps yet.</div>');
+  const answer = await openDmModal({
+    title: '💾 Save map',
+    html: `<div class="dm-field"><label for="smName">Its name</label>
+        <input class="dm-input" id="smName" placeholder="Name this map…" maxlength="60" autocomplete="off"></div>
+      <div class="dm-hint" style="margin:0.3rem 0 0.7rem">The map alone -- its size, background, objects and terrain -- to load again later (here, or in Map setup and the encounters). The Pokémon and NPCs on it aren't kept.</div>
+      <div class="dm-saved-maps" id="smList">${rows()}</div>`,
+    buttons: [{ label: 'Cancel', value: null }, { label: '💾 Save', kind: 'primary', value: 'save' }],
+    onOpen: (body, close) => {
+      const input = body.querySelector('#smName');
+      input.focus();
+      input.addEventListener('input', () => { typed = input.value; });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') close('save'); });
+      const box = body.querySelector('#smList');
+      box.addEventListener('click', async (e) => {
+        const over = e.target.closest('[data-over]');
+        if (over) { typed = _savedMaps.find(sm => sm.id === over.dataset.over)?.name || typed; close('over'); return; }
+        const del = e.target.closest('[data-del]');
+        if (!del) return;
+        if (!del.classList.contains('armed')) { del.classList.add('armed'); del.textContent = 'Delete?'; return; }
+        const next = _savedMaps.filter(sm => sm.id !== del.dataset.del);
+        try {
+          await DmAPI.saveState('saved-maps', next);
+          _savedMaps = next;
+          box.innerHTML = rows();
+        } catch (err) {
+          toast(`Couldn't delete it: ${err.message}`);
+        }
+      });
+    },
+  });
+  const name = String(typed).trim();
+  if (!answer) return;
+  if (!name) { toast('Give the map a name to save it.'); return; }
+  await storeSavedMap(name, map, { ask: answer !== 'over' }); // (one picked to save over: no need to ask again)
 }
 
 /** Puts a saved map in place of the current one. Creatures already placed keep their spot when it's still on the map
@@ -518,6 +596,7 @@ function wireStatic() {
     setMapUpright(b.dataset.mapTurn === '1');
     renderStage();
   });
+  wireZoom(document.getElementById('mapWrap'));
   if (!_live) {
     const across = document.getElementById('mapAcross');
     const down = document.getElementById('mapDown');
@@ -745,7 +824,7 @@ function renderToolPanel() {
     hint.textContent = 'Click or drag across squares to paint them.';
     panel.querySelectorAll('input[name="terrainKind"]').forEach(r => r.addEventListener('change', () => { ed.terrain = r.value; }));
   } else {
-    panel.innerHTML = '<div class="dm-hint">Click an object to remove it, or a marked square to clear it.</div>';
+    panel.innerHTML = `<div class="dm-hint">Click ${_opts.adventure ? 'a Pokémon or NPC to take it off the map, ' : ''}an object to remove it, or a marked square to clear it.</div>`;
     hint.textContent = 'Eraser: click what you want to remove.';
   }
 }
@@ -785,6 +864,7 @@ function showTurn() {
   if (across) across.textContent = up ? 'Squares down' : 'Squares across';
   if (down) down.textContent = up ? 'Squares across' : 'Squares down';
   document.querySelector('.dm-map-sizes')?.classList.toggle('upright', up);
+  _root?.querySelector('.dm-map-editor')?.classList.toggle('upright', up); // (the settings beside the map: dm-console.css)
 }
 
 /** What the map shows -- the same text, the same map (renderStage keeps it on the map's box). */
@@ -801,14 +881,13 @@ function renderStage() {
   // The creatures' sprites (looping videos) already showing are kept and moved into the new map, not loaded and
   // started again on every redraw
   const putShown = keepSprites(wrap);
+  const scrolled = [wrap.scrollLeft, wrap.scrollTop]; // zoomed in: the same part still in view
   wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: ed.tool === 'creatures' ? ed.creatureId : null, upright: mapUpright() });
   wrap._stageKey = stageKey(s);
   const stage = wrap.querySelector('.dm-map-stage');
-  // As tall as the screen has room for below where the map starts, the legend under it kept in view (measured: the
-  // adventure's and the live Map tab's bars put it lower down -- shown upright, it's the height that runs out first)
-  const top = Math.round(wrap.getBoundingClientRect().top);
-  sizeStage(wrap, m, top > 0 ? `100vh - ${top + 84}px` : `100vh - ${_live ? 300 : 190}px`);
   showTurn();
+  sizeMapStage(wrap, m);
+  [wrap.scrollLeft, wrap.scrollTop] = scrolled;
   stage.querySelectorAll('[data-img]').forEach((el) => {
     if (!el.dataset.img) return;
     if (!putShown(el)) patchPortraitMedia(el, el.dataset.img, '');
@@ -816,6 +895,7 @@ function renderStage() {
 
   stage.style.touchAction = 'none'; // a held finger turns / paints instead of scrolling the page
   stage.addEventListener('pointerdown', (e) => {
+    if (ed.pinch) return;
     const cell = cellAtPointer(e);
     if (!cell) return;
     e.preventDefault();
@@ -837,6 +917,113 @@ function renderStage() {
   stage.addEventListener('pointerleave', () => { if (!ed.gesture) { ed.hover = null; renderGhost(); } });
   renderGhost();
 }
+
+/** The map as big as the screen has room for below where it starts, the legend under it kept in view (measured: the
+ * adventure's and the live Map tab's bars put it lower down -- shown upright, it's the height that runs out first). Zoomed
+ * in, that times the zoom, in a box of that height scrolled to see the rest. */
+function sizeMapStage(wrap, m = getSetup().map) {
+  const top = Math.round(wrap.getBoundingClientRect().top);
+  const legend = wrap.nextElementSibling?.offsetHeight; // (more lines in a narrow column)
+  const avail = top > 0 ? `100vh - ${top + (legend ? legend + 34 : 84)}px` : `100vh - ${_live ? 300 : 190}px`;
+  sizeStage(wrap, m, avail);
+  const outer = wrap.firstElementChild; // the stage, or (shown upright) the box it's turned in
+  if (outer && ed.zoom > 1) outer.style.width = `calc(${outer.style.width} * ${ed.zoom})`;
+  wrap.classList.toggle('zoomed', ed.zoom > 1);
+  wrap.style.height = ed.zoom > 1 ? `calc(${avail})` : '';
+}
+
+// Zoom (the user's call, 2026-10-27): −, + and Fit over the map, Ctrl + the wheel (a trackpad's pinch too) at the pointer,
+// two fingers on a touch screen. Zoomed in, the wheel, the middle button held or two fingers move it around.
+const ZOOM_STEPS = [1, 1.5, 2, 3, 4];
+const MAX_ZOOM = ZOOM_STEPS[ZOOM_STEPS.length - 1];
+
+/** Zoom `z` (1: the whole map), the spot at screen point `at` ({x, y}; else the middle of the view) staying where it is. */
+function setZoom(z, at = null) {
+  const wrap = document.getElementById('mapWrap');
+  z = Math.min(MAX_ZOOM, Math.max(1, Math.round(z * 100) / 100));
+  if (!wrap || z === ed.zoom) return;
+  const r = wrap.getBoundingClientRect();
+  const px = at ? at.x - r.left : wrap.clientWidth / 2, py = at ? at.y - r.top : wrap.clientHeight / 2;
+  const fx = (wrap.scrollLeft + px) / wrap.scrollWidth, fy = (wrap.scrollTop + py) / wrap.scrollHeight;
+  ed.zoom = z;
+  sizeMapStage(wrap);
+  wrap.scrollLeft = fx * wrap.scrollWidth - px;
+  wrap.scrollTop = fy * wrap.scrollHeight - py;
+  showZoom();
+}
+
+function stepZoom(dir) {
+  const next = dir > 0 ? ZOOM_STEPS.find(z => z > ed.zoom + 0.01) : [...ZOOM_STEPS].reverse().find(z => z < ed.zoom - 0.01);
+  setZoom(next ?? ed.zoom);
+}
+
+function showZoom() {
+  const box = document.getElementById('mapZoom');
+  if (!box) return;
+  box.querySelector('[data-mapzoom="fit"]').textContent = ed.zoom > 1 ? `${Math.round(ed.zoom * 100)}%` : 'Fit';
+  box.querySelector('[data-mapzoom="out"]').disabled = ed.zoom <= 1;
+  box.querySelector('[data-mapzoom="in"]').disabled = ed.zoom >= MAX_ZOOM;
+}
+
+/** The zoom's buttons, wheel, middle button and fingers on the map's box (kept: only what's in it is drawn again). */
+function wireZoom(wrap) {
+  document.getElementById('mapZoom').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mapzoom]');
+    if (!b) return;
+    if (b.dataset.mapzoom === 'fit') setZoom(1); else stepZoom(b.dataset.mapzoom === 'in' ? 1 : -1);
+  });
+  showZoom();
+  wrap.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return; // the wheel alone scrolls
+    e.preventDefault();
+    setZoom(ed.zoom * Math.exp(-e.deltaY / 300), { x: e.clientX, y: e.clientY });
+  }, { passive: false });
+  // (before the map's own press: the middle button and a second finger never use the tool)
+  const fingers = new Map();
+  wrap.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') {
+      if (e.button !== 1 || ed.zoom <= 1) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const start = { x: e.clientX, y: e.clientY, l: wrap.scrollLeft, t: wrap.scrollTop };
+      const move = (ev) => { wrap.scrollLeft = start.l - (ev.clientX - start.x); wrap.scrollTop = start.t - (ev.clientY - start.y); };
+      const end = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', end);
+      return;
+    }
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (fingers.size !== 2) return;
+    e.stopPropagation();
+    const [a, b] = [...fingers.values()];
+    ed.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: ed.zoom, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    ed.painting = false;
+  }, true);
+  wrap.addEventListener('pointermove', (e) => {
+    if (!fingers.has(e.pointerId)) return;
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!ed.pinch || fingers.size < 2) return;
+    const [a, b] = [...fingers.values()];
+    const x = (a.x + b.x) / 2, y = (a.y + b.y) / 2;
+    setZoom(ed.pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / ed.pinch.d, { x, y });
+    wrap.scrollLeft -= x - ed.pinch.x;
+    wrap.scrollTop -= y - ed.pinch.y;
+    ed.pinch.x = x; ed.pinch.y = y;
+  }, true);
+  const lift = (e) => {
+    fingers.delete(e.pointerId);
+    if (!fingers.size) ed.pinch = null; // (the finger left over doesn't start anything until it's lifted too)
+  };
+  wrap.addEventListener('pointerup', lift, true);
+  wrap.addEventListener('pointercancel', lift, true);
+  // the hint over the map grows and shrinks with the tool, the legend under it with the column: the map sized again to
+  // keep the legend in view
+  _viewObs?.disconnect();
+  _viewObs = new ResizeObserver(() => { if (wrap.isConnected && wrap.firstElementChild) sizeMapStage(wrap); });
+  _viewObs.observe(wrap.previousElementSibling);
+  _viewObs.observe(wrap.nextElementSibling);
+}
+let _viewObs = null;
 
 /** Terrain: keeps painting under the pointer until it's let go -- followed on the window, since every painted square
  * redraws the map (and a finger's touch stays tied to the element it started on, which that replaces). */
@@ -866,13 +1053,17 @@ function startPainting(e, paintFn = paint) {
 /** Live mode's Creatures tool: a press on a creature picks it (again: lets go of it); with one picked, a press on a
  * square moves it there (live-map-store.js's placeToken -- the server checks it fits). */
 function onCreaturePress(col, row) {
-  const s = getSetup();
-  const hit = s.creatures.find(c => footprintCells(c.position.col, c.position.row, footprintForSize(c.participant?.size))
-    .some(p => p.col === col && p.row === row));
+  const hit = creatureAt(col, row);
   if (hit && hit.id !== ed.creatureId) { ed.creatureId = hit.id; renderToolPanel(); renderStage(); return; }
   if (hit) { ed.creatureId = null; renderToolPanel(); renderStage(); return; }
   if (!ed.creatureId) return;
   moveCreature(ed.creatureId, { col, row });
+}
+
+/** The creature standing on board square (col, row), if any (one not on the map yet stands nowhere). */
+function creatureAt(col, row) {
+  return getSetup().creatures.find(c => c.position && footprintCells(c.position.col, c.position.row, footprintForSize(c.participant?.size))
+    .some(p => p.col === col && p.row === row)) || null;
 }
 
 /** Moves / turns / lifts a creature: the running map's through the Pi (anyone's, any time), the prepared adventure's in
@@ -1243,6 +1434,12 @@ function paint(col, row) {
 async function onCellClick(col, row) {
   const m = getSetup().map;
   if (ed.tool === 'erase') {
+    // the adventure's Pokemon and NPCs too (the user's call, 2026-10-27) -- the DM's own; a player's leaves from their app
+    const who = _opts.adventure ? creatureAt(col, row) : null;
+    if (who) {
+      if (dmOwned(who)) removeCreature(who); else toast(`${who.name} is a player's -- they leave from their own app.`);
+      return;
+    }
     const hit = topObjectAt(m, col, row);
     if (hit) { removeObject(hit); return; } // squares it marked go back to normal unless another object marks them too
     if (m.marks?.[`${col},${row}`]) updateSetup(st => { delete st.map.marks[`${col},${row}`]; });

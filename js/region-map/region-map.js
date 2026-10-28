@@ -26,6 +26,8 @@
 // beside its picture on the Pi, "City-Astria.glb" by "City-Astria.png") has the model standing there instead -- the
 // picture stays the fallback, shown while the model loads and wherever there's none.
 // Trees, rocks and peaks stand on the land, made in code (map-objects.js; not without the graphics card).
+// A map painted region by region (js/dm/map-upload.js) shows each region's own painting up close in the Painted style
+// (region-detail.js: loaded only once zoomed in on it; not without the graphics card).
 // A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
@@ -33,6 +35,7 @@ import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds, iconSpot } from './map-features.js';
 import { currentMap, isMajor, partOfChain, FIRST_ID } from './map-version.js';
 import { addLandDetail } from './land-detail.js';
+import { addRegionDetail } from './region-detail.js';
 import { addSea, seaInfoTexture, LONGEST_WAVE, FADE } from './sea.js';
 import { buildMapObjects, findPlaces, MODEL_KINDS } from './map-objects.js';
 import { DmAPI } from '../api.js';
@@ -233,6 +236,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const models = [];        // the locations' 3D models standing on the land (in place of their icons' pictures)
   const modelScenes = {};   // the models, by URL (a promise each: the loaded scene, or why not)
   let objects = null;       // the trees, rocks and peaks (map-objects.js), once made
+  let details = null;       // the regions' own paintings up close (region-detail.js), on a map made of regions
 
   // Painting pixel -> world: x to the east, z to the south, y up (metres scaled by vert).
   const toWorld = (x, y, metres = 0) => new THREE.Vector3(x - land.W / 2, Math.max(metres, 0) * land.vert, y - land.H / 2);
@@ -304,6 +308,13 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (!gpu.software) {
       seaInfo = seaInfoTexture(land);
       addSea(material, { info: seaInfo, size: [land.W, land.H], time: seaTime }); // (sea.js)
+    }
+    if (!gpu.software && version.regions?.length && version.files.shade) {
+      details = addRegionDetail(material, {
+        renderer, regions: version.regions, shadeUrl: version.files.shade, size: [land.W, land.H],
+        phone: matchMedia('(pointer: coarse)').matches, onReady: () => { dirty = true; wake(); },
+      });
+      details.setStyle(style);
     }
     mesh = new THREE.Mesh(geo, material);
     scene.add(mesh);
@@ -1101,6 +1112,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       const fast = moved && shift >= SHARP_BELOW;      if (fast) keepUp(now); else lastDraw = 0;
       useLevel(fast ? Math.max(movingLevel, REST) : REST);
       orientIcons();
+      details?.update(camera, controls.target, root.clientHeight);
       render();
       placeLabels();
       const az = controls.getAzimuthalAngle();
@@ -1193,6 +1205,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     }
     root.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === next));
     root.classList.toggle('painted', next === 'painted'); // the painting has its own names and red dots
+    details?.setStyle(next);
     // (asked for before the map's loaded -- the PokéNav's saved view: load() starts in this style itself)
     if (!version) return;
     if (!textures[next]) textures[next] = await loadTexture(renderer, version.files[STYLES[next]]);
@@ -1320,6 +1333,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     seaInfo?.dispose();
     Object.values(iconTextures).forEach(p => p.then(t => t.dispose()).catch(() => {}));
     objects?.dispose();
+    details?.dispose();
     renderer.dispose();
   }
 

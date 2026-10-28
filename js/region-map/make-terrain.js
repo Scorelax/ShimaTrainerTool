@@ -457,3 +457,21 @@ export function paintTexture(big, terrain) {
   }
   return big;
 }
+
+/** What paintTexture multiplies the painting by, as a grey picture (RGBA, SW x SH): 0.7 + grey / 255 * 0.5 -- 1 on the
+ * water. The regions' own paintings are shaded with it on the 3D map (region-detail.js). */
+export function shadePicture(terrain) {
+  const { W, H, SW, SH, land, shade } = terrain;
+  const landAt = sampler(toFloat(land), W, H, false);
+  const fx = (W - 1) / Math.max(1, SW - 1), fy = (H - 1) / Math.max(1, SH - 1);
+  const out = new Uint8ClampedArray(SW * SH * 4);
+  for (let y = 0; y < SH; y++) {
+    for (let x = 0; x < SW; x++) {
+      const i = y * SW + x;
+      const k = landAt(x * fx, y * fy) <= 0.5 ? 1 : 0.8 + 0.35 * (shade[i] / 255);
+      out[i * 4] = out[i * 4 + 1] = out[i * 4 + 2] = Math.round(((k - 0.7) / 0.5) * 255);
+      out[i * 4 + 3] = 255;
+    }
+  }
+  return out;
+}

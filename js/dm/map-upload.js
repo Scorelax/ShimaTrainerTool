@@ -20,7 +20,7 @@ import { drawShape } from './location-map.js';
 import {
   FIRST_ID, allMaps, currentMap, loadMapState, between, compose, invert, apply, scaleOf, transformShape, transformIcon, fitSimilarity,
 } from '../region-map/map-version.js';
-import { SEA_OFFSET, paintTexture } from '../region-map/make-terrain.js';
+import { SEA_OFFSET, paintTexture, shadePicture } from '../region-map/make-terrain.js';
 
 const KM_PER_PX = 0.12;     // a new painting is worked on at the first one's detail: 120 m a pixel...
 const MAX_SIDE = 2048;      // ...unless that's bigger than this (its 3D pictures are twice the size: 4096, what every
@@ -726,6 +726,7 @@ export async function openRegionMaps({ locations, onChanged }) {
         cur, frameUrl, regions, added, addUp: add?.up, t, work, big, water,
         topo: canvasOf(t.SW, t.SH, new Uint8ClampedArray(t.topo.buffer)),
         height: canvasOf(W, H, new Uint8ClampedArray(t.height.buffer)),
+        shade: canvasOf(t.SW, t.SH, shadePicture(t)),   // (the regions' paintings shaded with it up close -- region-detail.js)
       };
       const prev = overlay.querySelector('#bdPrev');
       if (!prev) return;
@@ -739,21 +740,23 @@ export async function openRegionMaps({ locations, onChanged }) {
   }
 
   async function useRegions(b, step) {
-    const n = b.added ? 5 : 4;
+    const n = b.added ? 6 : 5;
     if (b.added) {
       step(`Storing the region's painting on the Pi (1 of ${n})…`);
       const pic = canvasOf(b.added.W, b.added.H);
       pic.getContext('2d').drawImage(b.addUp, 0, 0);
       b.added.file = await store(pic, 'image/webp', REGION_QUALITY);
     }
-    step(`Storing the map's painting (${n - 3} of ${n})…`);
+    step(`Storing the map's painting (${n - 4} of ${n})…`);
     const painting = await store(b.work, 'image/png');
-    step(`Storing the heights (${n - 2} of ${n})…`);
+    step(`Storing the heights (${n - 3} of ${n})…`);
     const height = await store(b.height, 'image/png');
-    step(`Storing the topographic map (${n - 1} of ${n})…`);
+    step(`Storing the topographic map (${n - 2} of ${n})…`);
     const topo = await store(b.topo, 'image/jpeg', 0.88);
-    step(`Storing the painted map (${n} of ${n})…`);
+    step(`Storing the painted map (${n - 1} of ${n})…`);
     const painted = await store(b.big, 'image/jpeg', 0.88);
+    step(`Storing the light on the land (${n} of ${n})…`);
+    const shade = await store(b.shade, 'image/png');
     const { cur, t } = b;
     const replaced = b.added && (cur.regions || []).some(r => r.id === b.added.id);
     const gone = (cur.regions || []).find(r => !b.regions.some(x => x.id === r.id));
@@ -761,7 +764,7 @@ export async function openRegionMaps({ locations, onChanged }) {
     const version = {
       id: newId('map'), name, at: new Date().toISOString(),
       W: cur.W, H: cur.H, kmPerPx: cur.kmPerPx, toBase: cur.toBase || [1, 0, 0, 0, 1, 0],
-      files: { painting, height, topo, painted },
+      files: { painting, height, topo, painted, shade },
       places: { width: cur.W, height: cur.H, seaOffset: SEA_OFFSET, scale: 2,
         towns: (cur.places?.towns || []).filter(x => x.x >= 0 && x.y >= 0 && x.x < cur.W && x.y < cur.H), spots: t.dots, water: b.water },
       frame: { painting: b.frameUrl },

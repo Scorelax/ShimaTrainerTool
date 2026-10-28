@@ -7,7 +7,8 @@
 //   current   the id of the map in use (none: the first one, the files in assets/)
 //   versions  [{ id, name, at (when it was made), W, H (its painting's pixels -- the locations' coordinates while it's
 //             in use), kmPerPx, toBase (the affine [a, b, c, d, e, f] from its pixels to the first painting's: x' = ax +
-//             by + c, y' = dx + ey + f), files: { painting, height, topo, painted } (URLs on the Pi), places: { seaOffset,
+//             by + c, y' = dx + ey + f), files: { painting, height, topo, painted, shade (a map built from regions: the
+//             light on its land, region-detail.js) } (URLs on the Pi), places: { seaOffset,
 //             scale, towns, spots, water } (as places.json),
 //             frame: { painting } (a map built from regions: its painting before any region was pasted on),
 //             regions: [{ id, name, file (its whole painting on the Pi, a WebP), W, H, toMap (the affine from its pixels to

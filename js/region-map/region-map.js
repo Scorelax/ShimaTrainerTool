@@ -27,7 +27,8 @@
 // picture stays the fallback, shown while the model loads and wherever there's none.
 // Trees, rocks and peaks stand on the land, made in code (map-objects.js; not without the graphics card).
 // A map painted region by region (js/dm/map-upload.js) shows each region's own painting up close in the Painted style
-// (region-detail.js: loaded only once zoomed in on it; not without the graphics card).
+// (region-detail.js: loaded only once zoomed in on it; not without the graphics card), and a thin dark line between
+// the regions in either style (region-borders.js).
 // A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
@@ -36,6 +37,7 @@ import { shapeBounds, iconSpot } from './map-features.js';
 import { currentMap, isMajor, partOfChain, FIRST_ID } from './map-version.js';
 import { addLandDetail } from './land-detail.js';
 import { addRegionDetail } from './region-detail.js';
+import { addRegionBorders } from './region-borders.js';
 import { addSea, seaInfoTexture, LONGEST_WAVE, FADE } from './sea.js';
 import { buildMapObjects, findPlaces, MODEL_KINDS } from './map-objects.js';
 import { DmAPI } from '../api.js';
@@ -237,6 +239,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const modelScenes = {};   // the models, by URL (a promise each: the loaded scene, or why not)
   let objects = null;       // the trees, rocks and peaks (map-objects.js), once made
   let details = null;       // the regions' own paintings up close (region-detail.js), on a map made of regions
+  let borders = null;       // ...and the lines between them (region-borders.js)
 
   // Painting pixel -> world: x to the east, z to the south, y up (metres scaled by vert).
   const toWorld = (x, y, metres = 0) => new THREE.Vector3(x - land.W / 2, Math.max(metres, 0) * land.vert, y - land.H / 2);
@@ -318,6 +321,12 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     }
     mesh = new THREE.Mesh(geo, material);
     scene.add(mesh);
+    if (version.borders?.length) {
+      borders = addRegionBorders(scene, {
+        borders: version.borders, size: [W, H], groundAt,
+        onLand: (x, y) => land.kind[Math.min(H - 1, Math.max(0, Math.round(y))) * W + Math.min(W - 1, Math.max(0, Math.round(x)))] !== 0,
+      });
+    }
 
     // the block: four sides hanging from the mesh's edge (up to the land where the painting cuts through it) and a
     // bottom, the dark blue of deep water
@@ -1334,6 +1343,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     Object.values(iconTextures).forEach(p => p.then(t => t.dispose()).catch(() => {}));
     objects?.dispose();
     details?.dispose();
+    borders?.dispose();
     renderer.dispose();
   }
 

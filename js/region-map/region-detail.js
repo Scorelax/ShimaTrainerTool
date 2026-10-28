@@ -44,10 +44,14 @@ vec3 regionDetail(vec3 colour) {
   d = rdOver(d, rdTex2, rdMat[2], rdOn[2], px);
   d = rdOver(d, rdTex3, rdMat[3], rdOn[3], px);
   if (d.a <= 0.0) return colour;
+  // (the paintings come as they're stored, sRGB: their see-through edges mixed there, as a painting program does --
+  // turned to light only after, or an edge half see-through came out much too dark, a dark seam where regions meet)
+  vec3 c = d.rgb / d.a;
+  c = mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
   // the painted picture's light on the land (0.8 to 1.15 times the painting's colour; 1 on the water) -- applied to the
   // painting's sRGB colour, so ~ to the 2.2 here
   float k = 0.7 + texture2D(rdShade, px / max(rdSize - 1.0, vec2(1.0))).r * 0.5;
-  return mix(colour, (d.rgb / d.a) * pow(k, 2.2), d.a);
+  return mix(colour, c * pow(k, 2.2), d.a);
 }
 `;
 
@@ -58,7 +62,8 @@ const blank = () => {
 };
 
 /** A region's painting (or the shade picture) from the Pi as a texture: `maxSide` caps it (a phone's), `srgb` for
- * colours (the shade is plain numbers). */
+ * colours (the shade is plain numbers) -- see-through edges premultiplied, the colours left sRGB (the shader turns
+ * them). */
 async function loadPicture(renderer, url, { maxSide = 4096, srgb = true } = {}) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`The Pi didn't send a region's painting (${res.status})`);
@@ -73,7 +78,7 @@ async function loadPicture(renderer, url, { maxSide = 4096, srgb = true } = {}) 
   }
   const tex = new THREE.Texture(bitmap);
   tex.flipY = false;   // (row 0 the picture's top: the shader works in the map's pixels, y down)
-  tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  tex.colorSpace = THREE.NoColorSpace;
   tex.premultiplyAlpha = false;   // (it already is)
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.generateMipmaps = true;

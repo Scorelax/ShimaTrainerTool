@@ -21,6 +21,7 @@ import {
   FIRST_ID, allMaps, currentMap, loadMapState, between, compose, invert, apply, scaleOf, transformShape, transformIcon, fitSimilarity,
 } from '../region-map/map-version.js';
 import { SEA_OFFSET, paintTexture, shadePicture } from '../region-map/make-terrain.js';
+import { traceBorders } from '../region-map/region-borders.js';
 
 const KM_PER_PX = 0.12;     // a new painting is worked on at the first one's detail: 120 m a pixel...
 const MAX_SIDE = 2048;      // ...unless that's bigger than this (its 3D pictures are twice the size: 4096, what every
@@ -697,6 +698,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       wctx.drawImage(frame, 0, 0, W, H);
       bctx.drawImage(frame, 0, 0, SW, SH);
       frame.close?.();
+      const borders = traceBorders(W, H);   // (where the regions meet: the lines between them, region-borders.js)
       for (const [i, r] of regions.entries()) {
         if (cancelled) return;
         step(`Pasting the regions onto the map (${i + 1} of ${regions.length})…`);
@@ -707,6 +709,7 @@ export async function openRegionMaps({ locations, onChanged }) {
           c.drawImage(pic, 0, 0);
           c.setTransform(1, 0, 0, 1, 0, 0);
         }
+        borders.add(pic, r);
         if (r !== added) pic.close?.();
       }
       const rgba = wctx.getImageData(0, 0, W, H).data;
@@ -723,7 +726,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       paintTexture(painted.data, t);
       bctx.putImageData(painted, 0, 0);
       built = {
-        cur, frameUrl, regions, added, addUp: add?.up, t, work, big, water,
+        cur, frameUrl, regions, added, addUp: add?.up, t, work, big, water, borders: borders.finish(),
         topo: canvasOf(t.SW, t.SH, new Uint8ClampedArray(t.topo.buffer)),
         height: canvasOf(W, H, new Uint8ClampedArray(t.height.buffer)),
         shade: canvasOf(t.SW, t.SH, shadePicture(t)),   // (the regions' paintings shaded with it up close -- region-detail.js)
@@ -769,6 +772,7 @@ export async function openRegionMaps({ locations, onChanged }) {
         towns: (cur.places?.towns || []).filter(x => x.x >= 0 && x.y >= 0 && x.x < cur.W && x.y < cur.H), spots: t.dots, water: b.water },
       frame: { painting: b.frameUrl },
       regions: b.regions,
+      borders: b.borders,
     };
     step('Putting it in use…');
     await switchTo(version, { addVersion: true });

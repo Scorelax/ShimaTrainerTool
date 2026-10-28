@@ -12,7 +12,8 @@
 //             scale, towns, spots, water } (as places.json),
 //             frame: { painting } (a map built from regions: its painting before any region was pasted on),
 //             regions: [{ id, name, file (its whole painting on the Pi, a WebP), W, H, toMap (the affine from its pixels to
-//             the map's), at }] (js/dm/map-upload.js's buildRegions, the user's call, 2026-10-28) }]
+//             the map's), at }] (js/dm/map-upload.js's buildRegions, the user's call, 2026-10-28),
+//             borders: [[[x, y], ...], ...] (the lines between those regions, in its pixels: region-borders.js) }]
 // Every map knows where it sits on the first one (toBase), so going from any map to any other is one transform
 // (between()), and going back puts the shapes back where they were -- the locations' icons too (their spot moves, their
 // size is in km).

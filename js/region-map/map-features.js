@@ -1,17 +1,20 @@
 // What's painted where on the region map's painting, read from its colours -- for the Admin module's map marking tools
-// (the user's call, 2026-10-20): a route follows the painted road between the DM's clicks, a forest (or a lake, or any
-// patch of one colour) fills itself in from one click. The same reading as tools/region-map/make_terrain.py's
-// classify(), so the roads and forests found here are the ones the 3D map was built from.
+// (the user's call, 2026-10-20): a route follows the painted road (the light tan paths) between the DM's clicks, a forest
+// (or a lake, or any patch of one colour) fills itself in from one click. readColours is the same reading as
+// tools/region-map/make_terrain.py's classify(), so the forests found here are the ones the 3D map was built from (its
+// `road` is the dark lines: the region borders).
 //
 // Pure maths on pixel arrays (no DOM), so it runs the same in the browser and under Node for testing. Everything is in
 // painting pixels: (x, y) from the top left, a mask a Uint8Array of W x H (1 = in).
 
 /** The painting's pixels (RGBA, as getImageData gives them) -> the masks the tools work on:
  * { W, H, rgba, road, water, forest (the dark green of the trees), density (how much of the land round each pixel is
- * trees, 0-255) }. */
+ * trees, 0-255) }. The roads are the light tan paths (the user's call, 2026-10-28: the dark lines are the region
+ * borders, not roads). */
 export function readFeatures(rgba, W, H) {
   const n = W * H;
   const road = new Uint8Array(n), water = new Uint8Array(n), forest = new Uint8Array(n);
+  const green = new Uint8Array(n), box = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
     const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
     const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
@@ -22,11 +25,20 @@ export function readFeatures(rgba, W, H) {
     hue *= 60;
     const isWater = hue > 185 && hue < 240 && sat > 0.35 && val > 0.2;
     water[i] = isWater ? 1 : 0;
-    road[i] = val < 0.3 && hue > 0 && hue < 50 && !isWater ? 1 : 0;
+    road[i] = hue > 20 && hue < 45 && sat > 0.2 && sat < 0.5 && val > 0.85 ? 1 : 0;   // light sandy tan
     forest[i] = hue > 55 && hue < 170 && sat > 0.25 && val < 0.5 ? 1 : 0;
+    green[i] = hue > 45 && hue < 170 && sat > 0.3 ? 1 : 0;                            // the fields and the trees
+    box[i] = r > 200 && g > 180 && b > 140 && r - b > 18 && sat < 0.2 ? 1 : 0;        // a name's box
   }
-  // the dark specks between the trees read as road too: only lines of some length are kept
-  dropSmall(road, W, H, 40);
+  // the same tan is the sand along the coast, the sunny side of a mountain and a name box's frame: a road runs through
+  // the fields and the forests, away from the water
+  const nearWater = dilate(water, W, H, 4), nearBox = dilate(box, W, H, 2);
+  const fields = boxMean(green, W, H, 7);
+  for (let i = 0; i < n; i++) if (road[i] && (nearWater[i] || nearBox[i] || fields[i] < 64)) road[i] = 0;
+  // and specks of it here and there: only lines of some length are kept (measured a pixel wider -- a thin road going
+  // slantwise is only joined at its pixels' corners)
+  const lines = dropSmall(dilate(road, W, H, 1), W, H, 120);
+  for (let i = 0; i < n; i++) road[i] &= lines[i];
   const density = boxMean(forest, W, H, 6);
   return { W, H, rgba, road, water, forest, density };
 }

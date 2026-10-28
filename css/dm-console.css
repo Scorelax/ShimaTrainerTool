@@ -638,6 +638,9 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-icon-btn.danger:hover { background: rgba(192, 57, 43, 0.5); }
 
 /* ---- Popups (dm-common.js's openDmModal) ---- */
+/* The alerts and confirms (combat-alert.js, z-index 1100 elsewhere) over everything the console opens -- a confirm
+   from inside the region map's window or a popup sat hidden under it */
+body.dm-console .combat-alert-overlay { z-index: 10070; }
 .dm-modal-overlay { position: fixed; inset: 0; z-index: 10040; display: flex; align-items: center; justify-content: center; background: rgba(3, 4, 12, 0.72); backdrop-filter: blur(3px); }
 .dm-modal { width: min(620px, 94vw); max-height: 90vh; display: flex; flex-direction: column; background: var(--dm-panel); border: 1px solid rgba(255, 215, 0, 0.35); border-radius: 14px; box-shadow: 0 16px 50px rgba(0, 0, 0, 0.6); }
 .dm-modal.wide { width: min(1080px, 96vw); }
@@ -1686,6 +1689,13 @@ button.dm-nav-fold:hover, .dm-world-fold:hover { color: var(--dm-gold); }
 .dm-mup-upload { align-self: flex-start; }
 .dm-mup-topbtns { align-self: flex-start; gap: 0.5rem; flex-wrap: wrap; }
 .dm-mup-topbtns .dm-btn { white-space: nowrap; }
+.dm-mup-regions { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.8rem; border: 1px solid var(--dm-line); border-radius: 12px; background: var(--dm-panel); }
+.dm-mup-regions .dm-card-title { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.dm-mup-reglist { display: flex; flex-direction: column; gap: 0.35rem; }
+.dm-mup-region { display: flex; align-items: center; gap: 0.6rem; padding: 0.3rem; border-radius: 8px; background: rgba(0, 0, 0, 0.18); }
+.dm-mup-region img { width: 56px; height: 56px; object-fit: contain; flex: none; background: #0c2240; border-radius: 6px; }
+.dm-mup-region > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.dm-mup-region small { color: var(--dm-muted); font-size: 0.76rem; }
 .dm-mup-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.8rem; }
 .dm-mup-card { display: flex; flex-direction: column; border: 1px solid var(--dm-line); border-radius: 12px; overflow: hidden; background: var(--dm-panel); }
 .dm-mup-card.in-use { border-color: var(--dm-gold); box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.35); }

@@ -8,6 +8,11 @@
 //      files stored on the Pi and every location's shape moved onto it.
 // The maps before it are kept: any of them can be put back in use, and the locations move back with it
 // (js/region-map/map-version.js keeps where each map sits on the first one).
+// Regions (the user's call, 2026-10-28): the map can also be painted one region at a time -- each region its own
+// painting (up to 4096 pixels, only the region, the rest see-through), lined up and checked the same way, then pasted
+// onto the map's own painting (its frame) with the others and the map built again at the same size, so nothing marked
+// on it moves. Each region is kept whole on the Pi (as a WebP): the painted picture is drawn from them at twice the
+// map's size, and adding a region again later replaces it. A whole new painting starts without regions.
 import { DmAPI } from '../api.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, newId, toast } from './dm-common.js';
@@ -21,6 +26,21 @@ const KM_PER_PX = 0.12;     // a new painting is worked on at the first one's de
 const MAX_SIDE = 2048;      // ...unless that's bigger than this (its 3D pictures are twice the size: 4096, what every
 const MAX_PIXELS = 2.6e6;   // graphics card takes), or than this many pixels (the land's reading needs ~100 bytes each)
 const PAIR_COLOURS = ['#ff5252', '#40c4ff', '#69f0ae', '#ffd740', '#e040fb', '#ff9100', '#ffffff', '#b2ff59'];
+
+// A region (the user's call, 2026-10-28): one part of the map painted on its own at up to this size each way (what
+// every graphics card takes), only the region, the rest see-through. Kept on the Pi as a WebP (see-through too, and
+// under the Pi's 15 MB a picture -- a 4096 PNG of a painting can be more).
+const REGION_MAX_SIDE = 4096;
+const REGION_QUALITY = 0.92;
+
+/** How fine a region's painting is, in words: metres a pixel. */
+const regionDetail = (r, map) => `about ${Math.round((map.kmPerPx * 1000) / scaleOf(r.toMap))} m a pixel`;
+
+async function loadBitmap(url) {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`The Pi didn't send a picture (${res.status}).`);
+  return createImageBitmap(await res.blob());
+}
 
 const sameFraming = (a, b) => Math.abs((a.W / a.H) / (b.W / b.H) - 1) < 0.02;
 const km = (px, perPx) => `${Math.round(px * perPx)}`;
@@ -202,6 +222,21 @@ export async function openRegionMaps({ locations, onChanged }) {
         <button class="dm-btn primary dm-mup-upload" data-mup="upload">⬆ Upload a new painting</button>
         <button class="dm-btn" data-mup="export" data-id="${escapeHtml(inUse.id)}" title="The painting of the map in use, as it was uploaded -- no locations, names or marks on it">⬇ Export the map (PNG)</button>
       </div>
+      <div class="dm-mup-regions">
+        <div class="dm-card-title"><span>🧩 Regions of the map in use (${(inUse.regions || []).length})</span>
+          <button class="dm-btn small primary" data-mup="region-add">⬆ Add a region</button></div>
+        <div class="dm-hint">Paint one region at a time -- only the region, everything round it see-through (a PNG) -- and fit it onto the
+          map: the map is built again with it pasted in (its land and all), and nothing marked on the map moves. A region
+          added again later replaces the one there (↺). The maps from before stay in the list below; a whole new painting
+          (⬆ above) starts without regions.</div>
+        <div class="dm-mup-reglist">${(inUse.regions || []).map(r => `
+          <div class="dm-mup-region">
+            <img src="${escapeHtml(r.file)}" alt="" loading="lazy">
+            <span><strong>${escapeHtml(r.name)}</strong><small>${r.at ? `${escapeHtml(new Date(r.at).toLocaleDateString())} · ` : ''}${r.W} × ${r.H} px · ${regionDetail(r, inUse)}</small></span>
+            <button class="dm-btn small" data-mup="region-replace" data-id="${escapeHtml(r.id)}" title="A new painting of this region in its place">↺ Replace</button>
+            <button class="dm-icon-btn danger" data-mup="region-remove" data-id="${escapeHtml(r.id)}" title="Build the map again without it">🗑</button>
+          </div>`).join('') || '<div class="dm-hint">No regions added yet.</div>'}</div>
+      </div>
       <div class="dm-mup-cards">${maps.slice().reverse().map(m => `
         <div class="dm-mup-card${m.id === inUse.id ? ' in-use' : ''}">
           <img src="${escapeHtml(m.files.topo)}" alt="" loading="lazy">
@@ -259,6 +294,14 @@ export async function openRegionMaps({ locations, onChanged }) {
     else if (act === 'upload') {
       const file = await pickFile();
       if (file) lineUp(file);
+    } else if (act === 'region-add' || act === 'region-replace') {
+      const replaces = act === 'region-replace' ? (inUse.regions || []).find(r => r.id === b.dataset.id) : null;
+      const file = await pickFile();
+      if (file) lineUp(file, [], { replaces, fileName: file.name });
+    } else if (act === 'region-remove') {
+      const gone = (inUse.regions || []).find(r => r.id === b.dataset.id);
+      if (!gone || !await showCombatConfirm(`Build the map again without "${gone.name}"? Its part of the map goes back to the painting under it. (The map as it is now stays in the list below.)`, { title: 'Remove region', yesLabel: 'Build it without', noLabel: 'Cancel' })) return;
+      buildRegions({ cur: inUse, remove: gone, back: showList });
     } else if (act === 'export') {
       const target = maps.find(m => m.id === b.dataset.id);
       if (!target) return;
@@ -303,19 +346,27 @@ export async function openRegionMaps({ locations, onChanged }) {
   // 1. Line it up
   // ---------------------------------------------------------------------------
 
-  /** `keep`: the spots placed before (back from checking). */
-  async function lineUp(file, keep = []) {
+  /** `keep`: the spots placed before (back from checking). `region` ({ replaces, fileName }): a region being added (or
+   * put in place of `replaces`) rather than a whole new painting. */
+  async function lineUp(file, keep = [], region = null) {
     let up, oldShown;
     try {
       [up, oldShown] = await Promise.all([createImageBitmap(file), loadImage(inUse.files.painted)]);
     } catch (err) {
-      showCombatAlert("That file couldn't be opened as a picture.", { title: 'Upload a new painting' });
+      showCombatAlert("That file couldn't be opened as a picture.", { title: region ? 'Add a region' : 'Upload a new painting' });
+      return;
+    }
+    if (region && Math.max(up.width, up.height) > REGION_MAX_SIDE) {
+      showCombatAlert(`That picture is ${up.width} × ${up.height} pixels -- a region can be ${REGION_MAX_SIDE} pixels at most each way (what every graphics card takes).`, { title: 'Add a region' });
       return;
     }
     const cur = inUse;
     const upMap = { W: up.width, H: up.height };
     const shownPer = oldShown.naturalWidth / cur.W;   // the painted picture's pixels per map pixel (2)
-    const same = sameFraming(cur, upMap);
+    // Lined up without any spots: a painting framed like the map in use by its edges; a region replacing one the same
+    // size where that one sat (a new painting of the same region, from the same template)
+    const same = region ? !!region.replaces && region.replaces.W === up.width && region.replaces.H === up.height : sameFraming(cur, upMap);
+    const sameT = () => (region ? invert(region.replaces.toMap) : (s => [s, 0, 0, 0, s, 0])((up.width / cur.W + up.height / cur.H) / 2));
     const pairs = keep.map(p => ({ ...p }));   // [{ a: [x, y] on the map in use | null, b: on the new painting | null }]
     let T = null;       // the map in use's pixels -> the new painting's
     let error = 0;
@@ -323,19 +374,19 @@ export async function openRegionMaps({ locations, onChanged }) {
     const solve = () => {
       const done = pairs.filter(p => p.a && p.b);
       const fit = fitSimilarity(done.map(p => p.a), done.map(p => p.b));
-      if (fit) { T = fit.m; error = done.length > 2 ? fit.error : 0; } else if (same) { const s = (up.width / cur.W + up.height / cur.H) / 2; T = [s, 0, 0, 0, s, 0]; error = 0; } else T = null;
+      if (fit) { T = fit.m; error = done.length > 2 ? fit.error : 0; } else if (same) { T = sameT(); error = 0; } else T = null;
     };
     solve();
 
     panes.forEach(p => p.destroy());
     overlay.dataset.screen = 'align';
-    overlay.innerHTML = `<div class="dm-lme-head"><h3>🗺 Line up the new painting</h3><span class="dm-lme-spacer"></span>
+    overlay.innerHTML = `<div class="dm-lme-head"><h3>${region ? `🧩 Line up the region${region.replaces ? ` (in place of "${escapeHtml(region.replaces.name)}")` : ''}` : '🗺 Line up the new painting'}</h3><span class="dm-lme-spacer"></span>
         <button class="dm-btn" data-al="cancel">Cancel</button><button class="dm-btn primary" data-al="next">Check it →</button></div>
       <div class="dm-lme-body">
         <aside class="dm-lme-tools" id="alTools"></aside>
         <div class="dm-mup-panes">
           <div class="dm-mup-pane"><div class="dm-mup-cap">The map in use</div><div class="dm-lme-stage" id="alOld"></div></div>
-          <div class="dm-mup-pane"><div class="dm-mup-cap">The new painting</div><div class="dm-lme-stage" id="alNew"></div></div>
+          <div class="dm-mup-pane"><div class="dm-mup-cap">${region ? 'The region' : 'The new painting'}</div><div class="dm-lme-stage" id="alNew"></div></div>
         </div>
       </div>`;
     const marks = (ctx, v, side) => {
@@ -387,13 +438,14 @@ export async function openRegionMaps({ locations, onChanged }) {
       overlay.querySelector('#alTools').innerHTML = `
         <div class="dm-hint">Click the same spot on both maps -- a town's middle, the tip of a cape, where two roads meet. Spread them out:
           two pairs line the maps up, a third checks it. Scroll to zoom, drag to move; click a mark again to take it off.</div>
-        ${same ? `<div class="dm-lme-stat dm-mup-same">✓ The same framing as the map in use${done < 2 ? ': lined up by its edges -- spots only if it looks off' : ''}</div>` : ''}
+        ${same ? `<div class="dm-lme-stat dm-mup-same">${region ? `✓ The same size as the region it replaces${done < 2 ? ': put where that one was -- spots only if it looks off' : ''}`
+          : `✓ The same framing as the map in use${done < 2 ? ': lined up by its edges -- spots only if it looks off' : ''}`}</div>` : ''}
         <div class="dm-mup-pairs">${pairs.map((p, i) => `<div class="dm-mup-pair"><span class="dm-mup-dot" style="background:${PAIR_COLOURS[i % PAIR_COLOURS.length]}"></span>
-          <span>${i + 1}. ${p.a ? '✓' : '…'} on the map in use · ${p.b ? '✓' : '…'} on the new one</span>
+          <span>${i + 1}. ${p.a ? '✓' : '…'} on the map in use · ${p.b ? '✓' : '…'} on the ${region ? 'region' : 'new one'}</span>
           <button class="dm-icon-btn danger" data-al="del" data-i="${i}" title="Take this pair off">✕</button></div>`).join('') || '<div class="dm-hint">No spots yet.</div>'}</div>
-        <div class="dm-lme-stat">${T ? `${done >= 2 ? `Lined up by ${done} pairs` : 'Lined up by its edges'}${error ? ` -- they agree within about ${missKm < 1 ? missKm.toFixed(1) : Math.round(missKm)} km${missKm > 2 ? '. One of them may be off' : ''}` : ''}`
+        <div class="dm-lme-stat">${T ? `${done >= 2 ? `Lined up by ${done} pairs` : region ? 'Put where the one it replaces was' : 'Lined up by its edges'}${error ? ` -- they agree within about ${missKm < 1 ? missKm.toFixed(1) : Math.round(missKm)} km${missKm > 2 ? '. One of them may be off' : ''}` : ''}`
           : `${2 - done} more pair${2 - done === 1 ? '' : 's'} to line them up`}</div>
-        ${T ? `<div class="dm-hint">The new painting is ${s >= 1 ? `${s.toFixed(2)} × bigger` : `${(1 / s).toFixed(2)} × smaller`}, turned ${Math.round((Math.atan2(T[3], T[0]) * 180) / Math.PI)}°.</div>` : ''}
+        ${T ? `<div class="dm-hint">The ${region ? 'region' : 'new painting'} is ${s >= 1 ? `${s.toFixed(2)} × bigger` : `${(1 / s).toFixed(2)} × smaller`}, turned ${Math.round((Math.atan2(T[3], T[0]) * 180) / Math.PI)}°${region ? ` -- about ${Math.round((cur.kmPerPx * 1000) / s)} m a pixel (the map in use: ${Math.round(cur.kmPerPx * 1000)} m)` : ''}.</div>` : ''}
         ${pairs.length ? '<button class="dm-btn small danger" data-al="clear">Clear the spots</button>' : ''}`;
       overlay.querySelector('[data-al="next"]').disabled = !T;
     }
@@ -402,7 +454,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       const b = e.target.closest('[data-al]');
       if (!b) return;
       if (b.dataset.al === 'cancel') { overlay.onclick = null; showList(); }
-      else if (b.dataset.al === 'next' && T) { overlay.onclick = null; check({ up, oldShown, shownPer, cur, T, back: () => lineUp(file, pairs) }); }
+      else if (b.dataset.al === 'next' && T) { overlay.onclick = null; check({ up, oldShown, shownPer, cur, T, region, back: () => lineUp(file, pairs, region) }); }
       else if (b.dataset.al === 'del') { pairs.splice(Number(b.dataset.i), 1); solve(); tools(); paneOld.redraw(); paneNew.redraw(); }
       else if (b.dataset.al === 'clear') { pairs.length = 0; solve(); tools(); paneOld.redraw(); paneNew.redraw(); }
     };
@@ -412,18 +464,21 @@ export async function openRegionMaps({ locations, onChanged }) {
   // 2. Check it: the map in use see-through over the new painting, the locations on it
   // ---------------------------------------------------------------------------
 
-  function check({ up, oldShown, shownPer, cur, T, back }) {
+  function check({ up, oldShown, shownPer, cur, T, region = null, back }) {
     panes.forEach(p => p.destroy());
     overlay.dataset.screen = 'check';
-    let alpha = 0.5;
+    // A region: the map in use whole, the region laid on it (see-through as the slider says) -- a whole painting: the
+    // map in use laid over it
+    let alpha = region ? 0.75 : 0.5;
     let showLocs = true;
     overlay.innerHTML = `<div class="dm-lme-head"><h3>🗺 Does it line up?</h3><span class="dm-lme-spacer"></span>
-        <button class="dm-btn" data-ck="back">← The spots</button><button class="dm-btn primary" data-ck="next">Build the 3D land →</button></div>
+        <button class="dm-btn" data-ck="back">← The spots</button><button class="dm-btn primary" data-ck="next">${region ? 'Build the map with it →' : 'Build the 3D land →'}</button></div>
       <div class="dm-lme-body">
         <aside class="dm-lme-tools">
-          <div class="dm-hint">The map in use, laid over the new painting the way the spots lined them up. Slide it to see through:
-            the coasts, roads and towns should sit on each other where both maps have them.</div>
-          <label class="dm-field"><span>The map in use on top: <b id="ckPct">50 %</b></span><input type="range" id="ckAlpha" min="0" max="100" value="50"></label>
+          <div class="dm-hint">${region ? 'The region, laid on the map in use the way the spots lined them up. Slide it to see through: its coast, roads and towns should sit on those of the map, and its edges meet the regions round it.'
+            : `The map in use, laid over the new painting the way the spots lined them up. Slide it to see through:
+            the coasts, roads and towns should sit on each other where both maps have them.`}</div>
+          <label class="dm-field"><span>${region ? 'The region on top' : 'The map in use on top'}: <b id="ckPct">${Math.round(alpha * 100)} %</b></span><input type="range" id="ckAlpha" min="0" max="100" value="${Math.round(alpha * 100)}"></label>
           <label class="dm-check"><input type="checkbox" id="ckLocs" checked><span>Show the locations <small>where they'll be on the new map</small></span></label>
         </aside>
         <div class="dm-lme-stage" id="ckStage"></div>
@@ -433,14 +488,20 @@ export async function openRegionMaps({ locations, onChanged }) {
       W: up.width, H: up.height,
       draw: (ctx, v, dpr) => {
         ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(up, v.ox, v.oy, up.width * v.s, up.height * v.s);
-        if (alpha > 0) {
+        if (!region) ctx.drawImage(up, v.ox, v.oy, up.width * v.s, up.height * v.s);
+        if (alpha > 0 || region) {
           // screen <- new painting (the view) <- the map in use (T) <- its painted picture (shownPer)
           const m = compose([v.s, 0, v.ox, 0, v.s, v.oy], compose(T, [1 / shownPer, 0, 0, 0, 1 / shownPer, 0]));
           ctx.save();
-          ctx.globalAlpha = alpha;
+          ctx.globalAlpha = region ? 1 : alpha;
           ctx.setTransform(dpr * m[0], dpr * m[3], dpr * m[1], dpr * m[4], dpr * m[2], dpr * m[5]);
           ctx.drawImage(oldShown, 0, 0);
+          ctx.restore();
+        }
+        if (region && alpha > 0) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.drawImage(up, v.ox, v.oy, up.width * v.s, up.height * v.s);
           ctx.restore();
         }
         if (showLocs) shapes.forEach(s => drawShape(ctx, s.shape, v, { name: s.name }));
@@ -458,6 +519,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       if (!b) return;
       overlay.onclick = null;
       if (b.dataset.ck === 'back') back();
+      else if (region) buildRegions({ cur, add: { up, T, replaces: region.replaces, fileName: region.fileName }, back: () => check({ up, oldShown, shownPer, cur, T, region, back }) });
       else build({ up, cur, T, back: () => check({ up, oldShown, shownPer, cur, T, back }) });
     };
   }
@@ -565,6 +627,147 @@ export async function openRegionMaps({ locations, onChanged }) {
       places: { width: b.W, height: b.H, seaOffset: SEA_OFFSET, scale: 2, towns: b.towns, spots: b.t.dots, water: b.water.map(w => ({ name: w.name, x: Math.round(w.x), y: Math.round(w.y) })) },
     };
     step('Moving the locations onto it…');
+    await switchTo(version, { addVersion: true });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Regions: the map built again from its frame (the painting before any region was added) with every region pasted
+  // on in order -- `add` ({ up, T: the map's pixels -> the region's, replaces, fileName }) one more (or in place of the
+  // one it replaces), `remove` one less. The same size, the same place on the first map: nothing marked on it moves.
+  // ---------------------------------------------------------------------------
+
+  function buildRegions({ cur, add = null, remove = null, back }) {
+    panes.forEach(p => p.destroy());
+    panes = [];
+    overlay.dataset.screen = 'build';
+    const { W, H } = cur;
+    const frameUrl = cur.frame?.painting || cur.files.painting;
+    const added = add && {
+      id: add.replaces?.id || newId('region'), name: add.replaces?.name || '', W: add.up.width, H: add.up.height,
+      toMap: invert(add.T), at: new Date().toISOString(),
+    };
+    const regions = (cur.regions || []).filter(r => r.id !== remove?.id).map(r => (r.id === added?.id ? added : r));
+    if (added && !add.replaces) regions.push(added);
+    const guess = (add?.fileName || '').replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' ').trim();
+    overlay.innerHTML = `<div class="dm-lme-head"><h3>🧩 ${remove ? `The map without "${escapeHtml(remove.name)}"` : 'The map with the region'}</h3><span class="dm-lme-spacer"></span>
+        <button class="dm-btn" data-bd="back">← ${add ? 'Check it' : 'Back'}</button><button class="dm-btn primary" data-bd="use" disabled>Use this map</button></div>
+      <div class="dm-mup-build">
+        ${added ? `<label class="dm-field"><span>The region's name</span><input class="dm-input" id="bdRegion" value="${escapeHtml(added.name || guess)}" maxlength="60" placeholder="e.g. Inex Woods"></label>` : ''}
+        <div class="dm-hint">${regions.length} region${regions.length === 1 ? '' : 's'} pasted onto the map's own painting (${W} × ${H} pixels, about ${km(W, cur.kmPerPx)} × ${km(H, cur.kmPerPx)} km),
+          its land read again from the colours. The painted picture is drawn from the regions' full paintings.</div>
+        <div class="dm-lme-stat" id="bdStep">Getting ready…</div>
+        <canvas class="dm-mup-preview" id="bdPrev" hidden></canvas>
+      </div>`;
+    const step = (t) => { const el = overlay.querySelector('#bdStep'); if (el) el.textContent = t; };
+    let built = null;
+    let cancelled = false;
+    overlay.onclick = async (e) => {
+      const b = e.target.closest('[data-bd]');
+      if (!b) return;
+      if (b.dataset.bd === 'back') { cancelled = true; overlay.onclick = null; back(); return; }
+      if (b.dataset.bd !== 'use' || !built) return;
+      if (added) {
+        added.name = overlay.querySelector('#bdRegion').value.trim();
+        if (!added.name) { overlay.querySelector('#bdRegion').focus(); step('Give the region a name first.'); return; }
+      }
+      b.disabled = true;
+      overlay.querySelector('[data-bd="back"]').disabled = true;
+      try {
+        await useRegions(built, step);
+        toast(remove ? `"${remove.name}" is off the map` : `"${added.name}" is on the map`);
+        overlay.onclick = null;
+        showList();
+      } catch (err) {
+        step(`Couldn't store it: ${err.message}`);
+        b.disabled = false;
+        overlay.querySelector('[data-bd="back"]').disabled = false;
+      }
+    };
+
+    (async () => {
+      step('Pasting the regions onto the map…');
+      const frame = await loadBitmap(frameUrl);
+      // the map's painting (to read the land from) and, twice the size, the one the painted picture is made from
+      const work = canvasOf(W, H);
+      const wctx = work.getContext('2d', { willReadFrequently: true });
+      const SW = Math.round(W * 2), SH = Math.round(H * 2);
+      const big = canvasOf(SW, SH);
+      const bctx = big.getContext('2d', { willReadFrequently: true });
+      [wctx, bctx].forEach((c) => { c.imageSmoothingQuality = 'high'; });
+      wctx.drawImage(frame, 0, 0, W, H);
+      bctx.drawImage(frame, 0, 0, SW, SH);
+      frame.close?.();
+      for (const [i, r] of regions.entries()) {
+        if (cancelled) return;
+        step(`Pasting the regions onto the map (${i + 1} of ${regions.length})…`);
+        const pic = r === added ? add.up : await loadBitmap(r.file);
+        for (const [c, k] of [[wctx, 1], [bctx, SW / W]]) {
+          const m = compose([k, 0, 0, 0, k, 0], r.toMap);
+          c.setTransform(m[0], m[3], m[1], m[4], m[2], m[5]);
+          c.drawImage(pic, 0, 0);
+          c.setTransform(1, 0, 0, 1, 0, 0);
+        }
+        if (r !== added) pic.close?.();
+      }
+      const rgba = wctx.getImageData(0, 0, W, H).data;
+      const inside = ([x, y]) => x >= 0 && y >= 0 && x < W && y < H;
+      const towns = [
+        ...(cur.places?.towns || []).map(t => [t.x, t.y]),
+        ...locations.filter(l => l.type === 'city' && l.shape?.kind === 'pin').map(l => [l.shape.x, l.shape.y]),
+      ].filter(inside);
+      const water = (cur.places?.water || []).filter(w => inside([w.x, w.y]));
+      const t = await buildInWorker(new Uint8ClampedArray(rgba), W, H, { towns, water, k: KM_PER_PX / cur.kmPerPx, scale: 2 }, step);
+      if (cancelled) return;
+      step('Painting the shaded picture');
+      const painted = bctx.getImageData(0, 0, t.SW, t.SH);
+      paintTexture(painted.data, t);
+      bctx.putImageData(painted, 0, 0);
+      built = {
+        cur, frameUrl, regions, added, addUp: add?.up, t, work, big, water,
+        topo: canvasOf(t.SW, t.SH, new Uint8ClampedArray(t.topo.buffer)),
+        height: canvasOf(W, H, new Uint8ClampedArray(t.height.buffer)),
+      };
+      const prev = overlay.querySelector('#bdPrev');
+      if (!prev) return;
+      const ph = 420, pw = Math.round((ph * t.SW) / t.SH);
+      prev.width = pw; prev.height = ph;
+      prev.getContext('2d').drawImage(big, 0, 0, pw, ph);
+      prev.hidden = false;
+      step(`Built: ${Math.round(t.stats.land * 100)} % land, the highest peak ${t.stats.highest.toLocaleString()} m, ${t.stats.spots} red spot${t.stats.spots === 1 ? '' : 's'}${t.stats.lake ? ', a lake' : ''}. Check the painted map below, then use it.`);
+      overlay.querySelector('[data-bd="use"]').disabled = false;
+    })().catch((err) => { if (!cancelled) step(`The map couldn't be built: ${err.message}`); });
+  }
+
+  async function useRegions(b, step) {
+    const n = b.added ? 5 : 4;
+    if (b.added) {
+      step(`Storing the region's painting on the Pi (1 of ${n})…`);
+      const pic = canvasOf(b.added.W, b.added.H);
+      pic.getContext('2d').drawImage(b.addUp, 0, 0);
+      b.added.file = await store(pic, 'image/webp', REGION_QUALITY);
+    }
+    step(`Storing the map's painting (${n - 3} of ${n})…`);
+    const painting = await store(b.work, 'image/png');
+    step(`Storing the heights (${n - 2} of ${n})…`);
+    const height = await store(b.height, 'image/png');
+    step(`Storing the topographic map (${n - 1} of ${n})…`);
+    const topo = await store(b.topo, 'image/jpeg', 0.88);
+    step(`Storing the painted map (${n} of ${n})…`);
+    const painted = await store(b.big, 'image/jpeg', 0.88);
+    const { cur, t } = b;
+    const replaced = b.added && (cur.regions || []).some(r => r.id === b.added.id);
+    const gone = (cur.regions || []).find(r => !b.regions.some(x => x.id === r.id));
+    const name = b.added ? `Shima: ${b.added.name} ${replaced ? 'painted again' : 'added'}` : `Shima: ${gone?.name || 'a region'} taken off`;
+    const version = {
+      id: newId('map'), name, at: new Date().toISOString(),
+      W: cur.W, H: cur.H, kmPerPx: cur.kmPerPx, toBase: cur.toBase || [1, 0, 0, 0, 1, 0],
+      files: { painting, height, topo, painted },
+      places: { width: cur.W, height: cur.H, seaOffset: SEA_OFFSET, scale: 2,
+        towns: (cur.places?.towns || []).filter(x => x.x >= 0 && x.y >= 0 && x.x < cur.W && x.y < cur.H), spots: t.dots, water: b.water },
+      frame: { painting: b.frameUrl },
+      regions: b.regions,
+    };
+    step('Putting it in use…');
     await switchTo(version, { addVersion: true });
   }
 

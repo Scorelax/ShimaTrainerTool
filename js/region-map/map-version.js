@@ -8,7 +8,10 @@
 //   versions  [{ id, name, at (when it was made), W, H (its painting's pixels -- the locations' coordinates while it's
 //             in use), kmPerPx, toBase (the affine [a, b, c, d, e, f] from its pixels to the first painting's: x' = ax +
 //             by + c, y' = dx + ey + f), files: { painting, height, topo, painted } (URLs on the Pi), places: { seaOffset,
-//             scale, towns, spots, water } (as places.json) }]
+//             scale, towns, spots, water } (as places.json),
+//             frame: { painting } (a map built from regions: its painting before any region was pasted on),
+//             regions: [{ id, name, file (its whole painting on the Pi, a WebP), W, H, toMap (the affine from its pixels to
+//             the map's), at }] (js/dm/map-upload.js's buildRegions, the user's call, 2026-10-28) }]
 // Every map knows where it sits on the first one (toBase), so going from any map to any other is one transform
 // (between()), and going back puts the shapes back where they were -- the locations' icons too (their spot moves, their
 // size is in km).

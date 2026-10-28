@@ -7,7 +7,7 @@ self.onmessage = async (e) => {
   const { rgba, W, H, options } = e.data;
   try {
     const t = await buildTerrain(rgba, W, H, { ...options, onStep: step => self.postMessage({ step }) });
-    self.postMessage({ done: t }, [t.height.buffer, t.topo.buffer, t.shade.buffer, t.land.buffer]);
+    self.postMessage({ done: t }, [t.height.buffer, t.topo.buffer, t.shade.buffer, t.land.buffer, t.lines.buffer]);
   } catch (err) {
     self.postMessage({ error: err.message || String(err) });
   }

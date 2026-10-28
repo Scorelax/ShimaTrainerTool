@@ -1,6 +1,7 @@
 // The borders between the regions (the user's call, 2026-10-28): on a map built region by region (js/dm/map-upload.js's
-// buildRegions) a thin dark line divides each region from the next -- drawn by the app, not painted (a black line in a
-// painting is read as a road, and it would be painted again with every region). Where the regions' paintings meet
+// buildRegions) a thin black line divides each region from the next -- drawn by the app, not painted (painted, it would
+// have to be painted again with every region, and blur up close). The first painting's own borders (its dark lines)
+// are turned black as the map's built (make-terrain.js), so they match. Where the regions' paintings meet
 // (each region's see-through outside tells where it ends; where two overlap, the one pasted later is on top) is found
 // once, as the map is built (traceBorders), and kept with the map as lines (map-version.js: `borders`). A region's
 // edge against the sea or against the map's own painting (no region painted there yet) has no line.
@@ -243,8 +244,8 @@ export function addRegionBorders(scene, { borders, size, groundAt, onLand }) {
     uniforms: {
       rbView: { value: view },
       rbWidth: { value: 4 },   // (the screen's pixels, edge to edge)
-      rbColour: { value: new THREE.Color(0x1e160c) },
-      rbOpacity: { value: 0.85 },
+      rbColour: { value: new THREE.Color(0x0a0a0a) },
+      rbOpacity: { value: 0.9 },
     },
   });
   const mesh = new THREE.Mesh(geo, material);

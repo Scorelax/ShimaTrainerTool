@@ -548,7 +548,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       <div class="dm-mup-build">
         <label class="dm-field"><span>Its name</span><input class="dm-input" id="bdName" value="${escapeHtml(name)}" maxlength="60"></label>
         <div class="dm-hint">${W} × ${H} pixels, about ${km(W, kmPerPx)} × ${km(H, kmPerPx)} km. Its land is read from its colours like the first map's: the blue
-          round it the sea, the grey, brown and snowy parts mountains, the dark green forests, the dark lines roads.</div>
+          round it the sea, the grey, brown and snowy parts mountains, the dark green forests, the dark lines the region borders (drawn black).</div>
         <div class="dm-lme-stat" id="bdStep">Getting ready…</div>
         <canvas class="dm-mup-preview" id="bdPrev" hidden></canvas>
       </div>`;

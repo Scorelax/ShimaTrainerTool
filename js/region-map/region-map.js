@@ -27,7 +27,7 @@
 // picture stays the fallback, shown while the model loads and wherever there's none.
 // Trees, rocks and peaks stand on the land, made in code (map-objects.js; not without the graphics card).
 // A map painted region by region (js/dm/map-upload.js) shows each region's own painting up close in the Painted style
-// (region-detail.js: loaded only once zoomed in on it; not without the graphics card), and a thin dark line between
+// (region-detail.js: loaded only once zoomed in on it; not without the graphics card), and a thin black line between
 // the regions in either style (region-borders.js).
 // A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).

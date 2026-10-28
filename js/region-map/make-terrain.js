@@ -4,8 +4,11 @@
 // DM's own computer does the work and the Pi only stores what comes out:
 //   height  the height map: R = high byte, G = low byte of the height in metres (+ SEA_OFFSET), B = what's there
 //           (0 sea, 1 land, 2 lake, 3 river) -- the painting's size
-//   topo    the topographic picture (SCALE x): coloured by height, shaded, the lake, the rivers, the coast and the roads
+//   topo    the topographic picture (SCALE x): coloured by height, shaded, the lake, the rivers, the coast and the
+//           painting's dark lines -- the region borders (the user's call, 2026-10-28: they're borders, not roads, and
+//           drawn black; the code still calls them `road`)
 //   shade   the light on the land (SCALE x, 0-255), for the painted picture (paintTexture)
+//   lines   those lines (the painting's size, 1 on one), so paintTexture draws them black on the painted picture too
 //   places  the spots (the painting's red dots) and the names on the water, plus the towns it was given
 // Its noise isn't numpy's, so a painting built here gets slightly different rough peaks than the PC script gave it.
 //
@@ -394,7 +397,8 @@ export async function buildTerrain(rgba, W, H, { towns = [], water = [], k = 1, 
   const forestAt = sampler(forestD, W, H, false);
   const riverAt = sampler(gaussian(toFloat(river), W, H, 0.35), W, H, false);
   const coastAt = sampler(gaussian(toFloat(land), W, H, 0.4), W, H, false);
-  const roadAt = sampler(gaussian(toFloat(opening(and(c.road, land), W, H, 1)), W, H, 0.4), W, H, false);
+  const lines = opening(and(c.road, land), W, H, 1);
+  const roadAt = sampler(gaussian(toFloat(lines), W, H, 0.4), W, H, false);
   const topo = new Uint8ClampedArray(SW * SH * 4);
   const shade = new Uint8Array(SW * SH);
   const col = [0, 0, 0];
@@ -425,7 +429,7 @@ export async function buildTerrain(rgba, W, H, { towns = [], water = [], k = 1, 
       const cl = Math.abs(Math.min(1, Math.max(0, coastAt(px, py))) - 0.5) < 0.22 ? 0.55 : 0;
       r = r * (1 - cl) + 40 * cl; g = g * (1 - cl) + 60 * cl; b = b * (1 - cl) + 70 * cl;
       const rd = Math.min(Math.max(roadAt(px, py) * 1.3, 0), 0.85);
-      r = r * (1 - rd) + 110 * rd; g = g * (1 - rd) + 62 * rd; b = b * (1 - rd) + 32 * rd;
+      r = r * (1 - rd) + 22 * rd; g = g * (1 - rd) + 20 * rd; b = b * (1 - rd) + 18 * rd;
       topo[i * 4] = r; topo[i * 4 + 1] = g; topo[i * 4 + 2] = b; topo[i * 4 + 3] = 255;
     }
     if (y % 400 === 0) await tick();
@@ -434,25 +438,34 @@ export async function buildTerrain(rgba, W, H, { towns = [], water = [], k = 1, 
   let maxH = -Infinity, minH = Infinity, landCount = 0;
   for (let i = 0; i < N; i++) { if (h[i] > maxH) maxH = h[i]; if (h[i] < minH) minH = h[i]; landCount += land[i]; }
   return {
-    W, H, height, SW, SH, topo, shade, land,
+    W, H, height, SW, SH, topo, shade, land, lines: Uint8Array.from(lines),
     dots: dots.map(d => ({ x: Math.round(d.cx * 10) / 10, y: Math.round(d.cy * 10) / 10 })).sort((a, b) => a.y - b.y || a.x - b.x),
     stats: { land: landCount / N, lake: lake.reduce((a, v) => a + v, 0), rivers: river.reduce((a, v) => a + v, 0), highest: Math.round(maxH), deepest: Math.round(minH), boxes: boxes.reduce((a, v) => a + v, 0), spots: dots.length },
   };
 }
 
-/** The painting at the pictures' size (RGBA, SW x SH, drawn there by the browser) shaded like the land, in place. */
+/** The painting at the pictures' size (RGBA, SW x SH, drawn there by the browser) shaded like the land, its dark
+ * lines (the region borders) turned black, in place. */
 export function paintTexture(big, terrain) {
   const { W, H, SW, SH, land, shade } = terrain;
   const landAt = sampler(toFloat(land), W, H, false);
+  const lineAt = terrain.lines ? sampler(gaussian(toFloat(terrain.lines), W, H, 0.4), W, H, false) : () => 0;
   const fx = (W - 1) / Math.max(1, SW - 1), fy = (H - 1) / Math.max(1, SH - 1);
   for (let y = 0; y < SH; y++) {
     for (let x = 0; x < SW; x++) {
       const i = y * SW + x;
       if (landAt(x * fx, y * fy) <= 0.5) continue;
       const k = 0.8 + 0.35 * (shade[i] / 255);
-      big[i * 4] = Math.min(255, big[i * 4] * k);
-      big[i * 4 + 1] = Math.min(255, big[i * 4 + 1] * k);
-      big[i * 4 + 2] = Math.min(255, big[i * 4 + 2] * k);
+      let r = big[i * 4] * k, g = big[i * 4 + 1] * k, b = big[i * 4 + 2] * k;
+      // the brown of a border line to near black (its own light and dark kept a little, so it isn't flat)
+      const m = Math.min(Math.max(lineAt(x * fx, y * fy) * 1.6, 0), 0.92);
+      if (m > 0) {
+        const v = ((r + g + b) / 3) * 0.18;
+        r = r * (1 - m) + v * m; g = g * (1 - m) + v * m; b = b * (1 - m) + v * m;
+      }
+      big[i * 4] = Math.min(255, r);
+      big[i * 4 + 1] = Math.min(255, g);
+      big[i * 4 + 2] = Math.min(255, b);
     }
   }
   return big;

@@ -3,8 +3,10 @@
 // have to be painted again with every region, and blur up close). The first painting's own borders (its dark lines)
 // are turned black as the map's built (make-terrain.js), so they match. Where the regions' paintings meet
 // (each region's see-through outside tells where it ends; where two overlap, the one pasted later is on top) is found
-// once, as the map is built (traceBorders), and kept with the map as lines (map-version.js: `borders`). A region's
-// edge against the sea or against the map's own painting (no region painted there yet) has no line.
+// once, as the map is built (traceBorders), and kept with the map as lines (map-version.js: `borders`). Where a region
+// meets the map's own painting (no region painted there yet) it has its line too, from the first region on (the
+// user's call, 2026-11-01: a region placed stands out from its neighbours at once) -- only on the land, not along the
+// coast; a region's edge out at sea has none.
 //
 // The 3D map lays them on the land (addRegionBorders) -- the same width on the screen at any zoom, sharp up close, hidden
 // behind a mountain like the land itself, and left out over the sea.
@@ -68,8 +70,28 @@ function smooth(pts, loop) {
   return p;
 }
 
+/** The land shrunk by 2 pixels (1 where the 5 x 5 square round a pixel is all land): off the coast. */
+function erode2(land, W, H) {
+  const across = new Uint8Array(W * H), out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let all = 1;
+      for (let d = -2; d <= 2 && all; d++) all = land[y * W + Math.min(W - 1, Math.max(0, x + d))] ? 1 : 0;
+      across[y * W + x] = all;
+    }
+  }
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let all = 1;
+      for (let d = -2; d <= 2 && all; d++) all = across[Math.min(H - 1, Math.max(0, y + d)) * W + x];
+      out[y * W + x] = all;
+    }
+  }
+  return out;
+}
+
 /**
- * traceBorders(W, H) -> { add(picture, region), finish() -> lines }: the borders between the regions on a W x H map.
+ * traceBorders(W, H) -> { add(picture, region), finish(land) -> lines }: the borders round the regions on a W x H map.
  * add() each region's whole painting in the order they're pasted (`region`: its { W, H, toMap }); finish() gives the
  * lines, each [[x, y], ...] in the map's pixels.
  */
@@ -103,19 +125,22 @@ export function traceBorders(W, H) {
     }
   }
 
-  function finish() {
-    if (count < 2) return [];
-    // the cells' edges where two regions meet, kept on their corners: 1 east, 2 south, 4 west, 8 north
+  /** `land`: the built map's land (W x H, 1 on land) -- where a region meets the map's own painting, the line's only
+   * drawn on land, a little way in from the coast. */
+  function finish(land = null) {
+    if (!count) return [];
+    const inland = land ? erode2(land, W, H) : null;
+    const onLand = (x, y) => !!inland?.[Math.min(H - 1, Math.floor(y / r)) * W + Math.min(W - 1, Math.floor(x / r))];
+    // a line between two cells: two regions, or a region and the map's own painting there on the land
+    const meets = (o, n, x, y, nx, ny) => o !== n && ((o && n) || (onLand(x, y) && onLand(nx, ny)));
+    // the cells' edges where a region ends, kept on their corners: 1 east, 2 south, 4 west, 8 north
     const CW = GW + 1;
     const links = new Uint8Array(CW * (GH + 1));
     for (let y = 0; y < GH; y++) {
       for (let x = 0; x < GW; x++) {
         const o = owner[y * GW + x];
-        if (!o) continue;
-        const east = x + 1 < GW ? owner[y * GW + x + 1] : 0;
-        if (east && east !== o) { links[y * CW + x + 1] |= 2; links[(y + 1) * CW + x + 1] |= 8; }
-        const south = y + 1 < GH ? owner[(y + 1) * GW + x] : 0;
-        if (south && south !== o) { links[(y + 1) * CW + x] |= 1; links[(y + 1) * CW + x + 1] |= 4; }
+        if (x + 1 < GW && meets(o, owner[y * GW + x + 1], x, y, x + 1, y)) { links[y * CW + x + 1] |= 2; links[(y + 1) * CW + x + 1] |= 8; }
+        if (y + 1 < GH && meets(o, owner[(y + 1) * GW + x], x, y, x, y + 1)) { links[(y + 1) * CW + x] |= 1; links[(y + 1) * CW + x + 1] |= 4; }
       }
     }
     const STEPS = { 1: [1, 0, 4], 2: [0, 1, 8], 4: [-1, 0, 1], 8: [0, -1, 2] };   // [dx, dy, the way back]

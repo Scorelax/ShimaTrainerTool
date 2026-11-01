@@ -726,7 +726,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       paintTexture(painted.data, t);
       bctx.putImageData(painted, 0, 0);
       built = {
-        cur, frameUrl, regions, added, addUp: add?.up, t, work, big, water, borders: borders.finish(),
+        cur, frameUrl, regions, added, addUp: add?.up, t, work, big, water, borders: borders.finish(t.land),
         topo: canvasOf(t.SW, t.SH, new Uint8ClampedArray(t.topo.buffer)),
         height: canvasOf(W, H, new Uint8ClampedArray(t.height.buffer)),
         shade: canvasOf(t.SW, t.SH, shadePicture(t)),   // (the regions' paintings shaded with it up close -- region-detail.js)

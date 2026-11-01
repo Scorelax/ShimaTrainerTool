@@ -417,7 +417,7 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-trainer { height: 100%; display: flex; flex-direction: column; }
 .dm-trainer-bar { display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem 1.2rem; border-bottom: 1px solid var(--dm-line); }
 .dm-trainer-bar h2 { margin: 0; color: var(--dm-gold); font-size: 1.25rem; }
-.dm-trainer-cols { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px minmax(0, 1fr) 360px; }
+.dm-trainer-cols { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px minmax(0, 3fr) minmax(360px, 2fr); }
 .dm-trainer-col { overflow-y: auto; padding: 0.9rem 1rem 1.5rem; border-right: 1px solid var(--dm-line); }
 .dm-trainer-col:last-child { border-right: none; background: var(--dm-panel); }
 .dm-tstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 0.5rem; }

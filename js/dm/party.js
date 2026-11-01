@@ -339,6 +339,9 @@ function inventoryOf(t, items) {
   return out;
 }
 
+/** An inventory group's key in _expanded. */
+const invKey = type => `inv|${type}`;
+
 function moneyAndItemsHtml(t, items) {
   const inv = inventoryOf(t, items);
   const groups = {};
@@ -346,7 +349,7 @@ function moneyAndItemsHtml(t, items) {
   return `
     <div class="dm-card-title">Money</div>
     <div class="dm-money">₽${num(t.money).toLocaleString()}</div>
-    <div class="dm-row">
+    <div class="dm-row dm-money-row">
       ${stepperHtml({ id: 'moneyAmount', min: 0, step: 100, placeholder: 'Amount', cls: 'dm-money-step' })}
       <button class="dm-btn primary" id="moneyAdd">+ Give</button>
       <button class="dm-btn danger" id="moneyTake">− Take</button>
@@ -375,15 +378,21 @@ function moneyAndItemsHtml(t, items) {
 
     <div class="dm-card-title" style="margin-top:1rem">Inventory</div>
     <div class="dm-inv">
-      ${Object.keys(groups).sort().map(type => `
-        <div class="dm-inv-group">${escapeHtml(type)}</div>
-        ${groups[type].map(it => `
+      ${Object.keys(groups).sort().map(type => {
+        // each kind folds away (shut at first; opened ones stay open, for every trainer, as the Pokémon rows do)
+        const key = invKey(type);
+        const open = _expanded.has(key);
+        return `
+        <div class="dm-inv-group" data-toggle="${escapeHtml(key)}" role="button" tabindex="0">
+          <span class="dm-inv-caret">${open ? '▾' : '▸'}</span>${escapeHtml(type)} <span class="dm-inv-count">${groups[type].length}</span></div>
+        ${open ? groups[type].map(it => `
           <div class="dm-inv-row" title="${escapeHtml(it.description)}">
             <span class="dm-inv-name">${escapeHtml(it.name)}</span>
             <span class="dm-inv-qty">x${it.quantity}</span>
             <button class="dm-icon-btn" data-item="${escapeHtml(it.name)}" data-custom="${it.custom ? 1 : ''}" data-delta="-1" title="Take one">−</button>
             <button class="dm-icon-btn" data-item="${escapeHtml(it.name)}" data-custom="${it.custom ? 1 : ''}" data-delta="1" title="Give one more">+</button>
-          </div>`).join('')}`).join('') || '<div class="dm-hint">Nothing in the inventory.</div>'}
+          </div>`).join('') : ''}`;
+      }).join('') || '<div class="dm-hint">Nothing in the inventory.</div>'}
     </div>
 `;
 }
@@ -463,12 +472,14 @@ function wireTrainer(name, items) {
       showCombatAlert(`"${typed}" isn't in the item list -- pick one from the suggestions, or give it under Custom item.`, { title: 'Give an item' });
       return;
     }
+    _expanded.add(invKey(known.category || 'Other'));   // (its group open, to see it arrive)
     run(() => DmAPI.giveItem(name, known.name, qty), `Gave ${name} ${qty} × ${known.name}`);
   });
   document.getElementById('giveCustomBtn').addEventListener('click', () => {
     const itemName = document.getElementById('customName').value.trim();
     const qty = Math.max(1, parseInt(document.getElementById('customQty').value, 10) || 1);
     if (!itemName) return;
+    _expanded.add(invKey('Custom items'));
     run(() => DmAPI.giveItem(name, itemName, qty, { custom: true, description: document.getElementById('customDesc').value.trim() }),
       `Gave ${name} ${qty} × ${itemName}`);
   });

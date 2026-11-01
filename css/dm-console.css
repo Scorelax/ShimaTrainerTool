@@ -437,7 +437,11 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-tmon-caret { color: var(--dm-muted); }
 .dm-tmon-body { padding: 0 0.7rem 0.7rem; }
 .dm-money { font-size: 1.6rem; font-weight: 800; color: var(--dm-gold); margin-bottom: 0.5rem; }
-.dm-inv-group { font-size: 0.68rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--dm-muted); margin: 0.6rem 0 0.2rem; }
+.dm-inv-group { display: flex; align-items: center; gap: 0.4rem; font-size: 0.68rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--dm-muted); margin: 0.35rem 0 0.15rem; padding: 0.3rem 0.3rem; border-radius: 6px; cursor: pointer; user-select: none; }
+.dm-inv-group:hover { background: rgba(255, 255, 255, 0.05); color: var(--dm-text, #fff); }
+.dm-inv-caret { width: 0.7rem; }
+.dm-inv-count { margin-left: auto; font-weight: 700; letter-spacing: 0; }
+.dm-money-row > .dm-btn { flex: 0 0 auto; padding-left: 0.9rem; padding-right: 0.9rem; }
 .dm-inv-row { display: grid; grid-template-columns: 1fr auto 28px 28px; gap: 0.35rem; align-items: center; padding: 0.2rem 0.3rem; border-radius: 6px; font-size: 0.86rem; }
 .dm-inv-row:hover { background: rgba(255, 255, 255, 0.05); }
 .dm-inv-qty { color: var(--dm-muted); font-weight: 700; }

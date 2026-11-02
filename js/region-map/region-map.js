@@ -817,8 +817,8 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
   function placeLabels() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     const dist = camera.position.distanceTo(controls.target);
-    // A minor location's name only closer in than 60 % of the whole-island view the compass goes back to (the user's
-    // call, 2026-10-20): from far out only the major locations are named.
+    // A minor location's name only closer in than 60 % of the painting filling the screen (the user's call, 2026-10-20:
+    // the compass's view then): from far out only the major locations are named.
     const minorAway = dist > fillFor(controls.getAzimuthalAngle()) * 0.6;
     // How far an icon reaches down the screen from its middle, by its location -- the lowest of its corners, the way the
     // map is turned and tilted now: its name goes just under it (region-map.css --below); with the
@@ -944,14 +944,14 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     wake();
   }
 
-  /** The whole island in view, tilted a little, turned the way it is now (or `azimuth`). `fill`: the map looked at
-   * straight down instead, filling the screen -- as close as the painting still covers all of it, so as little as
-   * possible of what's behind the painting shows (the PokeNav's default view, the user's call, 2026-10-19). */
-  function home({ ms = 900, azimuth = controls.getAzimuthalAngle(), fill = false } = {}) {
+  /** The whole island in view, tilted a little, turned the way it is now (or `azimuth`). `flat`: the whole painting
+   * looked at straight down instead, all of it on the screen (the PokeNav's default view, the user's calls, 2026-10-19
+   * and 2026-11-02 -- it filled the screen before, and a painting of another shape lost its edges). */
+  function home({ ms = 900, azimuth = controls.getAzimuthalAngle(), flat = false } = {}) {
     if (!land) return;
-    if (fill) {
+    if (flat) {
       // a hair off straight down -- exactly 0 leaves the camera no way to know which way is up
-      flyTo(new THREE.Vector3(0, 0, 0), fillFor(azimuth), 0.001, azimuth, ms);
+      flyTo(new THREE.Vector3(0, 0, 0), wholeFor(azimuth), 0.001, azimuth, ms);
       return;
     }
     const t = new THREE.Vector3(land.cx - land.W / 2, 0, land.cy - land.H / 2);
@@ -1065,14 +1065,23 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     return Math.max(spanZ / (2 * tanV), spanX / (2 * tanV * camera.aspect)) * 0.95;
   }
 
+  /** How far back the camera stands, looking straight down at the painting's middle turned `azimuth`, for the whole
+   * painting to be on the screen: the painting (W x H), turned, has to fit inside the screen's footprint both ways. */
+  function wholeFor(azimuth = 0) {
+    const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const c = Math.abs(Math.cos(azimuth)), s = Math.abs(Math.sin(azimuth));
+    const across = (land.W / 2) * c + (land.H / 2) * s, up = (land.W / 2) * s + (land.H / 2) * c;
+    return Math.min(controls.maxDistance, (Math.max(across / camera.aspect, up) / tanV) * 1.02); // (a little room round it)
+  }
+
   /** How far back the camera stands, looking straight down at the painting's middle turned `azimuth`, for the screen
-   * to be covered by the painting edge to edge: the screen's footprint on the ground, turned, has to fit inside the
-   * painting (W x H) both ways. */
+   * to be covered by the painting edge to edge (the minor names' measure): the screen's footprint on the ground,
+   * turned, has to fit inside the painting (W x H) both ways. */
   function fillFor(azimuth = 0) {
     const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     const c = Math.abs(Math.cos(azimuth)), s = Math.abs(Math.sin(azimuth));
     const k = Math.min((land.W / 2) / (camera.aspect * c + s), (land.H / 2) / (camera.aspect * s + c));
-    return Math.max(controls.minDistance, (k / tanV) * 0.97); // a little in, for the land standing above the sea
+    return Math.max(controls.minDistance, (k / tanV) * 0.97);
   }
 
   function resize() {
@@ -1232,7 +1241,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     if (t.closest('[data-act="north"]')) {
       // With a home direction (the DM's PokeNav: turned like the battle maps), the compass is the way back to the
       // default view -- the whole island, turned that way.
-      if (homeAzimuth != null) { home({ azimuth: homeAzimuth, fill: true }); return; }
+      if (homeAzimuth != null) { home({ azimuth: homeAzimuth, flat: true }); return; }
       const dist = camera.position.distanceTo(controls.target);
       flyTo(controls.target.clone(), dist, controls.getPolarAngle(), 0, 600);
       return;

@@ -115,9 +115,9 @@ export async function renderPokenav(section, { session } = {}) {
     if (saved) _map.setView(saved); // (for the map style it was left in)
     Promise.all([loadLocations(), _party || loadParty()]).then(([list]) => { _map?.setLocations(list); _map?.setParty(_party?.locationId); }).catch(() => {});
     await _map.ready;
-    // Every start opens on the default view -- the compass's: straight down, north to the right, filling the screen
+    // Every start opens on the default view -- the compass's: straight down, north to the right, the whole painting
     // (the user's call, 2026-10-19) -- and the board screen follows (the move is sent like any other).
-    _map.home({ ms: 0, azimuth: HOME_AZIMUTH, fill: true });
+    _map.home({ ms: 0, azimuth: HOME_AZIMUTH, flat: true });
   } catch (err) {
     document.getElementById('navMap').innerHTML = `<div class="dm-loading">Couldn't load the map: ${escapeHtml(err.message)}</div>`;
   }

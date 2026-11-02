@@ -314,6 +314,13 @@ def dm_admin_move(payload: dict):
     return _admin(lambda: admin.save_move(payload.get('move'), bool(payload.get('isNew'))))
 
 
+@app.post('/api/dm/admin-import')
+def dm_admin_import(payload: dict):
+    """A moves / Pokedex file read back ({kind: 'moves' | 'pokedex', data, apply}): what it changes, saved with `apply`."""
+    fn = admin.import_moves if payload.get('kind') == 'moves' else admin.import_species
+    return _admin(lambda: fn(payload.get('data'), bool(payload.get('apply'))))
+
+
 @app.post('/api/dm/admin-move-checked')
 def dm_admin_move_checked(payload: dict):
     """A move's "needs a look" mark taken off ({name})."""

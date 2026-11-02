@@ -1601,6 +1601,16 @@ export class DmAPI {
   }
 
   /** A move's "needs a look" mark taken off -> the move. */
+  /** Every move or Pokedex entry as one file ({kind, exported, about, moves | species + abilities}). `kind`: 'moves' | 'pokedex'. */
+  static async adminExport(kind) {
+    return (await API.request('dm', 'admin-export', { kind }, { useCache: false, timeout: HEAVY_TIMEOUT })).data;
+  }
+
+  /** Such a file read back -> {added, changed, unchanged, errors, ...}; saved only with `apply` (without: what it would do). */
+  static async adminImport(kind, data, apply) {
+    return (await DmAPI._post('admin-import', { kind, data, apply }, 'Importing')).data;
+  }
+
   static async adminMoveChecked(name) {
     return (await DmAPI._post('admin-move-checked', { name }, 'Saving')).data;
   }

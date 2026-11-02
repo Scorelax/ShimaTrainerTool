@@ -123,13 +123,19 @@ def save_item_image(name, data_url):
 # Pokedex entries (species) and their abilities
 # ---------------------------------------------------------------------------
 
+def _species_view(sp):
+    """A species as the form (and the export) has it: the whole object, without what's worked out."""
+    out = {k: v for k, v in sp.items() if k != 'evolvesFrom'}  # evolvesFrom is worked out, never kept
+    # every evolution with its criteria -- read from the text for one written before they existed
+    out['evolvesInto'] = [{**e, 'criteria': species_data.evolution_criteria(e)} for e in sp.get('evolvesInto') or []]
+    return out
+
+
 def species_record(name):
     """One species exactly as it's kept (the whole object, species.py's shape), its pictures, and whether it was added /
     edited here."""
     sp = species_data.require(name)
-    out = {k: v for k, v in sp.items() if k != 'evolvesFrom'}  # evolvesFrom is worked out, never kept
-    # every evolution with its criteria -- read from the text for one written before they existed
-    out['evolvesInto'] = [{**e, 'criteria': species_data.evolution_criteria(e)} for e in sp.get('evolvesInto') or []]
+    out = _species_view(sp)
     edited = sp['name'].lower() in species_data.read_overlay(species_data.OVERLAY_FILE)
     return {'species': out, 'edited': edited, 'pictures': species_pictures(sp),
             'abilityDescriptions': {a['name']: a['description'] for a in species_data.abilities(sp)},
@@ -169,13 +175,34 @@ def save_species(sp, is_new=False, ability_descriptions=None):
         raise ValueError(f'There is already a Pokémon called {existing["name"]}')
     if not is_new and not existing:
         raise ValueError(f'No Pokémon called {name}')
-    dex = _num(sp.get('dexNumber'))
-    if dex is None or dex < 1:
-        raise ValueError('The Pokémon needs a dex number')
+    record = _species_record_of(sp, existing)
+    dex = record['dexNumber']
     clash = next((s for s in species_data.all_species() if s.get('dexNumber') == dex
                   and s['name'].lower() != name.lower()), None)
     if clash:
         raise ValueError(f'#{dex} is {clash["name"]} already')
+    descriptions = {_text(k): _text(v) for k, v in (ability_descriptions or {}).items() if _text(k) and _text(v)}
+    if descriptions:
+        abilities = dict(species_data.read_overlay(species_data.ABILITY_OVERLAY_FILE))
+        for ability, text in descriptions.items():
+            if species_data.ability_description(ability) != text:
+                abilities[ability.lower()] = {'name': ability, 'description': text}
+        _write_json(species_data.ABILITY_OVERLAY_FILE, abilities)
+    overlay = dict(species_data.read_overlay(species_data.OVERLAY_FILE))
+    overlay[record['name'].lower()] = record
+    _write_json(species_data.OVERLAY_FILE, overlay)
+    return species_record(record['name'])
+
+
+def _species_record_of(sp, existing):
+    """The record kept for `sp` (species.py's shape, every field in its form) -- `existing`: the species of that name, or
+    None for a new one. The checks of one entry on its own (a dex number another species has is the caller's)."""
+    name = _text(sp.get('name'))
+    if not name:
+        raise ValueError('The Pokémon needs a name')
+    dex = _num(sp.get('dexNumber'))
+    if dex is None or dex < 1:
+        raise ValueError('The Pokémon needs a dex number')
     types = sp.get('types') or {}
     if not _text(types.get('primary')):
         raise ValueError('The Pokémon needs a primary type')
@@ -199,7 +226,7 @@ def save_species(sp, is_new=False, ability_descriptions=None):
         only_level = len(criteria) == 1 and criteria[0]['type'] == 'level'
         evolutions.append({'species': target, 'requirement': ', '.join(lines) or None, 'criteria': criteria,
                            **({'level': criteria[0]['value']} if only_level else {})})
-    record = {
+    return {
         'dexNumber': dex, 'name': existing['name'] if existing else name,
         'classification': _text(sp.get('classification')), 'description': _text(sp.get('description')),
         'types': {'primary': _text(types.get('primary')), 'secondary': _text(types.get('secondary')) or None},
@@ -215,17 +242,6 @@ def save_species(sp, is_new=False, ability_descriptions=None):
         'movement': group('movement', species_data.MOVEMENT, lambda v: _num(v) or 0),
         'senses': group('senses', species_data.SENSES, lambda v: _text(v) or None),
     }
-    descriptions = {_text(k): _text(v) for k, v in (ability_descriptions or {}).items() if _text(k) and _text(v)}
-    if descriptions:
-        abilities = dict(species_data.read_overlay(species_data.ABILITY_OVERLAY_FILE))
-        for ability, text in descriptions.items():
-            if species_data.ability_description(ability) != text:
-                abilities[ability.lower()] = {'name': ability, 'description': text}
-        _write_json(species_data.ABILITY_OVERLAY_FILE, abilities)
-    overlay = dict(species_data.read_overlay(species_data.OVERLAY_FILE))
-    overlay[record['name'].lower()] = record
-    _write_json(species_data.OVERLAY_FILE, overlay)
-    return species_record(record['name'])
 
 
 def save_pokemon_picture(name, kind, data_url, shiny=False):
@@ -493,6 +509,16 @@ def save_move(move, is_new=False):
     if not is_new and not current:
         raise ValueError(f'No move called {name}')
     base = next((m for m in gamedata.read_file(gamedata.MOVES_FILE).get('moves') or [] if m['name'].lower() == name.lower()), None)
+    overlay = dict(species_data.read_overlay(gamedata.MOVES_OVERLAY_FILE))
+    key = _lay_move(overlay, _move_wanted(move, current), current, base)
+    _write_json(gamedata.MOVES_OVERLAY_FILE, overlay)
+    return next(_move_entry(m, overlay) for m in gamedata.move_records() if m['name'].lower() == key)
+
+
+def _move_wanted(move, current):
+    """What a move is to be from the fields given (save_move's), checked -- `current`: the move of that name, or None for
+    a new one."""
+    name = re.sub(r'\s+', ' ', _text(move.get('name')))
     before = current or gamedata.NEW_MOVE
     action = _text(move.get('action')) or '1 action'
     wanted = {
@@ -514,7 +540,13 @@ def save_move(move, is_new=False):
     wanted['duration'] = old_duration if old_duration.get('raw', '') == raw_duration else _duration(raw_duration)
     if not wanted['description']:
         raise ValueError('The move needs a description')
+    return wanted
 
+
+def _lay_move(overlay, wanted, current, base):
+    """`wanted` (_move_wanted) laid into the moves' overlay ({key: patch}, changed in place) -- only what differs from the
+    file's move, marked for a new look when it's new or what the automation reads changed. -> its key."""
+    before = current or gamedata.NEW_MOVE
     # why it wants a new look now
     if not current:
         why = ['new']
@@ -533,7 +565,6 @@ def save_move(move, is_new=False):
             if differs(k, before.get(k), wanted[k]) and (base is None or differs(k, base.get(k), wanted[k])):
                 why.append(k)
 
-    overlay = dict(species_data.read_overlay(gamedata.MOVES_OVERLAY_FILE))
     key = wanted['name'].lower()
     old_patch = overlay.get(key) or {}
     # only what differs from the file's move (an added one: all of it)
@@ -550,8 +581,7 @@ def save_move(move, is_new=False):
         overlay.pop(key, None)  # back to exactly the file's
     else:
         overlay[key] = patch
-    _write_json(gamedata.MOVES_OVERLAY_FILE, overlay)
-    return next(_move_entry(m, overlay) for m in gamedata.move_records() if m['name'].lower() == key)
+    return key
 
 
 def move_checked(name):
@@ -568,6 +598,152 @@ def move_checked(name):
         overlay[key] = patch
     _write_json(gamedata.MOVES_OVERLAY_FILE, overlay)
     return next(_move_entry(m, overlay) for m in gamedata.move_records() if m['name'].lower() == key)
+
+
+# ---------------------------------------------------------------------------
+# Export and import (the user's call, 2026-11-02): every move / Pokedex entry as one JSON file, and such a file read back
+# -- many changes at once, each checked as its form's Save checks it
+# ---------------------------------------------------------------------------
+
+# A move's fields in the file: what the Moves tab can change (its effects and categories are the code's)
+_MOVE_EXPORT = ('name', 'type', 'action', 'range', 'duration', 'moveStat', 'vpCost', 'description', 'scaling', 'attackRoll')
+
+
+def export_moves():
+    return {
+        'kind': 'moves', 'exported': _now(),
+        'about': 'Every move, as the DM console\'s Admin > Moves tab has it. Change what you like and import the file '
+                 'there: only the moves that differ are saved, one with a new name is added. A move left out, or a field '
+                 'left out of one, stays as it is. Changing a move\'s text (not its dice) marks it "Needs a look".',
+        'moves': [{k: e[k] for k in _MOVE_EXPORT} for e in move_list()],
+    }
+
+
+def export_species():
+    species = [_species_view(s) for s in species_data.all_species()]
+    named = sorted({a for s in species for a in (s.get('abilities') or {}).values() if a}, key=str.lower)
+    return {
+        'kind': 'pokedex', 'exported': _now(),
+        'about': 'Every Pokedex entry, as the DM console\'s Admin > Pokedex entries tab has it, and the abilities they '
+                 'name. Change what you like and import the file there: only the entries that differ are saved, one with '
+                 'a new name is added. An entry left out, or a field left out of one, stays as it is. An evolution goes '
+                 'by its "criteria" (its "requirement" text is made from them).',
+        'species': species,
+        'abilities': {n: species_data.ability_description(n) for n in named},
+    }
+
+
+def _import_entries(data, key, kind, what):
+    """(the entries, the abilities) of an imported file: an export of this kind, or just the list of entries."""
+    if isinstance(data, list):
+        return data, {}
+    if not isinstance(data, dict):
+        raise ValueError(f'That isn\'t a file of {what}')
+    if data.get('kind') and data['kind'] != kind:
+        raise ValueError(f'That\'s an export of the {data["kind"]}, not of the {what}')
+    if not isinstance(data.get(key), list):
+        raise ValueError(f'That file has no "{key}" list')
+    return data[key], data.get('abilities') if isinstance(data.get('abilities'), dict) else {}
+
+
+def _over(current, given):
+    """`given` laid over `current`: a field left out stays as it is (an object's fields each on their own)."""
+    return {**current, **{k: {**current[k], **v} if isinstance(v, dict) and isinstance(current.get(k), dict) else v
+                          for k, v in given.items()}}
+
+
+def _entry_name(entry, what, seen):
+    """An imported entry's name (checked; once in the file)."""
+    if not isinstance(entry, dict):
+        raise ValueError(f'Not {what}')
+    name = re.sub(r'\s+', ' ', _text(entry.get('name')))
+    if not name:
+        raise ValueError('It has no name')
+    if name.lower() in seen:
+        raise ValueError(f'{name} is in the file twice -- only the first is read')
+    seen.add(name.lower())
+    return name
+
+
+def import_moves(data, apply=False):
+    """A moves file read (export_moves' shape, or a list of moves): {added, changed, marked (now "Needs a look"),
+    unchanged (a count), errors [{name, error}]} -- saved only with `apply`, the moves with an error left out."""
+    entries, _ = _import_entries(data, 'moves', 'moves', 'moves')
+    records = {m['name'].lower(): m for m in gamedata.move_records()}
+    bases = {m['name'].lower(): m for m in gamedata.read_file(gamedata.MOVES_FILE).get('moves') or []}
+    overlay = dict(species_data.read_overlay(gamedata.MOVES_OVERLAY_FILE))
+    out = {'added': [], 'changed': [], 'marked': [], 'unchanged': 0, 'errors': []}
+    seen = set()
+    for i, move in enumerate(entries):
+        label = f'Entry {i + 1}'
+        try:
+            label = _entry_name(move, 'a move', seen)
+            key = label.lower()
+            current = records.get(key)
+            if current:
+                now = _move_entry(current, overlay)
+                wanted = _move_wanted(_over(now, move), current)
+                if wanted == _move_wanted(now, current):
+                    out['unchanged'] += 1
+                    continue
+            else:
+                wanted = _move_wanted(move, None)
+            review = (overlay.get(key) or {}).get('review')
+            _lay_move(overlay, wanted, current, bases.get(key))
+            out['changed' if current else 'added'].append(wanted['name'])
+            if (overlay.get(key) or {}).get('review') not in (None, review):
+                out['marked'].append(wanted['name'])
+        except ValueError as e:
+            out['errors'].append({'name': label, 'error': str(e)})
+    if apply and (out['added'] or out['changed']):
+        _write_json(gamedata.MOVES_OVERLAY_FILE, overlay)
+    return out
+
+
+def import_species(data, apply=False):
+    """A Pokedex file read (export_species' shape, or a list of entries): {added, changed, abilities (descriptions
+    changed or added), unchanged (a count), errors [{name, error}]} -- saved only with `apply`, the entries with an error
+    left out."""
+    entries, given_abilities = _import_entries(data, 'species', 'pokedex', 'Pokédex entries')
+    overlay = dict(species_data.read_overlay(species_data.OVERLAY_FILE))
+    dex_of = {s['name'].lower(): (s.get('dexNumber'), s['name']) for s in species_data.all_species()}
+    out = {'added': [], 'changed': [], 'abilities': [], 'unchanged': 0, 'errors': []}
+    seen = set()
+    for i, sp in enumerate(entries):
+        label = f'Entry {i + 1}'
+        try:
+            label = _entry_name(sp, 'a Pokédex entry', seen)
+            key = label.lower()
+            existing = species_data.get(label)
+            if existing:
+                now = _species_view(existing)
+                record = _species_record_of(_over(now, sp), existing)
+                if record == _species_record_of(now, existing):
+                    out['unchanged'] += 1
+                    continue
+            else:
+                record = _species_record_of(sp, None)
+            dex = record['dexNumber']
+            if not existing or dex != existing.get('dexNumber'):
+                clash = next((n for k, (d, n) in dex_of.items() if d == dex and k != key), None)
+                if clash:
+                    raise ValueError(f'#{dex} is {clash} already')
+            overlay[key] = record
+            dex_of[key] = (dex, record['name'])
+            out['changed' if existing else 'added'].append(record['name'])
+        except ValueError as e:
+            out['errors'].append({'name': label, 'error': str(e)})
+    abilities = dict(species_data.read_overlay(species_data.ABILITY_OVERLAY_FILE))
+    for name, text in given_abilities.items():
+        name, text = _text(name), _text(text)
+        if name and text and species_data.ability_description(name) != re.sub(r'\s+', ' ', text):
+            abilities[name.lower()] = {'name': name, 'description': text}
+            out['abilities'].append(name)
+    if apply and (out['added'] or out['changed']):
+        _write_json(species_data.OVERLAY_FILE, overlay)
+    if apply and out['abilities']:
+        _write_json(species_data.ABILITY_OVERLAY_FILE, abilities)
+    return out
 
 
 def _now():

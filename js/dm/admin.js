@@ -16,6 +16,7 @@ import { openPicker } from './picker.js';
 import { forgetMapAssets } from './map-editor.js';
 import { drawEvents, drawLocations, drawStatuses, setWorldNav } from './admin-world.js';
 import { drawMoves, onReviewCount } from './admin-moves.js';
+import { transferButtonsHtml, wireTransfer } from './admin-transfer.js';
 
 const TAB_KEY = 'dmAdminTab';
 const TABS = ['items', 'moves', 'species', 'pictures', 'splashes', 'logs', 'events', 'locations', 'statuses'];
@@ -282,6 +283,7 @@ async function drawSpecies(body) {
         <div class="dm-editor-head"><h2>📕 Pokédex entries</h2><span class="dm-pill ok">${species.length}</span></div>
         <input class="dm-input" id="admSpSearch" placeholder="Search name, type or #…" autocomplete="off">
         <button class="dm-btn primary" id="admSpNew">＋ New Pokémon</button>
+        ${transferButtonsHtml()}
         <div class="dm-pdx-list" id="admSpList"></div>
       </aside>
       <section class="dm-editor-canvas" id="admSpForm"><div class="dm-cs-empty">Pick a Pokémon on the left, or make a new one.</div></section>
@@ -316,6 +318,14 @@ async function drawSpecies(body) {
     _record = { species: blankSpecies(next), edited: false, pictures: {}, abilityDescriptions: {}, abilityNames: abilityNames || [] };
     list();
     drawSpeciesForm(species, list);
+  });
+  wireTransfer(body, {
+    kind: 'pokedex', what: 'Pokédex entries', fileName: 'Pokedex',
+    onImported: () => {
+      dataChanged();
+      window.dispatchEvent(new CustomEvent('dm:species-changed', { detail: { name: null } })); // (every one of them)
+      return drawSpecies(body);
+    },
   });
   if (_speciesName) loadSpeciesForm(species, list);
 }

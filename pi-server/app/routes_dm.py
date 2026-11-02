@@ -78,6 +78,10 @@ def handle(conn, action, params):
         from . import admin
         return {'status': 'success', 'data': admin.move_list()}
 
+    if action == 'admin-export':  # every move / Pokedex entry as one file ({kind: 'moves' | 'pokedex'})
+        from . import admin
+        return {'status': 'success', 'data': admin.export_moves() if params.get('kind') == 'moves' else admin.export_species()}
+
     if action == 'admin-species':
         from . import admin
         if not params.get('name'):

@@ -1240,6 +1240,15 @@ span.dm-trap-pick { cursor: default; }
 .dm-adm-pic img, .dm-adm-pic video { width: 100%; height: 100%; object-fit: contain; }
 .dm-adm-text { resize: vertical; font-family: inherit; line-height: 1.35; }
 .dm-adm-actions { display: flex; justify-content: flex-end; }
+/* Export / Import of the moves and the Pokédex entries (js/dm/admin-transfer.js) */
+.dm-adm-transfer { display: flex; gap: 0.4rem; }
+.dm-adm-transfer > .dm-btn { flex: 1; }
+.dm-adm-imp { display: flex; flex-direction: column; gap: 0.7rem; }
+.dm-adm-imp p { margin: 0; }
+.dm-adm-imp-group h4 { margin: 0 0 0.35rem; font-size: 0.95rem; color: var(--dm-gold); display: flex; align-items: center; gap: 0.4rem; }
+.dm-adm-imp-names { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.dm-adm-imp-name { padding: 0.12rem 0.5rem; border-radius: 999px; background: rgba(255, 255, 255, 0.07); font-size: 0.85rem; }
+.dm-adm-imp-errors > div { font-size: 0.88rem; padding: 0.1rem 0; }
 /* The Moves tab (js/dm/admin-moves.js) */
 .dm-mv-row { grid-template-columns: 1fr auto; }
 .dm-mv-row .dm-pdx-main strong { color: inherit !important; }

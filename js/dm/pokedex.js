@@ -134,15 +134,16 @@ export async function renderPokedex(root) {
       const cb = document.getElementById('pdxNoRandom');
       if (cb && _selected) cb.checked = isExcluded(_selected);
     });
-    // The Admin module saved a Pokedex entry (admin.js): the list and that species' page read it again.
+    // The Admin module saved a Pokedex entry (admin.js): the list and that species' page read it again (no name: a file
+    // was imported -- every page).
     window.addEventListener('dm:species-changed', async (e) => {
       const name = e.detail?.name;
-      _details.delete(name);
+      if (name) _details.delete(name); else _details.clear();
       if (!document.getElementById('pdxList')) return; // not drawn yet -- it reads everything fresh when it is
       try { _species = await getSpecies(); } catch (err) { return; }
       renderList();
       applyFilter();
-      if (_selected === name) select(name);
+      if (_selected && (!name || _selected === name)) select(_selected);
     });
   }
   DmAPI.getState('encounter-exclusions').then((x) => { _exclusions = Array.isArray(x) ? x : []; if (_selected) { const cb = document.getElementById('pdxNoRandom'); if (cb) cb.checked = isExcluded(_selected); } }).catch(() => {});

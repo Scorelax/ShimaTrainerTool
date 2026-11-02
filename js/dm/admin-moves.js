@@ -15,6 +15,7 @@ import { showCombatAlert } from '../utils/combat-alert.js';
 import { POKEMON_TYPES } from '../utils/pokemon-types.js';
 import { escapeHtml, toast, typeBadges } from './dm-common.js';
 import { loadMoves } from './move-picker.js';
+import { transferButtonsHtml, wireTransfer } from './admin-transfer.js';
 
 const LIST_MAX = 250; // rows drawn at once -- the search narrows it down
 const FILTER_KEY = 'dmAdminMoveFilter';
@@ -100,6 +101,7 @@ export async function drawMoves(body) {
           <optgroup label="Type">${types.map(t => `<option value="type:${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}</optgroup>
         </select>
         <button class="dm-btn primary" id="admMoveNew">＋ New move</button>
+        ${transferButtonsHtml()}
         <div class="dm-pdx-list" id="admMoveList"></div>
       </aside>
       <section class="dm-editor-canvas" id="admMoveForm"><div class="dm-cs-empty">Pick a move on the left, or make a new one.</div></section>
@@ -142,6 +144,11 @@ export async function drawMoves(body) {
       duration: 'Instantaneous', moveStat: 'None', vpCost: '', description: '', scaling: '', attackRoll: false, categories: [], effects: 0 };
     list();
     drawMoveForm(list);
+  });
+  wireTransfer(body, {
+    kind: 'moves', what: 'moves', fileName: 'Moves',
+    // the console's own move list read again, and the tab drawn from the saved moves
+    onImported: () => { DmAPI.forgetCachedData(); loadMoves(); return drawMoves(body); },
   });
   if (_move) {
     if (!_move.isNew) _move = { ...(_moves.find(m => m.name === _move.name) || _move) };

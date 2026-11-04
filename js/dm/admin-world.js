@@ -451,49 +451,15 @@ export async function drawLocations(body) {
   iconsBtn.textContent = '🏰 Location icons';
   iconsBtn.title = 'The icons on the Pi -- upload many at once, named <Type>-<Location name>';
   maps.after(iconsBtn);
-  // Every region's locations sorted into it at once (the user's call, 2026-10-21: the regions drawn before marking one
-  // did it) -- the smaller regions first, so where two overlap a place goes in the smaller one
-  const sortBtn = document.createElement('button');
-  sortBtn.className = 'dm-btn';
-  sortBtn.textContent = '🗺️ Sort into regions';
-  sortBtn.title = 'Put every location under the region it lies in -- the ones outside a region they were under are taken out of it';
-  iconsBtn.after(sortBtn);
-  // The regions known by the map's borders (the user's call, 2026-11-04): a click opens one, or makes it a location
-  const regionsBtn = document.createElement('button');
-  regionsBtn.className = 'dm-btn';
-  regionsBtn.textContent = '🧩 Regions on the map';
-  regionsBtn.title = 'Click a region on the map: a marked one opens, one not marked yet becomes a new region location';
-  sortBtn.after(regionsBtn);
   // Where the map's trees are the DM's own models (the user's call, 2026-11-04: snowy trees in the mountains)
   const treesBtn = document.createElement('button');
   treesBtn.className = 'dm-btn';
   treesBtn.textContent = '🌲 Tree areas';
   treesBtn.title = 'Mark areas on the map and pick which of your tree models grow there';
-  regionsBtn.after(treesBtn);
+  iconsBtn.after(treesBtn);
   treesBtn.addEventListener('click', async () => {
     const { openTreeAreas } = await import('./tree-areas.js');
     await openTreeAreas(locations);
-  });
-  regionsBtn.addEventListener('click', async () => {
-    const { pickRegionOnMap } = await import('./region-picker.js');
-    const got = await pickRegionOnMap(locations);
-    if (!got) return;
-    if (got.id) { _selected.locations = got.id; list(); form(); return; }
-    const l = { id: newId('loc'), name: got.name, type: 'region', description: '', pois: [], image: '', createdAt: new Date().toISOString(), shape: got.shape };
-    locations.unshift(l);
-    _selected.locations = l.id;
-    const { moved } = sortIntoRegion(l, locations);
-    toast(`${l.name} is a region now${moved ? ` -- the ${moved} location${moved === 1 ? '' : 's'} inside it ${moved === 1 ? 'is' : 'are'} part of it` : ''}.`);
-    changed(); form();
-  });
-  sortBtn.addEventListener('click', () => {
-    const area = x => { const b = shapeBounds(x.shape); return b ? (b.x1 - b.x0) * (b.y1 - b.y0) : 0; };
-    const regions = locations.filter(x => x.type === 'region' && x.shape?.kind === 'area').sort((a, b) => area(a) - area(b));
-    if (!regions.length) { toast('No region is marked on the map yet -- mark one first (Location type Region, then Mark it on the map).'); return; }
-    let moved = 0, out = 0;
-    regions.forEach((r) => { const n = sortIntoRegion(r, locations); moved += n.moved; out += n.out; });
-    if (moved || out) { saveSoon('locations'); list(); form(); }
-    toast(moved || out ? `${moved} location${moved === 1 ? '' : 's'} put under ${moved === 1 ? 'its region' : 'their regions'}${out ? `, ${out} taken out of one ${out === 1 ? 'it\'s' : 'they\'re'} no longer in` : ''}.` : 'Every location is in its region already.');
   });
   iconsBtn.addEventListener('click', async () => {
     await openIconLibrary({ locations, onLocationsChanged: () => { saveSoon('locations'); list(); } });

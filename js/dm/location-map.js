@@ -51,10 +51,82 @@ export async function loadPainting() {
       c.width = W; c.height = H;
       const ctx = c.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(src, 0, 0);
-      return { W, H, shown, features: F.readFeatures(ctx.getImageData(0, 0, W, H).data, W, H) };
+      return { W, H, shown, features: F.readFeatures(ctx.getImageData(0, 0, W, H).data, W, H), borders: map.borders || [] };
     })().catch((err) => { _painting = null; throw err; });
   }
   return _painting;
+}
+
+// ---------------------------------------------------------------------------
+// Regions by the map's borders (the user's call, 2026-11-04: with the borders on the map, a region is known by a click
+// in it -- no need to mark it round)
+// ---------------------------------------------------------------------------
+
+/** The map's borders as a fence (map-features.js fenceOf) -- null when the map has none. Made once per painting. */
+export function fenceFor(P) {
+  if (!P.borders?.length) return null;
+  if (!P.fence) P.fence = F.fenceOf(P.borders, P.W, P.H, F.seaOf(P.features));
+  return P.fence;
+}
+
+/** The land a region can take (1): not the sea, nor in one of `others`' regions -- the lakes and rivers inland included. */
+export function regionFreeLand(P, others = []) {
+  const { W, H } = P;
+  const sea = F.seaOf(P.features);
+  const free = new Uint8Array(W * H);
+  for (let i = 0; i < free.length; i++) free[i] = sea[i] ? 0 : 1;
+  others.filter(o => o.type === 'region' && o.shape?.kind === 'area').forEach((o) => {
+    const taken = F.ringsToMask(o.shape.rings, W, H);
+    for (let i = 0; i < taken.length; i++) if (taken[i]) free[i] = 0;
+  });
+  return free;
+}
+
+/** The region a click is in: the `free` land round it up to the borders and the coast, out to the borders' middle.
+ * `also`: more to stop at (the editor's painted ring, closing a gap in a border). -> { mask, size } (empty: not on free
+ * land, or right on a border). */
+export function regionCell(P, free, x, y, also = null) {
+  const { W, H } = P;
+  const fence = fenceFor(P);
+  const open = new Uint8Array(W * H);
+  for (let i = 0; i < open.length; i++) open[i] = free[i] && !fence?.[i] && !also?.[i] ? 1 : 0;
+  const got = F.freeLandAt(open, W, H, x, y);
+  if (!got.size || !fence) return got;
+  const near = F.dilate(got.mask, W, H, 2);
+  for (let i = 0; i < near.length; i++) if (near[i] && fence[i] && free[i] && !got.mask[i]) { got.mask[i] = 1; got.size++; }
+  return got;
+}
+
+/** A region's reach: its land, and the sea that goes with it -- what the DM drew round (`drawn`: a ring, a loop) and a
+ * strip about 3 km wide along its coast -- for the locations marked out at sea to be in it (map-features.js inArea).
+ * -> { reach } or nothing (no sea with it). */
+export function regionReachOf(P, mask, drawn = null) {
+  const { W, H } = P;
+  const sea = F.seaOf(P.features);
+  const strip = F.dilate(mask, W, H, Math.max(4, Math.round(3 / kmPerPx())));
+  const reach = mask.slice();
+  let more = 0;
+  for (let i = 0; i < reach.length; i++) if (!reach[i] && sea[i] && (drawn?.[i] || strip[i])) { reach[i] = 1; more++; }
+  if (!more) return {};
+  const rings = F.maskToRings(reach, W, H);
+  return rings.length ? { reach: rings } : {};
+}
+
+/** The map's borders drawn on a view (painting pixel -> screen: x * s + ox), thin and dark red. */
+export function drawBorders(ctx, P, { s, ox, oy }) {
+  if (!P.borders?.length) return;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  P.borders.forEach(l => l.forEach(([x, y], i) => (i ? ctx.lineTo(x * s + ox, y * s + oy) : ctx.moveTo(x * s + ox, y * s + oy))));
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.stroke();
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = '#c4122f';
+  ctx.stroke();
+  ctx.restore();
 }
 
 function loadImage(url) {
@@ -148,6 +220,8 @@ export async function drawShapePreview(canvas, shape) {
 // ---------------------------------------------------------------------------
 
 const AREA_TOOLS = {
+  // (a region on a map with its borders drawn, the user's call, 2026-11-04: one click)
+  pick: { label: '🧩 Click it', hint: '<b>Click inside the region</b>: its land up to the borders (the red lines) and the coast fills in -- never the sea, never another region. An island of it: click that too. Alt + click takes a piece away.' },
   // (the user's call, 2026-10-21: a hybrid of the brush and the region fill -- the border painted round it, the land
   // inside filled in)
   // (`other`: the hint for a forest or any other area -- the user's call, 2026-10-21: the ring and the loop for forests
@@ -183,7 +257,9 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   let follow = old?.kind === 'path' ? old.follow !== false : true;
   let segs = [];
   let mask = old?.kind === 'area' ? F.ringsToMask(old.rings, W, H) : new Uint8Array(W * H);
-  let areaTool = loc.type === 'region' || loc.type === 'forest' ? 'ring' : 'wand';
+  // (a region on a map with its borders drawn: picked by a click)
+  const fence = loc.type === 'region' ? fenceFor(P) : null;
+  let areaTool = fence ? 'pick' : loc.type === 'region' || loc.type === 'forest' ? 'ring' : 'wand';
   // the Ring tool's painted border (1 = painted): only a guide -- what it closes in goes into `mask`, the ring itself is
   // never saved
   let ring = new Uint8Array(W * H);
@@ -196,16 +272,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   const isRegion = loc.type === 'region';
   let freeLand = null;
   function free() {
-    if (freeLand) return freeLand;
-    const sea = F.seaOf(f);
-    freeLand = new Uint8Array(W * H);
-    for (let i = 0; i < freeLand.length; i++) freeLand[i] = sea[i] ? 0 : 1;
-    if (isRegion) {
-      others.filter(o => o.type === 'region' && o.shape?.kind === 'area').forEach((o) => {
-        const taken = F.ringsToMask(o.shape.rings, W, H);
-        for (let i = 0; i < taken.length; i++) if (taken[i]) freeLand[i] = 0;
-      });
-    }
+    if (!freeLand) freeLand = regionFreeLand(P, isRegion ? others : []);
     return freeLand;
   }
   // the free land as a picture (see-through elsewhere): what a loop being drawn would take is shown through it
@@ -420,8 +487,9 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       ctx.drawImage(maskCanvas, ox, oy, W * s, H * s);
       ctx.imageSmoothingEnabled = true;
       if (at) drawIcon(ctx, iconImg, { ...icon, x: at[0], y: at[1] }, tf, { faint: true });
+      if (isRegion) drawBorders(ctx, P, tf);
       if (lasso.length > 2 && drag?.mode === 'lasso') drawLassoPreview();
-      if (areaTool === 'ring') {
+      if (areaTool === 'ring' || areaTool === 'pick') {   // (the ring closes a border's gap for a click too)
         ctx.imageSmoothingEnabled = s < 2;
         ctx.drawImage(ringCanvas, ox, oy, W * s, H * s);
         ctx.imageSmoothingEnabled = true;
@@ -497,8 +565,8 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
         <div class="dm-lme-stat">${anchors.length < 2 ? `${anchors.length ? 'The start' : 'No points yet'} -- it needs a start and an end` : describeShape({ kind: 'path', points: pts })}</div>${common}`;
     } else {
       box.innerHTML = `<div class="dm-card-title">⬚ An area</div>
-        <div class="dm-lme-toolgrid">${Object.entries(AREA_TOOLS).filter(([k]) => k !== 'wand' || !isRegion).map(([k, t]) => `<button class="dm-btn small${areaTool === k ? ' active' : ''}" data-tool="${k}">${t.label}</button>`).join('')}</div>
-        <div class="dm-hint">${(!isRegion && AREA_TOOLS[areaTool].other) || AREA_TOOLS[areaTool].hint}${isRegion && areaTool !== 'region' ? ' (Only land, outside the other regions.)' : ''}</div>
+        <div class="dm-lme-toolgrid">${Object.entries(AREA_TOOLS).filter(([k]) => (k !== 'wand' || !isRegion) && (k !== 'pick' || fence)).map(([k, t]) => `<button class="dm-btn small${areaTool === k ? ' active' : ''}" data-tool="${k}">${t.label}</button>`).join('')}</div>
+        <div class="dm-hint">${(!isRegion && AREA_TOOLS[areaTool].other) || AREA_TOOLS[areaTool].hint}${isRegion && areaTool !== 'region' && areaTool !== 'pick' ? ' (Only land, outside the other regions.)' : ''}</div>
         ${areaTool === 'brush' || areaTool === 'erase' || areaTool === 'ring' ? `<div class="dm-field"><label>Brush size</label><input type="range" id="lmeBrush" min="2" max="60" value="${brush}"></div>` : ''}
         ${areaTool === 'wand' ? `<div class="dm-field"><label>How alike (for a patch of one colour)</label><input type="range" id="lmeTol" min="0" max="100" value="${tolerance}"></div>` : ''}
         <div class="dm-row"><button class="dm-btn small" data-lme="undo" ${undos.area.length || lasso.length ? '' : 'disabled'}>↶ Undo</button>
@@ -553,19 +621,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
     if (n) paintMask();
     return n;
   }
-  /** A region's reach: its land, and the sea that goes with it -- what the DM drew round (a ring, a loop) and a strip
-   * about 3 km wide along its coast -- for the locations marked out at sea to be in it (map-features.js inArea). -> {
-   * reach } or nothing (no sea with it). */
-  function regionReach() {
-    const sea = F.seaOf(f);
-    const strip = F.dilate(mask, W, H, Math.max(4, Math.round(3 / kmPerPx())));
-    const reach = mask.slice();
-    let more = 0;
-    for (let i = 0; i < reach.length; i++) if (!reach[i] && sea[i] && (drawn[i] || strip[i])) { reach[i] = 1; more++; }
-    if (!more) return {};
-    const rings = F.maskToRings(reach, W, H);
-    return rings.length ? { reach: rings } : {};
-  }
+  const regionReach = () => regionReachOf(P, mask, drawn);
 
   /** A click with the Ring tool: the free land round it, up to the ring, the coast and the other regions (a ring from
    * coast to coast). */
@@ -621,6 +677,28 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
       remember();
       const seg = anchors.length > 1 ? segmentAt(p) : -1;
       if (seg >= 0) { anchors.splice(seg + 1, 0, snap(p)); retrace(seg, seg + 1); } else { anchors.push(snap(p)); retrace(anchors.length - 2); }
+    } else if (areaTool === 'pick') {
+      const i0 = Math.round(p[1]) * W + Math.round(p[0]);
+      if (e.altKey) {
+        const got = F.freeLandAt(mask, W, H, p[0], p[1]);
+        if (!got.size) return;
+        remember();
+        for (let i = 0; i < mask.length; i++) if (got.mask[i]) mask[i] = 0;
+        paintMask();
+      } else {
+        if (mask[i0]) { toast('That\'s in it already -- Alt + click takes this piece away.'); return; }
+        const got = regionCell(P, free(), p[0], p[1], ring);
+        if (!got.size) {
+          const other = byName(p[0], p[1]);
+          toast(other ? `That's in ${other} already.` : fence[i0] || ring[i0] ? 'That\'s on a border -- click inside the region.' : 'That\'s the sea -- click on land.');
+          return;
+        }
+        remember();
+        let n = 0;
+        for (let i = 0; i < mask.length; i++) if (got.mask[i] && !mask[i]) { mask[i] = 1; n++; }
+        paintMask();
+        toast(`Filled in up to the borders and the coast -- about ${Math.max(1, Math.round(n * kmPerPx() * kmPerPx()))} km². Too much? A border has a gap there: Undo, paint it shut with ⭕ Ring, then click here again.`);
+      }
     } else if (areaTool === 'region') {
       const i0 = Math.round(p[1]) * W + Math.round(p[0]);
       if (e.altKey) {

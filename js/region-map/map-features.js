@@ -264,6 +264,36 @@ export function enclosedBy(ring, W, H) {
   return inside;
 }
 
+/** The map's region borders (map-version.js `borders`, lines in its pixels) as a fence a fill stops at (1 = the line,
+ * about 3 pixels wide, closed even where it runs slantwise) -- the user's call, 2026-11-04: with the borders drawn,
+ * a region is known by clicking in it. A line's end is drawn on (up to `reach` pixels, till it meets the `sea`), so one
+ * stopped just short of the coast still closes its region off. */
+export function fenceOf(lines, W, H, sea = null, reach = 12) {
+  const fence = new Uint8Array(W * H);
+  const draw = (a, b) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) * 2));
+    for (let k = 0; k <= n; k++) stamp(fence, W, H, a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n, 1.2, 1);
+  };
+  const isSea = (x, y) => { const px = Math.round(x), py = Math.round(y); return px < 0 || py < 0 || px >= W || py >= H || (sea && sea[py * W + px]); };
+  (lines || []).forEach((pts) => {
+    for (let i = 1; i < pts.length; i++) draw(pts[i - 1], pts[i]);
+    if (pts.length < 2) return;
+    // each end drawn on the way it was heading
+    [[pts[0], pts[Math.min(pts.length - 1, 3)]], [pts[pts.length - 1], pts[Math.max(0, pts.length - 4)]]].forEach(([end, from]) => {
+      const len = Math.hypot(end[0] - from[0], end[1] - from[1]);
+      if (!len) return;
+      const dx = (end[0] - from[0]) / len, dy = (end[1] - from[1]) / len;
+      let at = end;
+      for (let k = 1; k <= reach && !isSea(end[0] + dx * k, end[1] + dy * k); k++) {
+        const next = [end[0] + dx * k, end[1] + dy * k];
+        draw(at, next);
+        at = next;
+      }
+    });
+  });
+  return fence;
+}
+
 /** The land round a click that's still free (`free`: 1 = land not in another region): all of it reached from there
  * without crossing the sea or another region -- the roads and the painting's lines don't matter (the user's call,
  * 2026-10-21: they never closed a region in). -> { mask, size } (empty when the click isn't on free land). */

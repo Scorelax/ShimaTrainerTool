@@ -458,6 +458,24 @@ export async function drawLocations(body) {
   sortBtn.textContent = '🗺️ Sort into regions';
   sortBtn.title = 'Put every location under the region it lies in -- the ones outside a region they were under are taken out of it';
   iconsBtn.after(sortBtn);
+  // The regions known by the map's borders (the user's call, 2026-11-04): a click opens one, or makes it a location
+  const regionsBtn = document.createElement('button');
+  regionsBtn.className = 'dm-btn';
+  regionsBtn.textContent = '🧩 Regions on the map';
+  regionsBtn.title = 'Click a region on the map: a marked one opens, one not marked yet becomes a new region location';
+  sortBtn.after(regionsBtn);
+  regionsBtn.addEventListener('click', async () => {
+    const { pickRegionOnMap } = await import('./region-picker.js');
+    const got = await pickRegionOnMap(locations);
+    if (!got) return;
+    if (got.id) { _selected.locations = got.id; list(); form(); return; }
+    const l = { id: newId('loc'), name: got.name, type: 'region', description: '', pois: [], image: '', createdAt: new Date().toISOString(), shape: got.shape };
+    locations.unshift(l);
+    _selected.locations = l.id;
+    const { moved } = sortIntoRegion(l, locations);
+    toast(`${l.name} is a region now${moved ? ` -- the ${moved} location${moved === 1 ? '' : 's'} inside it ${moved === 1 ? 'is' : 'are'} part of it` : ''}.`);
+    changed(); form();
+  });
   sortBtn.addEventListener('click', () => {
     const area = x => { const b = shapeBounds(x.shape); return b ? (b.x1 - b.x0) * (b.y1 - b.y0) : 0; };
     const regions = locations.filter(x => x.type === 'region' && x.shape?.kind === 'area').sort((a, b) => area(a) - area(b));

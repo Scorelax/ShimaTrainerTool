@@ -497,12 +497,13 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     tc.save();
     tracePathOf(tc, shape, k);
     tc.clip('evenodd');
-    tc.fillStyle = 'rgba(255, 248, 222, 0.3)';
+    // (faint, the user's call, 2026-11-04: brighter hid the painting's details)
+    tc.fillStyle = 'rgba(255, 248, 222, 0.1)';
     tc.fillRect(0, 0, t.width, t.height);
     tc.filter = 'blur(12px)';
     tc.lineJoin = 'round';
     tc.lineWidth = 34;
-    tc.strokeStyle = 'rgba(255, 250, 232, 0.6)';
+    tc.strokeStyle = 'rgba(255, 250, 232, 0.35)';
     tracePathOf(tc, shape, k);
     tc.stroke();
     tc.restore();
@@ -526,7 +527,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const k = c.width / (land.W - 1);   // painting pixel -> picture pixel (the land's uv runs 0..W-1)
     // (the party's place has nothing drawn on it, nor the map round it dimmed -- the user's call, 2026-10-20: the
     // players' marker on it is enough)
-    looked.reverse().forEach(l => (l.type === 'region' && l.shape.kind === 'area' ? drawRegionTint(ctx, l.shape, k) : drawLit(ctx, l.shape, k, '#8fd8ff', 'rgba(143, 216, 255, 0.28)')));
+    looked.reverse().forEach(l => (l.type === 'region' && l.shape.kind === 'area' ? drawRegionTint(ctx, l.shape, k) : drawLit(ctx, l.shape, k, '#8fd8ff', 'rgba(143, 216, 255, 0.1)')));
     overlay.tex.needsUpdate = true;
     dirty = true;
     wake();
@@ -1211,6 +1212,12 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
   let controlsMoved = false;
   controls.addEventListener('change', () => { controlsMoved = true; wake(); });
   canvas.addEventListener('wheel', wake, { passive: true });
+  // the wheel over a location's name zooms too (the user's call, 2026-11-04): the names take the pointer (a tap opens
+  // one), so their wheel is handed on to the canvas the controls listen on
+  labelLayer.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    canvas.dispatchEvent(new WheelEvent('wheel', e));
+  }, { passive: false });
   canvas.addEventListener('pointerdown', wake);
   // A weak device can take the 3D drawing away (short on graphics memory, say while the battle map plays its videos);
   // three.js sets it all up again when it's given back, and then it needs drawing again.

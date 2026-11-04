@@ -50,6 +50,9 @@ const BLOCK = 60;            // how deep the block of land goes under the sea
 const PIN_POLAR = 0.5;       // how far from straight down a flight to a town looks (radians)
 const STYLES = { topo: 'topo', painted: 'painted' };   // ...the map's files
 const STYLE_KEY = 'rmapStyle';
+// The DM's .glb models on the map -- the locations' and the trees', rocks' and summits' (and so the tree areas): off for
+// now (the user's call, 2026-11-05: the map ran too slowly on a tablet). The pictures and the trees made in code stay.
+const USE_MODELS = false;
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
@@ -610,7 +613,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
    * there's none, or it couldn't be read -- the picture stays). */
   function modelScene(iconUrl) {
     const url = String(iconUrl).replace(/\.[a-z0-9]+(\?.*)?$/i, '.glb');
-    if (url === iconUrl) return Promise.reject(new Error('No model'));
+    if (url === iconUrl || !USE_MODELS) return Promise.reject(new Error('No model'));
     return gltfScene(url);
   }
 
@@ -689,6 +692,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
    * models, and `at`: per land pixel, the one it's in (-1: none; where two overlap, the smaller). None when the
    * 'region-map' state can't be read. */
   async function treeAreas() {
+    if (!USE_MODELS) return [];
     let st = null;
     try { st = await loadMapState(); } catch (err) { return []; }
     const k = land.W / (version.W || land.W);
@@ -706,6 +710,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
    * MODEL_KINDS) -> { kind: [{ file, scene }, in file order] } -- one that won't load is left out (the shape made in code stands
    * in), and none at all when the Pi can't say. */
   async function objectModels(more = []) {
+    if (!USE_MODELS) return {};
     let list = [];
     try { list = await DmAPI.mapObjectModels(); } catch (err) { return {}; }
     const wanted = new Set([...Object.values(MODEL_KINDS).flat(), ...more]);

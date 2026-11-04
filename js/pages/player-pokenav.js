@@ -117,7 +117,7 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
     showLocations();
     showParty();
     await map.ready;
-    map?.home({ ms: 0, azimuth: HOME_AZIMUTH, fill: true });
+    map?.home({ ms: 0, azimuth: HOME_AZIMUTH, flat: true });   // (straight down, as the compass has it)
   };
 
   // The DM switched to another map (Admin › Locations): made again on it.

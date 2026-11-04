@@ -19,10 +19,9 @@
 // bright as ever. A minor location's name (not ticked Major, map-version.js isMajor) only shows zoomed in. A route or a forest the DM only looks at (highlight) is drawn in light blue (a town or a cave
 // isn't: its own pin is enough, and a ring over it looked odd).
 // A location with an icon (the user's call, 2026-10-20: a little model of the place the DM uploads, js/dm/location-icon.js)
-// has it standing on its mark facing south, the way the painting's towns are drawn (the user's call, 2026-10-21: it stays
-// put as the map turns, never turning round to face the viewer -- only leaning back as the map's tilted towards straight
-// down, so it's still seen from above), as tall as the DM set in km -- so it grows and shrinks with the land as the map
-// zooms, and keeps to scale with the others. A location with a 3D model as well (the user's call, 2026-10-25: a .glb
+// has it lying flat on its mark, its top to the north, laid over the land's shape like the painting itself (the user's
+// call, 2026-11-05: it stood facing south, leaning back with the map's tilt, before), as long as the DM set in km -- so it
+// grows and shrinks with the land as the map zooms, and keeps to scale with the others. A location with a 3D model as well (the user's call, 2026-10-25: a .glb
 // beside its picture on the Pi, "City-Astria.glb" by "City-Astria.png") has the model standing there instead -- the
 // picture stays the fallback, shown while the model loads and wherever there's none.
 // Trees, rocks and peaks stand on the land, made in code (map-objects.js; not without the graphics card).
@@ -234,7 +233,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   let highlighted = null;   // the id of the location drawn onto the land (the DM looking at it)
   let partyAt = null;       // the id of the location the party is at (outlined in gold, marked)
   let overlay = null;       // ...drawn here: { canvas, ctx, tex, mesh } -- the land's surface again, see-through
-  const icons = [];         // the locations' icons standing on the land (pictures facing south)
+  const icons = [];         // the locations' icons lying on the land (pictures, their top to the north)
   // one square, standing up facing south (+z, down the painting), every icon a copy of it scaled to its picture
   const iconPlane = new THREE.PlaneGeometry(1, 1);
   const iconTextures = {};  // their pictures, by URL (a promise each)
@@ -538,9 +537,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   }
 
   // ---------------------------------------------------------------------------
-  // The locations' icons: a picture with its middle on its spot, standing facing south -- turning with the map, not
-  // towards the viewer (the user's call, 2026-10-21), leaning back with the camera's tilt (orientIcons) -- drawn over the
-  // land (never hidden in a hillside) like the labels
+  // The locations' icons: a picture with its middle on its spot, lying flat on the land, its top to the north (the
+  // user's call, 2026-11-05) -- laid over the hills under it (flatIcon), so it turns and tilts with the map like the
+  // painting does
   // ---------------------------------------------------------------------------
 
   function iconTexture(url) {
@@ -556,8 +555,40 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     return iconTextures[url];
   }
 
+  /** An icon's picture laid on the land: `w` x `h` (painting pixels), its middle on (ix, iy), its top to the north, a
+   * corner every land step or so -- following the hills under it. Its corners kept for placeLabels. */
+  function flatIcon(sp, ix, iy, w, h) {
+    const nx = Math.min(48, Math.max(1, Math.ceil(w / STEP))), ny = Math.min(48, Math.max(1, Math.ceil(h / STEP)));
+    const pos = [], uv = [], index = [];
+    const y0 = sp.position.y;
+    for (let j = 0; j <= ny; j++) {
+      for (let i = 0; i <= nx; i++) {
+        const dx = (i / nx - 0.5) * w, dy = (j / ny - 0.5) * h;
+        pos.push(dx, groundAt(ix + dx, iy + dy) - y0, dy);
+        uv.push(i / nx, 1 - j / ny);
+      }
+    }
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1;
+        index.push(a, c, b, b, c, d);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(index);
+    geo.computeBoundingSphere();
+    if (sp.geometry !== iconPlane) sp.geometry.dispose();
+    sp.geometry = geo;
+    const at = k => new THREE.Vector3(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]);
+    sp.userData.corners = [at(0), at(nx), at(ny * (nx + 1)), at(ny * (nx + 1) + nx)];
+    sp.userData.reach = Math.hypot(w, h) / 2;
+    sp.updateMatrixWorld();
+  }
+
   function buildIcons() {
-    icons.forEach((sp) => { scene.remove(sp); sp.material.dispose(); });
+    icons.forEach((sp) => { scene.remove(sp); sp.material.dispose(); if (sp.geometry !== iconPlane) sp.geometry.dispose(); });
     icons.length = 0;
     models.forEach(m => scene.remove(m)); // (their shapes are kept with the loaded scene, for the next time)
     models.length = 0;
@@ -567,33 +598,22 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       if (!at) return;
       const [ix, iy] = at;
       const tall = (ic.size || 5) / land.kmPerPx;   // km -> painting pixels (the world's units across the land)
-      // (both sides drawn: from the north it's seen from behind, as a cut-out would be)
-      const bias = { value: 0 };
-      const sp = new THREE.Mesh(iconPlane, iconMaterial(bias));
-      // how far the ground round the spot (as far out as the picture reaches) rises above it, in the world's units --
-      // a hillside under the picture mustn't hide it either (orientIcons)
-      const ground = heightAt(ix, iy);
-      let rise = 0;
-      const reach = Math.ceil(tall * 0.6);
-      for (let dy = -reach; dy <= reach; dy += 2) {
-        for (let dx = -reach; dx <= reach; dx += 2) {
-          if (dx * dx + dy * dy <= reach * reach) rise = Math.max(rise, heightAt(ix + dx, iy + dy) - ground);
-        }
-      }
+      // its depth pulled a little towards the camera: the land's mesh and the picture laid over it never quite agree,
+      // and its own ground mustn't hide it -- a hill in front still does
+      const sp = new THREE.Mesh(iconPlane, iconMaterial({ value: Math.max(1.5, tall * 0.06) }));
       // its middle on the spot, the pin in the middle of the picture (the user's call, 2026-10-20) -- the name goes under
       // the picture (placeLabels: userData)
-      sp.userData = { locId: l.id, tall, bias, rise: rise * land.vert };
+      sp.userData = { locId: l.id, tall };
       sp.renderOrder = 2;
       sp.visible = false;
-      sp.position.copy(toWorld(ix, iy, heightAt(ix, iy)));
+      sp.position.copy(toWorld(ix, iy, 0)).setY(groundAt(ix, iy));
       scene.add(sp);
       icons.push(sp);
       iconTexture(ic.url).then((tex) => {
         if (!icons.includes(sp)) return;
         sp.material.map = tex;
         sp.material.needsUpdate = true;
-        sp.scale.set((tall * tex.image.width) / Math.max(1, tex.image.height), tall, 1);
-        orientIcons();
+        flatIcon(sp, ix, iy, (tall * tex.image.width) / Math.max(1, tex.image.height), tall);
         sp.visible = !sp.userData.model; // (its model came first: that stands there)
         dirty = true;
         wake();
@@ -657,7 +677,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function clearObjects() {
     objects?.setClearings(icons.map((sp) => {
       const p = sp.position;
-      const reach = sp.userData.model ? sp.userData.model.userData.reach + 1 : sp.userData.tall * 0.4;
+      const reach = sp.userData.model ? sp.userData.model.userData.reach + 1 : (sp.userData.reach || sp.userData.tall * 0.5);
       return { x: Math.round(p.x + land.W / 2), y: Math.round(p.z + land.H / 2), r: Math.round(reach) };
     }));
   }
@@ -758,8 +778,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
 
   /** An icon's picture, hidden by the land in front of it like everything else on the map (the user's call, 2026-10-22: a
    * town behind a mountain stays behind it -- it used to be drawn over everything). Only its own bit of ground mustn't
-   * cut it: with its middle on the spot and leant back, its lower half reaches into the land. So the depth it's tested
-   * at is pulled `bias.value` towards the camera (orientIcons) -- what it covers on the screen stays the same. */
+   * cut it: the depth it's tested at is pulled `bias.value` towards the camera -- what it covers on the screen stays the
+   * same. */
   function iconMaterial(bias) {
     const m = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide });
     m.onBeforeCompile = (shader) => {
@@ -770,22 +790,6 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
         gl_Position.z = nearer.z / nearer.w * gl_Position.w;`)}`;
     };
     return m;
-  }
-
-  /** The icons leant back as far as the camera's tilted from level (straight up seen level, flat on the land seen from
-   * straight above -- never edge on), still facing south: so they never turn as the map's turned. */
-  function orientIcons() {
-    const polar = controls.getPolarAngle();
-    const lean = polar - Math.PI / 2;
-    // How far behind the land in front of it the icon's lower edge is, as a share of its height (flatter: further), and a
-    // little more, and the hillside round it -- so its own ground never hides it, and a mountain further in front still does.
-    const under = (0.5 * Math.sin(polar)) / Math.max(Math.cos(polar), 0.25) + 0.25;
-    const slope = 1 / Math.max(Math.cos(polar), 0.5);
-    icons.forEach((sp) => {
-      sp.rotation.x = lean;
-      sp.updateMatrixWorld();
-      sp.userData.bias.value = sp.userData.tall * under + sp.userData.rise * slope;
-    });
   }
 
   /** The DM's locations as the map's names ([] or a list: theirs; null: the towns in places.json again). */
@@ -854,8 +858,8 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       if (!sp.visible) return;
       const mid = v.copy(sp.position).project(camera).y;
       let low = 0;
-      for (const [cx, cy] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) {
-        corner.set(cx, cy, 0).applyMatrix4(sp.matrixWorld).project(camera);
+      for (const c of sp.userData.corners || []) {
+        corner.copy(c).applyMatrix4(sp.matrixWorld).project(camera);
         low = Math.max(low, ((mid - corner.y) / 2) * h);
       }
       halfIcon.set(sp.userData.locId, low);
@@ -1155,7 +1159,6 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       // to rest, is drawn at its best (a slow device's coarse frames blurred the map for a second after every tap).
       const fast = moved && shift >= SHARP_BELOW;      if (fast) keepUp(now); else lastDraw = 0;
       useLevel(fast ? Math.max(movingLevel, REST) : REST);
-      orientIcons();
       details?.update(camera, controls.target, root.clientHeight);
       render();
       placeLabels();

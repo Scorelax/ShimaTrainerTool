@@ -33,8 +33,8 @@
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
-import { shapeBounds, iconSpot } from './map-features.js';
-import { currentMap, isMajor, partOfChain, FIRST_ID } from './map-version.js';
+import { shapeBounds, iconSpot, ringsToMask, ringArea } from './map-features.js';
+import { currentMap, isMajor, partOfChain, FIRST_ID, loadMapState, treeAreasOn } from './map-version.js';
 import { addLandDetail } from './land-detail.js';
 import { addRegionDetail } from './region-detail.js';
 import { addRegionBorders } from './region-borders.js';
@@ -671,25 +671,44 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     c.height = land.H;
     const ctx = c.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(bitmap, 0, 0, land.W, land.H);
+    const areas = await treeAreas();
     const [placed, models] = await Promise.all([
       findPlaces({ rgba: ctx.getImageData(0, 0, land.W, land.H).data, W: land.W, H: land.H, kind: land.kind.slice(), metres: land.metres.slice() }),
-      objectModels(),
+      objectModels(areas.flatMap(a => a.models || [])),
     ]);
     if (destroyed || objects) return;
-    objects = buildMapObjects({ land, placed, groundAt, toWorld, models });
+    objects = buildMapObjects({ land, placed, groundAt, toWorld, models,
+      treeAreas: areas.length ? { at: areas.at, models: areas.map(a => (a.models || []).flatMap(k => models[k] || [])) } : null });
     scene.add(objects.group);
     clearObjects();
     dirty = true;
     wake();
   }
 
+  /** The DM's tree areas (map-version.js treeAreasOn: the trees in one drawn with its own models) -> the ones with
+   * models, and `at`: per land pixel, the one it's in (-1: none; where two overlap, the smaller). None when the
+   * 'region-map' state can't be read. */
+  async function treeAreas() {
+    let st = null;
+    try { st = await loadMapState(); } catch (err) { return []; }
+    const k = land.W / (version.W || land.W);
+    const list = treeAreasOn(st, version)
+      .filter(a => a.models?.length && a.rings?.length)
+      .map(a => ({ ...a, rings: a.rings.map(r => r.map(([x, y]) => [x * k, y * k])) }));
+    const at = new Int16Array(land.W * land.H).fill(-1);
+    list.map((a, i) => [i, Math.abs(a.rings.reduce((n, r) => n + ringArea(r), 0))])
+      .sort((p, q) => q[1] - p[1])
+      .forEach(([i]) => { const m = ringsToMask(list[i].rings, land.W, land.H); for (let j = 0; j < m.length; j++) if (m[j]) at[j] = i; });
+    return Object.assign(list, { at });
+  }
+
   /** The DM's models for the trees, rocks and summits ("mapobject-<kind>.glb" beside the icons, map-objects.js
    * MODEL_KINDS) -> { kind: [{ file, scene }, in file order] } -- one that won't load is left out (the shape made in code stands
    * in), and none at all when the Pi can't say. */
-  async function objectModels() {
+  async function objectModels(more = []) {
     let list = [];
     try { list = await DmAPI.mapObjectModels(); } catch (err) { return {}; }
-    const wanted = new Set(Object.values(MODEL_KINDS).flat());
+    const wanted = new Set([...Object.values(MODEL_KINDS).flat(), ...more]);
     const loaded = await Promise.all(list.filter(m => wanted.has(m.kind)).map(m => gltfScene(m.url)
       .then(scene => ({ ...m, scene }))
       .catch((err) => { console.warn(`Map object ${m.file} won't load: ${err.message}`); return null; })));

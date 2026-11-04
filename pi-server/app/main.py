@@ -376,6 +376,12 @@ def dm_location_icon(payload: dict):
     return _admin(lambda: routes_dm.save_location_icon(payload))
 
 
+@app.post('/api/dm/map-object-model')
+def dm_map_object_model(payload: dict):
+    """A model for the region map's trees ({name, data}: a .glb) into the locations' icon folder -> the model."""
+    return _admin(lambda: routes_dm.save_map_object_model(payload))
+
+
 @app.post('/api/dm/npc-image')
 def dm_save_npc_image(payload: dict):
     """A picture for an NPC uploaded from the DM's computer, into the NPC pictures folder (routes_dm.save_npc_image)."""

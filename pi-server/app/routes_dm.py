@@ -175,6 +175,10 @@ def handle(conn, action, params):
     if action == 'map-object-models':
         return {'status': 'success', 'data': list_map_object_models()}
 
+    if action == 'delete-map-object-model':
+        delete_map_object_model(params.get('file'))
+        return {'status': 'success'}
+
     if action == 'delete-location-icon':
         delete_location_icon(params.get('file'))
         return {'status': 'success'}
@@ -728,6 +732,50 @@ def list_map_object_models():
             out.append({'file': f, 'kind': kind,
                         'url': f'{media.LOCATION_IMAGE_URL_PREFIX}{quote(f)}?v={int(os.path.getmtime(path))}'})
     return out
+
+
+_MAX_MODEL_BYTES = 25 * 1024 * 1024
+
+
+def save_map_object_model(payload):
+    """POST /api/dm/map-object-model: a model for the region map's objects ({name, data: "data:...;base64,..." of a
+    .glb}) written as "mapobject-<name>.glb" -- the name lowercased, its spaces made "_" (the user's call, 2026-11-04:
+    the DM's own trees, picked for the tree areas). One there already under that name: this one's added as another of
+    its look ("-2", "-3", ...), mixed in on the map. -> the model ({file, kind, url})."""
+    import base64
+    kind = re.sub(r'[^a-z0-9_]', '', re.sub(r'[\s-]+', '_', str(payload.get('name') or '').strip().lower())).strip('_')[:40]
+    kind = re.sub(r'_*\d+$', '', kind)   # (a number at the end is a variant's)
+    if not kind:
+        raise ValueError('The model needs a name (letters, e.g. "snowy pine")')
+    m = re.match(r'^data:[^;,]*;base64,(.+)$', str(payload.get('data') or ''), re.S)
+    if not m:
+        raise ValueError("That file couldn't be read")
+    raw = base64.b64decode(m.group(1))
+    if raw[:4] != b'glTF':
+        raise ValueError("That isn't a .glb model")
+    if len(raw) > _MAX_MODEL_BYTES:
+        raise ValueError('That model is too big (25 MB at most)')
+    os.makedirs(media.LOCATION_IMAGE_DIR, exist_ok=True)
+    taken = {e['file'].lower() for e in list_map_object_models()}
+    filename = f'{_MAP_OBJECT}{kind}.glb'
+    n = 2
+    while filename.lower() in taken:
+        filename = f'{_MAP_OBJECT}{kind}-{n}.glb'
+        n += 1
+    with open(os.path.join(media.LOCATION_IMAGE_DIR, filename), 'wb') as f:
+        f.write(raw)
+    return next(e for e in list_map_object_models() if e['file'] == filename)
+
+
+def delete_map_object_model(filename):
+    """One of the region map's object models taken out of the folder."""
+    filename = os.path.basename(str(filename or ''))
+    if not (filename.lower().startswith(_MAP_OBJECT) and filename.lower().endswith('.glb')):
+        raise ValueError('No such model')
+    try:
+        os.remove(os.path.join(media.LOCATION_IMAGE_DIR, filename))
+    except OSError:
+        raise ValueError('No such model')
 
 
 def save_location_icon(payload):

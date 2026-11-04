@@ -16,6 +16,9 @@
 //             borders: [[[x, y], ...], ...] (the lines between those regions, in its pixels: region-borders.js),
 //             borderPicture: { file (on the Pi, a PNG), W, H, toMap, at } (the borders drawn by the DM, the user's call,
 //             2026-11-04: `borders` read from it, and kept by the regions added after) }]
+//   treeAreas [{ id, name, models (the kinds of "mapobject-<kind>.glb" the trees there are drawn with), rings (in the
+//             first map's pixels, so they stay put whichever map is in use) }] (the DM's tree areas, the user's call,
+//             2026-11-04: snowy trees in the mountains -- js/dm/tree-areas.js; treeAreasOn())
 // Every map knows where it sits on the first one (toBase), so going from any map to any other is one transform
 // (between()), and going back puts the shapes back where they were -- the locations' icons too (their spot moves, their
 // size is in km).
@@ -194,4 +197,10 @@ export function fitSimilarity(from, to) {
   let miss = 0;
   for (let i = 0; i < n; i++) { const [x, y] = apply(m, from[i][0], from[i][1]); miss += Math.hypot(x - to[i][0], y - to[i][1]); }
   return { m, error: miss / n };
+}
+
+/** The DM's tree areas (the 'region-map' state's treeAreas) on `map`: [{ id, name, models, rings (in its pixels) }]. */
+export function treeAreasOn(state, map) {
+  const m = invert(map.toBase || IDENTITY);
+  return (state?.treeAreas || []).map(a => ({ ...a, rings: transformShape({ kind: 'area', rings: a.rings || [] }, m).rings }));
 }

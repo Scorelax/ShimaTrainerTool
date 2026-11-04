@@ -15,7 +15,9 @@
 //
 // findPlaces({ rgba (the painting, at the land's size), W, H, kind, metres }) -> where they stand, then
 // buildMapObjects({ land, placed, groundAt(x, y) (the land's surface there, world y), toWorld, models ({ kind: [{ file,
-// scene } loaded, in file order] }) }) -> { group (into the
+// scene } loaded, in file order] }), treeAreas ({ at (Int16Array, per land pixel: the area it's in, -1 none), models:
+// per area [{ file, scene }] } -- the DM's tree areas, the user's call, 2026-11-04: the trees in one drawn with its own
+// models, snowy pines in the mountains, say) }) -> { group (into the
 // scene), update(camera, viewHeightPx), setClearings([{ x, y, r }]) (no objects there: the locations' icons and models),
 // dispose() }.
 import * as THREE from '../vendor/three/three.module.min.js';
@@ -42,7 +44,9 @@ export const MODEL_KINDS = {
 // and the rocks wait for the DM's own -- a mapobject-peak / rock_land / rock_sea model still stands in their places
 const MODEL_ONLY = new Set(['peak', 'rock', 'searock']);
 // The most triangles a model may have: thousands of trees and rocks are drawn at once, and only 16 summits
-const MAX_TRIANGLES = { small: 1500, big: 30000 };
+export const MAX_TRIANGLES = { small: 1500, big: 30000 };
+// The shapes a tree area's models stand in for
+const TREES = new Set(['pine', 'leafy']);
 
 /** A number from -1 to 1 for a point -- so the corners two faces share are moved alike, and the shape stays closed. */
 function hash3(x, y, z) {
@@ -219,7 +223,7 @@ export function findPlaces(input) {
   });
 }
 
-export function buildMapObjects({ land, placed, groundAt, toWorld, models = {} }) {
+export function buildMapObjects({ land, placed, groundAt, toWorld, models = {}, treeAreas = null }) {
   const { W, H } = land;
 
   // The shapes, their class, and the materials (one per class: its own grow-in distances) -- or the DM's models in
@@ -236,21 +240,30 @@ export function buildMapObjects({ land, placed, groundAt, toWorld, models = {} }
   const shapes = {};
   const variants = {};
   const warned = new Set();
+  /** `list`'s models fitted into a shape's box -> [parts] (the ones too heavy or empty left out). */
+  const fit = (list, target, cls) => list.map(({ file, scene }) => {
+    const r = modelParts(scene, target, ranges[cls], MAX_TRIANGLES[cls]);
+    if (!r.parts && !warned.has(file)) {
+      warned.add(file);
+      console.warn(r.triangles > MAX_TRIANGLES[cls]
+        ? `Map object ${file} has ${r.triangles} triangles -- ${MAX_TRIANGLES[cls]} at most, so it's left out`
+        : `Map object ${file} has nothing to draw -- left out`);
+    }
+    return r.parts;
+  }).filter(Boolean);
   for (const [name, [cls, geo]] of Object.entries(made)) {
     geo.computeBoundingBox();
     const size = geo.boundingBox.getSize(new THREE.Vector3());
     const target = { biggest: Math.max(size.x, size.y, size.z), minY: geo.boundingBox.min.y };
+    // a tree area's own: "pine@2#0" (none fitted: its trees are drawn as anywhere else)
+    if (TREES.has(name)) {
+      (treeAreas?.models || []).forEach((list, a) => {
+        const own = fit(list || [], target, cls);
+        if (own.length) variants[`${name}@${a}`] = own.map((parts, n) => { shapes[`${name}@${a}#${n}`] = { cls, parts }; return `${name}@${a}#${n}`; });
+      });
+    }
     const kind = MODEL_KINDS[name].find(k => models[k]?.length);
-    const fitted = (kind ? models[kind] : []).map(({ file, scene }) => {
-      const r = modelParts(scene, target, ranges[cls], MAX_TRIANGLES[cls]);
-      if (!r.parts && !warned.has(file)) {
-        warned.add(file);
-        console.warn(r.triangles > MAX_TRIANGLES[cls]
-          ? `Map object ${file} has ${r.triangles} triangles -- ${MAX_TRIANGLES[cls]} at most, so it's left out`
-          : `Map object ${file} has nothing to draw -- left out`);
-      }
-      return r.parts;
-    }).filter(Boolean);
+    const fitted = fit(kind ? models[kind] : [], target, cls);
     if (fitted.length) {
       geo.dispose();
       variants[name] = fitted.map((parts, n) => { shapes[`${name}#${n}`] = { cls, parts }; return `${name}#${n}`; });
@@ -267,7 +280,8 @@ export function buildMapObjects({ land, placed, groundAt, toWorld, models = {} }
   const { shapes: names, data } = placed;
   for (let k = 0; k < data.length; k += FIELDS) {
     const [shape, x, y, turn, size, tall, shade] = data.subarray(k, k + FIELDS);
-    const keys = variants[names[shape]];
+    const a = treeAreas && TREES.has(names[shape]) ? treeAreas.at[Math.round(y) * W + Math.round(x)] : -1;
+    const keys = (a >= 0 && variants[`${names[shape]}@${a}`]) || variants[names[shape]];
     if (!keys) continue;
     const at = `${Math.floor(x / CHUNK)},${Math.floor(y / CHUNK)}`;
     if (!chunks.has(at)) chunks.set(at, { x0: Math.floor(x / CHUNK) * CHUNK, y0: Math.floor(y / CHUNK) * CHUNK, items: {}, meshes: {} });

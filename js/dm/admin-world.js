@@ -464,6 +464,16 @@ export async function drawLocations(body) {
   regionsBtn.textContent = '🧩 Regions on the map';
   regionsBtn.title = 'Click a region on the map: a marked one opens, one not marked yet becomes a new region location';
   sortBtn.after(regionsBtn);
+  // Where the map's trees are the DM's own models (the user's call, 2026-11-04: snowy trees in the mountains)
+  const treesBtn = document.createElement('button');
+  treesBtn.className = 'dm-btn';
+  treesBtn.textContent = '🌲 Tree areas';
+  treesBtn.title = 'Mark areas on the map and pick which of your tree models grow there';
+  regionsBtn.after(treesBtn);
+  treesBtn.addEventListener('click', async () => {
+    const { openTreeAreas } = await import('./tree-areas.js');
+    await openTreeAreas(locations);
+  });
   regionsBtn.addEventListener('click', async () => {
     const { pickRegionOnMap } = await import('./region-picker.js');
     const got = await pickRegionOnMap(locations);

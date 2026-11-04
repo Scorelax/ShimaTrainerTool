@@ -238,8 +238,9 @@ const AREA_TOOLS = {
 
 /** Marks `loc` on the map, full screen. `others`: the other locations, drawn faintly for reference.
  * -> the new shape, or undefined (cancelled). */
-/** `onIcon(icon)`: the location's icon resized here (at Done) -- it stands on the mark, wherever that's put. */
-export async function editLocationShape(loc, others = [], { onIcon } = {}) {
+/** `onIcon(icon)`: the location's icon resized here (at Done) -- it stands on the mark, wherever that's put. `kinds`: the
+ * kinds of mark it can be (SHAPE_KINDS; just one: no choice shown -- a tree area, tree-areas.js). */
+export async function editLocationShape(loc, others = [], { onIcon, kinds = Object.keys(SHAPE_KINDS) } = {}) {
   let P;
   try {
     P = await loadPainting();
@@ -251,7 +252,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   const old = loc.shape || null;
 
   // What's being drawn, one of each kind -- switching between them keeps the others as they were until Done.
-  let kind = old?.kind || defaultKind(loc.type);
+  let kind = old?.kind || (kinds.length === 1 ? kinds[0] : defaultKind(loc.type));
   let pin = old?.kind === 'pin' ? [old.x, old.y] : null;
   let anchors = old?.kind === 'path' ? (old.anchors?.length > 1 ? old.anchors : [old.points[0], old.points[old.points.length - 1]]).map(p => p.slice()) : [];
   let follow = old?.kind === 'path' ? old.follow !== false : true;
@@ -334,7 +335,7 @@ export async function editLocationShape(loc, others = [], { onIcon } = {}) {
   overlay.innerHTML = `
     <div class="dm-lme-head">
       <h3>🗺 ${escapeHtml(loc.name || 'Location')} on the map</h3>
-      <div class="dm-lme-seg" role="group">${Object.entries(SHAPE_KINDS).map(([k, l]) => `<button data-kind="${k}">${l}</button>`).join('')}</div>
+      <div class="dm-lme-seg" role="group"${kinds.length > 1 ? '' : ' style="display: none"'}>${Object.entries(SHAPE_KINDS).filter(([k]) => kinds.includes(k)).map(([k, l]) => `<button data-kind="${k}">${l}</button>`).join('')}</div>
       <span class="dm-lme-spacer"></span>
       <button class="dm-btn" data-lme="cancel">Cancel</button>
       <button class="dm-btn primary" data-lme="done">Done</button>

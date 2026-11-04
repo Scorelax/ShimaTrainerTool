@@ -1750,3 +1750,19 @@ button.dm-nav-fold:hover, .dm-world-fold:hover { color: var(--dm-gold); }
 .dm-world-icon.small { width: 56px; height: 56px; font-size: 1.2rem; }
 /* the players' marker as the party's icon in the PokéNav (the user's call, 2026-10-20) */
 .dm-nav-partyicon { width: 1.15em; height: 1.15em; image-rendering: pixelated; vertical-align: -0.2em; }
+
+/* Tree areas (js/dm/tree-areas.js) */
+.dm-ta-side { width: 320px; }
+.dm-ta-area { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.6rem; border: 1px solid var(--dm-line); border-radius: 10px; cursor: pointer; }
+.dm-ta-area.active { border-color: #ffd23f; background: rgba(255, 210, 63, 0.06); cursor: default; }
+.dm-ta-area .dm-row { display: flex; gap: 0.4rem; align-items: center; }
+.dm-ta-area .dm-input { flex: 1; min-width: 0; }
+.dm-ta-area .dm-row > .dm-icon-btn { flex: none; }
+.dm-ta-label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dm-muted); }
+.dm-ta-models { display: flex; flex-wrap: wrap; gap: 0.3rem 0.8rem; }
+.dm-ta-model { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+.dm-ta-files { display: flex; flex-direction: column; gap: 0.3rem; }
+.dm-ta-file { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+.dm-ta-file > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dm-ta-tris { color: var(--dm-muted); white-space: nowrap; }
+.dm-ta-tris.over { color: #ff6b6b; }

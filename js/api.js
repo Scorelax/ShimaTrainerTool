@@ -1524,6 +1524,18 @@ export class DmAPI {
     return (await API.request('dm', 'map-object-models', {}, { useCache: false })).data || [];
   }
 
+  /** A model for the map's trees uploaded ({name, data: a data: URL of a .glb}) -- a second under one name is another
+   * look of it ("-2"). */
+  static async saveMapObjectModel(model) {
+    return (await DmAPI._post('map-object-model', model, 'Uploading the model')).data;
+  }
+
+  static async deleteMapObjectModel(file) {
+    const res = await API.request('dm', 'delete-map-object-model', { file }, { useCache: false });
+    if (res.status !== 'success') throw new Error(res.error || "Couldn't delete the model");
+    return res;
+  }
+
   static async locationIcons() {
     return (await API.request('dm', 'location-icons', {}, { useCache: false })).data || [];
   }

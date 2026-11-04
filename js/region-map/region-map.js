@@ -324,7 +324,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (version.borders?.length) {
       borders = addRegionBorders(scene, {
         borders: version.borders, size: [W, H], groundAt,
-        onLand: (x, y) => land.kind[Math.min(H - 1, Math.max(0, Math.round(y))) * W + Math.min(W - 1, Math.max(0, Math.round(x)))] !== 0,
+        // (the DM's own lines wherever he drew them -- a strait between two regions too)
+        onLand: version.borderPicture ? () => true : (x, y) => land.kind[Math.min(H - 1, Math.max(0, Math.round(y))) * W + Math.min(W - 1, Math.max(0, Math.round(x)))] !== 0,
       });
     }
 

@@ -7,6 +7,9 @@
 // meets the map's own painting (no region painted there yet) it has its line too, from the first region on (the
 // user's call, 2026-11-01: a region placed stands out from its neighbours at once) -- only on the land, not along the
 // coast; a region's edge out at sea has none.
+// Since 2026-11-04 (the user's call: those also ran round a region's coast, messy) the DM can draw the borders himself,
+// a picture of only the lines (linesFromPicture, below) -- those are the map's lines from then on, and a region added
+// after keeps them; the traced ones are only for a map without.
 //
 // The 3D map lays them on the land (addRegionBorders) -- the same width on the screen at any zoom, sharp up close, hidden
 // behind a mountain like the land itself, and left out over the sea.
@@ -41,15 +44,25 @@ function simplify(pts, tol) {
     const [i, j] = stack.pop();
     const [ax, ay] = pts[i], [bx, by] = pts[j];
     const dx = bx - ax, dy = by - ay;
-    const len = Math.hypot(dx, dy) || 1;
+    const len = Math.hypot(dx, dy);
     let far = -1, most = tol;
     for (let k = i + 1; k < j; k++) {
-      const off = Math.abs((pts[k][0] - ax) * dy - (pts[k][1] - ay) * dx) / len;
+      // (from a point, where the ends are the same one -- a loop's)
+      const off = len ? Math.abs((pts[k][0] - ax) * dy - (pts[k][1] - ay) * dx) / len : Math.hypot(pts[k][0] - ax, pts[k][1] - ay);
       if (off > most) { most = off; far = k; }
     }
     if (far > 0) { keep[far] = 1; stack.push([i, far], [far, j]); }
   }
   return pts.filter((_, k) => keep[k]);
+}
+
+/** A line of pixel steps straightened (0.75 px off it at most) -- a loop in two halves: its ends are the same point,
+ * nothing to measure from. */
+function straighten(pts, loop) {
+  if (!loop) return simplify(pts, 0.75);
+  let m = 1;
+  pts.forEach(([x, y], i) => { if (Math.hypot(x - pts[0][0], y - pts[0][1]) > Math.hypot(pts[m][0] - pts[0][0], pts[m][1] - pts[0][1])) m = i; });
+  return [...simplify(pts.slice(0, m + 1), 0.75), ...simplify(pts.slice(m), 0.75).slice(1)];
 }
 
 /** Rounded off (Chaikin, twice): the corners cut, the ends kept where they are (a loop's too, it has none). */
@@ -166,14 +179,7 @@ export function traceBorders(W, H) {
     // the cells' steps straightened, rounded off, in map pixels; specks (a few stray cells) left out
     return raw.map((pts) => {
       const loop = pts.length > 2 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1];
-      let straight = simplify(pts, 0.75);
-      if (loop) {
-        // (a loop in two halves: its ends are the same point, nothing to measure from)
-        let m = 1;
-        pts.forEach(([x, y], i) => { if (Math.hypot(x - pts[0][0], y - pts[0][1]) > Math.hypot(pts[m][0] - pts[0][0], pts[m][1] - pts[0][1])) m = i; });
-        straight = [...simplify(pts.slice(0, m + 1), 0.75), ...simplify(pts.slice(m), 0.75).slice(1)];
-      }
-      return simplify(smooth(straight, loop), 0.1).map(([x, y]) => [Math.round((x / r) * 100) / 100, Math.round((y / r) * 100) / 100]);
+      return simplify(smooth(straighten(pts, loop), loop), 0.1).map(([x, y]) => [Math.round((x / r) * 100) / 100, Math.round((y / r) * 100) / 100]);
     }).filter((pts) => {
       let len = 0;
       for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
@@ -182,6 +188,150 @@ export function traceBorders(W, H) {
   }
 
   return { add, finish };
+}
+
+// ---------------------------------------------------------------------------
+// The DM's own borders (the user's call, 2026-11-04: the traced ones also ran round a region's coast, messy): a picture
+// of only the border lines (dark, the rest see-through), drawn over the whole map, read into lines once as it's
+// uploaded -- thinned to their middle, followed from end to end, rounded off.
+// ---------------------------------------------------------------------------
+
+const LINE_MAX_SIDE = 4096;   // a border picture is read at up to this size each way
+
+/** A picture's dark, solid pixels: 1 a line. -> { mask, w, h, s (the picture's pixels -> the mask's) } */
+function lineMask(picture) {
+  const s = Math.min(1, LINE_MAX_SIDE / Math.max(picture.width, picture.height));
+  const w = Math.max(1, Math.round(picture.width * s)), h = Math.max(1, Math.round(picture.height * s));
+  const mask = new Uint8Array(w * h);
+  for (let ty = 0; ty < h; ty += TILE) {
+    const th = Math.min(TILE, h - ty);
+    const cv = canvasOf(w, th);
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(picture, 0, -ty, w, h);
+    const px = ctx.getImageData(0, 0, w, th).data;
+    // (a picture made smaller fades its thin lines: a lower bar for it)
+    const solid = s < 1 ? 96 : 128;
+    for (let i = 0; i < w * th; i++) {
+      const luma = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+      mask[ty * w + i] = px[i * 4 + 3] >= solid && luma < 110 ? 1 : 0;
+    }
+  }
+  return { mask, w, h, s };
+}
+
+/** The lines thinned to one pixel, in place (Zhang-Suen). */
+function thin(m, w, h) {
+  for (let x = 0; x < w; x++) { m[x] = 0; m[(h - 1) * w + x] = 0; }
+  for (let y = 0; y < h; y++) { m[y * w] = 0; m[y * w + w - 1] = 0; }
+  let pts = [];
+  for (let i = 0; i < m.length; i++) if (m[i]) pts.push(i);
+  const del = [];
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const pass of [0, 1]) {
+      del.length = 0;
+      for (const p of pts) {
+        if (!m[p]) continue;
+        const n = [m[p - w], m[p - w + 1], m[p + 1], m[p + w + 1], m[p + w], m[p + w - 1], m[p - 1], m[p - w - 1]];   // P2..P9
+        const b = n[0] + n[1] + n[2] + n[3] + n[4] + n[5] + n[6] + n[7];
+        if (b < 2 || b > 6) continue;
+        let a = 0;
+        for (let k = 0; k < 8; k++) if (!n[k] && n[(k + 1) % 8]) a++;
+        if (a !== 1) continue;
+        if (pass === 0 ? (n[0] && n[2] && n[4]) || (n[2] && n[4] && n[6]) : (n[0] && n[2] && n[6]) || (n[0] && n[4] && n[6])) continue;
+        del.push(p);
+      }
+      for (const p of del) m[p] = 0;
+      if (del.length) changed = true;
+    }
+    pts = pts.filter(p => m[p]);
+  }
+  return pts;
+}
+
+/** The thinned pixels followed into lines ([[x, y], ...] in the mask's pixels): from each end or crossing to the next,
+ * then the loops. A step across a corner counts only where no step along the sides goes round it (a staircase is one
+ * line, not a ladder); stubs off a line (shorter than `stub`) and specks (shorter than `speck`) are left out. */
+function follow(m, w, pts, stub, speck) {
+  const NB = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [-1, -1], [1, -1]];
+  const near = (p) => {
+    const out = [];
+    for (const [dx, dy] of NB) {
+      const q = p + dy * w + dx;
+      if (!m[q]) continue;
+      if (dx && dy && (m[p + dx] || m[p + dy * w])) continue;   // (a corner with a way round it)
+      out.push(q);
+    }
+    return out;
+  };
+  const links = new Map();
+  for (const p of pts) links.set(p, near(p));
+  const isNode = p => links.get(p).length !== 2;
+  const seen = new Uint8Array(m.length);
+  const pairs = new Set();
+  const raw = [];   // [{ pts: [index, ...], a: degree at its start, b: at its end }]
+  const walk = (from, to) => {
+    const line = [from];
+    let prev = from, at = to;
+    for (;;) {
+      line.push(at);
+      if (isNode(at) || seen[at]) break;
+      seen[at] = 1;
+      const next = links.get(at).find(q => q !== prev);
+      if (next == null) break;
+      prev = at; at = next;
+    }
+    return line;
+  };
+  for (const p of pts) {
+    if (!isNode(p)) continue;
+    for (const q of links.get(p)) {
+      if (isNode(q)) {
+        const key = p < q ? `${p},${q}` : `${q},${p}`;
+        if (!pairs.has(key)) { pairs.add(key); raw.push([p, q]); }
+      } else if (!seen[q]) raw.push(walk(p, q));
+    }
+  }
+  for (const p of pts) {
+    if (seen[p] || isNode(p)) continue;
+    seen[p] = 1;
+    const line = walk(p, links.get(p)[0]);
+    if (line[line.length - 1] !== p) line.push(p);
+    raw.push(line);
+  }
+  const degree = p => links.get(p).length;
+  const twins = new Set();   // short lines between the same two points (round a pinhole in a drawn line): one is enough
+  return raw.filter((line) => {
+    const a = degree(line[0]), b = degree(line[line.length - 1]);
+    if (line.length < stub) {
+      const [p, q] = [line[0], line[line.length - 1]].sort((x, y) => x - y);
+      if (twins.has(`${p},${q}`)) return false;
+      twins.add(`${p},${q}`);
+    }
+    if ((a === 1 && b >= 3) || (b === 1 && a >= 3)) return line.length >= stub;   // a stub off a line
+    if (a === 1 && b === 1) return line.length >= speck;                          // a line on its own
+    return true;
+  }).map(line => line.map(p => [p % w + 0.5, Math.floor(p / w) + 0.5]));
+}
+
+/**
+ * linesFromPicture(picture, toMap) -> lines ([[x, y], ...] in the map's pixels): a picture of border lines read into
+ * lines -- `toMap` the affine from its pixels to the map's.
+ */
+export function linesFromPicture(picture, toMap) {
+  const { mask, w, h, s } = lineMask(picture);
+  let solid = 0;
+  for (let i = 0; i < mask.length; i++) solid += mask[i];
+  const pts = thin(mask, w, h);
+  const width = pts.length ? solid / pts.length : 1;   // how thick the lines were drawn, about
+  const [a, b, c, d, e, f] = toMap;
+  return follow(mask, w, pts, Math.max(4, width * 1.5), Math.max(6, width * 3)).map((line) => {
+    const loop = line.length > 3 && line[0][0] === line[line.length - 1][0] && line[0][1] === line[line.length - 1][1];
+    return simplify(smooth(straighten(line, loop), loop), 0.1)
+      .map(([x, y]) => [x / s, y / s])
+      .map(([x, y]) => [Math.round((a * x + b * y + c) * 100) / 100, Math.round((d * x + e * y + f) * 100) / 100]);
+  }).filter(line => line.length > 1);
 }
 
 const VERTEX = /* glsl */ `

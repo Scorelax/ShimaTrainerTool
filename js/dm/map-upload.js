@@ -13,6 +13,9 @@
 // onto the map's own painting (its frame) with the others and the map built again at the same size, so nothing marked
 // on it moves. Each region is kept whole on the Pi (as a WebP): the painted picture is drawn from them at twice the
 // map's size, and adding a region again later replaces it. A whole new painting starts without regions.
+// The region borders (the user's call, 2026-11-04): a picture of only the lines, drawn by hand over the whole map, lined
+// up the same way (by the map's edges when it's framed like it), read into lines and kept with a new version of the map
+// -- and with every region added after (readBorders). Without one, the lines are traced from where the regions end.
 import { DmAPI } from '../api.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, newId, toast } from './dm-common.js';
@@ -21,7 +24,7 @@ import {
   FIRST_ID, allMaps, currentMap, loadMapState, between, compose, invert, apply, scaleOf, transformShape, transformIcon, fitSimilarity,
 } from '../region-map/map-version.js';
 import { SEA_OFFSET, paintTexture, shadePicture } from '../region-map/make-terrain.js';
-import { traceBorders } from '../region-map/region-borders.js';
+import { traceBorders, linesFromPicture } from '../region-map/region-borders.js';
 
 const KM_PER_PX = 0.12;     // a new painting is worked on at the first one's detail: 120 m a pixel...
 const MAX_SIDE = 2048;      // ...unless that's bigger than this (its 3D pictures are twice the size: 4096, what every
@@ -33,6 +36,9 @@ const PAIR_COLOURS = ['#ff5252', '#40c4ff', '#69f0ae', '#ffd740', '#e040fb', '#f
 // under the Pi's 15 MB a picture -- a 4096 PNG of a painting can be more).
 const REGION_MAX_SIDE = 4096;
 const REGION_QUALITY = 0.92;
+// The region borders drawn by hand (the user's call, 2026-11-04): a picture of only the lines, over the whole map --
+// read into lines once (region-borders.js linesFromPicture), kept on the Pi as a PNG
+const BORDERS_MAX_SIDE = 8192;
 
 /** How fine a region's painting is, in words: metres a pixel. */
 const regionDetail = (r, map) => `about ${Math.round((map.kmPerPx * 1000) / scaleOf(r.toMap))} m a pixel`;
@@ -237,6 +243,16 @@ export async function openRegionMaps({ locations, onChanged }) {
             <button class="dm-btn small" data-mup="region-replace" data-id="${escapeHtml(r.id)}" title="A new painting of this region in its place">↺ Replace</button>
             <button class="dm-icon-btn danger" data-mup="region-remove" data-id="${escapeHtml(r.id)}" title="Build the map again without it">🗑</button>
           </div>`).join('') || '<div class="dm-hint">No regions added yet.</div>'}</div>
+        <div class="dm-card-title dm-mup-bordertitle"><span>✏️ The region borders</span>
+          <button class="dm-btn small primary" data-mup="borders-add">${inUse.borderPicture ? '↺ Replace the borders' : '⬆ Upload the borders'}</button></div>
+        <div class="dm-hint">The black lines between the regions, drawn by hand: ⬇ export the map (above), draw the borders over it on a
+          layer of their own, and save only that layer -- dark lines, the rest see-through -- as a PNG. The same size as the map, it's
+          lined up by itself. The lines stay with every region added after; upload them again when a border changes.${inUse.borderPicture ? ''
+            : ' Until then the lines are worked out from where the regions end.'}</div>
+        ${inUse.borderPicture ? `<div class="dm-mup-region">
+            <img class="dm-mup-borderpic" src="${escapeHtml(inUse.borderPicture.file)}" alt="" loading="lazy">
+            <span><strong>Drawn borders</strong><small>${inUse.borderPicture.at ? `${escapeHtml(new Date(inUse.borderPicture.at).toLocaleDateString())} · ` : ''}${inUse.borderPicture.W} × ${inUse.borderPicture.H} px · ${(inUse.borders || []).length} lines</small></span>
+          </div>` : ''}
       </div>
       <div class="dm-mup-cards">${maps.slice().reverse().map(m => `
         <div class="dm-mup-card${m.id === inUse.id ? ' in-use' : ''}">
@@ -299,6 +315,9 @@ export async function openRegionMaps({ locations, onChanged }) {
       const replaces = act === 'region-replace' ? (inUse.regions || []).find(r => r.id === b.dataset.id) : null;
       const file = await pickFile();
       if (file) lineUp(file, [], { replaces, fileName: file.name });
+    } else if (act === 'borders-add') {
+      const file = await pickFile();
+      if (file) lineUp(file, [], { borders: true, replaces: inUse.borderPicture || null, fileName: file.name });
     } else if (act === 'region-remove') {
       const gone = (inUse.regions || []).find(r => r.id === b.dataset.id);
       if (!gone || !await showCombatConfirm(`Build the map again without "${gone.name}"? Its part of the map goes back to the painting under it. (The map as it is now stays in the list below.)`, { title: 'Remove region', yesLabel: 'Build it without', noLabel: 'Cancel' })) return;
@@ -348,26 +367,33 @@ export async function openRegionMaps({ locations, onChanged }) {
   // ---------------------------------------------------------------------------
 
   /** `keep`: the spots placed before (back from checking). `region` ({ replaces, fileName }): a region being added (or
-   * put in place of `replaces`) rather than a whole new painting. */
+   * put in place of `replaces`) rather than a whole new painting -- with `borders`, the picture of the region borders
+   * (`replaces`: the one there was). */
   async function lineUp(file, keep = [], region = null) {
+    const borders = !!region?.borders;
+    const noun = borders ? 'borders' : region ? 'region' : 'new painting';
+    const title = borders ? 'The region borders' : region ? 'Add a region' : 'Upload a new painting';
     let up, oldShown;
     try {
       [up, oldShown] = await Promise.all([createImageBitmap(file), loadImage(inUse.files.painted)]);
     } catch (err) {
-      showCombatAlert("That file couldn't be opened as a picture.", { title: region ? 'Add a region' : 'Upload a new painting' });
+      showCombatAlert("That file couldn't be opened as a picture.", { title });
       return;
     }
-    if (region && Math.max(up.width, up.height) > REGION_MAX_SIDE) {
-      showCombatAlert(`That picture is ${up.width} × ${up.height} pixels -- a region can be ${REGION_MAX_SIDE} pixels at most each way (what every graphics card takes).`, { title: 'Add a region' });
+    const maxSide = borders ? BORDERS_MAX_SIDE : REGION_MAX_SIDE;
+    if (region && Math.max(up.width, up.height) > maxSide) {
+      showCombatAlert(`That picture is ${up.width} × ${up.height} pixels -- ${borders ? 'the borders' : 'a region'} can be ${maxSide} pixels at most each way${borders ? '' : ' (what every graphics card takes)'}.`, { title });
       return;
     }
     const cur = inUse;
     const upMap = { W: up.width, H: up.height };
     const shownPer = oldShown.naturalWidth / cur.W;   // the painted picture's pixels per map pixel (2)
     // Lined up without any spots: a painting framed like the map in use by its edges; a region replacing one the same
-    // size where that one sat (a new painting of the same region, from the same template)
-    const same = region ? !!region.replaces && region.replaces.W === up.width && region.replaces.H === up.height : sameFraming(cur, upMap);
-    const sameT = () => (region ? invert(region.replaces.toMap) : (s => [s, 0, 0, 0, s, 0])((up.width / cur.W + up.height / cur.H) / 2));
+    // size where that one sat (a new painting of the same region, from the same template); the borders by the map's
+    // edges, or where the ones they replace were
+    const sameSize = !!region?.replaces && region.replaces.W === up.width && region.replaces.H === up.height;
+    const same = borders ? sameSize || sameFraming(cur, upMap) : region ? sameSize : sameFraming(cur, upMap);
+    const sameT = () => (sameSize ? invert(region.replaces.toMap) : (s => [s, 0, 0, 0, s, 0])((up.width / cur.W + up.height / cur.H) / 2));
     const pairs = keep.map(p => ({ ...p }));   // [{ a: [x, y] on the map in use | null, b: on the new painting | null }]
     let T = null;       // the map in use's pixels -> the new painting's
     let error = 0;
@@ -381,13 +407,13 @@ export async function openRegionMaps({ locations, onChanged }) {
 
     panes.forEach(p => p.destroy());
     overlay.dataset.screen = 'align';
-    overlay.innerHTML = `<div class="dm-lme-head"><h3>${region ? `🧩 Line up the region${region.replaces ? ` (in place of "${escapeHtml(region.replaces.name)}")` : ''}` : '🗺 Line up the new painting'}</h3><span class="dm-lme-spacer"></span>
+    overlay.innerHTML = `<div class="dm-lme-head"><h3>${borders ? '✏️ Line up the borders' : region ? `🧩 Line up the region${region.replaces ? ` (in place of "${escapeHtml(region.replaces.name)}")` : ''}` : '🗺 Line up the new painting'}</h3><span class="dm-lme-spacer"></span>
         <button class="dm-btn" data-al="cancel">Cancel</button><button class="dm-btn primary" data-al="next">Check it →</button></div>
       <div class="dm-lme-body">
         <aside class="dm-lme-tools" id="alTools"></aside>
         <div class="dm-mup-panes">
           <div class="dm-mup-pane"><div class="dm-mup-cap">The map in use</div><div class="dm-lme-stage" id="alOld"></div></div>
-          <div class="dm-mup-pane"><div class="dm-mup-cap">${region ? 'The region' : 'The new painting'}</div><div class="dm-lme-stage" id="alNew"></div></div>
+          <div class="dm-mup-pane"><div class="dm-mup-cap">The ${noun}</div><div class="dm-lme-stage" id="alNew"></div></div>
         </div>
       </div>`;
     const marks = (ctx, v, side) => {
@@ -429,7 +455,12 @@ export async function openRegionMaps({ locations, onChanged }) {
     });
     const paneNew = makePane(overlay.querySelector('#alNew'), {
       W: up.width, H: up.height, onClick: click('b'),
-      draw: (ctx, v) => { ctx.imageSmoothingQuality = 'high'; ctx.drawImage(up, v.ox, v.oy, up.width * v.s, up.height * v.s); marks(ctx, v, 'b'); },
+      draw: (ctx, v) => {
+        ctx.imageSmoothingQuality = 'high';
+        if (borders) { ctx.fillStyle = '#f4ecd8'; ctx.fillRect(v.ox, v.oy, up.width * v.s, up.height * v.s); }   // (dark lines: on light)
+        ctx.drawImage(up, v.ox, v.oy, up.width * v.s, up.height * v.s);
+        marks(ctx, v, 'b');
+      },
     });
     panes = [paneOld, paneNew];
     function tools() {
@@ -439,14 +470,14 @@ export async function openRegionMaps({ locations, onChanged }) {
       overlay.querySelector('#alTools').innerHTML = `
         <div class="dm-hint">Click the same spot on both maps -- a town's middle, the tip of a cape, where two roads meet. Spread them out:
           two pairs line the maps up, a third checks it. Scroll to zoom, drag to move; click a mark again to take it off.</div>
-        ${same ? `<div class="dm-lme-stat dm-mup-same">${region ? `✓ The same size as the region it replaces${done < 2 ? ': put where that one was -- spots only if it looks off' : ''}`
+        ${same ? `<div class="dm-lme-stat dm-mup-same">${sameSize ? `✓ The same size as the ${borders ? 'borders' : 'region'} ${borders ? 'they replace' : 'it replaces'}${done < 2 ? `: put where ${borders ? 'those were' : 'that one was'} -- spots only if it looks off` : ''}`
           : `✓ The same framing as the map in use${done < 2 ? ': lined up by its edges -- spots only if it looks off' : ''}`}</div>` : ''}
         <div class="dm-mup-pairs">${pairs.map((p, i) => `<div class="dm-mup-pair"><span class="dm-mup-dot" style="background:${PAIR_COLOURS[i % PAIR_COLOURS.length]}"></span>
-          <span>${i + 1}. ${p.a ? '✓' : '…'} on the map in use · ${p.b ? '✓' : '…'} on the ${region ? 'region' : 'new one'}</span>
+          <span>${i + 1}. ${p.a ? '✓' : '…'} on the map in use · ${p.b ? '✓' : '…'} on the ${region ? noun : 'new one'}</span>
           <button class="dm-icon-btn danger" data-al="del" data-i="${i}" title="Take this pair off">✕</button></div>`).join('') || '<div class="dm-hint">No spots yet.</div>'}</div>
-        <div class="dm-lme-stat">${T ? `${done >= 2 ? `Lined up by ${done} pairs` : region ? 'Put where the one it replaces was' : 'Lined up by its edges'}${error ? ` -- they agree within about ${missKm < 1 ? missKm.toFixed(1) : Math.round(missKm)} km${missKm > 2 ? '. One of them may be off' : ''}` : ''}`
+        <div class="dm-lme-stat">${T ? `${done >= 2 ? `Lined up by ${done} pairs` : sameSize ? `Put where the ${borders ? 'ones they replace were' : 'one it replaces was'}` : 'Lined up by its edges'}${error ? ` -- they agree within about ${missKm < 1 ? missKm.toFixed(1) : Math.round(missKm)} km${missKm > 2 ? '. One of them may be off' : ''}` : ''}`
           : `${2 - done} more pair${2 - done === 1 ? '' : 's'} to line them up`}</div>
-        ${T ? `<div class="dm-hint">The ${region ? 'region' : 'new painting'} is ${s >= 1 ? `${s.toFixed(2)} × bigger` : `${(1 / s).toFixed(2)} × smaller`}, turned ${Math.round((Math.atan2(T[3], T[0]) * 180) / Math.PI)}°${region ? ` -- about ${Math.round((cur.kmPerPx * 1000) / s)} m a pixel (the map in use: ${Math.round(cur.kmPerPx * 1000)} m)` : ''}.</div>` : ''}
+        ${T ? `<div class="dm-hint">The ${noun} ${borders ? 'are' : 'is'} ${s >= 1 ? `${s.toFixed(2)} × bigger` : `${(1 / s).toFixed(2)} × smaller`}, turned ${Math.round((Math.atan2(T[3], T[0]) * 180) / Math.PI)}°${region && !borders ? ` -- about ${Math.round((cur.kmPerPx * 1000) / s)} m a pixel (the map in use: ${Math.round(cur.kmPerPx * 1000)} m)` : ''}.</div>` : ''}
         ${pairs.length ? '<button class="dm-btn small danger" data-al="clear">Clear the spots</button>' : ''}`;
       overlay.querySelector('[data-al="next"]').disabled = !T;
     }
@@ -470,17 +501,19 @@ export async function openRegionMaps({ locations, onChanged }) {
     overlay.dataset.screen = 'check';
     // A region: the map in use whole, the region laid on it (see-through as the slider says) -- a whole painting: the
     // map in use laid over it
-    let alpha = region ? 0.75 : 0.5;
-    let showLocs = true;
+    const borders = !!region?.borders;
+    let alpha = borders ? 1 : region ? 0.75 : 0.5;
+    let showLocs = !borders;
     overlay.innerHTML = `<div class="dm-lme-head"><h3>🗺 Does it line up?</h3><span class="dm-lme-spacer"></span>
-        <button class="dm-btn" data-ck="back">← The spots</button><button class="dm-btn primary" data-ck="next">${region ? 'Build the map with it →' : 'Build the 3D land →'}</button></div>
+        <button class="dm-btn" data-ck="back">← The spots</button><button class="dm-btn primary" data-ck="next">${borders ? 'Read the lines →' : region ? 'Build the map with it →' : 'Build the 3D land →'}</button></div>
       <div class="dm-lme-body">
         <aside class="dm-lme-tools">
-          <div class="dm-hint">${region ? 'The region, laid on the map in use the way the spots lined them up. Slide it to see through: its coast, roads and towns should sit on those of the map, and its edges meet the regions round it.'
+          <div class="dm-hint">${borders ? 'The borders, laid on the map in use the way they were lined up: each line should run where it divides the regions on the map.'
+            : region ? 'The region, laid on the map in use the way the spots lined them up. Slide it to see through: its coast, roads and towns should sit on those of the map, and its edges meet the regions round it.'
             : `The map in use, laid over the new painting the way the spots lined them up. Slide it to see through:
             the coasts, roads and towns should sit on each other where both maps have them.`}</div>
-          <label class="dm-field"><span>${region ? 'The region on top' : 'The map in use on top'}: <b id="ckPct">${Math.round(alpha * 100)} %</b></span><input type="range" id="ckAlpha" min="0" max="100" value="${Math.round(alpha * 100)}"></label>
-          <label class="dm-check"><input type="checkbox" id="ckLocs" checked><span>Show the locations <small>where they'll be on the new map</small></span></label>
+          <label class="dm-field"><span>${borders ? 'The borders' : region ? 'The region on top' : 'The map in use on top'}: <b id="ckPct">${Math.round(alpha * 100)} %</b></span><input type="range" id="ckAlpha" min="0" max="100" value="${Math.round(alpha * 100)}"></label>
+          <label class="dm-check"><input type="checkbox" id="ckLocs" ${showLocs ? 'checked' : ''}><span>Show the locations <small>where they'll be on the new map</small></span></label>
         </aside>
         <div class="dm-lme-stage" id="ckStage"></div>
       </div>`;
@@ -520,9 +553,94 @@ export async function openRegionMaps({ locations, onChanged }) {
       if (!b) return;
       overlay.onclick = null;
       if (b.dataset.ck === 'back') back();
+      else if (borders) readBorders({ up, oldShown, shownPer, cur, T, back: () => check({ up, oldShown, shownPer, cur, T, region, back }) });
       else if (region) buildRegions({ cur, add: { up, T, replaces: region.replaces, fileName: region.fileName }, back: () => check({ up, oldShown, shownPer, cur, T, region, back }) });
       else build({ up, cur, T, back: () => check({ up, oldShown, shownPer, cur, T, back }) });
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // The region borders: the picture read into lines and looked over, then kept with a new version of the map (the same
+  // painting and land -- nothing built again, nothing moves)
+  // ---------------------------------------------------------------------------
+
+  function readBorders({ up, oldShown, cur, T, back }) {
+    panes.forEach(p => p.destroy());
+    panes = [];
+    overlay.dataset.screen = 'build';
+    const toMap = invert(T);   // the picture's pixels -> the map's
+    let lines = null;
+    overlay.innerHTML = `<div class="dm-lme-head"><h3>✏️ The region borders</h3><span class="dm-lme-spacer"></span>
+        <button class="dm-btn" data-bd="back">← Check it</button><button class="dm-btn primary" data-bd="use" disabled>Use these borders</button></div>
+      <div class="dm-lme-body">
+        <aside class="dm-lme-tools">
+          <div class="dm-hint">The lines the 3D map will draw (red here, black on the map): each line of the picture followed along its middle.
+            Zoom in to look them over -- a line missing, or one too many, is mended in the picture and uploaded again.</div>
+          <div class="dm-lme-stat" id="bdStep">Reading the lines…</div>
+        </aside>
+        <div class="dm-lme-stage" id="bdStage"></div>
+      </div>`;
+    const step = (t) => { const el = overlay.querySelector('#bdStep'); if (el) el.textContent = t; };
+    const pane = makePane(overlay.querySelector('#bdStage'), {
+      W: cur.W, H: cur.H,
+      draw: (ctx, v) => {
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(oldShown, v.ox, v.oy, cur.W * v.s, cur.H * v.s);
+        if (!lines) return;
+        ctx.save();
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        lines.forEach(l => l.forEach(([x, y], i) => (i ? ctx.lineTo(v.ox + x * v.s, v.oy + y * v.s) : ctx.moveTo(v.ox + x * v.s, v.oy + y * v.s))));
+        ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)'; ctx.stroke();
+        ctx.lineWidth = 2; ctx.strokeStyle = '#e8173f'; ctx.stroke();
+        ctx.restore();
+      },
+    });
+    panes = [pane];
+    overlay.onclick = async (e) => {
+      const b = e.target.closest('[data-bd]');
+      if (!b) return;
+      if (b.dataset.bd === 'back') { overlay.onclick = null; back(); return; }
+      if (b.dataset.bd !== 'use' || !lines?.length) return;
+      b.disabled = true;
+      overlay.querySelector('[data-bd="back"]').disabled = true;
+      try {
+        step('Storing the picture on the Pi…');
+        const pic = canvasOf(up.width, up.height);
+        pic.getContext('2d').drawImage(up, 0, 0);
+        const file = await store(pic, 'image/png');
+        const at = new Date().toISOString();
+        step('Putting it in use…');
+        await switchTo({
+          ...cur, id: newId('map'), name: `Shima: borders ${cur.borderPicture ? 'drawn again' : 'drawn'}`, at,
+          borderPicture: { file, W: up.width, H: up.height, toMap, at }, borders: lines,
+        }, { addVersion: true });
+        toast('The borders are on the map');
+        overlay.onclick = null;
+        showList();
+      } catch (err) {
+        step(`Couldn't store them: ${err.message}`);
+        b.disabled = false;
+        overlay.querySelector('[data-bd="back"]').disabled = false;
+      }
+    };
+    // (a frame for the screen to show "Reading..." before the page is busy)
+    setTimeout(() => {
+      try {
+        lines = linesFromPicture(up, toMap);
+      } catch (err) {
+        step(`The lines couldn't be read: ${err.message}`);
+        return;
+      }
+      pane.redraw();
+      if (!lines.length) {
+        step('No lines found in the picture -- it reads dark lines on a see-through (or white) background.');
+        return;
+      }
+      step(`${lines.length} line${lines.length === 1 ? '' : 's'} read. Look them over, then use them.`);
+      overlay.querySelector('[data-bd="use"]').disabled = false;
+    }, 60);
   }
 
   // ---------------------------------------------------------------------------
@@ -698,7 +816,8 @@ export async function openRegionMaps({ locations, onChanged }) {
       wctx.drawImage(frame, 0, 0, W, H);
       bctx.drawImage(frame, 0, 0, SW, SH);
       frame.close?.();
-      const borders = traceBorders(W, H);   // (where the regions meet: the lines between them, region-borders.js)
+      // (where the regions meet: the lines between them, region-borders.js -- unless the DM drew the borders: those stay)
+      const borders = cur.borderPicture ? null : traceBorders(W, H);
       for (const [i, r] of regions.entries()) {
         if (cancelled) return;
         step(`Pasting the regions onto the map (${i + 1} of ${regions.length})…`);
@@ -709,7 +828,7 @@ export async function openRegionMaps({ locations, onChanged }) {
           c.drawImage(pic, 0, 0);
           c.setTransform(1, 0, 0, 1, 0, 0);
         }
-        borders.add(pic, r);
+        borders?.add(pic, r);
         if (r !== added) pic.close?.();
       }
       const rgba = wctx.getImageData(0, 0, W, H).data;
@@ -726,7 +845,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       paintTexture(painted.data, t);
       bctx.putImageData(painted, 0, 0);
       built = {
-        cur, frameUrl, regions, added, addUp: add?.up, t, work, big, water, borders: borders.finish(t.land),
+        cur, frameUrl, regions, added, addUp: add?.up, t, work, big, water, borders: borders ? borders.finish(t.land) : cur.borders,
         topo: canvasOf(t.SW, t.SH, new Uint8ClampedArray(t.topo.buffer)),
         height: canvasOf(W, H, new Uint8ClampedArray(t.height.buffer)),
         shade: canvasOf(t.SW, t.SH, shadePicture(t)),   // (the regions' paintings shaded with it up close -- region-detail.js)
@@ -773,6 +892,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       frame: { painting: b.frameUrl },
       regions: b.regions,
       borders: b.borders,
+      ...(cur.borderPicture ? { borderPicture: cur.borderPicture } : {}),
     };
     step('Putting it in use…');
     await switchTo(version, { addVersion: true });

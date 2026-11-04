@@ -1705,6 +1705,8 @@ button.dm-nav-fold:hover, .dm-world-fold:hover { color: var(--dm-gold); }
 .dm-mup-regions { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.8rem; border: 1px solid var(--dm-line); border-radius: 12px; background: var(--dm-panel); }
 .dm-mup-regions .dm-card-title { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .dm-mup-reglist { display: flex; flex-direction: column; gap: 0.35rem; }
+.dm-mup-bordertitle { margin-top: 0.6rem; padding-top: 0.7rem; border-top: 1px solid var(--dm-line); }
+.dm-mup-region img.dm-mup-borderpic { background: #f4ecd8; }   /* (the drawn borders: dark lines, on light) */
 .dm-mup-region { display: flex; align-items: center; gap: 0.6rem; padding: 0.3rem; border-radius: 8px; background: rgba(0, 0, 0, 0.18); }
 .dm-mup-region img { width: 56px; height: 56px; object-fit: contain; flex: none; background: #0c2240; border-radius: 6px; }
 .dm-mup-region > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }

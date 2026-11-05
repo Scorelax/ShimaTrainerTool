@@ -8,29 +8,26 @@
 // replaces, each copy still sized, turned and shaded its own way; more than one of a kind ("mapobject-tree-2.glb") are
 // mixed in. Only light ones (MAX_TRIANGLES) -- a heavier one is left out, the shape made here standing in.
 //
-// Thousands of them, so: a handful of low-poly shapes, each drawn as copies (InstancedMesh) in blocks of land (CHUNK),
-// so only the blocks on screen are drawn; and each object grows in from nothing as the camera comes close enough for it
-// to be a few pixels tall -- from far out the map looks as it did, and nothing flickers into place. Lit by the map's
-// own light from the north-west (region-map.js), shaded flat like a low-poly model.
+// A handful of low-poly shapes, each drawn as copies (InstancedMesh) in blocks of land (CHUNK), so only the blocks on
+// screen are drawn. They only show zoomed in (the user's call, 2026-11-05: 60 % of the way in, region-map.js
+// SWITCH_ZOOM): further out the painting is all there is, its trees already painted, and nothing's drawn for them. Each
+// grows in from nothing around that point, so nothing flickers into place. Lit by the map's own light from the
+// north-west (region-map.js), shaded flat like a low-poly model.
 //
 // findPlaces({ rgba (the painting, at the land's size), W, H, kind, metres }) -> where they stand, then
 // buildMapObjects({ land, placed, groundAt(x, y) (the land's surface there, world y), toWorld, models ({ kind: [{ file,
 // scene } loaded, in file order] }), treeAreas ({ at (Int16Array, per land pixel: the area it's in, -1 none), models:
 // per area [{ file, scene }] } -- the DM's tree areas, the user's call, 2026-11-04: the trees in one drawn with its own
 // models, snowy pines in the mountains, say) }) -> { group (into the
-// scene), update(camera, viewHeightPx), setClearings([{ x, y, r }]) (no objects there: the locations' icons and models),
+// scene), update(camera, showAt (how far away a copy's at its full size)), setClearings([{ x, y, r }]) (no objects there: the locations' icons and models),
 // dispose() }.
 import * as THREE from '../vendor/three/three.module.min.js';
 import { mergeGeometries } from '../vendor/three/BufferGeometryUtils.js';
-import { FIELDS, PEAK_SIZE } from './object-places.js';
+import { FIELDS } from './object-places.js';
 
 const CHUNK = 160;          // a block of land, in painting pixels: drawn or left out as one
-// How big each kind is, in world units (painting pixels, 120 m) -- as big as the painting's own trees, not real ones --
-// and how many screen pixels tall it has to be to show (`from`: starts growing in, `full`: full size).
-const CLASSES = {
-  small: { tall: 3.6, from: 2.5, full: 7 },   // trees and rocks
-  big: { tall: PEAK_SIZE, from: 4, full: 12 },   // peaks
-};
+// A copy starts growing in this many times further away than it's at its full size
+export const GROWS_FROM = 1.2;
 
 // Which of the DM's models stands in for each shape -- the first kind there is (a kind without a model: none)
 export const MODEL_KINDS = {
@@ -130,7 +127,7 @@ function peakShape() {
   ]);
 }
 
-/** The material the copies of one class share: flat-shaded and lit, each copy grown in by its distance from the camera
+/** The material the shapes made here share: flat-shaded and lit, each copy grown in by its distance from the camera
  * (`range`: { near (full size closer than this), far (nothing further than this) }, set in update). */
 function material(range) {
   return growIn(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), range);
@@ -226,10 +223,10 @@ export function findPlaces(input) {
 export function buildMapObjects({ land, placed, groundAt, toWorld, models = {}, treeAreas = null }) {
   const { W, H } = land;
 
-  // The shapes, their class, and the materials (one per class: its own grow-in distances) -- or the DM's models in
-  // their place: shapes[key] = { cls, parts: [{ geo, mat }] }, a shape's keys in variants[shape] (a model each)
-  const ranges = Object.fromEntries(Object.keys(CLASSES).map(k => [k, { near: { value: 1e9 }, far: { value: 2e9 } }]));
-  const mats = Object.fromEntries(Object.keys(CLASSES).map(k => [k, material(ranges[k])]));
+  // The shapes, their class (MAX_TRIANGLES) and their material -- or the DM's models in their place: shapes[key] = { cls,
+  // parts: [{ geo, mat }] }, a shape's keys in variants[shape] (a model each)
+  const range = { near: { value: 1e9 }, far: { value: 2e9 } };
+  const mat = material(range);
   const made = {
     pine: ['small', pineShape()],
     leafy: ['small', leafyShape()],
@@ -242,7 +239,7 @@ export function buildMapObjects({ land, placed, groundAt, toWorld, models = {}, 
   const warned = new Set();
   /** `list`'s models fitted into a shape's box -> [parts] (the ones too heavy or empty left out). */
   const fit = (list, target, cls) => list.map(({ file, scene }) => {
-    const r = modelParts(scene, target, ranges[cls], MAX_TRIANGLES[cls]);
+    const r = modelParts(scene, target, range, MAX_TRIANGLES[cls]);
     if (!r.parts && !warned.has(file)) {
       warned.add(file);
       console.warn(r.triangles > MAX_TRIANGLES[cls]
@@ -270,7 +267,7 @@ export function buildMapObjects({ land, placed, groundAt, toWorld, models = {}, 
     } else if (MODEL_ONLY.has(name)) {
       geo.dispose(); // (only its size was needed: what a model's fitted into)
     } else {
-      shapes[name] = { cls, parts: [{ geo, mat: mats[cls] }] };
+      shapes[name] = { cls, parts: [{ geo, mat }] };
       variants[name] = [name];
     }
   }
@@ -326,7 +323,6 @@ export function buildMapObjects({ land, placed, groundAt, toWorld, models = {}, 
       const s = shapes[key];
       c.meshes[key] = s.parts.map((p) => {
         const mesh = new THREE.InstancedMesh(p.geo, p.mat, items.length);
-        mesh.userData.cls = s.cls;
         mesh.matrixAutoUpdate = false;
         fill(mesh, items);
         group.add(mesh);
@@ -337,14 +333,11 @@ export function buildMapObjects({ land, placed, groundAt, toWorld, models = {}, 
   }
   group.userData.count = count;
 
-  /** The grow-in distances for this camera and screen, and the blocks too far away to show anything left out. */
-  function update(camera, viewHeightPx) {
-    const perUnit = viewHeightPx / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));   // pixels x distance, per unit
-    const far = {};
-    for (const [k, cl] of Object.entries(CLASSES)) {
-      ranges[k].near.value = (cl.tall * perUnit) / cl.full;
-      ranges[k].far.value = far[k] = (cl.tall * perUnit) / cl.from;
-    }
+  /** The grow-in distances (`showAt`: full size closer than this), and the blocks too far away to show anything left out. */
+  function update(camera, showAt) {
+    const far = showAt * GROWS_FROM;
+    range.near.value = showAt;
+    range.far.value = far;
     const cam = camera.position;
     for (const c of chunks.values()) {
       // the camera's distance from the block (its box, from the sea up to the highest land)
@@ -353,7 +346,7 @@ export function buildMapObjects({ land, placed, groundAt, toWorld, models = {}, 
       const dz = Math.max(z0 - cam.z, 0, cam.z - (z0 + CHUNK));
       const dy = Math.max(0, cam.y - land.topY);
       const d = Math.hypot(dx, dy, dz);
-      for (const list of Object.values(c.meshes)) for (const mesh of list) mesh.visible = mesh.count > 0 && d < far[mesh.userData.cls];
+      for (const list of Object.values(c.meshes)) for (const mesh of list) mesh.visible = mesh.count > 0 && d < far;
     }
   }
 
@@ -367,7 +360,7 @@ export function buildMapObjects({ land, placed, groundAt, toWorld, models = {}, 
 
   function dispose() {
     Object.values(shapes).forEach(s => s.parts.forEach((p) => { p.geo.dispose(); p.mat.dispose(); }));
-    Object.values(mats).forEach(m => m.dispose());
+    mat.dispose();
     group.children.forEach(m => m.dispose());
   }
 

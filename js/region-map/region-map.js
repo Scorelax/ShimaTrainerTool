@@ -22,9 +22,9 @@
 // has it lying flat on its mark, its top to the north, laid over the land's shape like the painting itself (the user's
 // call, 2026-11-05: it stood facing south, leaning back with the map's tilt, before), as long as the DM set in km -- so it
 // grows and shrinks with the land as the map zooms, and keeps to scale with the others. A location with a 3D model as well (the user's call, 2026-10-25: a .glb
-// beside its picture on the Pi, "City-Astria.glb" by "City-Astria.png") has the model standing there instead -- the
-// picture stays the fallback, shown while the model loads and wherever there's none.
-// Trees, rocks and peaks stand on the land, made in code (map-objects.js; not without the graphics card).
+// beside its picture on the Pi, "City-Astria.glb" by "City-Astria.png") has the model standing there instead once zoomed
+// in (SWITCH_ZOOM) -- the picture is what shows further out, while the model loads, and wherever there's none.
+// Trees, rocks and peaks stand on the land once zoomed in as well (map-objects.js; not without the graphics card).
 // A map painted region by region (js/dm/map-upload.js) shows each region's own painting up close in the Painted style
 // (region-detail.js: loaded only once zoomed in on it; not without the graphics card), and a thin black line between
 // the regions in either style (region-borders.js).
@@ -38,7 +38,7 @@ import { addLandDetail } from './land-detail.js';
 import { addRegionDetail } from './region-detail.js';
 import { addRegionBorders } from './region-borders.js';
 import { addSea, seaInfoTexture, LONGEST_WAVE, FADE } from './sea.js';
-import { buildMapObjects, findPlaces, MODEL_KINDS } from './map-objects.js';
+import { buildMapObjects, findPlaces, GROWS_FROM, MODEL_KINDS } from './map-objects.js';
 import { DmAPI } from '../api.js';
 
 const BASE = 'assets/region-map/';
@@ -49,9 +49,13 @@ const BLOCK = 60;            // how deep the block of land goes under the sea
 const PIN_POLAR = 0.5;       // how far from straight down a flight to a town looks (radians)
 const STYLES = { topo: 'topo', painted: 'painted' };   // ...the map's files
 const STYLE_KEY = 'rmapStyle';
-// The DM's .glb models on the map -- the locations' and the trees', rocks' and summits' (and so the tree areas): off for
-// now (the user's call, 2026-11-05: the map ran too slowly on a tablet). The pictures and the trees made in code stay.
-const USE_MODELS = false;
+// The DM's .glb models on the map -- the locations' and the trees', rocks' and summits' (and so the tree areas). False:
+// none are loaded, the pictures and the trees made in code stay.
+const USE_MODELS = true;
+// How far in the 3D objects take over from the painting (the user's call, 2026-11-05: they ran too slowly on a tablet
+// shown at any zoom): the share of the way from the whole island to as close as the camera goes. Further out there's
+// only the painting and the locations' pictures, and nothing of the objects is even loaded until the first time here.
+const SWITCH_ZOOM = 0.6;
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
@@ -240,6 +244,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const models = [];        // the locations' 3D models standing on the land (in place of their icons' pictures)
   const modelScenes = {};   // the models, by URL (a promise each: the loaded scene, or why not)
   let objects = null;       // the trees, rocks and peaks (map-objects.js), once made
+  let objectsAsked = false; // ...their making started (the first time zoomed in)
   let details = null;       // the regions' own paintings up close (region-detail.js), on a map made of regions
   let borders = null;       // ...and the lines between them (region-borders.js)
 
@@ -603,7 +608,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       const sp = new THREE.Mesh(iconPlane, iconMaterial({ value: Math.max(1.5, tall * 0.06) }));
       // its middle on the spot, the pin in the middle of the picture (the user's call, 2026-10-20) -- the name goes under
       // the picture (placeLabels: userData)
-      sp.userData = { locId: l.id, tall };
+      sp.userData = { locId: l.id, tall, url: ic.url, ix, iy };
       sp.renderOrder = 2;
       sp.visible = false;
       sp.position.copy(toWorld(ix, iy, 0)).setY(groundAt(ix, iy));
@@ -614,14 +619,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         sp.material.map = tex;
         sp.material.needsUpdate = true;
         flatIcon(sp, ix, iy, (tall * tex.image.width) / Math.max(1, tex.image.height), tall);
-        sp.visible = !sp.userData.model; // (its model came first: that stands there)
-        dirty = true;
+        sp.userData.ready = true;
+        dirty = true; // (shown from the next draw: showObjects)
         wake();
-      }).catch(() => {});
-      // its model, when there's one beside the picture: standing there in its place
-      modelScene(ic.url).then((src) => {
-        if (!icons.includes(sp)) return;
-        standModel(sp, src, ix, iy);
       }).catch(() => {});
     });
     clearObjects();
@@ -667,7 +667,6 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     scene.add(model);
     models.push(model);
     sp.userData.model = model;
-    sp.visible = false;
     clearObjects();
     dirty = true;
     wake();
@@ -677,13 +676,13 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function clearObjects() {
     objects?.setClearings(icons.map((sp) => {
       const p = sp.position;
-      const reach = sp.userData.model ? sp.userData.model.userData.reach + 1 : (sp.userData.reach || sp.userData.tall * 0.5);
+      const reach = Math.max(sp.userData.model ? sp.userData.model.userData.reach + 1 : 0, sp.userData.reach || sp.userData.tall * 0.5);
       return { x: Math.round(p.x + land.W / 2), y: Math.round(p.z + land.H / 2), r: Math.round(reach) };
     }));
   }
 
-  /** The trees, rocks and peaks (map-objects.js), read from the painting once the map's showing: off while the map's
-   * drawn coarse (a slow device keeping up while it moves), and never without the graphics card. */
+  /** The trees, rocks and peaks (map-objects.js), read from the painting the first time the map's zoomed in: off while
+   * the map's drawn coarse (a slow device keeping up while it moves), and never without the graphics card. */
   async function buildObjects() {
     if (gpu.software || objects || destroyed) return;
     const res = await fetch(version.files.painting);
@@ -766,13 +765,40 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const onVisible = () => { if (!document.hidden) wake(); };
   document.addEventListener('visibilitychange', onVisible);
 
-  /** Draws the map as the camera has it now (the objects grown in by their distance from it first). */
+  /** The 3D objects or the painting, by how far in the map's zoomed (SWITCH_ZOOM): the trees, rocks and peaks are made
+   * the first time they'd show, and a location's model is loaded once it's on or near the screen there -- until it's
+   * come, and further out, its flat picture lies there instead. */
+  function showObjects() {
+    if (!land?.fit) return;
+    const showAt = land.fit - SWITCH_ZOOM * (land.fit - controls.minDistance);
+    const dist = camera.position.distanceTo(controls.target);
+    const { coarse } = LEVELS[drawnLevel];
+    if (!objectsAsked && dist < showAt * GROWS_FROM) {
+      objectsAsked = true;
+      buildObjects().catch(() => {});
+    }
+    if (objects) {
+      objects.group.visible = !coarse;
+      objects.update(camera, showAt);
+    }
+    const close = dist < showAt && !coarse && !gpu.software;
+    for (const sp of icons) {
+      const u = sp.userData;
+      if (close && !u.modelAsked && sp.position.distanceTo(controls.target) < dist) {
+        u.modelAsked = true;
+        modelScene(u.url).then((src) => {
+          if (icons.includes(sp)) standModel(sp, src, u.ix, u.iy);
+        }).catch(() => {});
+      }
+      if (u.model) u.model.visible = close;
+      sp.visible = !!u.ready && !(close && u.model);
+    }
+  }
+
+  /** Draws the map as the camera has it now. */
   function render() {
     if (seaMoves()) seaTime.value = performance.now() / 1000;
-    if (objects) {
-      objects.group.visible = !LEVELS[drawnLevel].coarse;
-      objects.update(camera, canvas.clientHeight || 600);
-    }
+    showObjects();
     renderer.render(scene, camera);
   }
 
@@ -866,6 +892,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     });
     // a model: how far its box reaches down the screen from its foot
     models.forEach((m) => {
+      if (!m.visible) return;
       const mid = v.copy(m.position).project(camera).y;
       const { min, max } = m.userData.box;
       let low = 0;
@@ -1314,7 +1341,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       const r = canvas.getBoundingClientRect();
       tap.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(tap, camera);
-      const hit = ray.intersectObjects([...icons.filter(sp => sp.visible), ...models], true)[0];
+      const hit = ray.intersectObjects([...icons.filter(sp => sp.visible), ...models.filter(m => m.visible)], true)[0];
       let o = hit?.object;
       while (o && !o.userData.locId) o = o.parent; // (a model's part: its location is on the model)
       if (o) pickLocation(o.userData.locId);
@@ -1368,8 +1395,6 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     dirty = true;
     wake();
     $('.rmap-loading').remove();
-    // the objects after the map's first shown (reading the painting takes a moment)
-    setTimeout(() => buildObjects().catch(() => {}), 50);
   }
 
   function destroy() {

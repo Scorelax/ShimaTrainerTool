@@ -1,7 +1,8 @@
 // Where the region map's objects stand (map-objects.js draws them; the user's call, 2026-10-25), read from the painting's
-// colours (map-features.js readColours, the same reading the land was built from): pines and a few leafy trees where the
-// forests are painted, the odd lone tree on the fields, rocks on the painted rock up in the hills, rocks in the shallow
-// sea along the coast (the user's call, 2026-10-26), and a spire on each of the highest summits. Sizes, turns and shades vary from copy to copy, the same on every screen (a fixed seed).
+// colours (map-features.js readColours, the same reading the land was built from): one tree where each tree is painted
+// (the user's call, 2026-11-05: some 900 as big as the painted ones, not 23,000 small ones filling the forests), rocks on
+// the painted rock up in the hills, rocks in the shallow sea along the coast (the user's call, 2026-10-26), and a spire on
+// each of the highest summits. Sizes, turns and shades vary from copy to copy, the same on every screen (a fixed seed).
 //
 // Pure maths on pixel arrays (no DOM, no three.js), so it runs in a worker (object-worker.js) -- it takes a moment, and
 // the map shouldn't stop answering meanwhile.
@@ -13,8 +14,13 @@ import { readColours, boxMean } from './map-features.js';
 
 export const SHAPES = ['pine', 'leafy', 'rock', 'searock', 'peak'];
 export const FIELDS = 7;
-export const PEAK_SIZE = 16;  // a peak's height at scale 1 (map-objects.js CLASSES.big)
+const PEAK_SIZE = 16;  // a peak's height at scale 1
 const SEED = 20261025;
+// The painted trees (in painting pixels at the land's size): each some 12 tall and 9 wide, its crown about 4 above its foot
+const TREE_REACH = 4;   // a tree is the thickest spot of forest within this
+const TREE_THICK = 100; // ...at least this much forest round it (of 255), or it's only a speck
+const TREE_SIZE = 3.4;  // a tree's scale: a shape made to be 3.6 tall (map-objects.js) as tall as the painted ones
+const TREE_FOOT = 4;
 
 /** A seeded random number generator (mulberry32): the same objects in the same places on every screen. */
 function seeded(seed) {
@@ -31,15 +37,8 @@ function seeded(seed) {
 export function placeObjects({ rgba, W, H, kind, metres }) {
   const rand = seeded(SEED);
   const colours = readColours(rgba, W, H);
-  const forest = boxMean(colours.forest, W, H, 2);
+  const forest = boxMean(colours.forest, W, H, TREE_REACH);
   const rock = boxMean(colours.rock, W, H, 3);
-  const grass = new Uint8Array(W * H);
-  for (let i = 0; i < W * H; i++) {
-    const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
-    // the painting's light green fields: green the strongest, bright
-    grass[i] = g > r && g > b + 40 && g > 110 && !colours.forest[i] ? 1 : 0;
-  }
-  const grassy = boxMean(grass, W, H, 4);
   let top = 0;
   for (let i = 0; i < W * H; i++) if (kind[i] === 1 && metres[i] > top) top = metres[i];
   // where nothing stands: off the land (the sea, a lake, a river), on a road, a town's roofs and walls, a name's box
@@ -52,26 +51,30 @@ export function placeObjects({ rgba, W, H, kind, metres }) {
   const tint = (lo, hi) => lo + rand() * (hi - lo);
   const add = (shape, x, y, size, tall, shade) => out.push(SHAPES.indexOf(shape), x, y, rand() * Math.PI * 2, size, tall, shade);
 
-  // Trees: one every ~3 pixels where the painting's forest is thick (its edges thinning out), most of them pines
-  const S = 2.9;
-  for (let gy = 0; gy < H / S; gy++) {
-    for (let gx = 0; gx < W / S; gx++) {
-      const x = (gx + rand()) * S, y = (gy + rand()) * S;
-      if (x >= W - 1 || y >= H - 1 || !free(x, y)) continue;
-      const i = Math.round(y) * W + Math.round(x);
-      if (rand() < Math.min(1, (forest[i] / 255) * 1.7)) { // (the painted trees have light gaps between them: thick still reads as thick)
-        add(rand() < 0.8 ? 'pine' : 'leafy', x, y, tint(0.8, 1.25), tint(0.9, 1.15), tint(0.82, 1.1));
-      } else if (rand() < (grassy[i] / 255) * 0.012) {
-        add('leafy', x, y, tint(0.85, 1.2), tint(0.9, 1.1), tint(0.9, 1.12)); // a lone tree on the fields
+  // Trees: one on each painted tree -- a painted crown is the thickest spot of forest around it -- most of them pines,
+  // standing on the painted tree's foot (or on the crown, if that's in the water or on a border)
+  const R = TREE_REACH;
+  for (let y = R; y < H - R - TREE_FOOT; y++) {
+    for (let x = R; x < W - R; x++) {
+      const i = y * W + x, v = forest[i];
+      if (v < TREE_THICK || !free(x, y)) continue;
+      let thickest = true;
+      for (let dy = -R; dy <= R && thickest; dy++) {
+        for (let dx = -R; dx <= R; dx++) {
+          const o = forest[i + dy * W + dx];
+          if (o > v || (o === v && (dy < 0 || (dy === 0 && dx < 0)))) { thickest = false; break; } // (of equals, the first)
+        }
       }
+      if (!thickest) continue;
+      add(rand() < 0.8 ? 'pine' : 'leafy', x, free(x, y + TREE_FOOT) ? y + TREE_FOOT : y, TREE_SIZE * tint(0.85, 1.15), tint(0.9, 1.15), tint(0.82, 1.1));
     }
   }
   // Rocks: scattered over the painted rock up in the hills (lower down, the brown is paths and bare earth), never on the snow
   const hills = 0.12 * top;
-  const R = 7;
-  for (let gy = 0; gy < H / R; gy++) {
-    for (let gx = 0; gx < W / R; gx++) {
-      const x = (gx + rand()) * R, y = (gy + rand()) * R;
+  const RS = 7;
+  for (let gy = 0; gy < H / RS; gy++) {
+    for (let gx = 0; gx < W / RS; gx++) {
+      const x = (gx + rand()) * RS, y = (gy + rand()) * RS;
       if (x >= W - 1 || y >= H - 1 || !free(x, y)) continue;
       const i = Math.round(y) * W + Math.round(x);
       if (colours.snow[i] || metres[i] < hills || rand() > (rock[i] / 255) * 0.3) continue;

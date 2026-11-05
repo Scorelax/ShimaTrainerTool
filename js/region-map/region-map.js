@@ -56,6 +56,9 @@ const USE_MODELS = true;
 // shown at any zoom): the share of the way from the whole island to as close as the camera goes. Further out there's
 // only the painting and the locations' pictures, and nothing of the objects is even loaded until the first time here.
 const SWITCH_ZOOM = 0.6;
+// How far the map tilts (radians from straight down) as it's zoomed in, reached by that point (the user's call,
+// 2026-11-05: the objects only read as trees from the side -- from straight above they're dark blobs)
+const ZOOM_TILT = 0.8;
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
@@ -228,6 +231,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   let seaInfo = null;             // ...and how far its water is from the coast (a texture)
   let flight = null;
   let follow = null;        // view only: the camera easing towards the last view it was sent
+  let tiltDist = null;      // the camera's distance the tilt was last worked out for (tiltWithZoom)
   let lastView = null;      // ... and that view, put back when the screen changes size
   let lastTick = 0;
   let frame = 0;
@@ -765,12 +769,41 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const onVisible = () => { if (!document.hidden) wake(); };
   document.addEventListener('visibilitychange', onVisible);
 
+  /** How close the camera is when the 3D objects take over from the painting (SWITCH_ZOOM). */
+  function objectsAt() {
+    return land.fit - SWITCH_ZOOM * (land.fit - controls.minDistance);
+  }
+
+  /** The tilt that goes with a distance: none from the whole island out, ZOOM_TILT from where the objects show in. */
+  function tiltFor(dist) {
+    return ZOOM_TILT * (1 - THREE.MathUtils.smoothstep(dist, objectsAt(), land.fit));
+  }
+
+  /** Zoomed by hand: tilted along with it. A view (a flight, the DM's) has its own tilt and isn't touched (placeCamera).
+   * More tilted than the zoom would make it, the map's left as it was; less (flattened by hand), it moves by as much as
+   * the zoom's tilt does, so it never jumps. -> whether it tilted. */
+  function tiltWithZoom() {
+    if (!land?.fit) return false;
+    const dist = camera.position.distanceTo(controls.target);
+    if (tiltDist === null) tiltDist = dist;
+    if (Math.abs(dist - tiltDist) < 0.01) return false;
+    const was = tiltFor(tiltDist), polar = controls.getPolarAngle();
+    tiltDist = dist;
+    const change = tiltFor(dist) - was;
+    if (!change || polar > was + 0.002) return false;
+    // (a hair off straight down: see home)
+    camera.position.copy(viewFrom(controls.target, dist, Math.max(0.001, Math.min(controls.maxPolarAngle, polar + change)), controls.getAzimuthalAngle()));
+    camera.lookAt(controls.target);
+    controls.update();
+    return true;
+  }
+
   /** The 3D objects or the painting, by how far in the map's zoomed (SWITCH_ZOOM): the trees, rocks and peaks are made
    * the first time they'd show, and a location's model is loaded once it's on or near the screen there -- until it's
    * come, and further out, its flat picture lies there instead. */
   function showObjects() {
     if (!land?.fit) return;
-    const showAt = land.fit - SWITCH_ZOOM * (land.fit - controls.minDistance);
+    const showAt = objectsAt();
     const dist = camera.position.distanceTo(controls.target);
     const { coarse } = LEVELS[drawnLevel];
     if (!objectsAsked && dist < showAt * GROWS_FROM) {
@@ -1063,6 +1096,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     controls.target.copy(target);
     camera.position.copy(viewFrom(target, dist, polar, azimuth));
     camera.lookAt(target);
+    tiltDist = dist;
   }
 
   /** Shows `view` -- at once, or (`smooth`) easing there from where the camera is, so a stream of views sent a few
@@ -1167,6 +1201,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     lastTick = now;
     if (controls.update()) moved = true;
     if (controlsMoved) { moved = true; controlsMoved = false; }
+    if (tiltWithZoom()) moved = true;
     clampTarget();
     if ((moved || dirty) && !root.clientWidth) {
       dirty = true; // put away (the board screen during a battle): drawn when it's back (the resize wakes it)

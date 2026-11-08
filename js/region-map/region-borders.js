@@ -9,7 +9,9 @@
 // coast; a region's edge out at sea has none.
 // Since 2026-11-04 (the user's call: those also ran round a region's coast, messy) the DM can draw the borders himself,
 // a picture of only the lines (linesFromPicture, below) -- those are the map's lines from then on, and a region added
-// after keeps them; the traced ones are only for a map without.
+// after keeps them; the traced ones are only for a map without. Since 2026-11-08 the drawn ones are also painted into
+// the map's pictures as it's built (paintBorders): a region pasted over the painting's own lines covered them, and the
+// thin line below was all that was left there.
 //
 // The 3D map lays them on the land (addRegionBorders) -- the same width on the screen at any zoom, sharp up close, hidden
 // behind a mountain like the land itself, and left out over the sea.
@@ -332,6 +334,40 @@ export function linesFromPicture(picture, toMap) {
       .map(([x, y]) => [x / s, y / s])
       .map(([x, y]) => [Math.round((a * x + b * y + c) * 100) / 100, Math.round((d * x + e * y + f) * 100) / 100]);
   }).filter(line => line.length > 1);
+}
+
+/**
+ * paintBorders(target, lines, { scale, width, colour, land, W, H }): the DM's drawn borders painted into one of the map's
+ * pictures as it's built (the user's call, 2026-11-08: a region pasted over the painting's own lines left only the thin
+ * 3D line there -- painted, they're in the painting, its export and the painted and topographic pictures like the
+ * painting's own). `target` a canvas `scale` times the map's W x H pixels; `width` in the map's pixels; `land` (W x H, 1
+ * on land) keeps them off the sea, as the painted ones are.
+ */
+export function paintBorders(target, lines, { scale = 1, width = 4, colour = '#000', land = null, W = 0, H = 0 } = {}) {
+  if (!lines?.length) return;
+  const layer = canvasOf(target.width, target.height);
+  const c = layer.getContext('2d');
+  c.setTransform(scale, 0, 0, scale, 0, 0);
+  c.lineJoin = 'round';
+  c.lineCap = 'round';
+  c.lineWidth = width;
+  c.strokeStyle = colour;
+  c.beginPath();
+  lines.forEach(l => l.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))));
+  c.stroke();
+  if (land && W && H) {
+    const mask = canvasOf(W, H);
+    const mc = mask.getContext('2d');
+    const img = mc.createImageData(W, H);
+    for (let i = 0; i < W * H; i++) img.data[i * 4 + 3] = land[i] ? 255 : 0;
+    mc.putImageData(img, 0, 0);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = 'destination-in';
+    c.imageSmoothingEnabled = true;
+    c.imageSmoothingQuality = 'high';
+    c.drawImage(mask, 0, 0, target.width, target.height);
+  }
+  target.getContext('2d').drawImage(layer, 0, 0);
 }
 
 const VERTEX = /* glsl */ `

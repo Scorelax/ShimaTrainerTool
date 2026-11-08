@@ -16,6 +16,9 @@
 // The region borders (the user's call, 2026-11-04): a picture of only the lines, drawn by hand over the whole map, lined
 // up the same way (by the map's edges when it's framed like it), read into lines and kept with a new version of the map
 // -- and with every region added after (readBorders). Without one, the lines are traced from where the regions end.
+// Since 2026-11-08 (the user's call: a region pasted over the painting's own lines left only the thin 3D line there) the
+// drawn lines are also painted into the map every time it's built -- the painting (so its export), the painted and the
+// topographic pictures -- black and as wide as the painting's own; new borders build the map again, so the old ones go.
 import { DmAPI } from '../api.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, newId, toast } from './dm-common.js';
@@ -24,7 +27,7 @@ import {
   FIRST_ID, allMaps, currentMap, loadMapState, between, compose, invert, apply, scaleOf, transformShape, transformIcon, fitSimilarity,
 } from '../region-map/map-version.js';
 import { SEA_OFFSET, paintTexture, shadePicture } from '../region-map/make-terrain.js';
-import { traceBorders, linesFromPicture } from '../region-map/region-borders.js';
+import { traceBorders, linesFromPicture, paintBorders } from '../region-map/region-borders.js';
 
 const KM_PER_PX = 0.12;     // a new painting is worked on at the first one's detail: 120 m a pixel...
 const MAX_SIDE = 2048;      // ...unless that's bigger than this (its 3D pictures are twice the size: 4096, what every
@@ -39,6 +42,10 @@ const REGION_QUALITY = 0.92;
 // The region borders drawn by hand (the user's call, 2026-11-04): a picture of only the lines, over the whole map --
 // read into lines once (region-borders.js linesFromPicture), kept on the Pi as a PNG
 const BORDERS_MAX_SIDE = 8192;
+// ...painted into the map as it's built: as wide as the painting's own lines (about 4 of the map's pixels, measured on
+// Shima's, 2026-11-08), black -- in the topographic picture the colour its own lines get there (make-terrain.js)
+const BORDER_WIDTH = 4;
+const BORDER_TOPO_COLOUR = 'rgba(22, 20, 18, 0.85)';
 
 /** How fine a region's painting is, in words: metres a pixel. */
 const regionDetail = (r, map) => `about ${Math.round((map.kmPerPx * 1000) / scaleOf(r.toMap))} m a pixel`;
@@ -247,7 +254,8 @@ export async function openRegionMaps({ locations, onChanged }) {
           <button class="dm-btn small primary" data-mup="borders-add">${inUse.borderPicture ? '↺ Replace the borders' : '⬆ Upload the borders'}</button></div>
         <div class="dm-hint">The black lines between the regions, drawn by hand: ⬇ export the map (above), draw the borders over it on a
           layer of their own, and save only that layer -- dark lines, the rest see-through -- as a PNG. The same size as the map, it's
-          lined up by itself. The lines stay with every region added after; upload them again when a border changes.${inUse.borderPicture ? ''
+          lined up by itself. They're painted into the map, over the regions, every time it's built -- with every region added after
+          too; upload them again when a border changes.${inUse.borderPicture ? ''
             : ' Until then the lines are worked out from where the regions end.'}</div>
         ${inUse.borderPicture ? `<div class="dm-mup-region">
             <img class="dm-mup-borderpic" src="${escapeHtml(inUse.borderPicture.file)}" alt="" loading="lazy">
@@ -571,11 +579,12 @@ export async function openRegionMaps({ locations, onChanged }) {
     const toMap = invert(T);   // the picture's pixels -> the map's
     let lines = null;
     overlay.innerHTML = `<div class="dm-lme-head"><h3>✏️ The region borders</h3><span class="dm-lme-spacer"></span>
-        <button class="dm-btn" data-bd="back">← Check it</button><button class="dm-btn primary" data-bd="use" disabled>Use these borders</button></div>
+        <button class="dm-btn" data-bd="back">← Check it</button><button class="dm-btn primary" data-bd="use" disabled>Build the map with them →</button></div>
       <div class="dm-lme-body">
         <aside class="dm-lme-tools">
-          <div class="dm-hint">The lines the 3D map will draw (red here, black on the map): each line of the picture followed along its middle.
-            Zoom in to look them over -- a line missing, or one too many, is mended in the picture and uploaded again.</div>
+          <div class="dm-hint">The borders as they'll be painted on the map (red here, black on the map): each line of the picture followed along
+            its middle. Zoom in to look them over -- a line missing, or one too many, is mended in the picture and uploaded again. Next the
+            map is built again with them painted in, in place of the borders before.</div>
           <div class="dm-lme-stat" id="bdStep">Reading the lines…</div>
         </aside>
         <div class="dm-lme-stage" id="bdStage"></div>
@@ -603,27 +612,9 @@ export async function openRegionMaps({ locations, onChanged }) {
       if (!b) return;
       if (b.dataset.bd === 'back') { overlay.onclick = null; back(); return; }
       if (b.dataset.bd !== 'use' || !lines?.length) return;
-      b.disabled = true;
-      overlay.querySelector('[data-bd="back"]').disabled = true;
-      try {
-        step('Storing the picture on the Pi…');
-        const pic = canvasOf(up.width, up.height);
-        pic.getContext('2d').drawImage(up, 0, 0);
-        const file = await store(pic, 'image/png');
-        const at = new Date().toISOString();
-        step('Putting it in use…');
-        await switchTo({
-          ...cur, id: newId('map'), name: `Shima: borders ${cur.borderPicture ? 'drawn again' : 'drawn'}`, at,
-          borderPicture: { file, W: up.width, H: up.height, toMap, at }, borders: lines,
-        }, { addVersion: true });
-        toast('The borders are on the map');
-        overlay.onclick = null;
-        showList();
-      } catch (err) {
-        step(`Couldn't store them: ${err.message}`);
-        b.disabled = false;
-        overlay.querySelector('[data-bd="back"]').disabled = false;
-      }
+      // (the map built again from its frame and regions, these painted in -- the picture's stored as it's used)
+      overlay.onclick = null;
+      buildRegions({ cur, newBorders: { up, toMap, lines }, back: () => readBorders({ up, oldShown, cur, T, back }) });
     };
     // (a frame for the screen to show "Reading..." before the page is busy)
     setTimeout(() => {
@@ -755,7 +746,7 @@ export async function openRegionMaps({ locations, onChanged }) {
   // one it replaces), `remove` one less. The same size, the same place on the first map: nothing marked on it moves.
   // ---------------------------------------------------------------------------
 
-  function buildRegions({ cur, add = null, remove = null, back }) {
+  function buildRegions({ cur, add = null, remove = null, newBorders = null, back }) {
     panes.forEach(p => p.destroy());
     panes = [];
     overlay.dataset.screen = 'build';
@@ -767,13 +758,15 @@ export async function openRegionMaps({ locations, onChanged }) {
     };
     const regions = (cur.regions || []).filter(r => r.id !== remove?.id).map(r => (r.id === added?.id ? added : r));
     if (added && !add.replaces) regions.push(added);
+    // the DM's drawn borders (new ones, or the map's own), painted in once the land's read
+    const drawn = newBorders ? newBorders.lines : cur.borderPicture ? cur.borders || [] : null;
     const guess = (add?.fileName || '').replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' ').trim();
-    overlay.innerHTML = `<div class="dm-lme-head"><h3>🧩 ${remove ? `The map without "${escapeHtml(remove.name)}"` : 'The map with the region'}</h3><span class="dm-lme-spacer"></span>
-        <button class="dm-btn" data-bd="back">← ${add ? 'Check it' : 'Back'}</button><button class="dm-btn primary" data-bd="use" disabled>Use this map</button></div>
+    overlay.innerHTML = `<div class="dm-lme-head"><h3>🧩 ${remove ? `The map without "${escapeHtml(remove.name)}"` : newBorders ? 'The map with the borders' : 'The map with the region'}</h3><span class="dm-lme-spacer"></span>
+        <button class="dm-btn" data-bd="back">← ${add ? 'Check it' : newBorders ? 'The lines' : 'Back'}</button><button class="dm-btn primary" data-bd="use" disabled>Use this map</button></div>
       <div class="dm-mup-build">
         ${added ? `<label class="dm-field"><span>The region's name</span><input class="dm-input" id="bdRegion" value="${escapeHtml(added.name || guess)}" maxlength="60" placeholder="e.g. Inex Woods"></label>` : ''}
         <div class="dm-hint">${regions.length} region${regions.length === 1 ? '' : 's'} pasted onto the map's own painting (${W} × ${H} pixels, about ${km(W, cur.kmPerPx)} × ${km(H, cur.kmPerPx)} km),
-          its land read again from the colours. The painted picture is drawn from the regions' full paintings.</div>
+          its land read again from the colours. The painted picture is drawn from the regions' full paintings${drawn ? ', the drawn borders painted over them' : ''}.</div>
         <div class="dm-lme-stat" id="bdStep">Getting ready…</div>
         <canvas class="dm-mup-preview" id="bdPrev" hidden></canvas>
       </div>`;
@@ -793,7 +786,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       overlay.querySelector('[data-bd="back"]').disabled = true;
       try {
         await useRegions(built, step);
-        toast(remove ? `"${remove.name}" is off the map` : `"${added.name}" is on the map`);
+        toast(remove ? `"${remove.name}" is off the map` : added ? `"${added.name}" is on the map` : 'The borders are on the map');
         overlay.onclick = null;
         showList();
       } catch (err) {
@@ -817,7 +810,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       bctx.drawImage(frame, 0, 0, SW, SH);
       frame.close?.();
       // (where the regions meet: the lines between them, region-borders.js -- unless the DM drew the borders: those stay)
-      const borders = cur.borderPicture ? null : traceBorders(W, H);
+      const borders = drawn ? null : traceBorders(W, H);
       for (const [i, r] of regions.entries()) {
         if (cancelled) return;
         step(`Pasting the regions onto the map (${i + 1} of ${regions.length})…`);
@@ -840,13 +833,23 @@ export async function openRegionMaps({ locations, onChanged }) {
       const water = (cur.places?.water || []).filter(w => inside([w.x, w.y]));
       const t = await buildInWorker(new Uint8ClampedArray(rgba), W, H, { towns, water, k: KM_PER_PX / cur.kmPerPx, scale: 2 }, step);
       if (cancelled) return;
+      // The drawn borders painted in -- after the land's read (a line across a strait never reads as land), on the land
+      // only, as the painting's own lines are. The frame stays as it was: every build paints them afresh.
+      const topo = canvasOf(t.SW, t.SH, new Uint8ClampedArray(t.topo.buffer));
+      if (drawn?.length) {
+        step('Painting the borders');
+        const on = { land: t.land, W, H, width: BORDER_WIDTH };
+        paintBorders(work, drawn, on);
+        paintBorders(big, drawn, { ...on, scale: SW / W });
+        paintBorders(topo, drawn, { ...on, scale: t.SW / W, colour: BORDER_TOPO_COLOUR });
+      }
       step('Painting the shaded picture');
       const painted = bctx.getImageData(0, 0, t.SW, t.SH);
       paintTexture(painted.data, t);
       bctx.putImageData(painted, 0, 0);
       built = {
-        cur, frameUrl, regions, added, addUp: add?.up, t, work, big, water, borders: borders ? borders.finish(t.land) : cur.borders,
-        topo: canvasOf(t.SW, t.SH, new Uint8ClampedArray(t.topo.buffer)),
+        cur, frameUrl, regions, added, addUp: add?.up, newBorders, t, work, big, water, borders: borders ? borders.finish(t.land) : drawn,
+        topo,
         height: canvasOf(W, H, new Uint8ClampedArray(t.height.buffer)),
         shade: canvasOf(t.SW, t.SH, shadePicture(t)),   // (the regions' paintings shaded with it up close -- region-detail.js)
       };
@@ -862,7 +865,15 @@ export async function openRegionMaps({ locations, onChanged }) {
   }
 
   async function useRegions(b, step) {
-    const n = b.added ? 6 : 5;
+    const n = b.added || b.newBorders ? 6 : 5;
+    let borderPicture = b.cur.borderPicture || null;
+    if (b.newBorders) {
+      step(`Storing the borders' picture on the Pi (1 of ${n})…`);
+      const { up, toMap } = b.newBorders;
+      const pic = canvasOf(up.width, up.height);
+      pic.getContext('2d').drawImage(up, 0, 0);
+      borderPicture = { file: await store(pic, 'image/png'), W: up.width, H: up.height, toMap, at: new Date().toISOString() };
+    }
     if (b.added) {
       step(`Storing the region's painting on the Pi (1 of ${n})…`);
       const pic = canvasOf(b.added.W, b.added.H);
@@ -882,7 +893,8 @@ export async function openRegionMaps({ locations, onChanged }) {
     const { cur, t } = b;
     const replaced = b.added && (cur.regions || []).some(r => r.id === b.added.id);
     const gone = (cur.regions || []).find(r => !b.regions.some(x => x.id === r.id));
-    const name = b.added ? `Shima: ${b.added.name} ${replaced ? 'painted again' : 'added'}` : `Shima: ${gone?.name || 'a region'} taken off`;
+    const name = b.newBorders ? `Shima: borders ${cur.borderPicture ? 'drawn again' : 'drawn'}`
+      : b.added ? `Shima: ${b.added.name} ${replaced ? 'painted again' : 'added'}` : `Shima: ${gone?.name || 'a region'} taken off`;
     const version = {
       id: newId('map'), name, at: new Date().toISOString(),
       W: cur.W, H: cur.H, kmPerPx: cur.kmPerPx, toBase: cur.toBase || [1, 0, 0, 0, 1, 0],
@@ -892,7 +904,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       frame: { painting: b.frameUrl },
       regions: b.regions,
       borders: b.borders,
-      ...(cur.borderPicture ? { borderPicture: cur.borderPicture } : {}),
+      ...(borderPicture ? { borderPicture } : {}),
     };
     step('Putting it in use…');
     await switchTo(version, { addVersion: true });

@@ -364,6 +364,8 @@ export function renderPokemonForm() {
 
 export async function attachPokemonFormListeners() {
   const selectedSpecies = JSON.parse(sessionStorage.getItem('selectedSpecies'));
+  // No species: the page shows renderPokemonForm's "no Pokemon selected" message, with nothing to wire up.
+  if (!selectedSpecies) return;
 
   // Initialize visibility system
   await initializeVisibility();

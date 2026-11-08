@@ -627,6 +627,8 @@ export async function attachEvolutionListeners() {
   // Load current Pokemon data
   const selectedPokemonName = sessionStorage.getItem('selectedPokemonName');
   currentPokemon = cachedPokemon(selectedPokemonName);
+  // No Pokemon: the page shows renderEvolution's "no Pokemon selected" message, with nothing to wire up.
+  if (!currentPokemon) return;
 
   // Display current stats in modal (without nature, since nature is reapplied after evolution)
   document.getElementById('currentStr').textContent = currentPokemon.stats.strength - getNatureModifier('str');

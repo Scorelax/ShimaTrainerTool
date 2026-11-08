@@ -857,6 +857,8 @@ export function renderEditPokemon(pokemonName) {
 export async function attachEditPokemonListeners() {
   const pokemonName = sessionStorage.getItem('selectedPokemonName');
   const pokemonData = cachedPokemon(pokemonName);
+  // No Pokemon: the page shows renderEditPokemon's "not found" message, with nothing to wire up.
+  if (!pokemonData) return;
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 

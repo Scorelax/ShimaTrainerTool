@@ -127,9 +127,12 @@ class Router {
       window.location.hash = '';
     }
 
-    // Load initial route
+    // Load initial route. A reload keeps the page's history entry, params and all (the hash alone doesn't carry them):
+    // without them a reloaded Pokemon card or Edit Pokemon -- phones reload a page when the app comes back -- had no
+    // Pokemon to show.
     const hash = window.location.hash.slice(1) || 'index';
-    this.navigate(hash, {}, false);
+    const saved = window.history.state;
+    this.navigate(hash, saved && saved.route === hash && saved.params ? saved.params : {}, false);
   }
 
   navigate(route, params = {}, pushState = true) {
@@ -257,7 +260,8 @@ class Router {
 
   async renderPokemonCard(params) {
     const content = document.getElementById('content');
-    const pokemonName = params.pokemonName || '';
+    // (else the Pokemon last opened -- a page reached without params, e.g. a reload in a browser that lost them)
+    const pokemonName = params.pokemonName || sessionStorage.getItem('selectedPokemonName') || '';
     const html = renderPokemonCard(pokemonName);
     content.innerHTML = html;
     attachPokemonCardListeners();
@@ -269,7 +273,7 @@ class Router {
 
   async renderEditPokemon(params) {
     const content = document.getElementById('content');
-    const pokemonName = params.pokemonName || '';
+    const pokemonName = params.pokemonName || sessionStorage.getItem('selectedPokemonName') || '';
     const html = renderEditPokemon(pokemonName);
     content.innerHTML = html;
     attachEditPokemonListeners();

@@ -185,13 +185,19 @@ def update_active_party_status(conn, trainer_name, pokemon_name, pokeslots, oper
     mine = owned.all_owned(conn, trainer_name)
     target = next(((i, p) for i, p in mine if str(p['name']).lower() == str(pokemon_name).lower()), None)
     if operation == 'add':
-        taken = {p.get('partySlot') for _, p in mine if p.get('partySlot')}
+        if target is None:
+            return {'status': 'error', 'message': 'Pokemon not found'}
+        # Already in the party (a double tap, a second device): it keeps its slot -- not moved to a free one, nor told
+        # the party's full when it's one of the six.
+        if target[1].get('partySlot'):
+            return {'status': 'success', 'slot': target[1]['partySlot']}
+        # (as numbers: a slot the app saved back can be text, "1")
+        taken = {js_parse_int(p.get('partySlot')) for _, p in mine if p.get('partySlot')}
         if len(taken) >= (pokeslots or 0):
             return {'status': 'error', 'message': 'Party is full'}
         next_slot = next((i for i in range(1, (pokeslots or 0) + 1) if i not in taken), 1)
-        if target:
-            target[1]['partySlot'] = next_slot
-            owned.save(conn, *target)
+        target[1]['partySlot'] = next_slot
+        owned.save(conn, *target)
         return {'status': 'success', 'slot': next_slot}
     if operation == 'remove':
         if target:

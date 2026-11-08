@@ -1811,6 +1811,11 @@ function selectLongRestPokemon(pokemon) {
   completeButton.onclick = () => completeLongRest(pokemon);
 }
 
+/** Hit / vitality dice a long rest gives back: half the total, at least one (5e) -- floor(1 / 2) gave a level 1 none. */
+function diceBackOnLongRest(maxDice) {
+  return maxDice > 0 ? Math.max(1, Math.floor(maxDice / 2)) : 0;
+}
+
 async function completeLongRest(selectedPokemon) {
   if (!selectedPokemon) return;
 
@@ -1865,8 +1870,8 @@ async function completeLongRest(selectedPokemon) {
   const currentHD = (trainerData.current.hitDice === '' || trainerData.current.hitDice === null || trainerData.current.hitDice === undefined) ? maxHD : parseInt(trainerData.current.hitDice, 10);
   const currentVD = (trainerData.current.vitalityDice === '' || trainerData.current.vitalityDice === null || trainerData.current.vitalityDice === undefined) ? maxVD : parseInt(trainerData.current.vitalityDice, 10);
 
-  const hdToRestore = Math.floor(maxHD / 2);
-  const vdToRestore = Math.floor(maxVD / 2);
+  const hdToRestore = diceBackOnLongRest(maxHD);
+  const vdToRestore = diceBackOnLongRest(maxVD);
   trainerData.current.hitDice = Math.min(currentHD + hdToRestore, maxHD);
   trainerData.current.vitalityDice = Math.min(currentVD + vdToRestore, maxVD);
 
@@ -1890,8 +1895,8 @@ async function completeLongRest(selectedPokemon) {
     const pkCurrentHD = (pokemonData.current.hitDice === '' || pokemonData.current.hitDice === null || pokemonData.current.hitDice === undefined) ? pkMaxHD : parseInt(pokemonData.current.hitDice, 10);
     const pkCurrentVD = (pokemonData.current.vitalityDice === '' || pokemonData.current.vitalityDice === null || pokemonData.current.vitalityDice === undefined) ? pkMaxVD : parseInt(pokemonData.current.vitalityDice, 10);
 
-    pokemonData.current.hitDice = Math.min(pkCurrentHD + Math.floor(pkMaxHD / 2), pkMaxHD);
-    pokemonData.current.vitalityDice = Math.min(pkCurrentVD + Math.floor(pkMaxVD / 2), pkMaxVD);
+    pokemonData.current.hitDice = Math.min(pkCurrentHD + diceBackOnLongRest(pkMaxHD), pkMaxHD);
+    pokemonData.current.vitalityDice = Math.min(pkCurrentVD + diceBackOnLongRest(pkMaxVD), pkMaxVD);
 
     // Restore full HP/VP only for the selected Pokemon
     if (pokemonData.name === selectedPokemon.name) {

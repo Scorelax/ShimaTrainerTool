@@ -1640,8 +1640,20 @@ async function processShortRestHealing() {
   const hpToHeal = parseInt(document.getElementById('hpToHeal').value, 10) || 0;
   const vpToHeal = parseInt(document.getElementById('vpToHeal').value, 10) || 0;
 
-  // Allow skipping (0 HD and 0 VD) - just move to next
+  // Allow skipping (0 HD and 0 VD) - no healing, but a Pokemon that rested still gets its SR moves back
   if (hdToUse === 0 && vdToUse === 0 && hpToHeal === 0 && vpToHeal === 0) {
+    if (!isTrainer) {
+      const pokemon = JSON.parse(sessionStorage.getItem(entity.storageKey));
+      if (pokemon && restoreRechargesForRest(pokemon, 'SR')) {
+        sessionStorage.setItem(entity.storageKey, JSON.stringify(pokemon));
+        const { PokemonAPI } = await import('../api.js');
+        try {
+          await PokemonAPI.update(pokemon);
+        } catch (error) {
+          console.error('Error updating Pokemon data:', error);
+        }
+      }
+    }
     shortRestCurrentIndex++;
     showShortRestHealingForm();
     return;

@@ -545,7 +545,7 @@ export async function renderContinueJourney() {
       <div class="trainer-list-container">
         <div class="trainer-container">
           ${trainers.map(trainer => `
-            <div class="trainer-box" data-trainer-id="${trainer.id}" data-trainer-name="${trainer.name}" data-trainer-pin="${trainer.pinCode}">
+            <div class="trainer-box" data-trainer-id="${trainer.id}" data-trainer-name="${trainer.name}"${trainer.pinCode !== undefined ? ` data-trainer-pin="${trainer.pinCode}"` : ''}>
               <img class="trainer-image" src="${trainer.image || 'assets/Pokeball.png'}" alt="${trainer.name}">
               <div class="trainer-name">${trainer.name || 'Unnamed Trainer'}</div>
             </div>
@@ -608,12 +608,24 @@ export function attachContinueJourneyListeners() {
     });
   });
 
+  // The server checks the PIN (it no longer sends them out). One from before that change doesn't know check-pin yet
+  // but still lists the PINs, so the PIN is compared here as it used to be.
+  const pinIsRight = async (trainer, pin) => {
+    try {
+      const result = await TrainerAPI.checkPin(trainer.name, pin);
+      if (result && result.status === 'success' && typeof result.ok === 'boolean') return result.ok;
+    } catch (err) {
+      console.warn('[Login] PIN check on the server failed:', err);
+    }
+    return trainer.pinCode !== undefined && pin === String(trainer.pinCode);
+  };
+
   // PIN submit
   document.getElementById('pinSubmit')?.addEventListener('click', async () => {
     const input = document.getElementById('pinInput');
     const error = document.getElementById('pinError');
 
-    if (input.value === selectedTrainer.pinCode.toString()) {
+    if (await pinIsRight(selectedTrainer, input.value)) {
       // Correct PIN - load trainer data
       document.getElementById('pinModal').classList.remove('active');
 

@@ -10,6 +10,12 @@ def handle(conn, action, params):
     if action == 'list':
         return {'status': 'success', 'data': get_trainers(conn)}
 
+    if action == 'check-pin':
+        _, trainer = trainers.find(conn, str(params.get('name') or ''))
+        if trainer is None:
+            raise ValueError('Trainer not found: ' + str(params.get('name')))
+        return {'status': 'success', 'ok': trainers.pin_matches(trainer, params.get('pin'))}
+
     if action == 'get':
         if not params.get('name'):
             raise ValueError('Missing trainer name')
@@ -68,12 +74,13 @@ def _names(value):
 
 
 def get_trainers(conn):
-    """The login screen's list: every trainer's name, picture and PIN."""
+    """The login screen's list: every trainer's name, picture and whether it has a PIN (the PIN itself is checked
+    here, action check-pin)."""
     return [{
         'id': i,
         'image': trainers.with_image(t)['image'],
         'name': t['name'],
-        'pinCode': t.get('pinCode', ''),
+        'hasPin': bool(str(t.get('pinCode') or '').strip()),
     } for i, (_, t) in enumerate(trainers.all_trainers(conn), start=1)]
 
 
@@ -135,13 +142,13 @@ def create_trainer(conn, form):
 
 def update_trainer_data(conn, trainer):
     """The whole trainer, as the app changed it. The app sends back the picture it was shown -- it never changes a
-    trainer's picture, so the stored one is kept."""
+    trainer's picture, so the stored one is kept -- and no PIN (it's never sent one), so the stored one's kept too."""
     if not isinstance(trainer, dict) or not trainer.get('name'):
         raise ValueError('Not a trainer')
     tid, old = trainers.find(conn, trainer['name'])
     if tid is None:
         return {'status': 'error', 'message': 'Trainer not found.'}
-    trainer = {**trainer, 'name': old['name'], 'image': old.get('image', '')}
+    trainer = {**trainer, 'name': old['name'], 'image': old.get('image', ''), 'pinCode': old.get('pinCode', '')}
     trainers.save(conn, tid, trainer)
     return {'status': 'success'}
 

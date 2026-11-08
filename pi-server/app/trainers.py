@@ -86,9 +86,18 @@ def save(conn, tid, trainer):
 
 
 def with_image(trainer):
-    """The trainer with the picture the app shows in `image` (media.trainer_image_url)."""
+    """The trainer as it's sent to an app: the picture the app shows in `image` (media.trainer_image_url), and without
+    its PIN -- that's checked here (pin_matches), never sent out, so no screen can read another player's."""
     from . import media
-    return {**trainer, 'image': media.trainer_image_url(trainer.get('name'), trainer.get('image'))}
+    out = {k: v for k, v in trainer.items() if k != 'pinCode'}
+    out['image'] = media.trainer_image_url(trainer.get('name'), trainer.get('image'))
+    return out
+
+
+def pin_matches(trainer, pin):
+    """Whether `pin` is the trainer's PIN (a trainer without one lets anyone in, as the login screen always did)."""
+    stored = str(trainer.get('pinCode') or '').strip()
+    return not stored or str(pin or '').strip() == stored
 
 
 # ---------------------------------------------------------------------------

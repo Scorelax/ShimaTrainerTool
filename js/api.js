@@ -504,6 +504,11 @@ export class TrainerAPI {
     });
   }
 
+  /** Whether `pin` is the trainer's PIN -- checked on the server, which never sends the PINs out. */
+  static async checkPin(name, pin) {
+    return API.request('trainer', 'check-pin', { name, pin }, { useCache: false, retries: 0 });
+  }
+
   /**
    * Get specific trainer with their Pokemon
    */

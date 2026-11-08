@@ -1,5 +1,6 @@
 // What's painted where on the region map's painting, read from its colours -- for the Admin module's map marking tools
-// (the user's call, 2026-10-20): a route follows the painted road (the light tan paths) between the DM's clicks, a forest
+// (the user's call, 2026-10-20): a route follows the painted road (the light tan paths of the first painting, the yellow
+// roads painted in the regions) between the DM's clicks, a forest
 // (or a lake, or any patch of one colour) fills itself in from one click. readColours is the same reading as
 // tools/region-map/make_terrain.py's classify(), so the forests found here are the ones the 3D map was built from (its
 // `road` is the dark lines: the region borders).
@@ -10,11 +11,12 @@
 /** The painting's pixels (RGBA, as getImageData gives them) -> the masks the tools work on:
  * { W, H, rgba, road, water, forest (the dark green of the trees), density (how much of the land round each pixel is
  * trees, 0-255) }. The roads are the light tan paths (the user's call, 2026-10-28: the dark lines are the region
- * borders, not roads). */
+ * borders, not roads) and the yellow ones painted in the regions (2026-11-08: none of those were found before, so a
+ * route in Shima Libra ran straight from click to click). */
 export function readFeatures(rgba, W, H) {
   const n = W * H;
   const road = new Uint8Array(n), water = new Uint8Array(n), forest = new Uint8Array(n);
-  const green = new Uint8Array(n), box = new Uint8Array(n);
+  const green = new Uint8Array(n), box = new Uint8Array(n), yellow = new Uint8Array(n), brown = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
     const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
     const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
@@ -26,6 +28,10 @@ export function readFeatures(rgba, W, H) {
     const isWater = hue > 185 && hue < 240 && sat > 0.35 && val > 0.2;
     water[i] = isWater ? 1 : 0;
     road[i] = hue > 20 && hue < 45 && sat > 0.2 && sat < 0.5 && val > 0.85 ? 1 : 0;   // light sandy tan
+    // the strong yellow-orange of the roads painted in the regions (Shima Libra's, 2026-11-08: hue ~36-48, saturated,
+    // bright; a bright meadow's yellow-green is 48-54) -- no beach is this saturated, so it's kept near the coast too
+    yellow[i] = hue > 30 && hue < 49 && sat > 0.55 && val > 0.62 ? 1 : 0;
+    brown[i] = hue > 10 && hue < 45 && sat > 0.12 && sat < 0.55 && val > 0.25 ? 1 : 0;   // a mountain's rock and its pale foot, sand
     forest[i] = hue > 55 && hue < 170 && sat > 0.25 && val < 0.5 ? 1 : 0;
     green[i] = hue > 45 && hue < 170 && sat > 0.3 ? 1 : 0;                            // the fields and the trees
     box[i] = r > 200 && g > 180 && b > 140 && r - b > 18 && sat < 0.2 ? 1 : 0;        // a name's box
@@ -35,10 +41,20 @@ export function readFeatures(rgba, W, H) {
   const nearWater = dilate(water, W, H, 4), nearBox = dilate(box, W, H, 2);
   const fields = boxMean(green, W, H, 7);
   for (let i = 0; i < n; i++) if (road[i] && (nearWater[i] || nearBox[i] || fields[i] < 64)) road[i] = 0;
+  // The yellow roads, apart from what comes close to their colour: a patch of it (a road is a line two or three pixels
+  // wide -- whatever's left of the yellow shrunk by two pixels is a patch, left out with its edges), the golden band
+  // where a meadow meets a mountain's pale foot (a road has green on both sides, not rock or sand), and short dashes
+  // (a road network is long lines: a longer least than the tan's below)
+  const patch = dilate(erode(yellow, W, H, 2), W, H, 3);
+  const rocky = boxMean(brown, W, H, 3);
+  const painted = new Uint8Array(n);
+  for (let i = 0; i < n; i++) painted[i] = yellow[i] && !patch[i] && !water[i] && !box[i] && fields[i] >= 64 && rocky[i] < 40 ? 1 : 0;
+  const long = dropSmall(dilate(painted, W, H, 1), W, H, 300);
   // and specks of it here and there: only lines of some length are kept (measured a pixel wider -- a thin road going
   // slantwise is only joined at its pixels' corners)
   const lines = dropSmall(dilate(road, W, H, 1), W, H, 120);
   for (let i = 0; i < n; i++) road[i] &= lines[i];
+  for (let i = 0; i < n; i++) if (painted[i] && long[i]) road[i] = 1;
   const density = boxMean(forest, W, H, 6);
   return { W, H, rgba, road, water, forest, density };
 }

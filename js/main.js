@@ -181,10 +181,12 @@ class Router {
       content.innerHTML = `
         <div class="error">
           <h2>Error loading content</h2>
-          <p>${error.message}</p>
+          <p></p>
           <button onclick="location.reload()">Retry</button>
         </div>
       `;
+      // As text: a message can quote data (a name, a server reply) that mustn't be read as HTML.
+      content.querySelector('.error p').textContent = error?.message || String(error);
     }
   }
 

@@ -37,8 +37,8 @@ import threading
 import uuid
 from datetime import datetime, timezone
 
-from . import abilities, battle_lists, db, gamedata, live, media
-from .conditions import is_levitating, untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, weather_damage_kind, is_grounded, grounded_in, altitude_limits
+from . import abilities, battle_lists, gamedata, live, media
+from .conditions import is_levitating, untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, weather_damage_kind, grounded_in, altitude_limits
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as media.py's other

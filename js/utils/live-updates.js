@@ -42,13 +42,21 @@ export function initLiveUpdates() {
   // was down is gone, and phones drop it whenever the screen sleeps or the app goes to the background. So on every
   // reconnect, and whenever the app comes back to the foreground, pages that mirror live state (the shared battle)
   // are told to fetch it fresh ('app:live-resync').
+  // The trainer loaded in this tab is fetched fresh at the same moments: a DM's give-item / money / move / dice change
+  // pushed while the phone slept would otherwise be undone by the player's next save, which writes the whole trainer
+  // or Pokemon back from this device's copy.
+  const resync = () => {
+    window.dispatchEvent(new CustomEvent('app:live-resync'));
+    const currentName = loadTrainer().name;
+    if (currentName) refreshActiveTrainerData(currentName, { onlyIfChanged: true });
+  };
   let opened = false;
   source.onopen = () => {
-    if (opened) window.dispatchEvent(new CustomEvent('app:live-resync'));
+    if (opened) resync();
     opened = true;
   };
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') window.dispatchEvent(new CustomEvent('app:live-resync'));
+    if (document.visibilityState === 'visible') resync();
   });
   source.onmessage = (e) => {
     let event;
@@ -105,7 +113,31 @@ async function refreshPokedexData() {
  * this tab's sessionStorage -- otherwise every open device would refetch on
  * every other player's inventory change.
  */
-async function refreshActiveTrainerData(trainerName) {
+let trainerRefreshInFlight = false;
+let trainerRefreshQueued = null;
+
+/** This tab's copy of the trainer and its Pokemon, as stored -- to tell whether a fetch brought anything new. */
+function storedTrainerSnapshot() {
+  return Object.keys(sessionStorage)
+    .filter(k => k === 'trainerData' || k.startsWith('pokemon_'))
+    .sort()
+    .map(k => `${k}=${sessionStorage.getItem(k)}`)
+    .join('\n');
+}
+
+/**
+ * onlyIfChanged (the reconnect / back-to-the-foreground check): the pages re-render only when the fetch brought
+ * something new, so a popup the player has open isn't closed every time they switch back to the app.
+ */
+async function refreshActiveTrainerData(trainerName, { onlyIfChanged = false } = {}) {
+  // A reconnect and the app coming back to the foreground usually happen together: no second fetch alongside the
+  // first, just one more after it (a push arriving mid-fetch may be newer than what that fetch reads).
+  if (trainerRefreshInFlight) {
+    if (!trainerRefreshQueued || !onlyIfChanged) trainerRefreshQueued = { trainerName, onlyIfChanged };
+    return;
+  }
+  trainerRefreshInFlight = true;
+  const before = onlyIfChanged ? storedTrainerSnapshot() : null;
   try {
     const currentName = loadTrainer().name;
     if (!currentName || currentName.toLowerCase() !== trainerName.toLowerCase()) return;
@@ -126,8 +158,15 @@ async function refreshActiveTrainerData(trainerName) {
     // The move list too: a move the DM taught may be one of the DM's own, new since this device loaded the list
     if (Array.isArray(bundle.gameData?.moves)) sessionStorage.setItem('moves', JSON.stringify(bundle.gameData.moves));
 
-    window.dispatchEvent(new CustomEvent('app:trainer-updated'));
+    if (!onlyIfChanged || storedTrainerSnapshot() !== before) window.dispatchEvent(new CustomEvent('app:trainer-updated'));
   } catch (err) {
     console.warn('[LiveUpdates] Failed to refresh trainer data:', err);
+  } finally {
+    trainerRefreshInFlight = false;
+    if (trainerRefreshQueued) {
+      const next = trainerRefreshQueued;
+      trainerRefreshQueued = null;
+      refreshActiveTrainerData(next.trainerName, { onlyIfChanged: next.onlyIfChanged });
+    }
   }
 }

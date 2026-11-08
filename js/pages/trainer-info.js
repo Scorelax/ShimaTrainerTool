@@ -2714,21 +2714,29 @@ export function attachTrainerInfoListeners() {
     const itemsData = itemsStr ? JSON.parse(itemsStr) : [];
 
     const groupedItems = {};
+    // Matched to the item list whatever its case or spaces; one the list doesn't have (renamed or removed there) still
+    // shows, under Other, so it can be seen and taken out -- it was left out of the inventory altogether before. Each
+    // keeps the name it has in the inventory, the one Edit / Remove / Use look it up by.
+    const listKey = n => String(n || '').trim().toLowerCase();
     (itemsStr ? freshTrainerData.inventory : []).forEach(({ name: itemName, quantity }) => {
-      const itemData = itemsData.find(i => i.name === itemName);
-      if (itemData) {
-        const type = itemData.category || 'Misc';
-        if (!groupedItems[type]) {
-          groupedItems[type] = [];
-        }
-        groupedItems[type].push({
-          name: itemData.name,
-          description: itemData.description || 'No description available',
-          effect: itemData.effect || 'No effect description',
-          quantity: quantity,
-          fullData: itemData
-        });
+      const itemData = itemsData.find(i => listKey(i.name) === listKey(itemName));
+      const type = itemData ? (itemData.category || 'Misc') : 'Other';
+      if (!groupedItems[type]) {
+        groupedItems[type] = [];
       }
+      groupedItems[type].push(itemData ? {
+        name: itemName,
+        description: itemData.description || 'No description available',
+        effect: itemData.effect || 'No effect description',
+        quantity: quantity,
+        fullData: itemData
+      } : {
+        name: itemName,
+        description: 'This item isn\'t in the item list any more (renamed or removed there).',
+        effect: 'No effect description',
+        quantity: quantity,
+        fullData: {}
+      });
     });
 
     // Add custom items to their own section

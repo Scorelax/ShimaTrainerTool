@@ -17,7 +17,7 @@ import { prepareImage } from './display.js';
 import { openPicker } from './picker.js';
 import { STATUS_TRIGGERS, STATUS_EFFECTS, describeTrigger } from '../utils/custom-status.js';
 import { editLocationShape, drawShapePreview, describeShape } from './location-map.js';
-import { currentMap, isMajor, parentOf, partOfChain, isTopLocation, withInside } from '../region-map/map-version.js';
+import { currentMap, isMajor, parentOf, partOfChain, isTopLocation, withInside, routeColour } from '../region-map/map-version.js';
 import { iconSpot, inArea, shapeBounds } from '../region-map/map-features.js';
 import { fillRegionPictures, regionPictureHtml, wantsRegionPicture } from './region-picture.js';
 import { ICON_SIZE, iconFor, uploadIcon, pickLibraryIcon, openIconLibrary } from './location-icon.js';
@@ -187,6 +187,9 @@ function shell(body, { title, newLabel, searchPh }) {
     </div>`;
 }
 
+// A route's colour (the user's call, 2026-11-09): its name tag on the map in it, and its line when it's looked at -- a
+// few that stand out on the painting's greens and browns, or any colour
+const ROUTE_COLOURS = { '#e53935': 'Red', '#fb8c00': 'Orange', '#fdd835': 'Yellow', '#00bcd4': 'Cyan', '#1e88e5': 'Blue', '#8e24aa': 'Purple', '#ec407a': 'Pink', '#ffffff': 'White', '#37474f': 'Dark grey' };
 const field = (label, html, hint = '') => `<div class="dm-field"><label>${label}</label>${html}${hint ? `<div class="dm-hint">${hint}</div>` : ''}</div>`;
 const input = (k, v, ph = '', max = 120) => `<input class="dm-input" data-w="${k}" value="${escapeHtml(v ?? '')}" placeholder="${escapeHtml(ph)}" maxlength="${max}">`;
 const area = (k, v, ph = '', rows = 4) => `<textarea class="dm-input" data-w="${k}" rows="${rows}" placeholder="${escapeHtml(ph)}">${escapeHtml(v ?? '')}</textarea>`;
@@ -538,6 +541,10 @@ export async function drawLocations(body) {
           </span>
         </div>
       </div>
+      ${l.type === 'route' || l.shape?.kind === 'path' ? field('Route colour', `<div class="dm-world-colours">${Object.entries(ROUTE_COLOURS).map(([c, n]) => `<button class="dm-world-swatch${routeColour(l) === c ? ' active' : ''}" data-w-act="colour" data-c="${c}" style="background: ${c}" title="${n}" aria-label="${n}"></button>`).join('')}
+        <label class="dm-world-swatch dm-world-anycolour${routeColour(l) && !ROUTE_COLOURS[routeColour(l)] ? ' active' : ''}" title="Any colour" style="${routeColour(l) && !ROUTE_COLOURS[routeColour(l)] ? `background: ${routeColour(l)}` : ''}"><input type="color" data-w="colour" value="${routeColour(l) || '#8fd8ff'}">🎨</label>
+        <button class="dm-btn small${routeColour(l) ? '' : ' active'}" data-w-act="colour" data-c="">None</button></div>`,
+        'Its name on the map sits on a tag in this colour (the writing dark or white, to read on it), and the line is drawn in it when the route is picked. The tag can be moved in Change it on the map.') : ''}
       ${field('Description', area('description', l.description, 'What the place is like', 5))}
       <div class="dm-field"><label>Points of interest</label>
         <div class="dm-world-pois">${(l.pois || []).map((p, i) => `<div class="dm-row"><input class="dm-input" data-poi="${i}" value="${escapeHtml(p)}" placeholder="What the players can do here" maxlength="200"><button class="dm-icon-btn danger" data-w-act="poi-del" data-i="${i}" title="Remove">✕</button></div>`).join('')}</div>
@@ -551,7 +558,7 @@ export async function drawLocations(body) {
     </div>`;
     box.querySelectorAll('[data-poi]').forEach(el => el.addEventListener('input', () => { l.pois[Number(el.dataset.poi)] = el.value; changed(); }));
     const prev = document.getElementById('worldMapPrev');
-    if (prev) drawShapePreview(prev, l.shape).catch(() => {});
+    if (prev) drawShapePreview(prev, l.shape, routeColour(l)).catch(() => {});
   };
   const changed = () => { saveSoon('locations'); list(); };
   // a region's own picture (region-picture.js) put in as the list and the form are drawn
@@ -570,7 +577,15 @@ export async function drawLocations(body) {
     },
     pick: id => { _selected.locations = id; list(); form(); },
     current: () => locations.find(x => x.id === _selected.locations),
-    onField: (l, k, v) => { l[k] = v; changed(); },
+    onField: (l, k, v) => {
+      l[k] = v; changed();
+      // a colour picked with 🎨: shown on its swatch at once (the form isn't drawn again under the open picker)
+      if (k === 'colour') {
+        document.querySelectorAll('#worldForm .dm-world-colours .active').forEach(el => el.classList.remove('active'));
+        const any = document.querySelector('#worldForm .dm-world-anycolour');
+        if (any) { any.style.background = v; any.classList.add('active'); }
+      }
+    },
     onAct: async (l, act, btn) => {
       if (act === 'delete') {
         const n = events.filter(e => e.locationId === l.id).length;
@@ -581,6 +596,9 @@ export async function drawLocations(body) {
         locations.forEach((x) => { if (x.parentId === l.id) { if (l.parentId) x.parentId = l.parentId; else delete x.parentId; } });
         if (n) { events.forEach((e) => { if (e.locationId === l.id) e.locationId = ''; }); saveSoon('events'); }
         _selected.locations = null;
+        changed(); form();
+      } else if (act === 'colour') {
+        if (btn.dataset.c) l.colour = btn.dataset.c; else delete l.colour;
         changed(); form();
       } else if (act === 'poi-add') {
         l.pois = [...(l.pois || []), ''];

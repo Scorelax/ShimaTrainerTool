@@ -85,6 +85,17 @@ export async function currentMap({ fresh = false } = {}) {
 
 /** A major location (the user's call, 2026-10-20): its name shows on the map with the whole island in view; the others'
  * come in as it zooms in. Ticked by the DM on the location -- until then a city is, the rest aren't. */
+/** A route's own colour (the user's call, 2026-11-09: picked in its form, to tell the routes apart on the map): '#rrggbb',
+ * or null (none -- the light blue a looked-at location is drawn in, and the plain name). */
+export const routeColour = l => (/^#[0-9a-f]{6}$/i.test(l?.colour || '') ? l.colour.toLowerCase() : null);
+
+/** The writing on a name tag of colour `hex`: dark on a light colour, white on a dark one (whichever stands out more). */
+export function tagInk(hex) {
+  const lin = (c) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const [r, g, b] = [1, 3, 5].map(i => lin(parseInt(hex.slice(i, i + 2), 16)));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.2 ? '#1a1206' : '#ffffff';
+}
+
 export const isMajor = l => (typeof l?.major === 'boolean' ? l.major : ['city', 'region'].includes(l?.type || 'city'));
 
 // A location inside another (the user's call, 2026-10-20: a sawmill in Inex Woods, with its own mark and icon): it keeps
@@ -163,7 +174,7 @@ export function transformShape(shape, m) {
   const r = v => Math.round(v * 10) / 10;
   const pt = ([x, y]) => apply(m, x, y).map(r);
   if (shape.kind === 'pin') { const [x, y] = pt([shape.x, shape.y]); return { ...shape, x, y }; }
-  if (shape.kind === 'path') return { ...shape, anchors: shape.anchors?.map(pt), points: (shape.points || []).map(pt) };
+  if (shape.kind === 'path') return { ...shape, anchors: shape.anchors?.map(pt), points: (shape.points || []).map(pt), ...(Array.isArray(shape.label) ? { label: pt(shape.label) } : {}) };
   if (shape.kind === 'area') return { ...shape, rings: (shape.rings || []).map(ring => ring.map(pt)), ...(shape.reach ? { reach: shape.reach.map(ring => ring.map(pt)) } : {}) };
   return shape;
 }

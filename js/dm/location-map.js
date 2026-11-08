@@ -7,12 +7,13 @@
 // painting the DM uploaded (js/region-map/map-version.js moves every shape onto it) -- the 3D map's own coordinates, so
 // js/region-map/region-map.js draws it as it is):
 //   { kind: 'pin', x, y }
-//   { kind: 'path', anchors: [[x, y], ...] (the DM's clicks), follow (along the roads), points: [[x, y], ...] (the line) }
+//   { kind: 'path', anchors: [[x, y], ...] (the DM's clicks), follow (along the roads), points: [[x, y], ...] (the line),
+//     label: [x, y] (where its name goes, when the DM moved it from halfway along) }
 //   { kind: 'area', rings: [[[x, y], ...], ...] (outlines; a hole runs the other way round) }
 // The painting's roads and forests are read from its colours (js/region-map/map-features.js).
 import { escapeHtml, toast } from './dm-common.js';
 import * as F from '../region-map/map-features.js';
-import { currentMap, kmPerPx } from '../region-map/map-version.js';
+import { currentMap, kmPerPx, routeColour, tagInk } from '../region-map/map-version.js';
 import { iconImage, drawIcon, ICON_SIZE } from './location-icon.js';
 
 // The map in use's files: its painting (what the roads and forests are read from) and its painted picture (what the DM
@@ -144,7 +145,7 @@ function loadImage(url) {
 
 /** One shape onto a 2D canvas: `tf` = { s (canvas pixels per painting pixel), ox, oy }. `faint`: another location,
  * there for reference. */
-export function drawShape(ctx, shape, tf, { faint = false, name = '', below = 0 } = {}) {
+export function drawShape(ctx, shape, tf, { faint = false, name = '', below = 0, colour = null } = {}) {
   if (!shape) return;
   const X = x => tf.ox + x * tf.s, Y = y => tf.oy + y * tf.s;
   const gold = faint ? 'rgba(255, 255, 255, 0.75)' : '#ffd23f';
@@ -165,7 +166,7 @@ export function drawShape(ctx, shape, tf, { faint = false, name = '', below = 0 
     shape.points.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))));
     if (!faint) { ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(20, 16, 4, 0.75)'; ctx.stroke(); }
     ctx.lineWidth = faint ? 1.5 : 3.5;
-    ctx.strokeStyle = gold;
+    ctx.strokeStyle = colour || gold;   // (a route's own colour, map-version.js routeColour)
     ctx.stroke();
   } else if (shape.kind === 'pin') {
     ctx.beginPath();
@@ -177,7 +178,7 @@ export function drawShape(ctx, shape, tf, { faint = false, name = '', below = 0 
     ctx.stroke();
   }
   if (name) {
-    const at = F.shapeBounds(shape)?.mid;
+    const at = F.tagSpot(shape);
     if (at) {
       ctx.font = '600 11px Outfit, sans-serif';
       ctx.textAlign = 'center';
@@ -195,7 +196,7 @@ export function drawShape(ctx, shape, tf, { faint = false, name = '', below = 0 
 }
 
 /** The location's shape on a piece of the painting round it (the form's preview). */
-export async function drawShapePreview(canvas, shape) {
+export async function drawShapePreview(canvas, shape, colour = null) {
   const P = await loadPainting();
   const b = F.shapeBounds(shape);
   if (!b || !canvas.isConnected) return;
@@ -212,7 +213,29 @@ export async function drawShapePreview(canvas, shape) {
   ctx.fillStyle = '#0c2240';
   ctx.fillRect(0, 0, cw, ch);
   ctx.drawImage(P.shown, tf.ox, tf.oy, P.W * s, P.H * s);
-  drawShape(ctx, shape, tf);
+  drawShape(ctx, shape, tf, { colour });
+}
+
+/** A route's name tag on the editor's canvas, centred on (sx, sy) on the screen: in the route's colour (dark when it has
+ * none), as on the 3D map. -> its box on the screen, for grabbing it. */
+function drawTag(ctx, text, sx, sy, colour) {
+  ctx.save();
+  ctx.font = '700 11px Outfit, sans-serif';
+  const w = ctx.measureText(text).width + 14, h = 19;
+  const x = sx - w / 2, y = sy - h / 2;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 4);
+  ctx.fillStyle = colour || 'rgba(20, 16, 4, 0.85)';
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = colour ? 'rgba(20, 14, 4, 0.7)' : '#ffd23f';
+  ctx.stroke();
+  ctx.fillStyle = colour ? tagInk(colour) : '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, sx, sy + 1);
+  ctx.restore();
+  return { x, y, w, h };
 }
 
 // ---------------------------------------------------------------------------
@@ -256,6 +279,10 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
   let pin = old?.kind === 'pin' ? [old.x, old.y] : null;
   let anchors = old?.kind === 'path' ? (old.anchors?.length > 1 ? old.anchors : [old.points[0], old.points[old.points.length - 1]]).map(p => p.slice()) : [];
   let follow = old?.kind === 'path' ? old.follow !== false : true;
+  // a route's name tag: where the DM dragged it (null: halfway along), and its colour (picked in the location's form)
+  let label = old?.kind === 'path' && Array.isArray(old.label) ? old.label.slice() : null;
+  const colour = routeColour(loc);
+  let tagBox = null;   // the tag on the screen as last drawn (for grabbing it)
   let segs = [];
   let mask = old?.kind === 'area' ? F.ringsToMask(old.rings, W, H) : new Uint8Array(W * H);
   // (a region on a map with its borders drawn: picked by a click)
@@ -448,7 +475,7 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
 
   // ---- undo ----
   function remember() {
-    undos[kind].push(kind === 'pin' ? pin?.slice() || null : kind === 'path' ? anchors.map(p => p.slice()) : { mask: mask.slice(), ring: ring.slice(), drawn: drawn.slice() });
+    undos[kind].push(kind === 'pin' ? pin?.slice() || null : kind === 'path' ? { anchors: anchors.map(p => p.slice()), label: label?.slice() || null } : { mask: mask.slice(), ring: ring.slice(), drawn: drawn.slice() });
     if (undos[kind].length > 25) undos[kind].shift();
   }
   function undo() {
@@ -456,7 +483,7 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
     if (!undos[kind].length) return;
     const was = undos[kind].pop();
     if (kind === 'pin') pin = was;
-    else if (kind === 'path') { anchors = was; retrace(); }
+    else if (kind === 'path') { anchors = was.anchors; label = was.label; retrace(); }
     else { mask = was.mask; ring = was.ring; drawn = was.drawn; paintMask(); paintRing(); }
     tools(); draw();
   }
@@ -477,7 +504,7 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
     if (showOthers) {
       others.forEach((o) => {
         const withIcon = otherIcons.some(x => x.o === o);
-        drawShape(ctx, o.shape, tf, { faint: true, name: o.name || '', below: withIcon ? ((o.icon.size || ICON_SIZE.first) / kmPerPx()) * s / 2 : 0 });
+        drawShape(ctx, o.shape, tf, { faint: true, name: o.name || '', below: withIcon && !o.shape?.label ? ((o.icon.size || ICON_SIZE.first) / kmPerPx()) * s / 2 : 0, colour: o.shape?.kind === 'path' ? routeColour(o) : null });
       });
     }
     const at = icon && iconImg && markSpot();
@@ -519,7 +546,8 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
         ctx.stroke();
       }
     } else if (kind === 'path') {
-      drawShape(ctx, { kind: 'path', points: pathPoints() }, tf);
+      const pts = pathPoints();
+      drawShape(ctx, { kind: 'path', points: pts }, tf, { colour });
       anchors.forEach(([x, y], i) => {
         ctx.beginPath();
         ctx.arc(x * s + ox, y * s + oy, i === 0 || i === anchors.length - 1 ? 7 : 5.5, 0, Math.PI * 2);
@@ -529,6 +557,9 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
         ctx.strokeStyle = '#141004';
         ctx.stroke();
       });
+      // its name tag, over everything -- halfway along, or where it was dragged to
+      const tagAt = label || (pts.length > 1 ? F.alongPath(pts, 0.5) : null);
+      tagBox = tagAt ? drawTag(ctx, loc.name || 'Route', tagAt[0] * s + ox, tagAt[1] * s + oy, colour) : null;
     } else if (pin) {
       drawShape(ctx, { kind: 'pin', x: pin[0], y: pin[1] }, tf);
       ctx.beginPath();
@@ -563,7 +594,10 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
         <div class="dm-hint">Click the start, then the end -- and any turn in between. Click on the line to add a point there, drag a point to move it, right-click a point to take it away.</div>
         <div class="dm-row"><button class="dm-btn small" data-lme="undo" ${undos.path.length ? '' : 'disabled'}>↶ Undo</button>
           <button class="dm-btn small danger" data-lme="clear" ${anchors.length ? '' : 'disabled'}>Clear</button></div>
-        <div class="dm-lme-stat">${anchors.length < 2 ? `${anchors.length ? 'The start' : 'No points yet'} -- it needs a start and an end` : describeShape({ kind: 'path', points: pts })}</div>${common}`;
+        <div class="dm-lme-stat">${anchors.length < 2 ? `${anchors.length ? 'The start' : 'No points yet'} -- it needs a start and an end` : describeShape({ kind: 'path', points: pts })}</div>
+        <div class="dm-card-title">🏷 Its name tag</div>
+        <div class="dm-hint">${label ? 'Where you put it -- drag it again to move it.' : 'Halfway along the line -- drag the tag to put it somewhere it reads better.'} ${colour ? '' : 'Give the route a colour in its form (Route colour) and the tag and line are drawn in it.'}</div>
+        ${label ? '<div class="dm-row"><button class="dm-btn small" data-lme="tag-reset">↺ Back halfway</button></div>' : ''}${common}`;
     } else {
       box.innerHTML = `<div class="dm-card-title">⬚ An area</div>
         <div class="dm-lme-toolgrid">${Object.entries(AREA_TOOLS).filter(([k]) => (k !== 'wand' || !isRegion) && (k !== 'pick' || fence)).map(([k, t]) => `<button class="dm-btn small${areaTool === k ? ' active' : ''}" data-tool="${k}">${t.label}</button>`).join('')}</div>
@@ -587,6 +621,11 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
   let space = false;
   const near = (a, b, px) => a && b && Math.hypot(a[0] - b[0], a[1] - b[1]) * s <= px;
   const anchorAt = p => anchors.findIndex(a => near(a, p, 9));
+  const onTag = (e) => {
+    if (!tagBox) return false;
+    const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    return x >= tagBox.x - 3 && x <= tagBox.x + tagBox.w + 3 && y >= tagBox.y - 3 && y <= tagBox.y + tagBox.h + 3;
+  };
   /** Where on the line a click falls: the segment it's on (or -1). */
   function segmentAt(p) {
     let best = -1, bestD = 8;
@@ -747,6 +786,7 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
     if (drag.pan) return;
     if (kind === 'pin' && near(pin, p, 14)) drag.mode = 'pin';
     else if (kind === 'path' && anchorAt(p) >= 0) drag.mode = { anchor: anchorAt(p) };
+    else if (kind === 'path' && onTag(e)) drag.mode = 'tag';
     else if (kind === 'area' && (areaTool === 'brush' || areaTool === 'erase')) { remember(); drag.mode = 'paint'; stroke(p, p); draw(); }
     else if (kind === 'area' && areaTool === 'region') { drag.mode = 'lasso'; drag.alt = e.altKey; lasso = [p]; }
     else if (kind === 'area' && areaTool === 'ring') { drag.mode = 'ring'; drag.alt = e.altKey; }
@@ -754,16 +794,17 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
   canvas.addEventListener('pointermove', (e) => {
     const p = toPaint(e);
     hover = p;
-    if (!drag) { if (kind === 'area') draw(); return; }
+    if (!drag) { canvas.style.cursor = kind === 'path' && anchorAt(p) < 0 && onTag(e) ? 'grab' : ''; if (kind === 'area') draw(); return; }
     if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) {
       drag.moved = true;
-      if (drag.mode === 'pin' || Number.isInteger(drag.mode?.anchor)) remember();
+      if (drag.mode === 'pin' || drag.mode === 'tag' || Number.isInteger(drag.mode?.anchor)) remember();
     }
     if (!drag.moved) return;
     // (a line's point dragged is { anchor: its number } -- checked as a number: the brush's mode is the word 'paint', and
     // every word has an old .anchor() of its own, which made the brush move a line's point instead of painting, the user's
     // call, 2026-10-20: the brush has to paint while it's dragged)
     if (drag.mode === 'pin') pin = p;
+    else if (drag.mode === 'tag') label = p;
     else if (Number.isInteger(drag.mode?.anchor)) {
       anchors[drag.mode.anchor] = p;
       // straight lines while dragging, along the road again when it's let go
@@ -807,6 +848,9 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
       retrace(d.mode.anchor - 1, d.mode.anchor);
     } else if (d.mode === 'pin' && d.moved) {
       pin = p.map(v => Math.round(v * 10) / 10);
+    } else if (d.mode === 'tag') {
+      // (a click on the tag without dragging it does nothing -- it doesn't add a point under it)
+      if (d.moved) label = p.map(v => Math.round(v * 10) / 10);
     } else if (!d.moved && d.button === 2 && kind === 'path' && anchorAt(p) >= 0) {
       remember();
       anchors.splice(anchorAt(p), 1);
@@ -873,7 +917,7 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
         done({ kind: 'pin', x: r(pin[0]), y: r(pin[1]) });
       } else if (kind === 'path') {
         if (anchors.length < 2) { toast('A line needs a start and an end -- click both on the map.'); return; }
-        done({ kind: 'path', follow, anchors: anchors.map(p => p.map(r)), points: pathPoints().map(p => p.map(r)) });
+        done({ kind: 'path', follow, anchors: anchors.map(p => p.map(r)), points: pathPoints().map(p => p.map(r)), ...(label ? { label: label.map(r) } : {}) });
       } else {
         if (lasso.length >= 3) closeLasso(false);
         const rings = F.maskToRings(mask, W, H);
@@ -902,9 +946,10 @@ export async function editLocationShape(loc, others = [], { onIcon, kinds = Obje
       else if (act === 'in') zoomAt(1.4);
       else if (act === 'out') zoomAt(1 / 1.4);
       else if (act === 'fit') { fitAll(); draw(); }
+      else if (act === 'tag-reset') { remember(); label = null; tools(); draw(); }
       else if (act === 'clear') {
         remember();
-        if (kind === 'path') { anchors = []; retrace(); } else { mask = new Uint8Array(W * H); ring = new Uint8Array(W * H); drawn = new Uint8Array(W * H); lasso = []; paintMask(); paintRing(); }
+        if (kind === 'path') { anchors = []; label = null; retrace(); } else { mask = new Uint8Array(W * H); ring = new Uint8Array(W * H); drawn = new Uint8Array(W * H); lasso = []; paintMask(); paintRing(); }
         tools(); draw();
       }
     });

@@ -33,8 +33,8 @@
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
-import { shapeBounds, iconSpot, ringsToMask, ringArea } from './map-features.js';
-import { currentMap, isMajor, partOfChain, FIRST_ID, loadMapState, treeAreasOn } from './map-version.js';
+import { shapeBounds, iconSpot, tagSpot, ringsToMask, ringArea } from './map-features.js';
+import { currentMap, isMajor, partOfChain, FIRST_ID, loadMapState, treeAreasOn, routeColour, tagInk } from './map-version.js';
 import { addLandDetail } from './land-detail.js';
 import { addRegionDetail } from './region-detail.js';
 import { addRegionBorders } from './region-borders.js';
@@ -378,7 +378,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function buildLabels() {
     labels.forEach(l => l.el.remove());
     labels.length = 0;
-    const add = (kind, name, x, y, lift, { locId = null, extra = '' } = {}) => {
+    const add = (kind, name, x, y, lift, { locId = null, extra = '', tag = null } = {}) => {
       const el = document.createElement(kind === 'town' || kind === 'region' ? 'button' : 'div');
       el.className = `rmap-label ${kind}${extra}`;
       if (kind === 'town') el.innerHTML = `<span class="rmap-pin"></span><span class="rmap-name">${esc(name)}</span>`;
@@ -386,6 +386,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       // the players' marker (assets/MapMarker.png, the user's pixel-art trainer, kept 32 x 32 here and drawn crisp)
       else if (kind === 'party') el.innerHTML = `<img class="rmap-party-marker" src="${BASE}party-marker.png" alt="The party">`;
       else el.textContent = name;
+      if (tag) { el.style.setProperty('--tag', tag); el.style.setProperty('--ink', tagInk(tag)); }
       if (kind === 'town' || kind === 'region') el.dataset.fly = labels.length;
       labelLayer.appendChild(el);
       labels.push({ el, kind, x, y, locId, at: toWorld(x, y, heightAt(x, y) + lift) });
@@ -406,7 +407,13 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
         if (!b) return;
         const minor = isMajor(l) ? '' : ' minor';
         if (l.shape.kind === 'pin') add('town', l.name || '', b.mid[0], b.mid[1], liftOf(l, 40), { locId: l.id, extra: `${['cave', 'landmark', 'building'].includes(l.type) ? ` ${l.type}` : ''}${painted(l, b) ? ' on-painting' : ''}${minor}` });
-        else add('region', l.name || '', b.mid[0], b.mid[1], liftOf(l, 30), { locId: l.id, extra: ` ${l.shape.kind}${minor}${l.icon?.url ? ' has-icon' : ''}${l.type === 'region' ? ' realm' : ''}` });
+        else {
+          // a route's name where the DM put it, if they moved it (then not under its icon), on a tag in the route's own
+          // colour (the user's call, 2026-11-09)
+          const at = tagSpot(l.shape), moved = l.shape.kind === 'path' && Array.isArray(l.shape.label);
+          const tag = l.shape.kind === 'path' ? routeColour(l) : null;
+          add('region', l.name || '', at[0], at[1], moved ? 30 : liftOf(l, 30), { locId: l.id, tag, extra: ` ${l.shape.kind}${minor}${l.icon?.url && !moved ? ' has-icon' : ''}${l.type === 'region' ? ' realm' : ''}${tag ? ' tagged' : ''}` });
+        }
         // a region's name kept inside the region (fitRealmName): its outline on the land, a few hundred points at most
         if (l.type === 'region' && l.shape.kind === 'area') {
           labels[labels.length - 1].border = (l.shape.rings || []).filter(r => r.length > 2).map((r) => {
@@ -542,7 +549,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const k = c.width / (land.W - 1);   // painting pixel -> picture pixel (the land's uv runs 0..W-1)
     // (the party's place has nothing drawn on it, nor the map round it dimmed -- the user's call, 2026-10-20: the
     // players' marker on it is enough)
-    looked.reverse().forEach(l => (l.type === 'region' && l.shape.kind === 'area' ? drawRegionTint(ctx, l.shape, k) : drawLit(ctx, l.shape, k, '#8fd8ff', 'rgba(143, 216, 255, 0.1)')));
+    // (a route with its own colour drawn in it -- only while it's looked at, the user's call, 2026-11-09)
+    looked.reverse().forEach(l => (l.type === 'region' && l.shape.kind === 'area' ? drawRegionTint(ctx, l.shape, k)
+      : drawLit(ctx, l.shape, k, (l.shape.kind === 'path' && routeColour(l)) || '#8fd8ff', 'rgba(143, 216, 255, 0.1)')));
     overlay.tex.needsUpdate = true;
     dirty = true;
     wake();

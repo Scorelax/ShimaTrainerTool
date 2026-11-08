@@ -90,6 +90,11 @@
 .rmap-label.region.realm.no-room { visibility: hidden; }
 /* a route or a forest with an icon on its middle: the name just under the picture, like a town's (--below: half the
    icon's height on the screen) */
+/* a route with its own colour (the user's call, 2026-11-09): its name on a tag in that colour, written dark or white --
+   whichever reads on it (map-version.js tagInk) */
+.rmap-label.region.tagged { background: var(--tag); color: var(--ink); text-shadow: none; font-style: normal; white-space: nowrap; max-width: none;
+  padding: 0.15em 0.5em 0.1em; border-radius: 3px; border: 1px solid rgba(20, 14, 4, 0.55); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
+.rmap-label.region.tagged.lit { color: var(--ink); box-shadow: 0 0 0 2px #fff, 0 0 10px var(--tag); }
 .rmap-label.region.has-icon { translate: -50% calc(var(--below, 0px) + 2px); }
 /* where the party is (setParty): the players' marker, fading out over a second and back in over a second, over and
    over, standing on its location's spot; its size (--mk) set from the screen and the zoom in region-map.js's

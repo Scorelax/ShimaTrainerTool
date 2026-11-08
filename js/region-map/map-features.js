@@ -584,6 +584,12 @@ export function iconSpot(shape) {
   return shapeBounds(shape)?.mid || null;
 }
 
+/** Where a location's name goes: its mark's middle -- or, on a route the DM moved it on (the shape's `label`, the user's
+ * call, 2026-11-09: somewhere it reads better), there. The icon stays halfway along. */
+export function tagSpot(shape) {
+  return shape?.kind === 'path' && Array.isArray(shape.label) ? shape.label : iconSpot(shape);
+}
+
 /** The point `t` (0-1) of the way along a line. */
 export function alongPath(pts, t) {
   const lens = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));

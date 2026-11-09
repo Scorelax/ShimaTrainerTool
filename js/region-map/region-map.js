@@ -44,8 +44,11 @@ import { DmAPI } from '../api.js';
 
 const BASE = 'assets/region-map/';
 // (one pixel of the first painting is 120 m: the island is ~110 x 200 km -- each map says its own, kmPerPx)
-const EXAG = 3;              // the heights exaggerated, so the mountains read from the air
-const STEP = 3;              // one corner of the land's mesh every this many pixels
+// How much the land's real heights are raised. 0: flat (the user's call, 2026-11-09: with height, the painting was
+// stretched down the slopes and the tilted mountains looked warped -- the painting has its mountains drawn in anyway, and
+// land-detail.js gives them their texture). 3 was the raised land.
+const EXAG = 0;
+const STEP = EXAG > 0 ? 3 : 24;   // one corner of the land's mesh every this many pixels (flat land needs few)
 const BLOCK = 60;            // how deep the block of land goes under the sea
 const PIN_POLAR = 0.5;       // how far from straight down a flight to a town looks (radians)
 const PIN_ZOOM = 0.2;        // ...and how close it comes (a share of the whole-island distance; the user's call, 2026-11-05: closer than 0.28)
@@ -309,7 +312,6 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geo.setIndex(index);
-    geo.computeVertexNormals(); // the slope, smooth from corner to corner (land-detail.js)
     return { geo, pos, cols, rows };
   }
 
@@ -321,7 +323,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     geometries.fine = geo;
     geometries.coarse = gridGeometry(STEP * 2).geo;
     const material = new THREE.MeshBasicMaterial({ map: texture });
-    if (!gpu.software) addLandDetail(material); // made-up detail up close (land-detail.js) -- too costly without the card
+    if (!gpu.software) addLandDetail(material, land); // made-up detail up close (land-detail.js) -- too costly without the card
     if (!gpu.software) {
       seaInfo = seaInfoTexture(land);
       addSea(material, { info: seaInfo, size: [land.W, land.H], time: seaTime }); // (sea.js)

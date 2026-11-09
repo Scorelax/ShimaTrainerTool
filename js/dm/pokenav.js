@@ -12,7 +12,7 @@ import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, toast, openDmModal } from './dm-common.js';
 import { loadLocations, loadEvents, LOCATION_TYPES, readFolded, toggleFold } from './admin-world.js';
 import { shapeDistance } from '../region-map/map-features.js';
-import { currentMap, kmPerPx, parentOf, isTopLocation, withInside } from '../region-map/map-version.js';
+import { currentMap, kmPerPx, parentOf, isTopLocation, withInside, routeSections } from '../region-map/map-version.js';
 import { getClock, formatDate, formatTime } from './world-clock.js';
 import { renderAdventure, startAdventure } from './adventure.js';
 import { regionPicture, wantsRegionPicture } from './region-picture.js';
@@ -139,6 +139,10 @@ const NAV_FOLDED = 'dm-nav-folded';
 const NAV_GROUPS_SHUT = 'dm-nav-groups-shut';   // the location types folded up in the list
 // the players' marker (assets/MapMarker.png) as the party's icon here too (the user's call, 2026-10-20)
 const PARTY_ICON = '<img class="dm-nav-partyicon" src="assets/region-map/party-marker.png" alt="">';
+// What's inside a region, listed by type in this order and by name within a type (the user's call, 2026-11-09).
+const INSIDE_ORDER = ['city', 'cave', 'forest', 'landmark', 'building', 'route'];
+const insideRank = (l) => { const i = INSIDE_ORDER.indexOf(l.type || 'city'); return i < 0 ? INSIDE_ORDER.length : i; };
+const insideOrder = (a, b) => insideRank(a) - insideRank(b) || String(a.name).localeCompare(String(b.name));
 
 let _lit = null;     // the location drawn onto the map here
 let _party = null;   // { locationId, onBoard, at (the world clock's date and time), recent: [ids] }
@@ -175,7 +179,7 @@ async function setPartyAt(id) {
   if (_party.locationId) {
     _lit = null;
     _map?.highlight(null);
-    _map?.flyToLocation(_party.locationId);
+    _map?.flyToLocation(_party.locationId, { sectionOnly: true });
   }
   drawLocations();
 }
@@ -242,12 +246,17 @@ async function drawLocations() {
   // one with others inside folds up (▾ / ▸, remembered on this computer)
   const folded = readFolded(NAV_FOLDED);
   const groupsShut = readFolded(NAV_GROUPS_SHUT);
+  // what's lit in the list: the picked location, and the rest of a route that runs on into other regions
+  const litIds = () => routeSections(locations.find(l => l.id === _lit), locations).map(l => l.id);
+  const litNow = litIds();
+  const typeLabel = l => LOCATION_TYPES[l.type || 'city'] || '';
   const fold = l => (locations.some(x => parentOf(x, locations) === l)
     ? `<button class="dm-nav-fold" data-fold="${escapeHtml(l.id)}" title="${folded.has(l.id) ? 'Show' : 'Hide'} what's inside">${folded.has(l.id) ? '▸' : '▾'}</button>` : '<span class="dm-nav-fold"></span>');
-  const row = (l, depth = 0) => `<div class="dm-nav-locrow${depth ? ' sub' : ''}" ${depth ? `style="--depth: ${depth}"` : ''}>${fold(l)}<button class="dm-nav-loc${l.id === _lit ? ' lit' : ''}${l.id === _party?.locationId ? ' party' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
+  const row = (l, depth = 0) => `<div class="dm-nav-locrow${depth ? ' sub' : ''}" ${depth ? `style="--depth: ${depth}"` : ''}>${fold(l)}<button class="dm-nav-loc${litNow.includes(l.id) ? ' lit' : ''}${l.id === _party?.locationId ? ' party' : ''}${l.shape ? '' : ' off-map'}" data-loc="${escapeHtml(l.id)}"
       title="${l.shape ? 'Show it on the map' : 'Not marked on the map yet (Admin › Locations)'}">
       <span>${depth ? '<span class="dm-nav-subarrow">⤷</span> ' : ''}${l.id === _party?.locationId ? `${PARTY_ICON} ` : ''}${escapeHtml(l.name || 'Unnamed')}${l.secret ? ' 🔒' : ''}</span>
-      <small>${[!l.shape && 'not on the map', events.some(e => e.locationId === l.id) && `${events.filter(e => e.locationId === l.id).length} event(s)`].filter(Boolean).join(' · ')}</small></button>
+      <small>${[!l.shape && 'not on the map', events.some(e => e.locationId === l.id) && `${events.filter(e => e.locationId === l.id).length} event(s)`].filter(Boolean).join(' · ')}</small>
+      <span class="dm-nav-loctype" title="${escapeHtml(typeLabel(l).split(' ').slice(1).join(' '))}" aria-hidden="true">${typeLabel(l).split(' ')[0]}</span></button>
     ${l.type === 'region' ? '<span class="dm-icon-btn dm-nav-noparty" aria-hidden="true"></span>' : `<button class="dm-icon-btn" data-party="${escapeHtml(l.id)}" title="The party is here">${PARTY_ICON}</button>`}
     <button class="dm-icon-btn" data-info="${escapeHtml(l.id)}" title="Location info">ⓘ</button></div>`;
   // Two columns side by side, using the room beside the map (the user's call, 2026-10-20): the party and what's planned
@@ -258,7 +267,7 @@ async function drawLocations() {
     <div class="dm-nav-col dm-nav-placescol">
       <div class="dm-card-title"><span>📍 Locations</span></div>
       <div class="dm-nav-groups">${Object.entries(LOCATION_TYPES).map(([k, label]) => {
-        const here = withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort((a, b) => String(a.name).localeCompare(String(b.name))), locations, folded);
+        const here = withInside(locations.filter(l => (l.type || 'city') === k && isTopLocation(l, locations)).sort((a, b) => String(a.name).localeCompare(String(b.name))), locations, folded, insideOrder);
         // (the count: the locations of this type -- not what's inside them, listed here under them whatever their type)
         // A type's list folds up from its title (the user's call, 2026-10-21: no scrolling past every city to the routes),
         // remembered on this computer.
@@ -286,10 +295,11 @@ async function drawLocations() {
     const l = locations.find(x => x.id === (info || b)?.dataset[info ? 'info' : 'loc']);
     if (!l) return;
     if (info || !l.shape) { showLocation(l, events.filter(x => x.locationId === l.id)); return; }
-    _lit = _lit === l.id ? null : l.id;
+    _lit = litIds().includes(l.id) ? null : l.id;
     _map?.highlight(_lit);
     if (_lit) _map?.flyToLocation(l.id);
-    box.querySelectorAll('.dm-nav-loc').forEach(x => x.classList.toggle('lit', x.dataset.loc === _lit));
+    const lit = litIds();
+    box.querySelectorAll('.dm-nav-loc').forEach(x => x.classList.toggle('lit', lit.includes(x.dataset.loc)));
   };
 }
 

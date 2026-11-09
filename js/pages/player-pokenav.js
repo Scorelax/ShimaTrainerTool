@@ -108,7 +108,7 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
   // the party button: only while the party's marker is on the map (a secret place shows nothing) -- flies there, turning
   // the map north up on the way (the user's call, 2026-10-22)
   const syncParty = () => { partyBtn.hidden = !(partyAt && shownIds.has(partyAt)); };
-  partyBtn.addEventListener('click', () => { if (partyAt) map?.flyToLocation(partyAt, { azimuth: HOME_AZIMUTH }); });
+  partyBtn.addEventListener('click', () => { if (partyAt) map?.flyToLocation(partyAt, { azimuth: HOME_AZIMUTH, sectionOnly: true }); });
 
   const mount = async () => {
     const { mountRegionMap } = await import('../region-map/region-map.js');

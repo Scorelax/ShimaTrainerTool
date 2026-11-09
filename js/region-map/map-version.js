@@ -122,9 +122,20 @@ export function isTopLocation(l, all) {
   return chain.length === 1 || !!parentOf(chain[chain.length - 1], all);
 }
 
-/** `tops` (in order) each followed by what's inside it, by name, nested -> [{ l, depth }]. `folded`: the ids of the
- * ones folded up (what's inside them left out). */
-export function withInside(tops, all, folded = null) {
+/** `l` itself first, then the other stretches of the same route: a route crossing a region border is one location per
+ * region under the same name (the user's call, 2026-11-09). Only the ones marked on the map. Not a route: just `l`. */
+export function routeSections(l, all) {
+  if (!l) return [];
+  const key = x => String(x.name || '').trim().toLowerCase();
+  if (l.type !== 'route' || !key(l)) return [l];
+  return [l, ...all.filter(x => x !== l && x.type === 'route' && x.shape && key(x) === key(l))];
+}
+
+const byName = (a, b) => String(a.name).localeCompare(String(b.name));
+
+/** `tops` (in order) each followed by what's inside it, nested -> [{ l, depth }], what's inside sorted by `order` (by
+ * name unless given). `folded`: the ids of the ones folded up (what's inside them left out). */
+export function withInside(tops, all, folded = null, order = byName) {
   const out = [];
   const seen = new Set();
   const walk = (l, depth) => {
@@ -132,7 +143,7 @@ export function withInside(tops, all, folded = null) {
     seen.add(l.id);
     out.push({ l, depth });
     if (folded?.has(l.id)) return;
-    all.filter(x => parentOf(x, all) === l).sort((a, b) => String(a.name).localeCompare(String(b.name))).forEach(x => walk(x, depth + 1));
+    all.filter(x => parentOf(x, all) === l).sort(order).forEach(x => walk(x, depth + 1));
   };
   tops.forEach(l => walk(l, 0));
   return out;

@@ -34,7 +34,7 @@
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds, iconSpot, tagSpot, ringsToMask, ringArea } from './map-features.js';
-import { currentMap, isMajor, partOfChain, FIRST_ID, loadMapState, treeAreasOn, routeColour, tagInk } from './map-version.js';
+import { currentMap, isMajor, partOfChain, routeSections, FIRST_ID, loadMapState, treeAreasOn, routeColour, tagInk } from './map-version.js';
 import { addLandDetail } from './land-detail.js';
 import { addRegionDetail } from './region-detail.js';
 import { addRegionBorders } from './region-borders.js';
@@ -459,10 +459,11 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     drawOverlay();
   }
 
-  /** The highlighted location and the ones it's part of (a sawmill and its forest: lit together), itself first. */
+  /** The highlighted location and the ones it's part of (a sawmill and its forest: lit together), itself first -- and
+   * the rest of a route that runs on into other regions (routeSections). */
   function litChain() {
     const l = highlighted && locations?.find(x => x.id === highlighted);
-    return l ? partOfChain(l, locations) : [];
+    return l ? [...partOfChain(l, locations), ...routeSections(l, locations).slice(1)] : [];
   }
 
   function markLabels() {
@@ -885,11 +886,16 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
   }
 
   /** Flies to a location: in close over a town, far enough back over a route or a forest to see all of it. Turned the way
-   * the map is now, or to `azimuth` (the players' party button: north up). */
-  function flyToLocation(id, { ms = 900, azimuth = controls.getAzimuthalAngle() } = {}) {
+   * the map is now, or to `azimuth` (the players' party button: north up). A route running through several regions: all
+   * of it, unless `sectionOnly` (the party is on one stretch of it). */
+  function flyToLocation(id, { ms = 900, azimuth = controls.getAzimuthalAngle(), sectionOnly = false } = {}) {
     const loc = locations?.find(l => l.id === id);
-    const b = shapeBounds(loc?.shape);
+    let b = shapeBounds(loc?.shape);
     if (!b || !land) return false;
+    if (!sectionOnly) {
+      const all = routeSections(loc, locations).map(l => shapeBounds(l.shape)).filter(Boolean);
+      b = { ...b, x0: Math.min(...all.map(s => s.x0)), y0: Math.min(...all.map(s => s.y0)), x1: Math.max(...all.map(s => s.x1)), y1: Math.max(...all.map(s => s.y1)) };
+    }
     const az = azimuth;
     if (loc.shape.kind === 'pin') {
       // looked at from fairly high up -- a little tilt for the mountains, mostly from above (the user's call, 2026-10-20;

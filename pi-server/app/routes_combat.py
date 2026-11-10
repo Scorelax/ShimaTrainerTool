@@ -3070,9 +3070,18 @@ def _apply_status(state, target_id, spec):
     if new.get('kind') == 'condition' and new.get('apply') in INCAPACITATING_CONDITIONS:
         # Power-Up Punch: "all stacks are lost if you are incapacitated".
         statuses[:] = [s for s in statuses if s.get('apply') != 'power_up']
+        # Outrage: "this attack stops if ... the user becomes incapacitated" -- a rampage's concentration ends (and with
+        # it the move lock; its confusion follows, _concentration_end_effects). Logged after the new condition, below.
+        stopped = [s for s in _concentrating_moves(target)
+                   if (_move_record(s.get('moveName')).get('twoStage') or {}).get('stage') == 'rampage']
+    else:
+        stopped = []
     text = (f"{target['name']} is {_status_label(new)}" if _is_concentration_status(new)
             else f"{target['name']} {verb} {_status_label(new)}{from_text}")
     _log_event(state, 'status-apply', text=text, actorId=source_id, actorName=source_name, targetId=target_id, targetName=target['name'])
+    for s in stopped:
+        if s in _statuses_of(target):
+            _remove_status(state, target_id, s['id'], f"{target['name']} is {new.get('apply')}")
     _mirror_magic_coat(state, target, target_id, source, source_id, spec, new)
     if not existing and not spec.get('fromSynchronize'):
         _ability_condition_gained(state, target_id, new, source_id)  # Synchronize, Defiant, Shield Dust...
@@ -3252,6 +3261,33 @@ def _end_concentration_effects(state, holder_id, move_name):
             state[key] = None
         for z in gone:
             _log_event(state, 'terrain', text=f"The {z.get('name')} fades (concentration ended)")
+    _concentration_end_effects(state, holder_id, move_name)
+
+
+def _move_record(move_name):
+    """The move data's whole record for `move_name` (effects, twoStage...), or {}."""
+    if not move_name:
+        return {}
+    return next((m for m in _load_move_data_file().get('moves', []) if m.get('name') == move_name), None) or {}
+
+
+def _concentration_end_effects(state, holder_id, move_name):
+    """Outrage: "when this move ends, either after the third round or from breaking concentration, you become confused" --
+    the move's effects with `when: concentration_end`, put on the holder however its concentration on the move ended (run
+    out, a failed save, dropped, the last round used). Not on a fainted one: it has nothing left to rampage with."""
+    holder = state['participants'].get(holder_id)
+    if not holder or (holder.get('currentHP') or 0) <= 0:
+        return
+    for e in _move_record(move_name).get('effects') or []:
+        if (e.get('when') or {}).get('type') != 'concentration_end':
+            continue
+        spec = {k: v for k, v in e.items() if k not in ('when', 'target', 'note')}
+        spec.update({'sourceId': holder_id, 'sourceName': holder['name'], 'moveName': move_name, 'ends': e.get('ends') or []})
+        try:
+            _apply_status(state, holder_id, spec)
+        except ValueError as err:
+            _log_event(state, 'status-apply', text=f"{holder['name']}'s {move_name} ends -- {err}",
+                       targetId=holder_id, targetName=holder['name'])
 
 
 def _consume_ignore_immunities(state, pid, attacker, move_type, move_name):

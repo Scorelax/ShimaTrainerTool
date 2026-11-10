@@ -1301,7 +1301,8 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
       <div class="expanded-section-label">Moves</div>
       <div class="expanded-moves-list">
         ${c.moves.map(moveName => {
-          const rs = c.rechargeStates && c.rechargeStates[moveName];
+          // (not while it's a free release / Outrage's next rampage round -- see _rechargeInfo in showCombatMoveDetails)
+          const rs = !c.releasableMoves?.[moveName] && c.rechargeStates && c.rechargeStates[moveName];
           const isLocked = rs && rs.chargesLeft <= 0;
           const isDice = rs && rs.type === 'DICE';
           let chargeText = '';
@@ -2620,6 +2621,12 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weathers = [], moveN
         const mult = cond.cap ? Math.min(2 ** pos, cond.cap) : 2 ** pos;
         return { met: mult > 1, magnitude: mult };
       }
+      // Outrage: "2d8 in the first round, 4d8 in the second, 8d8 in the third" -- the round of its rampage it's on
+      // (c.rampageRounds, bridged by combat-wip.js from when its concentration started; the shared battle only).
+      case 'self_rampage_round': {
+        const mult = 2 ** Math.max(0, (c.rampageRounds?.[moveName] || 1) - 1);
+        return { met: mult > 1, magnitude: mult };
+      }
       // Fusion Bolt's own "if Fusion Bolt or Fusion Flare was already used
       // this round" -- c.movesUsedThisRound is WIP-only (see combat-wip.js's
       // own _movesUsedThisRound/_syncLocalCombatState), same "quietly never
@@ -3247,7 +3254,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // server would refuse the hit after the VP was already spent.
   const _useBlock = c.hasFloor === false ? `It isn't ${c.name}'s turn -- moves are used on its own turn (press React first for a reaction)`
     : (c.disabledMoves || []).includes(moveName) ? `${moveName} is disabled right now`
-    : c.lockedMove && c.lockedMove !== moveName ? `Only ${c.lockedMove} can be used right now (Encore)`
+    : c.lockedMove && c.lockedMove !== moveName ? `Only ${c.lockedMove} can be used right now`
     : c.burrowed && moveFlagsFor(moveName).semiInvulnerable !== 'underground' && String(move.range || '').trim().toLowerCase() !== 'self'
       ? 'Burrowed underground -- come up to the surface first (only a move like Dig, or one on itself, works from down there)'
       : null;
@@ -3367,7 +3374,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     : '';
 
   const _bonusSpent = _isSharedCombat && (!!c.bonusActionUsed || !!c.bonusActionBlockedBy) && _isBonusActionMove(moveName);
-  const _rechargeInfo = c.rechargeStates?.[moveName];
+  // A release / follow-up / Outrage's next rampage round was paid for on the first use -- its recharge doesn't stop it.
+  const _rechargeInfo = c.releasableMoves?.[moveName] ? undefined : c.rechargeStates?.[moveName];
   const chargesLeft = _rechargeInfo !== undefined ? _rechargeInfo.chargesLeft : undefined;
 
   const _moveLower = moveName.toLowerCase();

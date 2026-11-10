@@ -57,6 +57,17 @@ export function parseDamageDice(description, higherLevels, pokemonLevel, base = 
       if (pokemonLevel >= tierLevel && tierLevel > bestLevel) { bestLevel = tierLevel; bestDice = match[1]; }
     }
     if (bestDice) baseDice = bestDice;
+    else {
+      // "The damage dice changes to a d8 at level 5, a d10 at level 10" (Rollout, Outrage, Archive Blast, Formation
+      // Strike): only the die grows -- the count stays the move's own.
+      const sizeRegex = /(?<!\d)d(\d+)\s+at\s+level\s+(\d+)/gi;
+      let bestSize = null;
+      while ((match = sizeRegex.exec(higherLevels)) !== null) {
+        const tierLevel = parseInt(match[2]);
+        if (pokemonLevel >= tierLevel && tierLevel > bestLevel) { bestLevel = tierLevel; bestSize = match[1]; }
+      }
+      if (bestSize && /^\d+d\d+$/i.test(baseDice)) baseDice = baseDice.replace(/d\d+$/i, `d${bestSize}`);
+    }
   }
   return baseDice;
 }

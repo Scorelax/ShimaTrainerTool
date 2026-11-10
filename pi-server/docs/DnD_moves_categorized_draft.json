@@ -4865,14 +4865,39 @@
         "damage",
         "recharge_locked",
         "guaranteed_hit",
-        "self_potential_status_condition_confused"
+        "self_potential_status_condition_confused",
+        "damage_note",
+        "self_status_condition_move_locked_to"
       ],
       "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_rampage_round"
+          },
+          "diceMultiplierFromMagnitude": true,
+          "note": "the rampage doubles the dice each round"
+        },
+        {
+          "kind": "condition",
+          "apply": "move_locked_to",
+          "value": "Outrage",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "While rampaging you cannot use any other move."
+        },
         {
           "kind": "condition",
           "apply": "confused",
           "when": {
-            "type": "special"
+            "type": "concentration_end"
           },
           "target": "self",
           "note": "when the move ends, after the third round or on broken concentration"
@@ -4883,7 +4908,10 @@
       "vpCost": "20",
       "scaling": "The dice used for this move changes to a d10 at level 5, a d12 at level 10, and a d20 at level 17.",
       "attackRoll": false,
-      "baseDamageDice": "2d8"
+      "baseDamageDice": "2d8",
+      "twoStage": {
+        "stage": "rampage"
+      }
     },
     {
       "name": "Thunderous Roar",

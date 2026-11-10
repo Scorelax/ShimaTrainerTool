@@ -152,6 +152,10 @@ export function evaluateEffect(effect, ctx) {
       // Applied when a two-stage move is charged up (Swords Dance's +1 AC, Razor Wind's +2) -- by combat-wip.js's
       // _twoStageFlow itself, never offered again when the move is released.
       return 'no';
+    case 'concentration_end':
+      // Outrage's confusion "when this move ends" -- put on the user by the server whenever the move's concentration
+      // ends (routes_combat.py _end_concentration_effects), never offered after a hit.
+      return 'no';
     case 'on_hit':
       return hit ? 'yes' : 'no';
     case 'on_miss':

@@ -1169,6 +1169,9 @@ function _moveFlow(handler) {
 // ordinary attack / save / area flow, after which the concentration ends.
 // Hold moves (`stage: 'hold'` -- Bind, Rock Tomb, Sand Tomb): while the target is still grappled / restrained by this
 // creature's move, using it again hits that target automatically (no attack roll, no save) for the move's dice, free.
+// Rampage moves (`stage: 'rampage'` -- Outrage): the first use is the ordinary one and starts the concentration; using
+// it again on the next rounds while that lasts is free and keeps it (so its rounds are counted from the first), and the
+// last round's use ends it -- the server then puts the move's `concentration_end` effects on it (Outrage's confusion).
 // ---------------------------------------------------------------------------
 
 let _flowNoConcentration = null; // { combatantId, moveName }: this use starts no new concentration (a release, a skipped charge)
@@ -1222,13 +1225,27 @@ function _heldTargetOf(holderId, moveName, condition) {
     && (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === condition && s.sourceId === holderId && s.moveName === moveName)) || null;
 }
 
+/** `p`'s rampage with `moveName` (Outrage): {status, round, rounds} -- its concentration on the move, which round of the
+ * rampage this is (1 = the round it started) and how many it lasts -- or null when it isn't rampaging with it. */
+function _rampageOf(p, moveName) {
+  if (moveFlagsFor(moveName).twoStage?.stage !== 'rampage') return null;
+  const status = (p?.statuses || []).find((s) => s.kind === 'condition' && s.apply === 'concentrating' && s.moveName === moveName);
+  if (!status) return null;
+  const start = parseInt(String(status.value || '').split(':')[0], 10);
+  const round = Number.isFinite(start) && session?.round ? session.round - start + 1 : 1;
+  return { status, round, rounds: _concentrationEnds(moveName).find((e) => e.type === 'rounds')?.n || 1 };
+}
+
 /** The moves this creature can release / follow up for free right now, with the move popup's note for each (combat.js's
  * VP cost reads the keys). */
 function _releasableMoves(p) {
   const out = {};
   for (const name of p.moves || []) {
     const ts = moveFlagsFor(name).twoStage;
-    if (ts?.stage === 'charge' && (p.statuses || []).some((s) => isConcentrationHolder(s) && s.moveName === name)) {
+    const rampage = ts?.stage === 'rampage' ? _rampageOf(p, name) : null;
+    if (rampage && rampage.round > 1) {
+      out[name] = `Rampage, round ${rampage.round} of ${rampage.rounds} (no VP)${rampage.round >= rampage.rounds ? ' -- the last one: it ends after this hit' : ''}`;
+    } else if (ts?.stage === 'charge' && (p.statuses || []).some((s) => isConcentrationHolder(s) && s.moveName === name)) {
       out[name] = `Charged -- using it now releases it${ts.release === 'bonus' ? ' as a bonus action' : ''} (no VP)`;
     } else if (ts?.stage === 'hold') {
       const held = _heldTargetOf(p.id, name, ts.holdCondition);
@@ -1321,6 +1338,24 @@ async function _twoStageFlow(args, handler) {
       showCombatAlert(err.message, { title: moveName });
     }
     playBattleAnimationFloating(speciesName);
+    return 'handled';
+  }
+
+  if (ts?.stage === 'rampage') {
+    const rampage = _rampageOf(holder, moveName);
+    if (!rampage) return null; // its first round: the ordinary use, which starts the concentration (_onMovePaid)
+    if (rampage.round <= 1) {
+      showCombatAlert(`${holder.name} already started ${moveName} this round -- the rampage goes on next round.`, { title: moveName });
+      return 'handled';
+    }
+    // The next round: free (combat.js's VP cost reads _releasableMoves), the dice doubled for the round (combat.js's
+    // self_rampage_round), and the concentration it started with kept -- it counts the rounds.
+    _flowNoConcentration = same;
+    _flowPaid = null;
+    await handler(args);
+    if (rampage.round >= rampage.rounds && _flowPaid?.combatantId === combatantId && _flowPaid.moveName === moveName) {
+      await CombatAPI.removeStatus(combatantId, rampage.status.id, `${moveName}'s rampage is over`).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
+    }
     return 'handled';
   }
 
@@ -2107,6 +2142,8 @@ function _syncLocalCombatState(session) {
     merged.semiHeldMoves = (p.statuses || []).filter((s) => s.kind === 'condition' && UNTARGETABLE_STATES.includes(s.apply) && s.moveName).map((s) => s.moveName);
     // Charged moves / held targets: using the move again releases it or follows up, free (see _twoStageFlow).
     merged.releasableMoves = _releasableMoves(p);
+    // Outrage's rampage: which round of it each move is on (combat.js's self_rampage_round doubles the dice from it).
+    merged.rampageRounds = Object.fromEntries((p.moves || []).map((n) => [n, _rampageOf(p, n)?.round || 0]).filter(([, r]) => r > 1));
     // What it can't use right now (combat.js's move popup refuses those): Disable / Imprison / Throat Chop's disabled
     // moves, Encore's "only this one", and burrowed underground on the map (only a move like Dig, or one on itself).
     merged.disabledMoves = (p.statuses || []).filter((s) => s.kind === 'condition' && s.apply === 'move_disabled' && s.value).map((s) => s.value);

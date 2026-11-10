@@ -3226,7 +3226,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // computeMoveData has run (below). The legacy page never gets here (no ability data, _isSharedCombat false).
   const _moveFx = moveEffectsFor(moveName);
   const _abilityMods = _isSharedCombat ? moveAbilityMods(c, move, {
-    damaging: !!parseDamageDice(move.description || '', move.scaling || '', c.level),
+    damaging: !!parseDamageDice(move.description || '', move.scaling || '', c.level, move.baseDamageDice || null),
     melee: isMeleeMoveRow(move),
     soundBased: !!moveFlagsFor(moveName).soundBased,
     attackRoll: !moveFlagsFor(moveName).noAttackRoll,

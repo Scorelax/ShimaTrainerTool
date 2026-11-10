@@ -36,10 +36,17 @@ export function getTextColorForBackground(bgColor) {
   return luminance > 0.5 ? '#000000' : '#ffffff';
 }
 
-export function parseDamageDice(description, higherLevels, pokemonLevel) {
-  const damagePatterns = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit|hit\s+for\s+\d+d\d+|heal yourself for\s+\d+d\d+|recovering\s+\d+d\d+/i;
-  if (!damagePatterns.test(description)) return null;
-  const diceMatch = description.match(/(\d+d\d+)/i);
+export function parseDamageDice(description, higherLevels, pokemonLevel, base = null) {
+  // `base`: the move's own `baseDamageDice` -- for a text worded in a way this can't safely read ("automatically hits for
+  // 2d8", "deals 3d10", "inflict 2d8"; matching those words in general would also catch Powder's reaction text), or a
+  // flat amount ("2": Struggle's "damage equal to 2 + MOVE"), which never scales.
+  if (base) {
+    if (/^\d+$/.test(String(base))) return String(base);
+  } else {
+    const damagePatterns = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit|hit\s+for\s+\d+d\d+|heal yourself for\s+\d+d\d+|recovering\s+\d+d\d+/i;
+    if (!damagePatterns.test(description)) return null;
+  }
+  const diceMatch = base ? [null, String(base)] : description.match(/(\d+d\d+)/i);
   if (!diceMatch) return null;
   let baseDice = diceMatch[1];
   if (higherLevels && pokemonLevel > 1) {
@@ -228,7 +235,7 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
   heldItemDmgSources.forEach(s => dmgParts.push(s));
   if (damageRollBonus !== 0) dmgParts.push(`Status ${fmt(damageRollBonus)}`);
 
-  const damageDice = parseDamageDice(desc, move.scaling || '', level);
+  const damageDice = parseDamageDice(desc, move.scaling || '', level, move.baseDamageDice || null);
   // Electro Ball's own damage_note nextTierDice field -- null once already
   // at/above the highest tier (see nextTierDamageDice's own comment).
   const nextTierDice = nextTierDamageDice(move.scaling || '', level);

@@ -109,6 +109,9 @@ def moves():
         for m in records:
             mv = {k: m.get(k) if m.get(k) is not None else '' for k in _MOVE_FIELDS}
             mv['duration'] = (m.get('duration') or {}).get('raw', '') if isinstance(m.get('duration'), dict) else str(mv['duration'])
+            # The damage, where the text words it in a way the app doesn't read (pokemon-types.js parseDamageDice)
+            if m.get('baseDamageDice'):
+                mv['baseDamageDice'] = str(m['baseDamageDice'])
             out.append(mv)
         _moves = (records, out)
     return _moves[1]

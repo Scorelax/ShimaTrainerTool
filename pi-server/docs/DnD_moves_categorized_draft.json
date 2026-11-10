@@ -766,12 +766,38 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition_taunted"
+      ],
       "description": "You scatter a cloud of irritating powder, drawing attacks to yourself. Any creature in a 15 foot cone must make a WIS saving throw against your Move DC. On a failure, the creature(s) can only use damaging moves that target you for the duration. Any creature affected can repeat the save at the end of each of its turns to shake off the effect.",
       "moveStat": "CON/CHA",
       "vpCost": "3",
       "scaling": "",
-      "attackRoll": false
+      "attackRoll": false,
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "taunted",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "save",
+              "ability": "WIS",
+              "timing": "end_of_turn"
+            }
+          ],
+          "note": "every creature in the cone; it can only use damaging moves that target you"
+        }
+      ]
     },
     {
       "name": "Signal Beam",
@@ -3457,7 +3483,8 @@
           ]
         }
       ],
-      "attackRoll": false
+      "attackRoll": false,
+      "baseDamageDice": "3d10"
     },
     {
       "name": "Imperial Decree",
@@ -4855,7 +4882,8 @@
       "moveStat": "STR",
       "vpCost": "20",
       "scaling": "The dice used for this move changes to a d10 at level 5, a d12 at level 10, and a d20 at level 17.",
-      "attackRoll": false
+      "attackRoll": false,
+      "baseDamageDice": "2d8"
     },
     {
       "name": "Thunderous Roar",
@@ -6976,14 +7004,16 @@
       "reaction": false,
       "categories": [
         "damage",
-        "guaranteed_hit"
+        "guaranteed_hit",
+        "multi_hit_aoe"
       ],
       "description": "You let out a charming cry, dealing emotional damage to any opponent in range that can hear you. This move automatically hits for 1d4 + MOVE fairy damage unless a creature is in the invulnerable stages of Fly, Dig, Bounce, etc.",
       "moveStat": "CHA",
       "vpCost": "3",
       "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17.",
       "soundBased": true,
-      "attackRoll": false
+      "attackRoll": false,
+      "baseDamageDice": "1d4"
     },
     {
       "name": "Divine Noodle Form",
@@ -19075,12 +19105,29 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "faint_on_roll"
+      ],
       "description": "You send a chill down the spine of a creature, freezing its core. Choose a target in range and roll a d20. On a 20, the target faints. On any other roll, this move has no effect. If the target's level is 10 more than your own, this move automatically fails.",
       "moveStat": "None",
       "vpCost": "15",
       "scaling": "",
-      "attackRoll": false
+      "attackRoll": false,
+      "effects": [
+        {
+          "kind": "faint_on_roll",
+          "min": 20,
+          "levelGap": 10,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Thermal Shock",
@@ -24809,7 +24856,8 @@
       "moveStat": "STR/DEX",
       "vpCost": "0",
       "scaling": "",
-      "attackRoll": true
+      "attackRoll": true,
+      "baseDamageDice": "2"
     },
     {
       "name": "Study",
@@ -27900,7 +27948,8 @@
         "damage",
         "drain",
         "situational_use",
-        "self_heal"
+        "self_heal",
+        "guaranteed_hit"
       ],
       "description": "You tap into a sleeping Pokémon’s dreams, sucking from its energy pool. Instantly inflict 2d8 + MOVE psychic damage on a sleeping target in range, regaining half as many hitpoints to yourself.",
       "moveStat": "WIS",
@@ -27924,7 +27973,8 @@
         }
       ],
       "targetRequiresStatus": "asleep",
-      "attackRoll": false
+      "attackRoll": false,
+      "baseDamageDice": "2d8"
     },
     {
       "name": "Dream Fang",

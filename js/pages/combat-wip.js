@@ -3761,7 +3761,9 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
     await _resolveCombinedAttacks(combatantId, moveName, move, computedData, speciesName, picked);
     return;
   }
-  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, feintMoveName: _feintMoveNameFor(combatantId) });
+  // A flat amount instead of dice (Struggle's "2 + MOVE"): nothing to roll, the damage step comes filled in.
+  const flatDamage = /^\d+$/.test(String(computedData.damageDice || '')) ? Number(computedData.damageDice) : null;
+  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, feintMoveName: _feintMoveNameFor(combatantId), presetRoll: flatDamage });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { direct: true });
 
   const isSameTarget = categories.includes('multi_hit_same_target');

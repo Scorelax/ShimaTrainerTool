@@ -82,6 +82,9 @@ function loadMoveCategories() {
     _moveEffects = result.effects || {};
     _moveFlags = result.flags || {};
     setAbilityData(result.abilities || {}, result.abilityTexts || {}); // the shared battle's ability engine (ability-mods.js)
+    // A card drawn before this arrived knew no move's flags (a charged move's free release, Outrage's rampage round):
+    // the shared battle draws it again (combat-wip.js).
+    window.dispatchEvent(new CustomEvent('app:move-data-loaded'));
   }).catch(() => {}).finally(() => { _moveCategoriesLoading = false; });
 }
 

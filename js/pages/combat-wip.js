@@ -625,6 +625,7 @@ const PLACEMENT_CSS = `
 
 let session = null;
 let combatUpdateHandler = null;
+let moveDataHandler = null; // the move data arriving after the battle was drawn (see attachCombatWipListeners)
 
 // Joining a fight reuses combat.js's actual Setup + Initiative phases
 // (trainer auto-included, pick one lead Pokémon, roll a d20) instead of a
@@ -3421,6 +3422,11 @@ export function attachCombatWipListeners() {
   // in live so "see everyone's placement live" isn't only true for hover
   // previews. The normal view picks up the latest session the moment the
   // join flow completes and re-renders.
+  // The move data (flags, effects) only arrives after the page is first drawn: the card shown meanwhile didn't know a
+  // charged move's free release or Outrage's rampage round -- drawn again in place once it's there.
+  if (moveDataHandler) window.removeEventListener('app:move-data-loaded', moveDataHandler);
+  moveDataHandler = () => { if (session?.active && document.getElementById('wipBattlePhase')) _syncMainFocus(session); };
+  window.addEventListener('app:move-data-loaded', moveDataHandler);
   if (combatUpdateHandler) window.removeEventListener('app:combat-updated', combatUpdateHandler);
   combatUpdateHandler = (e) => {
     // The answer to this device's own request and the live push of the same change both arrive: only a newer copy

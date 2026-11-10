@@ -88,6 +88,17 @@ function _injectStyles() {
     .target-picker-dice-input-row input { flex: 1; box-sizing: border-box; background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; border-radius: 6px; padding: 0.5rem 0.6rem; font-size: 0.95rem; }
     .target-picker-dice-input-row button { flex-shrink: 0; padding: 0 0.9rem; }
     .target-picker-dice-used { font-size: 0.82rem; color: #2ecc71; padding: 0.5rem; text-align: center; background: rgba(46,204,113,0.1); border-radius: 8px; }
+    .target-picker-slot-badge { margin-top: 0.25rem; font-size: 0.72rem; font-weight: 800; color: #1e1e34; background: #FFD700; border-radius: 999px; padding: 0.05rem 0.45rem; display: inline-block; }
+    .target-picker-card.picked { border-color: #FFD700; }
+    .target-picker-multi-targets { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .target-picker-multi-targets .target-picker-roll-target { margin-bottom: 0; flex: 1 1 140px; }
+    .target-picker-multi-row { display: grid; grid-template-columns: 1fr auto; gap: 0 0.6rem; align-items: center; margin-bottom: 0.2rem; }
+    .target-picker-multi-row .target-picker-roll-label { grid-column: 1 / -1; margin-bottom: 0.25rem; }
+    .target-picker-multi-row .target-picker-roll-input { margin-bottom: 0.4rem; }
+    .target-picker-multi-total { min-width: 4.5em; text-align: right; font-size: 0.9rem; color: #a0a0c0; margin-bottom: 0.4rem; }
+    .target-picker-multi-total strong { color: #FFD700; font-size: 1.1rem; }
+    .target-picker-multi-hit { grid-column: 1 / -1; font-size: 0.85rem; color: #a0a0c0; margin: -0.2rem 0 0.5rem; display: flex; align-items: center; gap: 0.4rem; }
+    .target-picker-multi-group-name { font-weight: 800; color: #e0e0e0; margin-top: 0.3rem; }
   `;
   document.head.appendChild(style);
 }
@@ -217,6 +228,26 @@ let _attackBattleDice = 0;
 let _damageDiceExtra = 0;
 let _damageBattleDice = 0;
 
+// A move that makes several attacks in one go (`attacks` on pickTarget -- Bubble's "make three ranged attacks", Double
+// Hit's two; the user's rules, 2026-11-10): every attack roll is entered at once and checked on its own (a crit only
+// counts for the attack that rolled it), then the hits on a target are rolled as one damage entry ("2 of 3 hit: roll
+// 2d4"). The move's modifier is added once for the whole move (STAB...), except the part its text gives "on each hit"
+// (`perHitModifier`, a "+ MOVE"). Same target for every attack unless the text lets them split (`splitTargets`: each
+// attack picks its own). `guaranteedAttacks`: how many of them can't miss (all for Swift-likes, 1 for Lock-On's
+// "next attack").
+let _attackCount = 1;
+let _splitTargets = false;
+let _guaranteedAttacks = 0;
+let _perHitModifier = 0;
+let _slots = [];          // the target of each attack, in order: [{p, name}]
+let _groups = [];         // one per target: {p, name, ctx, blocked, blockerName, reactionDamage, hits, crits, anyCrit, critBlockedBy, bestRoll, rolls}
+let _damageQueue = [];    // the groups with a hit, in order -- the damage step goes through them one by one
+let _groupIndex = 0;      // which of _damageQueue the damage step is on
+let _multiResults = [];   // what's been resolved so far (also handed back if the popup is closed half-way)
+let _multiDamageBattleDice = 0; // Battle Dice added on the earlier targets' damage steps, spent with the rest at the end
+function _isMulti() { return _attackCount > 1; }
+function _currentGroup() { return _isMulti() ? _damageQueue[_groupIndex] || null : null; }
+
 /** The attack modifier actually in force: the move's own plus any live attack-roll status
  * plus any dice bonus the player chose to add in on this roll. */
 function _effectiveAttackMod() { return _attackModifier + (_atkCtx?.attackBonus || 0) + _diceBonusExtra; }
@@ -227,11 +258,12 @@ function _effectiveAttackMod() { return _attackModifier + (_atkCtx?.attackBonus 
  * than a native prompt(), matching every other roll in this popup. */
 function _renderDiceRow() {
   const row = document.getElementById('targetPickerDiceRow');
-  const options = _guaranteedHit ? [] : diceBonusOptionsFor(_attacker, 'attack_rolls');
+  const allGuaranteed = _isMulti() ? _guaranteedAttacks >= _attackCount : _guaranteedHit;
+  const options = allGuaranteed ? [] : diceBonusOptionsFor(_attacker, 'attack_rolls');
   row.innerHTML = options.map(o => `
     <button type="button" class="combat-use-move-btn target-picker-dice-btn" data-status-id="${o.statusId}" data-dice="${o.dice}" data-move="${o.moveName}" data-consumable="${o.consumable}">
       Add ${o.moveName} (+${o.dice})
-    </button>`).join('') + (_guaranteedHit ? '' : battleDieButtonHtml('target-picker-dice-btn'));
+    </button>`).join('') + (allGuaranteed ? '' : battleDieButtonHtml('target-picker-dice-btn'));
   row.querySelectorAll('[data-status-id]').forEach(btn => {
     btn.addEventListener('click', () => _openDiceBonusInput(btn));
   });
@@ -351,9 +383,13 @@ function _ensureDom() {
           <div class="target-picker-roll-target" id="targetPickerRollTarget"></div>
           <div class="target-picker-roll-notes" id="targetPickerRollNotes"></div>
           <div class="target-picker-dice-row" id="targetPickerDiceRow"></div>
-          <label class="target-picker-roll-label" for="targetPickerAttackInput">Attack roll<span id="targetPickerAttackModifierNote"></span></label>
-          <input type="number" id="targetPickerAttackInput" class="target-picker-roll-input" placeholder="Enter roll…">
-          <div class="target-picker-roll-total" id="targetPickerAttackTotal"></div>
+          <div id="targetPickerSingleRoll">
+            <label class="target-picker-roll-label" for="targetPickerAttackInput">Attack roll<span id="targetPickerAttackModifierNote"></span></label>
+            <input type="number" id="targetPickerAttackInput" class="target-picker-roll-input" placeholder="Enter roll…">
+            <div class="target-picker-roll-total" id="targetPickerAttackTotal"></div>
+          </div>
+          <!-- A move with several attacks (Bubble): one roll per attack, see _showMultiStep2 -->
+          <div id="targetPickerMultiRolls" hidden></div>
           <div class="target-picker-roll-actions">
             <button class="combat-use-move-btn target-picker-roll-back" id="targetPickerBack">← Back</button>
             <!-- Only shown when the target's AC isn't known at all (a DM's freeform PvE
@@ -402,6 +438,16 @@ function _ensureDom() {
 }
 
 function _close(result) {
+  // Several attacks, closed half-way through their damage: the targets already done still count (the rest is dropped).
+  if (result === null && _isMulti() && _multiResults.length) {
+    _consumeMulti();
+    result = { results: _multiResults };
+  }
+  // (in the order the targets were picked -- the misses are found before any damage is rolled)
+  if (result?.results) {
+    const at = (r) => _groups.findIndex((g) => g.p.id === r.targetId);
+    result.results = [...result.results].sort((x, y) => at(x) - at(y));
+  }
   if (_overlay) _overlay.style.display = 'none';
   if (_resolve) { _resolve(result); _resolve = null; }
 }
@@ -411,9 +457,269 @@ function _showStep1() {
   document.getElementById('targetPickerReactionWait').hidden = true;
   document.getElementById('targetPickerStep2').hidden = true;
   document.getElementById('targetPickerStep3').hidden = true;
-  document.getElementById('targetPickerTitle').textContent = 'Choose a Target';
   _selectedTargetId = null;
   _selectedTarget = null;
+  _slots = [];
+  _groups = [];
+  _multiResults = [];
+  _overlay?.querySelectorAll('.target-picker-slot-badge').forEach((b) => b.remove());
+  _overlay?.querySelectorAll('.target-picker-card.picked').forEach((c) => c.classList.remove('picked'));
+  _step1Title();
+}
+
+/** "Choose a Target" -- or, when each of a move's attacks picks its own, which attack is being picked for. */
+function _step1Title() {
+  document.getElementById('targetPickerTitle').textContent = _isMulti() && _splitTargets
+    ? `Attack ${_slots.length + 1} of ${_attackCount}: Choose a Target`
+    : 'Choose a Target';
+}
+
+/** A target card was clicked. One attack (or several at one target): that's the target. Several attacks that may
+ * split: it's this attack's target -- the same creature can be picked again for the next one. */
+function _onTargetCard(card, p, name) {
+  if (!_isMulti()) {
+    _selectedTargetId = p.id;
+    _afterTargetSelected(p, name);
+    return;
+  }
+  if (!_splitTargets) {
+    _slots = Array.from({ length: _attackCount }, () => ({ p, name }));
+  } else {
+    _slots.push({ p, name });
+    card.classList.add('picked');
+    const n = _slots.filter((s) => s.p.id === p.id).length;
+    let badge = card.querySelector('.target-picker-slot-badge');
+    if (!badge) { badge = document.createElement('div'); badge.className = 'target-picker-slot-badge'; card.appendChild(badge); }
+    badge.textContent = `×${n}`;
+    if (_slots.length < _attackCount) { _step1Title(); return; }
+  }
+  _afterTargetsSelected();
+}
+
+/** _afterTargetSelected for several attacks: one reaction window per creature targeted (a block -- Protect -- stops the
+ * attacks at that creature only), then the attack rolls. */
+async function _afterTargetsSelected() {
+  const byId = new Map();
+  for (const s of _slots) {
+    if (!byId.has(s.p.id)) byId.set(s.p.id, { p: s.p, name: s.name, blocked: false, blockerName: '', reactionDamage: null });
+  }
+  _groups = [...byId.values()];
+  document.getElementById('targetPickerStep1').hidden = true;
+  document.getElementById('targetPickerReactionWait').hidden = false;
+  document.getElementById('targetPickerTitle').textContent = 'Reaction Window';
+  for (const g of _groups) {
+    document.getElementById('targetPickerReactionWaitText').textContent = _groups.length > 1
+      ? `Waiting for possible reactions (${g.name})…` : 'Waiting for possible reactions…';
+    document.getElementById('targetPickerReactionWaitTimer').textContent = '';
+    const reaction = await waitForReactionWindow('targeted', g.p.id, _attacker?.id, _moveName, (status) => {
+      if (!status.opened) return;
+      document.getElementById('targetPickerReactionWaitTimer').textContent = `${Math.ceil(status.msLeft / 1000)}s`;
+    });
+    g.reactionDamage = reaction?.multiplier ? { multiplier: reaction.multiplier, pool: reaction.pool || null } : null;
+    if (!reaction?.blocked) continue;
+    let bypassed = false;
+    if (_feintMoveName) {
+      const useFeint = await showCombatConfirm(
+        `${reaction.blockerName} blocked the attack. Use ${_feintMoveName} to bypass it and resolve the attack normally?`,
+        { title: 'Blocked!', yesLabel: `Use ${_feintMoveName}`, noLabel: 'Accept the block' },
+      );
+      if (useFeint) {
+        try { await CombatAPI.negateReactionBlock(_attacker.id); bypassed = true; } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
+      }
+    }
+    if (!bypassed) { g.blocked = true; g.blockerName = reaction.blockerName; }
+  }
+  document.getElementById('targetPickerReactionWait').hidden = true;
+  if (_groups.every((g) => g.blocked)) {
+    _close({ results: _groups.map((g) => ({ targetId: g.p.id, blocked: true, blockerName: g.blockerName })) });
+    return;
+  }
+  _showMultiStep2();
+}
+
+/** The roll modes and notes of an attack at `p` (statuses, weather, cover, the move's own advantage) -- see
+ * attackRollContext. */
+function _buildAtkCtx(p) {
+  const ctx = attackRollContext(_attacker, p, _moveAbilityResolver(_moveName), { ignoreTargetStatChanges: !!_moveFlagResolver(_moveName)?.ignoresTargetStatChanges, ignoreTargetAcBoosts: !!_moveFlagResolver(_moveName)?.ignoresTargetAcBoosts });
+  if (!ctx) return ctx;
+  const weatherMode = _weatherModeResolver(_moveName, _attacker?.id);
+  if (weatherMode) {
+    ctx.mode = mergeRollMode(ctx.mode, weatherMode.mode);
+    if (weatherMode.note) ctx.notes.push(weatherMode.note);
+  }
+  const coverMode = _coverModeResolver(_moveName, _attacker?.id, p?.id);
+  if (coverMode) {
+    ctx.mode = mergeRollMode(ctx.mode, coverMode.mode);
+    if (coverMode.note) ctx.notes.push(coverMode.note);
+  }
+  if (_forcedRollMode) {
+    ctx.mode = mergeRollMode(ctx.mode, _forcedRollMode);
+    if (_forcedRollNote) ctx.notes.push(_forcedRollNote);
+  }
+  // Feint Attack, Close Combat, Limit Break, ...: the move's own attack is always rolled with advantage.
+  const ownMode = _moveFlagResolver(_moveName)?.attackRollMode;
+  if (ownMode) {
+    ctx.mode = mergeRollMode(ctx.mode, ownMode);
+    ctx.notes.push(`${_moveName}: always rolled with ${ownMode}`);
+  }
+  return ctx;
+}
+
+/** Abilities that have to be called before an attack roll at `p` (Intimidate, Heavy Metal, Lightning Rod...). */
+function _remindersHtml(p) {
+  const atkRow = _moveRowResolver(_moveName);
+  const reminders = atkRow ? attackRollReminders(_attacker, p, moveAbilityMods(_attacker, atkRow).type, { damaging: !!_damageDice }) : [];
+  return reminders.map(r => `<div class="note ability-reminder-note">${r}</div>`).join('');
+}
+
+function _targetChipHtml(p, name) {
+  return `<div class="target-picker-roll-target">
+    <div class="target-picker-portrait">${spriteMediaHtml(p.image, name, '', '', { small: true })}</div>
+    <div class="target-picker-roll-target-name">${name}</div></div>`;
+}
+
+/** The attack step for several attacks: a roll box per attack (with who it's at, when they split), each total shown as
+ * it's typed. The targets' ACs stay hidden, as with one attack; a target with none on record gets a "Hit" tick per
+ * attack instead (the table decides). */
+function _showMultiStep2() {
+  document.getElementById('targetPickerStep1').hidden = true;
+  document.getElementById('targetPickerStep2').hidden = false;
+  document.getElementById('targetPickerStep3').hidden = true;
+  document.getElementById('targetPickerSingleRoll').hidden = true;
+  document.getElementById('targetPickerMiss').hidden = true;
+  document.getElementById('targetPickerTitle').textContent = `Attack Rolls (${_attackCount})`;
+  const live = _groups.filter((g) => !g.blocked);
+  live.forEach((g) => { g.ctx = _buildAtkCtx(g.p); });
+  _atkCtx = live[0]?.ctx || null;
+  const chips = document.getElementById('targetPickerRollTarget');
+  chips.className = 'target-picker-multi-targets';
+  chips.innerHTML = live.map((g) => _targetChipHtml(g.p, g.name)).join('');
+  const notes = [];
+  for (const g of _groups) {
+    if (g.blocked) { notes.push(`<div class="note">${g.blockerName} blocked the attacks at ${g.name}.</div>`); continue; }
+    const body = _notesHtml(g.ctx) + _remindersHtml(g.p);
+    if (body) notes.push(live.length > 1 ? `<div class="target-picker-multi-group-name">${g.name}</div>${body}` : body);
+  }
+  if (_guaranteedAttacks > 0) {
+    notes.unshift(`<div class="mode advantage">${_guaranteedAttacks >= _attackCount ? 'Every attack hits' : `Attack 1 can't miss`} -- roll only to see if it crits</div>`);
+  }
+  document.getElementById('targetPickerRollNotes').innerHTML = notes.join('');
+  _diceBonusExtra = 0;
+  _diceBonusConsume = [];
+  _attackBattleDice = 0;
+  _renderDiceRow();
+
+  const box = document.getElementById('targetPickerMultiRolls');
+  box.hidden = false;
+  box.innerHTML = _slots.map((s, i) => {
+    const g = _groups.find((x) => x.p.id === s.p.id);
+    if (g.blocked) return '';
+    const guaranteed = i < _guaranteedAttacks;
+    const acUnknown = !Number.isFinite(g.p.ac);
+    return `<div class="target-picker-multi-row" data-slot="${i}">
+      <label class="target-picker-roll-label" for="targetPickerMulti${i}">Attack ${i + 1}${_splitTargets ? ` → <strong>${g.name}</strong>` : ''}${guaranteed ? ' (hits -- roll for a crit)' : ''}</label>
+      <input type="number" id="targetPickerMulti${i}" class="target-picker-roll-input" data-slot-input placeholder="Enter roll…">
+      <div class="target-picker-multi-total" data-slot-total></div>
+      ${acUnknown && !guaranteed ? '<label class="target-picker-multi-hit"><input type="checkbox" data-slot-hit> Hit (no AC on record -- your call)</label>' : ''}
+    </div>`;
+  }).join('');
+  const inputs = [...box.querySelectorAll('[data-slot-input]')];
+  inputs.forEach((input, k) => {
+    input.addEventListener('input', _updateAttackTotal);
+    input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      if (inputs[k + 1]) inputs[k + 1].focus(); else _confirmAttack();
+    });
+  });
+  document.getElementById('targetPickerHit').textContent = 'Attack';
+  _updateAttackTotal();
+  setTimeout(() => inputs[0]?.focus(), 50);
+}
+
+/** The attack modifier in force against group `g` (its own attack-roll statuses -- see _effectiveAttackMod). */
+function _groupAttackMod(g) { return _attackModifier + (g?.ctx?.attackBonus || 0) + _diceBonusExtra; }
+
+function _updateMultiTotals() {
+  document.querySelectorAll('#targetPickerMultiRolls [data-slot]').forEach((row) => {
+    const g = _groups.find((x) => x.p.id === _slots[Number(row.dataset.slot)].p.id);
+    const raw = parseInt(row.querySelector('[data-slot-input]').value, 10);
+    row.querySelector('[data-slot-total]').innerHTML = Number.isNaN(raw) ? '' : `= <strong>${raw + _groupAttackMod(g)}</strong>`;
+  });
+}
+
+/** Attack, for several attacks: every roll checked on its own against its target's AC (or the table's tick), a crit
+ * counted per attack. A target nothing hit is a miss; the rest go on to the damage step, one target at a time. */
+function _confirmMultiAttack() {
+  const rows = [...document.querySelectorAll('#targetPickerMultiRolls [data-slot]')];
+  const empty = rows.find((r) => Number.isNaN(parseInt(r.querySelector('[data-slot-input]').value, 10)));
+  if (empty) { empty.querySelector('[data-slot-input]').focus(); return; }
+  commitMove(); // the attacks were rolled -- the move is paid for now, hit or miss (move-commit.js)
+  for (const g of _groups) Object.assign(g, { hits: 0, crits: 0, anyCrit: false, critBlockedBy: null, bestRoll: null, rolls: [] });
+  for (const row of rows) {
+    const i = Number(row.dataset.slot);
+    const g = _groups.find((x) => x.p.id === _slots[i].p.id);
+    const roll = parseInt(row.querySelector('[data-slot-input]').value, 10);
+    g.rolls.push(roll);
+    const ac = Number.isFinite(g.p.ac) ? g.p.ac + (g.ctx?.acDelta || 0) : null;
+    const hit = i < _guaranteedAttacks || (ac === null ? !!row.querySelector('[data-slot-hit]')?.checked : roll + _groupAttackMod(g) >= ac);
+    if (!hit) continue;
+    g.hits++;
+    g.bestRoll = g.bestRoll === null ? roll : Math.max(g.bestRoll, roll);
+    // Laser Focus makes only the move's first attack a crit -- the rest crit on their own rolls.
+    const ci = _critResolver(_moveName, _attacker?.id, roll, g.p.id, { first: i === 0 }) || {};
+    if (ci.crit) {
+      g.anyCrit = true;
+      if (ci.blockedBy) g.critBlockedBy = ci.blockedBy; else g.crits++;
+    }
+  }
+  _multiResults = [];
+  for (const g of _groups) {
+    if (g.blocked) _multiResults.push({ targetId: g.p.id, blocked: true, blockerName: g.blockerName });
+    else if (!g.hits) _multiResults.push({ targetId: g.p.id, hit: false, attackRoll: Math.max(...g.rolls), rollMode: g.ctx?.mode || 'normal', attacks: g.rolls.length, hits: 0 });
+  }
+  _damageQueue = _groups.filter((g) => !g.blocked && g.hits > 0);
+  if (!_damageQueue.length) {
+    _consumeMulti();
+    _close({ results: _multiResults });
+    return;
+  }
+  _groupIndex = 0;
+  _showMultiDamage();
+}
+
+/** The damage step for the next target that was hit. */
+function _showMultiDamage() {
+  const g = _currentGroup();
+  _selectedTarget = g.p;
+  _selectedTargetName = g.name;
+  _selectedTargetId = g.p.id;
+  _attackRoll = g.bestRoll;
+  _atkCtx = g.ctx;
+  _reactionDamage = g.reactionDamage;
+  _showStep3();
+}
+
+/** The "next attack" statuses and dice bonuses the rolls used, spent once for the whole move. */
+function _consumeMulti() {
+  const seen = new Set();
+  const consume = [];
+  for (const g of _groups) {
+    for (const c of g.ctx?.consume || []) {
+      const key = `${c.holderId}:${c.statusId}`;
+      if (!seen.has(key)) { seen.add(key); consume.push(c); }
+    }
+  }
+  _damageBattleDice += _multiDamageBattleDice;
+  _multiDamageBattleDice = 0;
+  _consume({ consume });
+}
+
+/** The damage modifier added automatically on this damage step: the whole of it for one attack; for several, the
+ * once-per-move part on the first target hit only, plus the "on each hit" part for every hit on this one. */
+function _stepDamageModifier() {
+  const g = _currentGroup();
+  if (!g) return _damageModifier;
+  return (_groupIndex === 0 ? _damageModifier - _perHitModifier : 0) + g.hits * _perHitModifier;
 }
 
 /** Between picking a target and showing the Attack Roll step (or, on a
@@ -484,7 +790,8 @@ async function _afterTargetSelected(p, name) {
 /** A guaranteed hit still gets the attack roll -- only to see whether it crits (any roll hits). The one exception is a
  * guaranteed crit (Laser Focus): nothing left to roll for. */
 function _skipsAttackRoll() {
-  return _guaranteedHit && !!guaranteedCritStatusId(_attacker);
+  // (several attacks always roll: Laser Focus only makes the first one a crit)
+  return !_isMulti() && _guaranteedHit && !!guaranteedCritStatusId(_attacker);
 }
 
 /** Attack-roll step -- entered fresh from a target card, or returned to via
@@ -495,37 +802,16 @@ function _showStep2(p, name) {
   document.getElementById('targetPickerStep2').hidden = false;
   document.getElementById('targetPickerStep3').hidden = true;
   document.getElementById('targetPickerTitle').textContent = 'Attack Roll';
-  document.getElementById('targetPickerRollTarget').innerHTML = `
+  document.getElementById('targetPickerSingleRoll').hidden = false;
+  document.getElementById('targetPickerMultiRolls').hidden = true;
+  const chip = document.getElementById('targetPickerRollTarget');
+  chip.className = 'target-picker-roll-target';
+  chip.innerHTML = `
     <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName, '', '', { small: true })}</div>
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
-  _atkCtx = attackRollContext(_attacker, _selectedTarget, _moveAbilityResolver(_moveName), { ignoreTargetStatChanges: !!_moveFlagResolver(_moveName)?.ignoresTargetStatChanges, ignoreTargetAcBoosts: !!_moveFlagResolver(_moveName)?.ignoresTargetAcBoosts });
-  const weatherMode = _atkCtx ? _weatherModeResolver(_moveName, _attacker?.id) : null;
-  if (weatherMode) {
-    _atkCtx.mode = mergeRollMode(_atkCtx.mode, weatherMode.mode);
-    if (weatherMode.note) _atkCtx.notes.push(weatherMode.note);
-  }
-  const coverMode = _atkCtx ? _coverModeResolver(_moveName, _attacker?.id, _selectedTarget?.id) : null;
-  if (coverMode) {
-    _atkCtx.mode = mergeRollMode(_atkCtx.mode, coverMode.mode);
-    if (coverMode.note) _atkCtx.notes.push(coverMode.note);
-  }
-  if (_forcedRollMode && _atkCtx) {
-    _atkCtx.mode = mergeRollMode(_atkCtx.mode, _forcedRollMode);
-    if (_forcedRollNote) _atkCtx.notes.push(_forcedRollNote);
-  }
-  // Feint Attack, Close Combat, Limit Break, ...: the move's own attack is always rolled with advantage.
-  const ownMode = _atkCtx ? _moveFlagResolver(_moveName)?.attackRollMode : null;
-  if (ownMode) {
-    _atkCtx.mode = mergeRollMode(_atkCtx.mode, ownMode);
-    _atkCtx.notes.push(`${_moveName}: always rolled with ${ownMode}`);
-  }
+  _atkCtx = _buildAtkCtx(_selectedTarget);
   // Abilities that have to be called before this roll (Intimidate, Heavy Metal, Lightning Rod, Huge Power...).
-  const atkRow = _moveRowResolver(_moveName);
-  const reminders = atkRow
-    ? attackRollReminders(_attacker, _selectedTarget, moveAbilityMods(_attacker, atkRow).type, { damaging: !!_damageDice })
-    : [];
-  document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx)
-    + reminders.map(r => `<div class="note ability-reminder-note">${r}</div>`).join('');
+  document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx) + _remindersHtml(_selectedTarget);
   _diceBonusExtra = 0;
   _diceBonusConsume = [];
   _attackBattleDice = 0;
@@ -571,6 +857,7 @@ function _effectiveTargetAc() {
 }
 
 function _updateAttackTotal() {
+  if (_isMulti()) { _updateMultiTotals(); return; }
   const raw = _currentAttackRoll();
   const totalEl = document.getElementById('targetPickerAttackTotal');
   if (raw === null) { totalEl.innerHTML = ''; return; }
@@ -599,6 +886,7 @@ function _confirmMiss() {
  * roll is entered -- the one-shot battle animation only plays once the damage roll is
  * actually confirmed (see _confirmDamageRoll/_playAnimation). */
 function _confirmAttack() {
+  if (_isMulti()) { _confirmMultiAttack(); return; }
   const attackRoll = _currentAttackRoll();
   if (attackRoll === null) return;
   commitMove(); // the attack was rolled -- the move is paid for now, hit or miss (move-commit.js)
@@ -617,6 +905,7 @@ function _confirmAttack() {
  * target. A guaranteed hit has no attack-roll step to return to, so it goes
  * back to target selection instead. */
 function _backFromDamage() {
+  if (_isMulti()) { _showMultiStep2(); return; } // (only offered on the first target's damage -- see _showStep3)
   if (_skipsAttackRoll()) _showStep1();
   else _showStep2();
 }
@@ -752,22 +1041,44 @@ function _showStep3() {
   }
   noteEl.innerHTML = noteParts.join('');
   // Which dice to roll, the target's own notes included (Electro Ball's tier swap, Hex's doubled dice...).
-  const rollDice = !_damageDice ? ''
+  const hitDice = !_damageDice ? ''
     : diceOverride ? diceOverride
     : diceMultiplier > 1 ? multiplyDiceString(_damageDice, diceMultiplier)
     : extraDiceCount > 0 ? addDiceString(_damageDice, extraDiceCount)
     : _damageDice;
+  // Several attacks: the hits on this target rolled together -- 2 hits of 1d4 is 2d4.
+  const group = _currentGroup();
+  const hits = group ? group.hits : 1;
+  let rollDice = hitDice;
+  if (hits > 1 && hitDice) {
+    const together = multiplyDiceString(hitDice, hits);
+    rollDice = together !== hitDice ? together : `${hits} × (${hitDice})`;
+  }
   document.getElementById('targetPickerDiceText').innerHTML = rollDice ? `: <strong>${rollDice}</strong>` : '';
   // A critical hit (the user's rule, 2026-10-15): the move's dice count at their maximum, on top of the roll and the
   // modifier -- Hyper Fang's 2d6 rolled 5 with +6 does 5 + 6 + 12. The target's Battle Armor & co. cancel the extra.
-  const critInfo = _critResolver(_moveName, _attacker?.id, _attackRoll, _selectedTargetId) || {};
-  _critBonus = critInfo.crit && !critInfo.blockedBy && rollDice ? _maxOfDice(rollDice) : 0;
-  if (critInfo.crit) {
-    noteEl.insertAdjacentHTML('afterbegin', critInfo.blockedBy
-      ? `<div class="note">Critical hit -- but ${critInfo.blockedBy}: no extra damage, roll the normal dice</div>`
-      : `<div class="mode advantage">💥 Critical hit! The dice count at full (${rollDice} = ${_critBonus}) on top of your roll${_critBonus ? ` -- +${_critBonus} added automatically` : ''}</div>`);
+  // With several attacks, only the ones that crit: one die-set at full for each.
+  if (group) {
+    const n = group.crits;
+    _critBonus = n && hitDice ? n * _maxOfDice(hitDice) : 0;
+    if (n) {
+      noteEl.insertAdjacentHTML('afterbegin', `<div class="mode advantage">💥 ${n === 1 ? 'A critical hit' : `${n} critical hits`}! ${n === 1 ? 'Its' : 'Their'} dice count at full (${n} × ${hitDice} = ${_critBonus}) on top of your roll -- +${_critBonus} added automatically</div>`);
+    } else if (group.critBlockedBy) {
+      noteEl.insertAdjacentHTML('afterbegin', `<div class="note">Critical hit -- but ${group.critBlockedBy}: no extra damage, roll the normal dice</div>`);
+    }
+    noteEl.insertAdjacentHTML('afterbegin', `<div class="note"><strong>${group.hits} of ${group.rolls.length}</strong> ${group.rolls.length === 1 ? 'attack' : 'attacks'} hit ${_selectedTargetName}${group.hits > 1 ? ' -- roll their damage together' : ''}</div>`);
+  } else {
+    const critInfo = _critResolver(_moveName, _attacker?.id, _attackRoll, _selectedTargetId) || {};
+    _critBonus = critInfo.crit && !critInfo.blockedBy && rollDice ? _maxOfDice(rollDice) : 0;
+    if (critInfo.crit) {
+      noteEl.insertAdjacentHTML('afterbegin', critInfo.blockedBy
+        ? `<div class="note">Critical hit -- but ${critInfo.blockedBy}: no extra damage, roll the normal dice</div>`
+        : `<div class="mode advantage">💥 Critical hit! The dice count at full (${rollDice} = ${_critBonus}) on top of your roll${_critBonus ? ` -- +${_critBonus} added automatically` : ''}</div>`);
+    }
   }
   _baseTargetFlat += _critBonus;
+  // Several attacks: back to the rolls only from the first target's damage (a later one's are already in).
+  if (_isMulti()) document.getElementById('targetPickerBackToAttack').style.display = _groupIndex === 0 ? '' : 'none';
 
   _damageDiceExtra = 0;
   _damageBattleDice = 0;
@@ -775,7 +1086,8 @@ function _showStep3() {
   const input = document.getElementById('targetPickerRollInput');
   input.value = _presetRoll != null ? _presetRoll : '';
   // Blaze / Torrent... -- their extra dice in a field of their own (ability-dice-inputs.js). Not on a pre-filled amount.
-  renderAbilityDiceInputs(document.getElementById('targetPickerAbilityDice'), _presetRoll != null ? [] : _abilityDice,
+  // (once per move: on the first target's damage only)
+  renderAbilityDiceInputs(document.getElementById('targetPickerAbilityDice'), _presetRoll != null || (_isMulti() && _groupIndex > 0) ? [] : _abilityDice,
     { labelClass: 'target-picker-roll-label', inputClass: 'target-picker-roll-input', onInput: _updateRollTotal, onEnter: _confirmDamageRoll });
 
   // Abilities against THIS target (ability-mods.js): drawn now, then again once the server says how effective the hit
@@ -818,7 +1130,7 @@ function _renderAbilityDamage(row, moveType, typeMultiplier) {
   }
   ab.notes.forEach(n => lines.push(`<div class="note">${n}</div>`));
   document.getElementById('targetPickerAbilityNote').innerHTML = lines.join('');
-  const totalMod = _damageModifier + _targetFlatBonus;
+  const totalMod = _stepDamageModifier() + _targetFlatBonus;
   document.getElementById('targetPickerModifierNote').textContent =
     totalMod ? ` (${totalMod >= 0 ? '+' : ''}${totalMod} modifier added automatically)` : '';
   _updateRollTotal();
@@ -829,7 +1141,7 @@ function _updateRollTotal() {
   const totalEl = document.getElementById('targetPickerRollTotal');
   const ability = abilityDiceSum(document.getElementById('targetPickerAbilityDice'));
   totalEl.innerHTML = Number.isNaN(raw) ? ''
-    : `Total: <strong>${raw + _damageModifier + _targetFlatBonus + _damageDiceExtra + (ability || 0)}</strong>${Number.isNaN(ability) ? ' (+ the ability roll below)' : ''}`;
+    : `Total: <strong>${raw + _stepDamageModifier() + _targetFlatBonus + _damageDiceExtra + (ability || 0)}</strong>${Number.isNaN(ability) ? ' (+ the ability roll below)' : ''}`;
 }
 
 /** Confirm Damage -- plays the one-shot attack animation (see _playAnimation)
@@ -850,6 +1162,28 @@ async function _confirmDamageRoll() {
   if (btn.disabled) return;
   btn.disabled = true;
   commitMove(); // a guaranteed hit has no attack roll -- the damage roll is what pays for it
+  const group = _currentGroup();
+  if (group) {
+    // Several attacks: this target's hits, with the whole modifier already in (modifierIncluded -- the once-per-move
+    // part only went on the first target's), then the next target hit, or done.
+    _multiResults.push({
+      targetId: group.p.id, hit: true, modifierIncluded: true,
+      rawRoll: raw + _stepDamageModifier() + _targetFlatBonus + _damageDiceExtra + abilityRoll,
+      attackRoll: group.bestRoll, attackTotal: group.bestRoll + _groupAttackMod(group), rollMode: group.ctx?.mode || 'normal',
+      crit: group.anyCrit, hits: group.hits, attacks: group.rolls.length,
+      ...(group.reactionDamage ? { reactionMultiplier: group.reactionDamage.multiplier, reactionPool: group.reactionDamage.pool } : {}),
+    });
+    if (_groupIndex + 1 < _damageQueue.length) {
+      _groupIndex++;
+      _multiDamageBattleDice += _damageBattleDice; // (the next damage step starts its own count)
+      _showMultiDamage();
+      return;
+    }
+    _consumeMulti();
+    await _playAnimation();
+    _close({ results: _multiResults });
+    return;
+  }
   const result = {
     // _targetFlatBonus (Crush Grip's own "+proficiency if target above 50%
     // HP", see _showStep3) folded straight into rawRoll -- the caller
@@ -917,8 +1251,14 @@ function _cardHtml(p) {
  * The attacker is never offered as a target card -- the "No Target
  * (self-only move)" button already covers "this doesn't hit anyone else",
  * so a separate self-card would just be the same choice twice.
+ *
+ * `attacks` > 1 (Bubble, Double Hit -- see the module's _attackCount): every attack rolled in one step, the hits on a
+ * target in one damage entry. Resolves to {results: [...]} then -- one entry per creature targeted, each shaped as above
+ * ({targetId, blocked} / {targetId, hit:false, ...} / {targetId, hit:true, rawRoll, modifierIncluded: true, crit, hits,
+ * attacks, ...}) -- or null if closed before anything was rolled. `splitTargets`, `guaranteedAttacks` and
+ * `perHitModifier` as described there.
  */
-export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null, feintMoveName = '', abilityDice = [] } = {}) {
+export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null, feintMoveName = '', abilityDice = [], attacks = 1, splitTargets = false, guaranteedAttacks = null, perHitModifier = 0 } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -947,6 +1287,11 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _feintMoveName = feintMoveName;
   _targetFlatBonus = 0;
   _reactionDamage = null;
+  _attackCount = Math.max(1, Math.floor(Number(attacks)) || 1);
+  _splitTargets = _attackCount > 1 && !!splitTargets;
+  _guaranteedAttacks = guaranteedAttacks == null ? (guaranteedHit ? _attackCount : 0) : Math.min(_attackCount, guaranteedAttacks);
+  _perHitModifier = _attackCount > 1 ? perHitModifier : 0;
+  _multiDamageBattleDice = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   document.getElementById('targetPickerBack').style.display = '';
   document.getElementById('targetPickerBackToAttack').style.display = '';
@@ -957,9 +1302,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   grid.querySelectorAll('[data-target-id]').forEach(card => {
     card.addEventListener('click', () => {
       const p = session.participants[card.dataset.targetId];
-      const name = visibleToViewer(p, 'name') ? p.name : '???';
-      _selectedTargetId = card.dataset.targetId;
-      _afterTargetSelected(p, name);
+      _onTargetCard(card, p, visibleToViewer(p, 'name') ? p.name : '???');
     });
   });
 
@@ -998,6 +1341,10 @@ export async function pickTargetAgain(target, targetName, { attackModifier = 0, 
   _forcedRollNote = forcedRollNote;
   _feintMoveName = ''; // never reaches _afterTargetSelected from here -- see this function's own header
   _targetFlatBonus = 0;
+  _attackCount = 1; // (one attack at a time here)
+  _splitTargets = false;
+  _guaranteedAttacks = 0;
+  _perHitModifier = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   _selectedTargetId = target.id;
   document.getElementById('targetPickerBack').style.display = 'none';

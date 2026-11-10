@@ -1479,9 +1479,10 @@ function _isCritRoll(attackerId, moveName, attackRoll) {
 }
 // The damage step adds a critical hit's maxed dice (target-picker.js) -- Laser Focus makes it one whatever the roll;
 // a target whose ability cancels a crit's extra damage (Battle Armor, Shell Armor) gets none.
-setCritResolver((moveName, attackerId, attackRoll, targetId) => {
+// `first` false: a later attack of a move that makes several (Bubble) -- Laser Focus was the first one's.
+setCritResolver((moveName, attackerId, attackRoll, targetId, { first = true } = {}) => {
   const attacker = session?.participants?.[attackerId];
-  const crit = !!guaranteedCritStatusId(attacker) || _isCritRoll(attackerId, moveName, attackRoll);
+  const crit = (first && !!guaranteedCritStatusId(attacker)) || _isCritRoll(attackerId, moveName, attackRoll);
   if (!crit) return { crit: false };
   const target = session?.participants?.[targetId];
   const block = target ? abilityEffectsOf(target).find(({ effect: e }) => e.kind === 'immunity' && e.critDamage) : null;
@@ -3686,13 +3687,19 @@ async function _handleBideResolve({ combatantId, dealt }) {
  * must re-evaluate this each time through, not reuse whatever was true
  * before the first hit already spent it. */
 function _guaranteedHitFor(combatantId, categories, moveName) {
+  if (_standingGuaranteedHit(combatantId, categories, moveName)) return true;
+  const attacker = session?.participants?.[combatantId];
+  return !!guaranteedCritStatusId(attacker) || !!guaranteedHitStatusId(attacker);
+}
+
+/** The guarantees that cover every attack, not just the next one: the move's own (guaranteed_hit) and Thunderstorm
+ * Dance's standing "all electric type moves are guaranteed to hit" -- NOT consumed (unlike Laser Focus / Lock-On),
+ * scoped to the move's own type. */
+function _standingGuaranteedHit(combatantId, categories, moveName) {
   if (categories.includes('guaranteed_hit')) return true;
   const attacker = session?.participants?.[combatantId];
-  // Thunderstorm Dance's standing "all electric type moves are guaranteed to hit" -- NOT
-  // consumed (unlike the one-shot flags below), scoped to the move's own type.
   const moveType = String(findMoveRow(moveName)?.type || '').toUpperCase();
-  if (moveType && (attacker?.statuses || []).some((st) => st.kind === 'condition' && st.apply === 'guaranteed_hit_type' && String(st.value || '').toUpperCase() === moveType)) return true;
-  return !!guaranteedCritStatusId(attacker) || !!guaranteedHitStatusId(attacker);
+  return !!moveType && (attacker?.statuses || []).some((st) => st.kind === 'condition' && st.apply === 'guaranteed_hit_type' && String(st.value || '').toUpperCase() === moveType);
 }
 
 /** The name of a move `combatantId` knows that carries `negatesProtectBlock`
@@ -3747,6 +3754,13 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // Target-conditional damage_note effects (Brine, Smelling Salts, Venoshock,
   // ...) -- see move-effects-schema.md and target-picker.js's own use of these.
   const damageNotes = _targetDamageNotes(moveName);
+  const combined = categories.includes('multi_hit_combined_roll') ? _combinedAttacks(moveName, combatantId, computedData) : null;
+  if (combined) {
+    // Bubble, Double Hit, Bonemerang...: every attack rolled in one go, one damage entry per target hit (target-picker.js).
+    const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, feintMoveName: _feintMoveNameFor(combatantId), ...combined });
+    await _resolveCombinedAttacks(combatantId, moveName, move, computedData, speciesName, picked);
+    return;
+  }
   const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, feintMoveName: _feintMoveNameFor(combatantId) });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { direct: true });
 
@@ -3779,6 +3793,48 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, feintMoveName: _feintMoveNameFor(combatantId) });
     }
     hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, nextPicked);
+  }
+}
+
+const _ATTACK_COUNT_WORDS = { two: 2, three: 3, four: 4, five: 5 };
+
+/** A `multi_hit_combined_roll` move's attacks, from its text (the user's rules, 2026-11-10): how many ("make three
+ * ranged attacks", "make two attack rolls"); at one target when the text says "a target" (Bubble, Bonemerang, Coin
+ * Toss), else each picks its own (Double Hit, Page Slice); how many can't miss (all with Swift-likes or Thunderstorm
+ * Dance, the first only with Lock-On / Mind Reader / Laser Focus's one-shot); and the part of the damage modifier its
+ * text gives "on each hit" -- a "+ MOVE" -- since the rest (STAB...) is added once for the whole move. null when the
+ * count can't be read (it's then one attack, as before). */
+function _combinedAttacks(moveName, combatantId, computedData) {
+  const text = String((findMoveRow(moveName) || {}).description || '');
+  const m = /\bmake (two|three|four|five|\d+) (?:ranged |melee )?attack(?: roll)?s\b/i.exec(text);
+  const attacks = m ? (_ATTACK_COUNT_WORDS[m[1].toLowerCase()] || parseInt(m[1], 10)) : 0;
+  if (!(attacks > 1)) return null;
+  const attacker = session?.participants?.[combatantId];
+  const oneShot = !!guaranteedCritStatusId(attacker) || !!guaranteedHitStatusId(attacker);
+  const standing = _standingGuaranteedHit(combatantId, moveCategoriesFor(moveName), moveName);
+  return {
+    attacks,
+    splitTargets: !/\ba target\b/i.test(text),
+    guaranteedAttacks: standing ? attacks : oneShot ? 1 : 0,
+    perHitModifier: /\+\s*MOVE/i.test(text) ? (computedData.highestMod || 0) : 0,
+  };
+}
+
+/** What pickTarget's several-attack step handed back ({results: [...]}, one per creature targeted): each target's
+ * share resolved like a single hit (a miss logged, damage applied, effects offered), plus a log line when only some of
+ * the attacks at it hit. */
+async function _resolveCombinedAttacks(combatantId, moveName, move, computedData, speciesName, picked) {
+  if (!picked?.results) return;
+  const attackerName = session?.participants?.[combatantId]?.name || '?';
+  for (const r of picked.results) {
+    if (r.hit && r.attacks > 1) {
+      const targetName = session?.participants?.[r.targetId]?.name || '?';
+      CombatAPI.logEvent({
+        type: 'attack-rolls', actorId: combatantId, actorName: attackerName, targetId: r.targetId, targetName, move: moveName,
+        text: `${attackerName}'s ${moveName}: ${r.hits} of ${r.attacks} attacks hit ${targetName}`,
+      }).catch(() => {});
+    }
+    await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, r, { direct: true });
   }
 }
 
@@ -6087,7 +6143,8 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   }
 
   const { targetId, rawRoll } = picked;
-  const damageModifier = computedData.damageBonus || 0;
+  // (several attacks in one: the picker already added the modifier -- once per move, see target-picker.js)
+  const damageModifier = picked.modifierIncluded ? 0 : (computedData.damageBonus || 0);
   const moveType = (move && move.type) || '';
 
   // What the recorded rolls say this hit triggered: natural-roll thresholds, a crit,
@@ -6123,6 +6180,8 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   // hit's actually resolved) since it also affects the `crit` this damage log gets.
   const laserFocusId = guaranteedCritStatusId(attacker);
   if (laserFocusId) crit = true;
+  // Several attacks in one (Bubble): the picker checked each attack's crit itself (Laser Focus on the first only).
+  if (typeof picked.crit === 'boolean') crit = picked.crit;
 
   let damageDealt, targetFainted, rawDamageDealt, lastTypeMultiplier = null;
   try {

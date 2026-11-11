@@ -311,11 +311,11 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-stat label { font-size: 0.68rem; font-weight: 800; color: var(--dm-muted); }
 .dm-stat input::placeholder { color: #7b7c99; }
 .dm-cs-work { gap: 1rem; }
-/* Stays in view while the form below scrolls, so placing someone never means scrolling back up. */
+/* Scrolls with the page, the form under it (the user's call, 2026-11-11: kept in view, the form slid behind it) --
+   as big as the screen lets it be (creature-setup.js's renderMap). */
 .dm-cs-mapbox {
-  position: sticky; top: -1rem; z-index: 5; display: flex; flex-direction: column; gap: 0.4rem;
+  display: flex; flex-direction: column; gap: 0.4rem; flex: none;
   background: var(--dm-panel); border: 1px solid var(--dm-line); border-radius: 14px; padding: 0.7rem 0.8rem 0.8rem;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
 }
 .dm-cs-mapbox .dm-map-wrap { flex: none; }
 .dm-cs-mapbox .dm-map-cell { cursor: pointer; }

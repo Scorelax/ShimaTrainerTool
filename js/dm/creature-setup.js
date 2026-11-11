@@ -5,8 +5,9 @@
 // fine-tune it here -- override any of its numbers, give it extra skills; an NPC trainer's numbers likewise. Each is
 // saved with a ready battle participant (setup-store.js), so Start battle only has to send them in.
 //
-// The map sits above the form: pick someone (from the list or by clicking their token) and click a square to stand
-// them there. Map setup's Participants opens it with the one clicked already picked (`select`). A hidden one can stand on
+// The map sits above the form (scrolling with it, Horizontal or Vertical as the map editor shows it): pick someone (from
+// the list or by clicking their token) and click a square to stand them there -- on their own square again, to take
+// them off. Map setup's Participants opens it with the one clicked already picked (`select`). A hidden one can stand on
 // the map too -- see-through, only the DM sees it until it's shown; one not placed joins later (the user's call,
 // 2026-10-27; routes_combat.start_prepared_session starts both).
 import { DmAPI } from '../api.js';
@@ -18,7 +19,7 @@ import {
   natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect, portraitOptionsHtml, toast,
 } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup, onSetupChange } from './setup-store.js';
-import { mapStageHtml, tokenScreenRect, creatureSpotProblem, mapUpright, sizeStage, stageKey, keepSprites, PLACED_FACING } from './map-view.js';
+import { mapStageHtml, tokenScreenRect, creatureSpotProblem, mapUpright, setMapUpright, sizeStage, stageKey, keepSprites, PLACED_FACING } from './map-view.js';
 
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
@@ -54,13 +55,27 @@ export async function renderCreatureSetup(root, { onDone, select = null }) {
       </aside>
       <section class="dm-editor-canvas dm-cs-work">
         <div class="dm-cs-mapbox">
-          <div class="dm-editor-hint" id="csMapHint"></div>
+          <div class="dm-map-viewbar">
+            <div class="dm-editor-hint" id="csMapHint"></div>
+            <div class="dm-map-turnpick" id="csTurnPick" role="group" aria-label="How the map is shown on this screen"
+              title="Only how the map is shown here -- the table TV shows it the same either way">
+              <button class="dm-btn small" data-map-turn="0">▭ Horizontal</button>
+              <button class="dm-btn small" data-map-turn="1">▯ Vertical</button>
+            </div>
+          </div>
           <div class="dm-map-wrap" id="csMap"></div>
         </div>
         <div class="dm-cs-editor" id="csEditor"></div>
       </section>
     </div>`;
   document.getElementById('csBack').addEventListener('click', leave);
+  // Horizontal / Vertical, as in the map editor (the user's call, 2026-11-11) -- the same choice, kept on this computer
+  document.getElementById('csTurnPick').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-map-turn]');
+    if (!b || (b.dataset.mapTurn === '1') === mapUpright()) return;
+    setMapUpright(b.dataset.mapTurn === '1');
+    renderMap();
+  });
   document.getElementById('csToEnc').addEventListener('click', async () => {
     await leave();
     window.dispatchEvent(new CustomEvent('dm:battle-tab', { detail: { tab: 'library' } }));
@@ -165,7 +180,10 @@ function renderMap() {
   wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: sel?.id, upright: mapUpright() });   // (as the map setup shows it)
   wrap._key = mapKey();
   const stage = wrap.querySelector('.dm-map-stage');
-  sizeStage(wrap, m, mapUpright() ? '60vh' : '34vh');
+  // As big as the screen lets it be -- its width, or the screen's height under the bar and the map's own bar (the user's
+  // call, 2026-11-11: it scrolls with the page now, so it needn't stay small to leave room for the form)
+  sizeStage(wrap, m, 'max(20rem, 100vh - 13rem)');
+  document.querySelectorAll('#csTurnPick [data-map-turn]').forEach(b => b.classList.toggle('primary', (b.dataset.mapTurn === '1') === mapUpright()));
   stage.querySelectorAll('[data-img]').forEach((el) => {
     if (!el.dataset.img) el.innerHTML = '<span class="dm-token-emoji">👤</span>';
     else if (!putShown(el)) patchPortraitMedia(el, el.dataset.img, '');
@@ -175,7 +193,7 @@ function renderMap() {
   if (hint) {
     hint.textContent = !sel
       ? 'Pick someone on the left (or click a token) to place them on the map.'
-      : `Click a square to place ${sel.name}${sel.position ? ' somewhere else' : ''}${sel.heldBack ? " -- hidden: only you see it until it's shown" : ''}.`;
+      : `Click a square to place ${sel.name}${sel.position ? ' somewhere else, or on it to take it off the map' : ''}${sel.heldBack ? " -- hidden: only you see it until it's shown" : ''}.`;
   }
 
   const grid = stage.querySelector('.dm-map-grid');
@@ -213,7 +231,13 @@ function onMapClick(col, row) {
   const other = creatureAt(col, row);
   const sel = selectedCreature();
   if (other && other.id !== sel?.id) { edit({ mode: other.kind, id: other.id }); return; }
-  if (!sel || other) return;
+  if (!sel) return;
+  // On where it already stands: off the map again (the user's call, 2026-11-11 -- quick to take back)
+  if (other) {
+    updateSetup(s => { s.creatures.find(x => x.id === sel.id).position = null; });
+    renderPlacementLine();
+    return;
+  }
   const problem = creatureSpotProblem(getSetup(), sel, col, row);
   if (problem) { showCombatAlert(problem, { title: sel.name }); return; }
   // facing the players' side when first placed; moved, it keeps the way it faces

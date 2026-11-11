@@ -189,6 +189,8 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-editor-hint { font-size: 0.86rem; color: var(--dm-muted); min-height: 1.2em; }
 
 .dm-tool-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 0.7rem; }
+.dm-tool-tabs.dm-tool-tabs-3 { grid-template-columns: repeat(3, 1fr); } /* the map editor's one row: Pokémon, Items, Objects... */
+.dm-tool-tabs-3 button { padding: 0.45rem 0.1rem; font-size: 0.77rem; white-space: nowrap; letter-spacing: -0.01em; }
 .dm-tool-tabs button {
   padding: 0.45rem 0.3rem; border-radius: 7px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.04);
   color: var(--dm-text); font-size: 0.82rem; font-weight: 700; cursor: pointer;
@@ -1392,9 +1394,6 @@ span.dm-trap-pick { cursor: default; }
 .dm-adm-logtime { color: var(--dm-muted); font-variant-numeric: tabular-nums; font-size: 0.78rem; padding-top: 1px; }
 
 /* Map editor: Add to the map */
-.dm-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
-.dm-add-grid .dm-btn { padding: 0.55rem 0.4rem; font-weight: 800; }
-.dm-add-grid .dm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .dm-object-pick { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.5rem; }
 .dm-object-pick .dm-object-preview { width: 64px; height: 64px; flex: none; margin: 0; }
 .dm-object-pick > div:last-child { display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-start; min-width: 0; font-size: 0.86rem; }

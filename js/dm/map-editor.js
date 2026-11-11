@@ -31,6 +31,10 @@
 // (shown upright on a wide screen: a column of their own right of the map); Horizontal / Vertical and the zoom over the
 // map; the Eraser takes the adventure's Pokemon and NPCs off too; the adventure saves its map from its own bar
 // (saveMapDialog) instead of a Saved maps card.
+//
+// 2026-11-11 (the user's call): Add to the map and the tools are one row -- Pokémon, Items, Objects, Terrain, Traps, Eraser.
+// Map setup's Pokémon places who's in the next battle (from Encounter setup) -- before, they only showed on the map. The
+// object being placed (or Items, being placed) clicked again lets go of it.
 import { CombatAPI, DmAPI } from '../api.js';
 import { mapObjectHtml, objectScreenRect, objectCells, footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
@@ -50,7 +54,7 @@ const getSetup = () => _store.getSetup();
 const updateSetup = (fn) => _store.updateSetup(fn);
 const flushSetup = () => _store.flushSetup();
 const onSetupChange = (fn) => _store.onSetupChange(fn);
-import { mapStageHtml, mapUpright, setMapUpright, sizeStage, pointOn, screenStep, stageKey as drawnKey, keepSprites, PLACED_FACING } from './map-view.js';
+import { mapStageHtml, mapUpright, setMapUpright, sizeStage, pointOn, screenStep, stageKey as drawnKey, keepSprites, PLACED_FACING, tokenScreenRect } from './map-view.js';
 
 // Starting height (ft) for an object the DM places -- changeable before placing. Anything not listed starts at 5ft.
 const DEFAULT_HEIGHTS = { tree: 30, rock: 5, bush: 5, log: 5 };
@@ -85,7 +89,10 @@ const HOLD_MS = 350; // a press on a placed object held this long turns it (a sh
 
 /** The adventure being prepared: its Pokemon and NPCs are the map's own (the store's creatures), not a battle's. */
 const prepCreatures = () => !_live && !!_opts.adventure;
-const creaturesTool = () => _live || prepCreatures();
+/** Map setup's own map: the next battle's creatures (from Encounter setup) stand on it -- placed with the Pokémon tool
+ * (the user's call, 2026-11-11). An encounter's own map (map-store.js) has nobody on it. */
+const battleCreatures = () => !_live && !_opts.adventure && _store === setupStore;
+const creaturesTool = () => _live || prepCreatures() || battleCreatures();
 /** One of the DM's own creatures (a player's can be moved, but not hidden or taken off from here). */
 const dmOwned = c => !_live || !c.owner || c.owner === 'DM';
 
@@ -305,7 +312,7 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
   _onDone = onDone;
   _live = live;
   _store = store || (live ? liveStore : setupStore);
-  if (!live && !adventure && ed.tool === 'creatures') ed.tool = 'objects';
+  if (!creaturesTool() && ed.tool === 'creatures') ed.tool = 'objects';
   if (!live && !adventure) ed.creatureQueue = [];
   root.innerHTML = '<div class="dm-loading">Loading the map tools…</div>';
   try {
@@ -334,23 +341,18 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
 
           <div class="dm-card">
             <div class="dm-card-title">Add to the map</div>
-            <div class="dm-add-grid" id="mapAdd">
-              ${adventure ? `<button class="dm-btn" data-add="pokemon">🐾 Pokémon</button>
-              <button class="dm-btn" data-add="npc">👤 NPCs</button>` : ''}
-              <button class="dm-btn" data-add="object">🌲 Objects</button>
-              <button class="dm-btn" data-add="item">🎒 Items</button>
-            </div>
-            ${adventure && !_live ? '<div class="dm-hint" style="margin-top:0.35rem">Pokémon and NPCs wait on the map -- the players see them once the map is opened to them (hidden ones only when you show them).</div>' : ''}
-          </div>
-
-          <div class="dm-card">
-            <div class="dm-tool-tabs" id="mapTools">
+            <div class="dm-tool-tabs dm-tool-tabs-3" id="mapTools">
+              ${battleCreatures() ? '<button data-tool="creatures" title="Who\'s in the next battle (from Encounter setup) -- place, move, turn or take them off">🐾 Pokémon</button>' : ''}
+              ${adventure ? `<button data-add="pokemon">🐾 Pokémon</button>
+              <button data-add="npc">👤 NPCs</button>` : ''}
               ${_live || adventure ? '<button data-tool="creatures">🧍 Creatures</button>' : ''}
+              <button data-add="item">🎒 Items</button>
               <button data-tool="objects">🌲 Objects</button>
               <button data-tool="terrain">🟫 Terrain</button>
               <button data-tool="traps">🪤 Traps</button>
               <button data-tool="erase">🧽 Eraser</button>
             </div>
+            ${adventure && !_live ? '<div class="dm-hint" style="margin:-0.35rem 0 0.6rem">Pokémon and NPCs wait on the map -- the players see them once the map is opened to them (hidden ones only when you show them).</div>' : ''}
             <div id="mapToolPanel"></div>
           </div>
         </div>
@@ -611,11 +613,19 @@ function wireStatic() {
     document.getElementById('mapApplySize').addEventListener('click', () => applySize(Number(across.value), Number(down.value)));
   }
   document.getElementById('mapBackground').addEventListener('change', (e) => updateSetup(s => { s.map.background = e.target.value; }));
-  document.getElementById('mapAdd').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-add]');
-    if (b && !b.disabled) addToMap(b.dataset.add);
-  });
+  // One row (the user's call, 2026-11-11): Items -- and the adventure's Pokemon / NPCs -- open their picker, the rest are tools
   document.getElementById('mapTools').addEventListener('click', (e) => {
+    const add = e.target.closest('[data-add]');
+    if (add) {
+      // lit (being placed): a second click lets go of what's waiting instead
+      if (add.classList.contains('active')) {
+        if (add.dataset.add === 'item') stopPlacing();
+        else { ed.creatureQueue = []; renderToolPanel(); }
+        return;
+      }
+      addToMap(add.dataset.add);
+      return;
+    }
     const b = e.target.closest('[data-tool]');
     if (!b) return;
     ed.tool = b.dataset.tool;
@@ -752,11 +762,25 @@ function quickObjectsHtml() {
       </div>`;
 }
 
+/** The row's button for what's being done lit: Items while items are being placed, the adventure's Pokémon / NPCs while
+ * theirs are, else the tool's own. */
+function markActiveTool() {
+  const items = ed.tool === 'objects' && !!ed.queue[0]?.item;
+  const adding = ed.tool === 'creatures' ? ed.creatureQueue[0]?.kind : null;
+  document.querySelectorAll('#mapTools button').forEach((b) => {
+    const on = b.dataset.tool ? b.dataset.tool === ed.tool && !items && !adding
+      : b.dataset.add === 'item' ? items : !!adding && b.dataset.add === adding;
+    b.classList.toggle('active', on);
+  });
+}
+
 function renderToolPanel() {
-  document.querySelectorAll('#mapTools [data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === ed.tool));
+  markActiveTool();
   const panel = document.getElementById('mapToolPanel');
   const hint = document.getElementById('mapHint');
-  if (ed.tool === 'objects') {
+  if (ed.tool === 'creatures' && battleCreatures()) {
+    renderBattleCreaturePanel(panel, hint);
+  } else if (ed.tool === 'objects') {
     const asset = currentAsset();
     const editing = !!ed.selectedId;
     const missing = editing && !ed.objectKey; // its picture is no longer on the Pi
@@ -804,7 +828,7 @@ function renderToolPanel() {
     hint.textContent = editing
       ? 'Picked up: click a square to move it there -- hold it to turn it. Click it again (or Esc) to put it down.'
       : placing()
-        ? `Click a square to place ${asset?.label || 'it'} -- or hold and move the pointer around to turn it, then let go. Esc: stop placing.`
+        ? `Click a square to place ${asset?.label || 'it'} -- or hold and move the pointer around to turn it, then let go. Click it in the list again (or Esc) to stop placing.`
         : 'Click a placed object to pick it up (then click a square to move it there) -- hold it to turn it. 🌲 Pick objects… or one from the list to place new ones.';
     // Editing: every change goes straight onto the object (applyEdit). Placing: it only changes what the next one looks like.
     const changed = () => { if (ed.selectedId) applyEdit(); else renderGhost(); };
@@ -815,7 +839,10 @@ function renderToolPanel() {
       quick.addEventListener('click', (e) => {
         const b = e.target.closest('[data-quick-obj]');
         const asset = b && _assets.objects.find(o => o.key === b.dataset.quickObj);
-        if (asset) queueObjects([{ asset, hidden: false }]);
+        if (!asset) return;
+        // the one being placed clicked again: not placing it after all (the user's call, 2026-11-11)
+        if (placing() && ed.objectKey === asset.key) { stopPlacing(); return; }
+        queueObjects([{ asset, hidden: false }]);
       });
     }
     document.getElementById('objSort')?.addEventListener('change', (e) => {
@@ -891,7 +918,7 @@ function renderToolPanel() {
     hint.textContent = 'Click or drag across squares to paint them.';
     panel.querySelectorAll('input[name="terrainKind"]').forEach(r => r.addEventListener('change', () => { ed.terrain = r.value; }));
   } else {
-    panel.innerHTML = `<div class="dm-hint">Click ${_opts.adventure ? 'a Pokémon or NPC to take it off the map, ' : ''}an object to remove it, or a marked square to clear it.</div>`;
+    panel.innerHTML = `<div class="dm-hint">Click ${_opts.adventure ? 'a Pokémon or NPC to take it off the map, ' : battleCreatures() ? 'a Pokémon or trainer to take them off the map (they stay in the battle), ' : ''}an object to remove it, or a marked square to clear it.</div>`;
     hint.textContent = 'Eraser: click what you want to remove.';
   }
 }
@@ -939,7 +966,7 @@ function stageKey(s = getSetup()) {
   return drawnKey(s, ed.tool, ed.creatureId, mapUpright());
 }
 
-/** The whole map, the way the table TV shows it. Creatures already placed in the battle setup show, for reference. */
+/** The whole map, the way the table TV shows it, with the creatures standing on it (Map setup's placed with its Pokémon tool). */
 function renderStage() {
   const wrap = document.getElementById('mapWrap');
   if (!wrap) return;
@@ -970,6 +997,7 @@ function renderStage() {
     if (ed.tool === 'terrain') { startPainting(e); paint(col, row); }
     else if (ed.tool === 'traps') startTrapStroke(e, col, row);
     else if (ed.tool === 'objects') startObjectPress(e, col, row);
+    else if (ed.tool === 'creatures' && battleCreatures()) onBattleCreaturePress(col, row);
     else if (ed.tool === 'creatures') (ed.creatureQueue.length ? placeQueuedCreature(col, row) : onCreaturePress(col, row));
     else onCellClick(col, row);
   });
@@ -1177,6 +1205,75 @@ async function removeCreature(c) {
   renderToolPanel();
 }
 
+// ---------------------------------------------------------------------------
+// Map setup's Pokémon tool (the user's call, 2026-11-11): who's in the next battle -- they come from Encounter setup, this
+// only places them. Pick one (in the list or on the map), click a square to stand them there; their own square again takes
+// them off the map (they stay in the battle) -- as Place everyone does (creature-setup.js, which also fine-tunes them).
+// ---------------------------------------------------------------------------
+
+function renderBattleCreaturePanel(panel, hint) {
+  const all = getSetup().creatures;
+  const c = all.find(x => x.id === ed.creatureId);
+  const trainers = all.filter(x => x.kind === 'trainer');
+  const wild = all.filter(x => x.kind !== 'trainer' && !trainers.some(t => t.id === x.trainerId));
+  const row = (x, nested = false) => {
+    const where = x.heldBack ? (x.position ? '🙈 hidden · 📍 on the map' : '🙈 hidden · joins later') : x.position ? '📍 on the map' : '⚠ not placed';
+    return `<button type="button" class="dm-cs-row${nested ? ' nested' : ''}${x.id === ed.creatureId ? ' selected' : ''}" data-bc="${escapeHtml(x.id)}">
+      <span class="dm-cs-thumb" data-img="${escapeHtml(x.participant?.image || '')}"></span>
+      <span class="dm-cs-main"><span class="dm-cs-name">${escapeHtml(x.name)}</span>
+        <span class="dm-cs-sub">Lv ${x.participant?.level ?? '?'} · <span class="${!x.heldBack && !x.position ? 'dm-warn-text' : ''}">${where}</span></span></span>
+    </button>`;
+  };
+  const putShown = keepSprites(panel); // (drawn again on every change -- the thumbnails' sprites carried over)
+  panel.innerHTML = `
+    ${c ? `<div class="dm-edit-head"><b>${escapeHtml(c.name)}</b><small>${c.position ? `On the map${c.heldBack ? ' -- hidden from the players' : ''}` : 'Not on the map -- click a square'}</small></div>
+      ${c.position ? `<div class="dm-field"><label>Turn</label><div class="dm-row">
+        <button class="dm-btn" data-bc-act="turn" data-v="-45" title="Turn left 45°">⟲ 45°</button><button class="dm-btn" data-bc-act="turn" data-v="45" title="Turn right 45°">⟳ 45°</button></div></div>` : ''}
+      <label class="dm-check" title="Only you see them (see-through on the map, or joining later if not placed) until you untick this"><input type="checkbox" id="bcHidden" ${c.heldBack ? 'checked' : ''}><span>🙈 Hidden from the players</span></label>
+      <div class="dm-row" style="margin-bottom:0.6rem">${c.position ? '<button class="dm-btn" data-bc-act="off">Take off the map</button>' : ''}
+        <button class="dm-btn primary" data-bc-act="done">✓ Done</button></div>` : ''}
+    <div class="dm-cs-list">${all.length ? [
+      ...trainers.map(t => `<div class="dm-cs-group">${row(t)}${all.filter(x => x.kind === 'pokemon' && x.trainerId === t.id).map(x => row(x, true)).join('')}</div>`),
+      wild.length ? `<div class="dm-cs-group">${trainers.length ? '<div class="dm-cs-group-title">Wild Pokémon</div>' : ''}${wild.map(x => row(x)).join('')}</div>` : '',
+    ].join('') : '<div class="dm-hint">Nobody in the next battle yet -- they come from Encounter setup (or 📥 Import encounter on Map setup).</div>'}</div>
+    <button class="dm-btn wide" id="bcToEnc" style="margin-top:0.6rem" title="Who's in the battle is chosen in Encounter setup"><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Change who's in it</button>`;
+  panel.querySelectorAll('[data-img]').forEach((x) => {
+    if (!x.dataset.img) x.innerHTML = '<span style="font-size:1.5rem">👤</span>';
+    else if (!putShown(x)) patchPortraitMedia(x, x.dataset.img, '');
+  });
+  hint.textContent = !c ? 'Pokémon: pick someone on the left (or click them on the map), then click a square to place them.'
+    : `Click a square to place ${c.name}${c.position ? ' somewhere else -- or on them to take them off the map' : ''}. Click them in the list again (or Esc) to let go.`;
+  const pick = (id) => { ed.creatureId = id; renderToolPanel(); renderStage(); };
+  panel.querySelectorAll('[data-bc]').forEach(b => b.addEventListener('click', () => pick(b.dataset.bc === ed.creatureId ? null : b.dataset.bc)));
+  document.getElementById('bcHidden')?.addEventListener('change', (e) => updateSetup((st) => { const x = st.creatures.find(y => y.id === c.id); if (x) x.heldBack = e.target.checked; }));
+  panel.querySelectorAll('[data-bc-act]').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.bcAct === 'done') { pick(null); return; }
+    updateSetup((st) => {
+      const x = st.creatures.find(y => y.id === c.id);
+      if (!x?.position) return;
+      if (b.dataset.bcAct === 'off') x.position = null;
+      else x.position = { ...x.position, facing: ((((Number(x.position.facing) || 0) + Number(b.dataset.v)) % 360) + 360) % 360 };
+    });
+  }));
+  document.getElementById('bcToEnc')?.addEventListener('click', async () => {
+    await leave();
+    window.dispatchEvent(new CustomEvent('dm:battle-tab', { detail: { tab: 'library' } }));
+  });
+}
+
+/** The Pokémon tool, a press on (col, row): someone else there is picked; the picked one's own square takes them off the
+ * map; an open square stands the picked one there (facing the players' side when first placed). */
+function onBattleCreaturePress(col, row) {
+  const hit = creatureAt(col, row);
+  const sel = getSetup().creatures.find(x => x.id === ed.creatureId);
+  if (hit && hit.id !== sel?.id) { ed.creatureId = hit.id; renderToolPanel(); renderStage(); return; }
+  if (!sel) return;
+  if (hit) { updateSetup((st) => { const x = st.creatures.find(y => y.id === sel.id); if (x) x.position = null; }); return; }
+  const problem = creatureSpotProblem(getSetup(), sel, col, row);
+  if (problem) { toast(problem); return; }
+  updateSetup((st) => { const x = st.creatures.find(y => y.id === sel.id); if (x) x.position = { col, row, facing: sel.position?.facing ?? PLACED_FACING }; });
+}
+
 /** The board square under the pointer, worked out from where it is on the map (the objects sit above the grid). */
 function cellAtPointer(e) {
   const grid = document.querySelector('#mapWrap .dm-map-grid');
@@ -1369,6 +1466,14 @@ function useQueued(q) {
   ed.objHidden = !!q.hidden;
 }
 
+/** Nothing waiting to be placed any more -- the objects / items picked are let go of. */
+function stopPlacing() {
+  ed.queue = [];
+  ed.objectKey = '';
+  renderToolPanel();
+  renderGhost();
+}
+
 function nextQueued() {
   ed.queue.shift();
   if (ed.queue.length) useQueued(ed.queue[0]);
@@ -1452,6 +1557,14 @@ function renderGhost() {
   if (!ghost) return;
   const m = getSetup().map;
   document.querySelectorAll('#mapWrap .bmap-object.dm-editing-hidden').forEach(el => el.classList.remove('dm-editing-hidden'));
+  if (ed.tool === 'creatures' && battleCreatures()) {
+    // where the picked one would stand -- red where they can't
+    const sel = getSetup().creatures.find(x => x.id === ed.creatureId);
+    if (!ed.hover || !sel || creatureAt(ed.hover.col, ed.hover.row)) { ghost.innerHTML = ''; return; }
+    const r = tokenScreenRect(m, ed.hover.col, ed.hover.row, footprintForSize(sel.participant?.size));
+    ghost.innerHTML = `<div class="${creatureSpotProblem(getSetup(), sel, ed.hover.col, ed.hover.row) ? 'dm-ghost-bad' : 'dm-ghost-good'}" style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"></div>`;
+    return;
+  }
   if (ed.tool !== 'objects') { ghost.innerHTML = ''; return; }
   const board = { grid: { cols: m.cols, rows: m.rows } };
   const g = ed.gesture;
@@ -1503,7 +1616,9 @@ async function onCellClick(col, row) {
   const m = getSetup().map;
   if (ed.tool === 'erase') {
     // the adventure's Pokemon and NPCs too (the user's call, 2026-10-27) -- the DM's own; a player's leaves from their app
-    const who = _opts.adventure ? creatureAt(col, row) : null;
+    const who = _opts.adventure || battleCreatures() ? creatureAt(col, row) : null;
+    // Map setup: off the map, still in the battle
+    if (who && battleCreatures()) { updateSetup((st) => { const x = st.creatures.find(y => y.id === who.id); if (x) x.position = null; }); return; }
     if (who) {
       if (dmOwned(who)) removeCreature(who); else toast(`${who.name} is a player's -- they leave from their own app.`);
       return;

@@ -235,6 +235,38 @@ OLD_TARGET_SPELLINGS = {'Elqueeen': 'Elqueen', 'Agulizz': 'Agiluzz', 'Compiizard
                         'Silivolt': 'Silvolt', 'Blaziiken': 'Blaziken'}
 
 
+_TARGET_KEYS = ('evoToTargets', 'evoReqTargets', 'evoReqLines')
+
+
+def clean_evolution_targets(config):
+    """Each species' per-target evolution switches name only its own evolutions (the user's call, 2026-11-11: Tangela
+    (Stalker Form) listed Igniscairn, Albaross and Mightyena -- the defaults' targets, copied in with them by settings
+    made before that was fixed; the evolution page offered them). Spelled as the species data spells them; a species
+    the data doesn't know is left as it is. The defaults name no targets (theirs stand for every species' with one
+    switch). In place; True when anything changed."""
+    changed = False
+    defaults = (config or {}).get('defaults')
+    if isinstance(defaults, dict):
+        for key in _TARGET_KEYS:
+            if defaults.get(key):
+                defaults[key] = {}
+                changed = True
+    for name, vis in ((config or {}).get('visibility') or {}).items():
+        sp = get(name)
+        if sp is None or not isinstance(vis, dict):
+            continue
+        real = {t.lower(): t for t in evolves_into_names(sp)}
+        for key in _TARGET_KEYS:
+            targets = vis.get(key)
+            if not isinstance(targets, dict):
+                continue
+            kept = {real[str(t).lower()]: v for t, v in targets.items() if str(t).lower() in real}
+            if kept != targets:
+                vis[key] = kept
+                changed = True
+    return changed
+
+
 def fix_target_spellings(config):
     """The players' Pokedex settings saved before the fix keep their per-evolution-target switches under the old
     spelling -- renamed to the species' name (in place; True when anything changed)."""

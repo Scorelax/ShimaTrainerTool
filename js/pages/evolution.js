@@ -5,7 +5,7 @@ import { cachedPokemon, forgetPokemon, storePokemon } from '../utils/owned-pokem
 import { PokemonAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
-import { initializeVisibility, getPokemonVisibility } from '../utils/visibility.js';
+import { initializeVisibility, getPokemonVisibility, shownEvolutions } from '../utils/visibility.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 import { spriteMediaHtml, renderSpriteInto, prefetchSprite } from '../utils/sprite-media.js';
 import { loadTrainer } from '../utils/trainer-data.js';
@@ -675,24 +675,6 @@ async function loadEvolutionOptions() {
   const currentPokemonName = currentPokemon.name; // Pokemon name at index 2
 
   try {
-    // Get visibility settings for current Pokemon
-    const visibility = getPokemonVisibility(currentPokemonName);
-    const evoToTargets = visibility.evoToTargets || {};
-
-    console.log('[Evolution] Checking evoToTargets for', currentPokemonName, ':', evoToTargets);
-
-    // Get target Pokemon names where value is true
-    const targetNames = Object.keys(evoToTargets).filter(name => evoToTargets[name] === true);
-
-    if (targetNames.length === 0) {
-      console.log('[Evolution] No evolution targets defined in config');
-      document.getElementById('pokemonList').innerHTML = '<li style="text-align: center; color: #666;">This Pokemon\'s evolution is currently not available in the registered Pokedex.</li>';
-      evolutionOptions = [];
-      return;
-    }
-
-    console.log('[Evolution] Target evolution names:', targetNames);
-
     // Get complete Pokemon data from cache
     const completePokemonDataStr = sessionStorage.getItem('registeredSpecies');
     if (!completePokemonDataStr) {
@@ -703,6 +685,23 @@ async function loadEvolutionOptions() {
     }
 
     const completePokemonData = JSON.parse(completePokemonDataStr);
+
+    // Its own evolutions (the species data) that the players can see -- never another species' (the user's call,
+    // 2026-11-11). A species missing from the list: the targets its settings tick (the Pi keeps those its own).
+    const species = findSpecies(completePokemonData, currentPokemonName);
+    const evoToTargets = getPokemonVisibility(currentPokemonName).evoToTargets || {};
+    const targetNames = species
+      ? shownEvolutions(currentPokemonName, (species.evolvesInto || []).map(e => e.species))
+      : Object.keys(evoToTargets).filter(name => evoToTargets[name] === true);
+
+    if (targetNames.length === 0) {
+      console.log('[Evolution] No evolution targets the players can see');
+      document.getElementById('pokemonList').innerHTML = '<li style="text-align: center; color: #666;">This Pokemon\'s evolution is currently not available in the registered Pokedex.</li>';
+      evolutionOptions = [];
+      return;
+    }
+
+    console.log('[Evolution] Target evolution names:', targetNames);
 
     // Find evolution targets in complete Pokemon data
     evolutionOptions = [];

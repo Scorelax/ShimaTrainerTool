@@ -107,6 +107,20 @@ export function getPokemonVisibility(pokemonName) {
 }
 
 /**
+ * The evolutions of `pokemonName` the players can see -- of `evolvesTo` (its own, from the species data) only, as the
+ * players' Pokedex reads them (pi-server player_pokedex.py): its own settings' per-target switches, or, without any,
+ * the defaults' single "Evolves into" switch for all of them. (The user's call, 2026-11-11: settings could name
+ * other species' evolutions, and this page offered those.)
+ */
+export function shownEvolutions(pokemonName, evolvesTo) {
+  const own = pokedexConfig?.visibility?.[String(pokemonName || '').toLowerCase()];
+  if (!pokedexConfig) return [];
+  if (!own) return pokedexConfig.defaults?.evoTo ? [...evolvesTo] : [];
+  const ticked = Object.entries(own.evoToTargets || {}).filter(([, on]) => on === true).map(([t]) => t.toLowerCase());
+  return evolvesTo.filter(t => ticked.includes(String(t).toLowerCase()));
+}
+
+/**
  * Check if a specific field should be visible for a Pokemon
  * @param {string} pokemonName - Name of the Pokemon
  * @param {string} field - Field name (e.g., 'hiddenAbility', 'stats', 'types')

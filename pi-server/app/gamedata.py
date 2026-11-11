@@ -230,6 +230,9 @@ def store_pokedex_config(conn, data):
         raise ValueError("The Pokedex settings must be an object with a 'registered' list")
     if 'visibility' in data and not isinstance(data['visibility'], dict):
         raise ValueError("'visibility' must be an object")
+    from . import species
+    species.fix_target_spellings(data)
+    species.clean_evolution_targets(data)  # (only a species' own evolutions as its targets)
     conn.execute('INSERT OR REPLACE INTO dm_state (key, json, updated_at) VALUES (?, ?, ?)',
                  (POKEDEX_CONFIG_KEY, json.dumps(data, ensure_ascii=False), datetime.now(timezone.utc).isoformat()))
     conn.commit()

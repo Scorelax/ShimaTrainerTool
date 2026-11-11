@@ -10,6 +10,8 @@
     running battle and in what the DM console keeps -- its battle setups, saved encounters and NPCs (2026-10-19)
   - expertise out of the skill names ("Stealth+") into its own `expertise` list, on the trainers, the players' Pokemon
     and everything the battle text lists cover (2026-10-19)
+  - the players' Pokedex settings: evolution targets that aren't the species' own evolutions (the defaults' ones,
+    copied in by old settings) dropped (2026-11-11, species.clean_evolution_targets)
 """
 import json
 import os
@@ -25,6 +27,7 @@ def run(conn):
     _retire_rule_tables(conn)
     _localize_repo_pictures(conn)
     _battle_text_to_lists(conn)
+    _clean_evolution_targets(conn)
 
 
 def _has_table(conn, name):
@@ -107,6 +110,17 @@ def _move_pokedex_config(conn):
     if _has_table(conn, 'image_cache'):
         conn.execute('DROP TABLE image_cache')
     conn.commit()
+
+
+def _clean_evolution_targets(conn):
+    """The players' Pokedex settings with only each species' own evolutions as its targets -- stored (devices refresh)
+    only when something was dropped, so it does nothing the second time."""
+    from . import gamedata, species
+    if not conn.execute('SELECT 1 FROM dm_state WHERE key = ?', (gamedata.POKEDEX_CONFIG_KEY,)).fetchone():
+        return
+    config = gamedata.pokedex_config(conn)
+    if species.clean_evolution_targets(config):
+        gamedata.store_pokedex_config(conn, config)
 
 
 def _rule_tables(conn):

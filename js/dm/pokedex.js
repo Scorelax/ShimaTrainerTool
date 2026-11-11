@@ -308,7 +308,10 @@ const speciesNamed = n => _species.find(s => s.name.toLowerCase() === String(n).
 /** Each evolution target of `name` and whether the players see it (as the players' Pokedex reads it). */
 function targetStates(name) {
   const own = ownSettings(name);
-  const list = [...new Set([...(_details.get(name)?.evolvesTo || []), ...Object.keys(own?.evoToTargets || {})])]
+  // Only its own evolutions (the user's call, 2026-11-11: old settings named other species' too -- the Pi drops those);
+  // what its settings name only while its details aren't loaded yet
+  const real = _details.get(name)?.evolvesTo;
+  const list = (real || Object.keys(own?.evoToTargets || {}))
     .filter(t => t.toLowerCase() !== name.toLowerCase()); // (old settings can name the species itself -- not a target)
   const v = effectiveSettings(name);
   return Object.fromEntries(list.map(t => [t, own ? !!own.evoToTargets?.[t] : !!v.evoTo]));
@@ -485,10 +488,9 @@ function refreshCaughtBox() {
 /** The per-target switches under "Evolves into" -- the evolution page offers a target only when it's ticked here. */
 function evoTargetsHtml(d, v) {
   if (!d) return ''; // the defaults: targets are always a species' own
-  // Its own evolution targets, plus any its OWN settings already name (not the defaults', which are other species').
+  // Its own evolution targets only (settings naming others were the defaults', copied in -- the Pi drops those)
   const own = ownSettings(d.name)?.evoToTargets || {};
-  const targets = [...new Set([...(d.evolvesTo || []), ...Object.keys(own)])]
-    .filter(t => t.toLowerCase() !== d.name.toLowerCase()); // (old settings can name the species itself)
+  const targets = (d.evolvesTo || []).filter(t => t.toLowerCase() !== d.name.toLowerCase()); // (old settings can name the species itself)
   if (!targets.length) return '';
   const ownReqs = ownSettings(d.name)?.evoReqTargets || {};
   v = { ...v, evoToTargets: ownSettings(d.name) ? own : Object.fromEntries(targets.map(t => [t, !!v.evoTo])),

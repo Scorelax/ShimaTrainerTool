@@ -112,7 +112,7 @@ export function addRegionDetail(material, { renderer, regions, shadeUrl, size, p
     const det = a * e - b * d;
     const inv = [e / det, -b / det, (b * f - c * e) / det, -d / det, a / det, (c * d - a * f) / det];
     return {
-      order, url: r.file,
+      order, url: r.shown || r.file,   // (`shown`: with the map's borders painted in, map-upload.js)
       box: [Math.min(...corners.map(p => p[0])), Math.min(...corners.map(p => p[1])), Math.max(...corners.map(p => p[0])), Math.max(...corners.map(p => p[1]))],
       uv: new THREE.Matrix3().set(inv[0] / r.W, inv[1] / r.W, inv[2] / r.W, inv[3] / r.H, inv[4] / r.H, inv[5] / r.H, 0, 0, 1),
       tex: null, loading: null, failed: false, used: 0,

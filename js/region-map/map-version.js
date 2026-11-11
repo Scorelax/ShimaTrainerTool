@@ -11,7 +11,8 @@
 //             light on its land, region-detail.js) } (URLs on the Pi), places: { seaOffset,
 //             scale, towns, spots, water } (as places.json),
 //             frame: { painting } (a map built from regions: its painting before any region was pasted on),
-//             regions: [{ id, name, file (its whole painting on the Pi, a WebP), W, H, toMap (the affine from its pixels to
+//             regions: [{ id, name, file (its whole painting on the Pi, a WebP), shown (the same with the map's drawn
+//             borders painted in, the one shown up close -- since 2026-11-11), W, H, toMap (the affine from its pixels to
 //             the map's), at }] (js/dm/map-upload.js's buildRegions, the user's call, 2026-10-28),
 //             borders: [[[x, y], ...], ...] (the lines between those regions, in its pixels: region-borders.js),
 //             borderPicture: { file (on the Pi, a PNG), W, H, toMap, at } (the borders drawn by the DM, the user's call,

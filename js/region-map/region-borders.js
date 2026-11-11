@@ -13,8 +13,11 @@
 // the map's pictures as it's built (paintBorders): a region pasted over the painting's own lines covered them, and the
 // thin line below was all that was left there.
 //
-// The 3D map lays them on the land (addRegionBorders) -- the same width on the screen at any zoom, sharp up close, hidden
-// behind a mountain like the land itself, and left out over the sea.
+// Since 2026-11-11 (the user's call: the line each device drew looked uneven on the phones -- the borders go into the
+// map as it's built, one picture) they're painted into every region's own painting too, the ones shown up close
+// (map-upload.js keeps those as each region's `shown`), and the 3D map draws no line of its own. Only a map built before
+// that, or one with traced borders, still has the 3D map lay them on the land (addRegionBorders) -- the same width on
+// the screen at any zoom, hidden behind a mountain like the land itself, and left out over the sea.
 import * as THREE from '../vendor/three/three.module.min.js';
 
 const MAX_CELLS = 32e6;   // the regions' outlines read at up to 4 cells a map pixel, this many cells at most
@@ -340,14 +343,17 @@ export function linesFromPicture(picture, toMap) {
  * paintBorders(target, lines, { scale, width, colour, land, W, H }): the DM's drawn borders painted into one of the map's
  * pictures as it's built (the user's call, 2026-11-08: a region pasted over the painting's own lines left only the thin
  * 3D line there -- painted, they're in the painting, its export and the painted and topographic pictures like the
- * painting's own). `target` a canvas `scale` times the map's W x H pixels; `width` in the map's pixels; `land` (W x H, 1
- * on land) keeps them off the sea, as the painted ones are.
+ * painting's own). `target` a canvas `scale` times the map's W x H pixels -- or, with `toPic` (the affine [a, b, c, d,
+ * e, f] from the map's pixels to the target's), any picture lying on the map: a region's own painting (the user's call,
+ * 2026-11-11: the borders built into every picture of the map, none drawn by the device); `width` in the map's pixels;
+ * `land` (W x H, 1 on land) keeps them off the sea, as the painted ones are.
  */
-export function paintBorders(target, lines, { scale = 1, width = 4, colour = '#000', land = null, W = 0, H = 0 } = {}) {
+export function paintBorders(target, lines, { scale = 1, toPic = null, width = 4, colour = '#000', land = null, W = 0, H = 0 } = {}) {
   if (!lines?.length) return;
+  const [ta, tb, tc, td, te, tf] = toPic || [scale, 0, 0, 0, scale, 0];
   const layer = canvasOf(target.width, target.height);
   const c = layer.getContext('2d');
-  c.setTransform(scale, 0, 0, scale, 0, 0);
+  c.setTransform(ta, td, tb, te, tc, tf);
   c.lineJoin = 'round';
   c.lineCap = 'round';
   c.lineWidth = width;
@@ -361,11 +367,11 @@ export function paintBorders(target, lines, { scale = 1, width = 4, colour = '#0
     const img = mc.createImageData(W, H);
     for (let i = 0; i < W * H; i++) img.data[i * 4 + 3] = land[i] ? 255 : 0;
     mc.putImageData(img, 0, 0);
-    c.setTransform(1, 0, 0, 1, 0, 0);
+    // (the land laid on the target as the lines are: whatever of the target it leaves out is cleared too)
     c.globalCompositeOperation = 'destination-in';
     c.imageSmoothingEnabled = true;
     c.imageSmoothingQuality = 'high';
-    c.drawImage(mask, 0, 0, target.width, target.height);
+    c.drawImage(mask, 0, 0, W, H);
   }
   target.getContext('2d').drawImage(layer, 0, 0);
 }

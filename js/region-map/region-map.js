@@ -337,7 +337,10 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     }
     mesh = new THREE.Mesh(geo, material);
     scene.add(mesh);
-    if (version.borders?.length) {
+    // (the DM's drawn borders built into every picture of the map -- its regions' paintings too, since 2026-11-11: no
+    // line of its own, region-borders.js; a map built before that still gets one)
+    const builtIn = !!version.borderPicture && (version.regions || []).every(r => r.shown);
+    if (version.borders?.length && !builtIn) {
       borders = addRegionBorders(scene, {
         borders: version.borders, size: [W, H], groundAt,
         // (the DM's own lines wherever he drew them -- a strait between two regions too)

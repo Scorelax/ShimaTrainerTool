@@ -848,7 +848,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       paintTexture(painted.data, t);
       bctx.putImageData(painted, 0, 0);
       built = {
-        cur, frameUrl, regions, added, addUp: add?.up, newBorders, t, work, big, water, borders: borders ? borders.finish(t.land) : drawn,
+        cur, frameUrl, regions, added, addUp: add?.up, newBorders, t, work, big, water, borders: borders ? borders.finish(t.land) : drawn, drawn,
         topo,
         height: canvasOf(W, H, new Uint8ClampedArray(t.height.buffer)),
         shade: canvasOf(t.SW, t.SH, shadePicture(t)),   // (the regions' paintings shaded with it up close -- region-detail.js)
@@ -865,7 +865,8 @@ export async function openRegionMaps({ locations, onChanged }) {
   }
 
   async function useRegions(b, step) {
-    const n = b.added || b.newBorders ? 6 : 5;
+    const bordersIn = !!b.drawn?.length && b.regions.length > 0;
+    const n = (b.added || b.newBorders ? 6 : 5) + (bordersIn ? 1 : 0);
     let borderPicture = b.cur.borderPicture || null;
     if (b.newBorders) {
       step(`Storing the borders' picture on the Pi (1 of ${n})…`);
@@ -880,17 +881,37 @@ export async function openRegionMaps({ locations, onChanged }) {
       pic.getContext('2d').drawImage(b.addUp, 0, 0);
       b.added.file = await store(pic, 'image/webp', REGION_QUALITY);
     }
-    step(`Storing the map's painting (${n - 4} of ${n})…`);
+    const m = bordersIn ? n - 1 : n;   // (the last step: the regions' paintings with the borders, when there are)
+    step(`Storing the map's painting (${m - 4} of ${n})…`);
     const painting = await store(b.work, 'image/png');
-    step(`Storing the heights (${n - 3} of ${n})…`);
+    step(`Storing the heights (${m - 3} of ${n})…`);
     const height = await store(b.height, 'image/png');
-    step(`Storing the topographic map (${n - 2} of ${n})…`);
+    step(`Storing the topographic map (${m - 2} of ${n})…`);
     const topo = await store(b.topo, 'image/jpeg', 0.88);
-    step(`Storing the painted map (${n - 1} of ${n})…`);
+    step(`Storing the painted map (${m - 1} of ${n})…`);
     const painted = await store(b.big, 'image/jpeg', 0.88);
-    step(`Storing the light on the land (${n} of ${n})…`);
+    step(`Storing the light on the land (${m} of ${n})…`);
     const shade = await store(b.shade, 'image/png');
     const { cur, t } = b;
+    // The borders built into the regions' own paintings too (the user's call, 2026-11-11: one picture, no line drawn by
+    // the device) -- the ones the 3D map shows up close. Each region keeps its painting as it was uploaded (`file`, what
+    // the next build pastes on) and gets a copy with this map's borders in it (`shown`), made again with every build.
+    let regions = b.regions.map(({ shown, ...r }) => r);
+    if (bordersIn) {
+      const out = [];
+      for (const [i, r] of regions.entries()) {
+        step(`Painting the borders into the regions' paintings (${n} of ${n}: ${i + 1} of ${regions.length})…`);
+        const isNew = r.id === b.added?.id;
+        const pic = isNew ? b.addUp : await loadBitmap(r.file);
+        const c = canvasOf(r.W, r.H);
+        c.getContext('2d').drawImage(pic, 0, 0, r.W, r.H);
+        if (!isNew) pic.close?.();
+        paintBorders(c, b.drawn, { toPic: invert(r.toMap), land: t.land, W: cur.W, H: cur.H, width: BORDER_WIDTH });
+        out.push({ ...r, shown: await store(c, 'image/webp', REGION_QUALITY) });
+        c.width = c.height = 0;
+      }
+      regions = out;
+    }
     const replaced = b.added && (cur.regions || []).some(r => r.id === b.added.id);
     const gone = (cur.regions || []).find(r => !b.regions.some(x => x.id === r.id));
     const name = b.newBorders ? `Shima: borders ${cur.borderPicture ? 'drawn again' : 'drawn'}`
@@ -902,7 +923,7 @@ export async function openRegionMaps({ locations, onChanged }) {
       places: { width: cur.W, height: cur.H, seaOffset: SEA_OFFSET, scale: 2,
         towns: (cur.places?.towns || []).filter(x => x.x >= 0 && x.y >= 0 && x.x < cur.W && x.y < cur.H), spots: t.dots, water: b.water },
       frame: { painting: b.frameUrl },
-      regions: b.regions,
+      regions,
       borders: b.borders,
       ...(borderPicture ? { borderPicture } : {}),
     };

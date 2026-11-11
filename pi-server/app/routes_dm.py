@@ -30,6 +30,7 @@ _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclu
                'display-npc-folders',  # ...and for its NPCs: {folders: [{id, name, parent}], placed: {npc id: folder id}}
                'display-planner',  # its planned scenes, waiting to be shown: [{id, name, folder, scene, shownAt}] (js/dm/display-store.js)
                'display-plan-folders',  # ...and their folders: [{id, name, parent}] (js/dm/display.js)
+               'encounter-folders',  # Encounter setup's folders: [{id, name, parent}]; an encounter keeps its `folder` (js/dm/encounters.js)
                # The Admin module's world (js/dm/admin-world.js, the user's call, 2026-10-20): planned events, the region's
                # locations, and the DM's own status conditions (their battle triggers run in routes_combat.py)
                'events', 'locations', 'status-conditions',

@@ -6,7 +6,7 @@
 // and live-pushed to every device.
 import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
-import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
+import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, typeBadges, getSpecies, lazySprites } from './dm-common.js';
 import { dexQuery } from '../utils/dex-search.js';
 import { prepareImage } from './display.js';
@@ -26,11 +26,12 @@ const GROUPS = [
     ['charSize', 'Size', d => d.size], ['charRarity', 'Rarity', d => d.rarity], ['charBehavior', 'Behaviour', d => d.behavior],
     ['charHabitat', 'Habitat', d => d.habitat], ['charActivity', 'Active', d => d.activity],
   ]],
+  // (a row that is a list of rows: those share one line -- the short ones, the user's call, 2026-11-11)
   ['Stats', [
-    ['statAC', 'AC', d => d.ac], ['statHD', 'Hit die', d => (d.hitDice ? `d${d.hitDice}` : '—')], ['statVD', 'Vitality die', d => (d.vitalityDice ? `d${d.vitalityDice}` : '—')],
+    [['statAC', 'AC', d => d.ac], ['statHD', 'HD', d => (d.hitDice ? `d${d.hitDice}` : '—')], ['statVD', 'VD', d => (d.vitalityDice ? `d${d.vitalityDice}` : '—')]],
     ['statSpeed', 'Speed', d => d.speed],
-    ['statSTR', 'STR', d => d.stats.str], ['statDEX', 'DEX', d => d.stats.dex], ['statCON', 'CON', d => d.stats.con],
-    ['statINT', 'INT', d => d.stats.int], ['statWIS', 'WIS', d => d.stats.wis], ['statCHA', 'CHA', d => d.stats.cha],
+    [['statSTR', 'STR', d => d.stats.str], ['statDEX', 'DEX', d => d.stats.dex], ['statCON', 'CON', d => d.stats.con]],
+    [['statINT', 'INT', d => d.stats.int], ['statWIS', 'WIS', d => d.stats.wis], ['statCHA', 'CHA', d => d.stats.cha]],
     ['statSaves', 'Saving throws', d => d.savingThrows || '—'], ['statSkills', 'Skills', d => d.skills || '—'],
   ]],
   ['Abilities', [
@@ -50,7 +51,8 @@ const GROUPS = [
     ['evoReq', 'Evolution requirements', d => requirementsText(d)],
   ]],
 ];
-const BOOL_KEYS = GROUPS.flatMap(([, rows]) => rows.map(r => r[0])).concat('moves');
+const flatRows = rows => rows.flatMap(r => (Array.isArray(r[0]) ? r : [r]));
+const BOOL_KEYS = GROUPS.flatMap(([, rows]) => flatRows(rows).map(r => r[0])).concat('moves');
 
 /** What a species gets when there's nothing at all to go on -- the same fallback js/utils/visibility.js uses. */
 function fallbackSettings() {
@@ -393,18 +395,20 @@ function renderDetail() {
   const isDefaults = name === DEFAULTS;
   const d = isDefaults ? null : _details.get(name);
   const v = effectiveSettings(name);
-  const own = !isDefaults && !!ownSettings(name);
-  const check = (key, label, value) => `
-    <label class="dm-pdx-field${v[key] ? ' on' : ''}">
+  const check = (key, label, value, cls = '') => `
+    <label class="dm-pdx-field${cls}${v[key] ? ' on' : ''}">
       <input type="checkbox" data-key="${key}" ${v[key] ? 'checked' : ''}>
       <span class="dm-pdx-label">${label}</span>
       ${isDefaults ? '' : `<span class="dm-pdx-value">${value ?? '—'}</span>`}
     </label>`;
+  const field = ([key, label, value, isHtml], cls) => check(key, label, isDefaults ? '' : (isHtml ? value(d) : escapeHtml(value(d))), cls);
   const groupHtml = ([title, rows]) => `
     <div class="dm-pdx-group">
       <div class="dm-pdx-group-head"><span>${title}</span>
-        <span><button class="dm-btn small" data-all="${rows.map(r => r[0]).join(',')}">All</button><button class="dm-btn small" data-none="${rows.map(r => r[0]).join(',')}">None</button></span></div>
-      ${rows.map(([key, label, value, isHtml]) => check(key, label, isDefaults ? '' : (isHtml ? value(d) : escapeHtml(value(d))))).join('')}
+        <span><button class="dm-btn small" data-all="${flatRows(rows).map(r => r[0]).join(',')}">All</button><button class="dm-btn small" data-none="${flatRows(rows).map(r => r[0]).join(',')}">None</button></span></div>
+      ${rows.map(r => (Array.isArray(r[0])
+        ? `<div class="dm-pdx-fieldrow">${r.map(x => field(x, ' short')).join('')}</div>`
+        : field(r))).join('')}
       ${title === 'Evolution' ? evoTargetsHtml(d, v) : ''}
     </div>`;
 
@@ -422,8 +426,6 @@ function renderDetail() {
             <label class="dm-pdx-reg"><input type="checkbox" id="pdxRegistered" ${isRegistered(name) ? 'checked' : ''}> In the players' Pokédex</label>
             <label class="dm-pdx-reg" id="pdxCaughtBox"><input type="checkbox" id="pdxCaught"> Caught by the players</label>
             <label class="dm-pdx-reg dm-pdx-dmonly" title="DM only -- not part of the players' Pokédex. A random encounter or random trainer never picks it (Encounter setup's 🚫 Exclusions is the same list)."><input type="checkbox" id="pdxNoRandom" ${isExcluded(name) ? 'checked' : ''}> 🚫 Not possible to encounter randomly</label>
-            <span class="dm-pill ${own ? 'ok' : 'todo'}">${own ? 'Own settings' : 'Using the defaults'}</span>
-            ${own ? '<button class="dm-btn small" id="pdxBackToDefaults">Back to defaults</button>' : ''}
           </div>`}
       </div>
       <div class="dm-pdx-quick"><button class="dm-btn small" id="pdxShowAll">Show everything</button><button class="dm-btn small" id="pdxHideAll">Hide everything</button></div>
@@ -613,13 +615,6 @@ function wireDetail(name, d) {
     }
     refreshListFlags();
     if (_selected === name) refreshCaughtBox();
-  });
-  document.getElementById('pdxBackToDefaults')?.addEventListener('click', async () => {
-    if (!await showCombatConfirm(`Drop ${name}'s own settings? It goes back to showing what the default settings show.`, { title: 'Back to defaults', yesLabel: 'Use defaults', noLabel: 'Cancel' })) return;
-    delete _config.visibility[name.toLowerCase()];
-    scheduleSave();
-    refreshListFlags();
-    renderDetail();
   });
 }
 

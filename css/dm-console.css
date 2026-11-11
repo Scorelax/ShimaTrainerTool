@@ -368,6 +368,9 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-pdx-field:hover { background: rgba(255, 255, 255, 0.05); }
 .dm-pdx-field input { margin-top: 0.15rem; accent-color: #27ae60; }
 .dm-pdx-field.small { grid-template-columns: 18px 1fr; }
+/* Short stats three to a line (AC / HD / VD, STR / DEX / CON, INT / WIS / CHA). */
+.dm-pdx-fieldrow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 0.3rem; }
+.dm-pdx-field.short { grid-template-columns: 18px auto 1fr; gap: 0.4rem; }
 .dm-pdx-label { font-weight: 700; color: var(--dm-muted); }
 .dm-pdx-field.on .dm-pdx-label { color: var(--dm-text); }
 .dm-pdx-value { color: #8d8ea8; line-height: 1.35; }
@@ -661,24 +664,31 @@ body.dm-console .combat-alert-overlay { z-index: 10070; }
 .dm-tab-icon { height: 1.15em; width: auto; vertical-align: -0.2em; margin-right: 0.35em; }
 .dm-enc-body { flex: 1; min-height: 0; }
 .dm-enc-body > .dm-editor { height: 100%; }
-.dm-enc-list { display: flex; flex-direction: column; gap: 2px; flex: none; max-height: 30%; overflow-y: auto; }
-/* Encounter setup's left column: the saved-Pokemon library fills what the encounter list leaves. */
-.dm-editor-tools:has(.dm-enc-savedlib) { overflow: hidden; }
-.dm-enc-savedlib { flex: 1; min-height: 120px; display: flex; flex-direction: column; border-top: 1px solid var(--dm-line); padding-top: 0.7rem; }
-.dm-enc-savedlib .dm-enc-saved { flex: 1; min-height: 0; overflow-y: auto; padding-right: 0.2rem; }
-.dm-enc-savedlib .dm-enc-savedrow { grid-template-columns: 34px 1fr auto auto; gap: 0.45rem; }
-.dm-enc-savedlib .dm-enc-savedrow strong { font-size: 0.86rem; }
-.dm-enc-savedlib .dm-enc-thumb { width: 34px; height: 34px; }
-.dm-enc-savedlib .dm-editor-foot, .dm-enc-savedlib + .dm-editor-foot { margin-top: 0; }
+/* Encounter setup's left column: a bit wider than the other editors', the encounter list (with its folders) fills it. */
+.dm-editor.dm-enc-editor { grid-template-columns: 400px minmax(0, 1fr); }
+.dm-enc-editor > .dm-editor-tools { overflow: hidden; }
+.dm-enc-list { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 120px; overflow-y: auto; }
+.dm-enc-listbar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: -0.3rem; }
+.dm-enc-listbar .dm-check { margin: 0; font-size: 0.84rem; }
+.dm-enc-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; padding-bottom: 0.3rem; }
+.dm-enc-crumbs > span { color: var(--dm-muted); }
+.dm-enc-crumb { padding: 0.22rem 0.5rem; border-radius: 8px; border: 1px dashed transparent; background: rgba(255, 255, 255, 0.05); color: var(--dm-text);
+  font: inherit; font-size: 0.8rem; cursor: pointer; }
+.dm-enc-crumb.here { color: var(--dm-gold); background: rgba(255, 215, 0, 0.1); }
+.dm-enc-folder { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.4rem 0.35rem 0.55rem; border-radius: 8px; border: 1px solid transparent; cursor: pointer; }
+.dm-enc-folder:hover { background: rgba(255, 255, 255, 0.06); }
+.dm-enc-folder-icon { font-size: 1.15rem; }
+.dm-enc-folder-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dm-enc-folder-name small { font-size: 0.72rem; color: var(--dm-muted); }
+.dm-enc-folder.drop-here, .dm-enc-crumb.drop-here { border: 2px dashed #2ecc71; background: rgba(46, 204, 113, 0.16); }
+.dm-enc-list .dragging { opacity: 0.45; }
+/* 📚 Add saved Pokémon's popup */
+.dm-enc-saveddlg { max-height: 55vh; overflow-y: auto; padding-right: 0.2rem; }
 .dm-enc-row { display: flex; flex-direction: column; gap: 0.1rem; width: 100%; padding: 0.45rem 0.55rem; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; color: inherit; font: inherit; cursor: pointer; }
 .dm-enc-row:hover { background: rgba(255, 255, 255, 0.06); }
 .dm-enc-row.selected { background: rgba(255, 215, 0, 0.1); border-color: rgba(255, 215, 0, 0.4); }
 .dm-enc-row small { font-size: 0.72rem; color: var(--dm-muted); }
 .dm-enc-live { font-size: 0.7rem; color: #5fe39a; font-weight: 700; }
-.dm-enc-finished { margin-top: 0.3rem; border-top: 1px solid var(--dm-line); padding-top: 0.3rem; }
-.dm-enc-finished > summary { cursor: pointer; padding: 0.35rem 0.55rem; font-size: 0.82rem; font-weight: 700; color: var(--dm-muted); border-radius: 8px; }
-.dm-enc-finished > summary:hover { background: rgba(255, 255, 255, 0.06); }
-.dm-enc-finished .dm-enc-row strong { color: var(--dm-muted); }
 .dm-enc-head { display: flex; gap: 0.8rem; align-items: center; }
 .dm-enc-name { font-size: 1.3rem; font-weight: 800; color: var(--dm-gold); flex: 1; }
 .dm-enc-actions { display: flex; gap: 0.4rem; align-items: center; }
@@ -721,7 +731,12 @@ body.dm-console .combat-alert-overlay { z-index: 10070; }
 .dm-enc-bonus-cell .dm-input { width: 100%; text-align: center; }
 .dm-enc-bonus-cell small { text-align: center; font-weight: 600; }
 .dm-enc-bonus-cell small.changed { color: var(--dm-gold); }
-.dm-enc-mon-btns { display: flex; gap: 3px; align-items: center; }
+/* A wild Pokemon's buttons: Info / Customize / Save / Duplicate two by two, Remove beside them the full height. */
+.dm-enc-mon-btns { display: flex; gap: 4px; align-items: stretch; }
+.dm-enc-mon-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.dm-enc-mon-grid .dm-btn { white-space: nowrap; text-align: left; }
+.dm-enc-mon-del { white-space: nowrap; }
+.dm-enc-mon-sum > label { display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; color: var(--dm-text); cursor: pointer; }
 .dm-enc-npcs { display: flex; flex-direction: column; gap: 0.35rem; }
 .dm-enc-npc { display: grid; grid-template-columns: 42px 1fr auto; gap: 0.6rem; align-items: center; }
 .dm-enc-npc small, .dm-enc-savedrow small { display: block; font-size: 0.74rem; color: var(--dm-muted); }

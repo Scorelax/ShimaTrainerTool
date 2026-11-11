@@ -4,8 +4,8 @@
 // Library: encounters prepared ahead of a session (dm_encounters table) -- a name, the wild Pokemon (each with a nature,
 // its abilities and any stat bonuses -- the ⚙ panel), NPC trainers from the NPC library, round-based events, and notes
 // and note categories (under the encounter list on the left). The map, its terrain and weather are Map setup's. The old
-// tool's random encounter / random trainer generators, saved-Pokemon library (always shown under the encounter list)
-// and exclusion list are here too. "Put in play" makes it the next battle: its Pokemon and NPC trainers go into the battle setup
+// tool's random encounter / random trainer generators, saved-Pokemon library (Wild Pokémon's 📚 Add saved Pokémon -- a
+// list of its own under the encounters until 2026-11-11) and exclusion list are here too. "Put in play" makes it the next battle: its Pokemon and NPC trainers go into the battle setup
 // (setup-store.js), where Map setup places everyone and starts the battle; the encounter becomes the one in play
 // ('encounter-run'), whose events and capture helper show beside the running battle (battle-live.js). Until the battle
 // starts, the next battle follows the encounter in play as it's changed (syncInPlay) -- whoever keeps their entry keeps
@@ -17,8 +17,13 @@
 // (the running battle's third tab, battle-live.js), an encounter can carry its own map (made here with the map editor --
 // map-store.js), the Battle module imports one (importEncounterDialog: its creatures and its map become the next
 // battle), each wild Pokemon's ℹ️ shows everything its species is known for (species-info.js), and an encounter's NPC
-// opens in the NPC module to change it for good. One that's been played can be marked finished (`finished`): it moves
-// into a closed "Finished encounters" box under the list, still there to open again (the user's call, 2026-10-27).
+// opens in the NPC module to change it for good.
+//
+// The encounter list has folders (the user's call, 2026-11-11 -- the way the Display module's backgrounds do): [{id, name,
+// parent}] in dm_state 'encounter-folders', an encounter keeps its folder's id (`folder`, '' = the top). Drag an
+// encounter (or a folder) onto a folder or a step of the path, or use 📁 Move to… on the open one. Folder mode unticked:
+// every encounter in one list. The first time, "Planned encounters" and "Archived encounters" are made, and the ones
+// marked finished before (the old "Finished encounters" box, 2026-10-27) go into Archived.
 //
 // Post battle: after a PvE battle ends (routes_combat._remember_battle keeps it as 'last-battle'), what happened -- who
 // was defeated, caught or got away -- and what to hand out. Unlike the old tool, which exported files or called the
@@ -65,6 +70,13 @@ const _customizing = new Set(); // wild Pokemon whose ⚙ panel (abilities, stat
 const _calc = new Map(); // wild Pokemon id -> {sig, values}: its numbers at its level and nature, before any bonus
 // The stat bonuses a wild Pokemon can get on top of what its level and nature give (build-pokemon's `bonus`).
 const BONUS_KEYS = [['str', 'STR'], ['dex', 'DEX'], ['con', 'CON'], ['int', 'INT'], ['wis', 'WIS'], ['cha', 'CHA'], ['ac', 'AC'], ['maxHP', 'Max HP'], ['maxVP', 'Max VP']];
+// The encounter list's folders (see the top): the folders, the one open, and Folder mode (remembered on this computer).
+const FOLDERS_KEY = 'encounter-folders';
+const FOLDER_MODE_KEY = 'dm-enc-folder-mode';
+let _folders = [];
+let _folder = '';
+let _folderShown = false; // the open encounter's folder opened once (when the tab is first drawn)
+let _folderMode = (() => { try { return localStorage.getItem(FOLDER_MODE_KEY) !== 'off'; } catch { return true; } })();
 
 /** One of the battle module's tabs (dm-console.js draws the tabs): `tab` 'library' (Encounter setup) or 'aftermath'
  * (Post battle). */
@@ -98,8 +110,9 @@ function blankEncounter() {
 
 /** The library and everything it uses, fresh from the Pi. */
 async function loadLibraryData() {
-  const [encs, species, npcs, excl, saved, run] = await Promise.all([
+  const [encs, species, npcs, excl, saved, run, folders] = await Promise.all([
     DmAPI.encounters(), getSpecies(), DmAPI.npcs(), DmAPI.getState('encounter-exclusions'), DmAPI.getState('saved-pokemon'), DmAPI.getState('encounter-run'),
+    DmAPI.getState(FOLDERS_KEY).catch(() => undefined), // (undefined: couldn't read them -- null: never made)
   ]);
   // An encounter being changed here keeps this tab's copy (its save may not be on the Pi yet).
   _encounters = (encs.data || []).map(e => (_saveTimers.has(e.id) ? _encounters.find(x => x.id === e.id) || e : e));
@@ -109,7 +122,42 @@ async function loadLibraryData() {
   _saved = Array.isArray(saved) ? saved : [];
   _runId = run?.encounterId || null;
   _runLinked = !!run?.linked;
+  _folders = (Array.isArray(folders) ? folders : []).filter(f => f && f.id)
+    .map(f => ({ id: f.id, name: String(f.name || 'Folder'), parent: f.parent || '' }));
+  if (folders === null) await firstFolders();
 }
+
+/** The first time: "Planned encounters" and "Archived encounters", and the encounters marked finished before folders
+ * came into Archived. */
+async function firstFolders() {
+  const planned = { id: newId('efold'), name: 'Planned encounters', parent: '' };
+  const archived = { id: newId('efold'), name: 'Archived encounters', parent: '' };
+  try { await DmAPI.saveState(FOLDERS_KEY, [planned, archived]); } catch { return; } // (tried again next time)
+  _folders = [planned, archived];
+  _encounters.filter(e => e.finished).forEach((e) => {
+    e.folder = archived.id;
+    delete e.finished;
+    delete e.finishedAt;
+    saveNow(e);
+  });
+}
+
+function saveFolders() {
+  return DmAPI.saveState(FOLDERS_KEY, _folders).catch(err => showCombatAlert(err.message, { title: 'Folders' }));
+}
+
+/** The folder `id` and the ones above it, top first. */
+function folderPath(id) {
+  const path = [];
+  const seen = new Set();
+  for (let f = _folders.find(x => x.id === id); f && !seen.has(f.id); f = _folders.find(x => x.id === f.parent)) {
+    seen.add(f.id);
+    path.unshift(f);
+  }
+  return path;
+}
+
+const folderLabel = id => folderPath(id).map(f => f.name).join(' › ');
 
 // The Pokedex module's "not possible to encounter randomly" box changes the same exclusion list.
 window.addEventListener('dm:exclusions-changed', (e) => {
@@ -129,17 +177,20 @@ async function renderLibrary(body) {
   if (_tab !== 'library') return;
   // Opens on the encounter in play, unless another one was picked.
   if (!_encounters.some(e => e.id === _selectedId)) _selectedId = _encounters.some(e => e.id === _runId) ? _runId : null;
+  // The first time it's drawn, the open encounter's folder is the one open.
+  if (!_folderShown) { _folderShown = true; _folder = current()?.folder || ''; }
   body.innerHTML = `
-    <div class="dm-editor">
+    <div class="dm-editor dm-enc-editor">
       <aside class="dm-editor-tools">
         <div class="dm-editor-head"><h2>Encounter setup</h2><span class="dm-pill ok" id="encSave">All saved</span></div>
         <button class="dm-btn primary wide" id="encNew">+ New encounter</button>
         <input class="dm-input" id="encSearch" placeholder="Search encounters…" autocomplete="off">
-        <div class="dm-enc-list" id="encList"></div>
-        <div class="dm-enc-savedlib">
-          <div class="dm-card-title"><span>📚 Saved Pokémon</span><span class="dm-hint" id="encSavedCount"></span></div>
-          <div class="dm-enc-saved" id="encSavedList"></div>
+        <div class="dm-enc-listbar">
+          <label class="dm-check" title="Ticked: the folders, and the encounters in the one open. Unticked: every encounter in one list.">
+            <input type="checkbox" id="encFolderMode" ${_folderMode ? 'checked' : ''}><span>Folder mode</span></label>
+          <button class="dm-btn small" id="encNewFolder" title="A new folder, in the one open" ${_folderMode ? '' : 'hidden'}>＋ Folder</button>
         </div>
+        <div class="dm-enc-list" id="encList"></div>
         <div class="dm-enc-notesbox" id="encNotes"></div>
         <div class="dm-editor-foot">
           <button class="dm-btn small" id="encExclusions">🚫 Exclusions (${_exclusions.length})</button>
@@ -151,13 +202,26 @@ async function renderLibrary(body) {
   renderSheet();
   bindSheet();
   document.getElementById('encSearch').addEventListener('input', renderList);
-  document.getElementById('encSavedList').addEventListener('click', onSavedClick);
-  document.getElementById('encList').addEventListener('click', (e) => {
+  const list = document.getElementById('encList');
+  list.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-folder-act]');
+    if (act) { folderAction(act.dataset.folderAct, _folders.find(f => f.id === act.closest('[data-folder]')?.dataset.folder)); return; }
+    const open = e.target.closest('[data-open-folder]');
+    if (open) { _folder = open.dataset.openFolder; renderList(); return; }
     const row = e.target.closest('[data-enc]');
     if (row) { _selectedId = row.dataset.enc; _adding = false; renderList(); renderSheet(); }
   });
+  wireListDrag(list);
+  document.getElementById('encFolderMode').addEventListener('change', (e) => {
+    _folderMode = e.target.checked;
+    try { localStorage.setItem(FOLDER_MODE_KEY, _folderMode ? 'on' : 'off'); } catch { /* not remembered */ }
+    document.getElementById('encNewFolder').hidden = !_folderMode;
+    renderList();
+  });
+  document.getElementById('encNewFolder').addEventListener('click', newFolder);
   document.getElementById('encNew').addEventListener('click', () => {
     const enc = blankEncounter();
+    if (_folderMode) enc.folder = _folder; // (in the folder open)
     _encounters.unshift(enc);
     _selectedId = enc.id;
     saveNow(enc);
@@ -184,28 +248,147 @@ function renderList() {
   const box = document.getElementById('encList');
   if (!box) return;
   const q = (document.getElementById('encSearch')?.value || '').trim().toLowerCase();
-  const list = _encounters.filter(e => !q || e.name.toLowerCase().includes(q));
+  if (_folder && !_folders.some(f => f.id === _folder)) _folder = '';
+  // Searching looks in every folder, and so does Folder mode unticked; otherwise the folder open: its folders, then its
+  // encounters.
+  const every = !!q || !_folderMode;
+  const known = id => !!id && _folders.some(f => f.id === id); // (an encounter whose folder is gone: at the top)
+  const list = _encounters.filter(e => (q ? e.name.toLowerCase().includes(q) : every || (known(e.folder) ? e.folder : '') === _folder));
+  const subs = every ? [] : _folders.filter(f => f.parent === _folder).sort((a, b) => a.name.localeCompare(b.name));
+  const inside = f => _encounters.filter(e => e.folder === f.id).length + _folders.filter(x => x.parent === f.id).length;
   const row = e => `
-    <button class="dm-enc-row${e.id === _selectedId ? ' selected' : ''}" data-enc="${escapeHtml(e.id)}">
+    <div class="dm-enc-row${e.id === _selectedId ? ' selected' : ''}" data-enc="${escapeHtml(e.id)}" draggable="true" role="button" tabindex="0" title="Open it -- or drag it onto a folder">
       <strong>${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' <span class="dm-enc-live" title="The next battle">● in play</span>' : ''}</strong>
-      <small>${escapeHtml(summary(e))}</small>
-    </button>`;
-  // The finished ones (✓ Mark finished) out of the way in a box of their own, closed unless the DM opened it
-  const open = list.filter(e => !e.finished);
-  const done = list.filter(e => e.finished);
-  const doneOpen = done.some(e => e.id === _selectedId) || finishedBoxOpen();
-  box.innerHTML = (open.length ? open.map(row).join('')
-    : `<div class="dm-hint">${_encounters.length ? (q ? 'No encounter matches that.' : 'Every encounter is finished.') : 'No encounters yet -- make one with "+ New encounter", or save the next battle as one.'}</div>`)
-    + (done.length ? `<details class="dm-enc-finished" id="encFinished" ${doneOpen ? 'open' : ''}>
-        <summary>✓ Finished encounters (${done.length})</summary>${done.map(row).join('')}</details>` : '');
-  // (the DM's own open / close only -- not the box opening by itself for a finished one picked)
-  box.querySelector('#encFinished > summary')?.addEventListener('click', (e) => {
-    try { localStorage.setItem('dm-enc-finished-open', e.target.parentElement.open ? '' : '1'); } catch { /* only remembered where it can be */ }
+      <small>${escapeHtml(summary(e))}${every && known(e.folder) ? ` · 📁 ${escapeHtml(folderLabel(e.folder))}` : ''}</small>
+    </div>`;
+  const crumbs = every
+    ? (q ? '<div class="dm-enc-crumbs"><span class="dm-hint">Searching every folder</span></div>' : '')
+    : `<div class="dm-enc-crumbs">
+        <button class="dm-enc-crumb${_folder ? '' : ' here'}" data-open-folder="" data-drop-folder="">⚔️ All encounters</button>
+        ${folderPath(_folder).map(f => `<span>›</span><button class="dm-enc-crumb${f.id === _folder ? ' here' : ''}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}">📁 ${escapeHtml(f.name)}</button>`).join('')}
+      </div>`;
+  const empty = !_encounters.length ? 'No encounters yet -- make one with "+ New encounter", or save the next battle as one.'
+    : q ? 'No encounter matches that.'
+    : 'Nothing in this folder yet -- drag encounters onto it, or use 📁 Move to… on one.';
+  box.innerHTML = crumbs
+    + subs.map(f => `
+      <div class="dm-enc-folder" data-folder="${escapeHtml(f.id)}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}" draggable="true" role="button" tabindex="0" title="Open it -- or drag encounters onto it">
+        <span class="dm-enc-folder-icon">📁</span>
+        <span class="dm-enc-folder-name"><strong>${escapeHtml(f.name)}</strong><small>${inside(f)} inside</small></span>
+        <button class="dm-icon-btn" data-folder-act="rename" title="Rename">✎</button>
+        <button class="dm-icon-btn danger" data-folder-act="delete" title="Delete the folder (what's in it moves up)">✕</button>
+      </div>`).join('')
+    + (list.length ? list.map(row).join('') : subs.length ? '' : `<div class="dm-hint">${empty}</div>`);
+}
+
+/** Drag an encounter (or a folder) onto a folder or a step of the path to move it there. */
+function wireListDrag(box) {
+  const TYPE = 'application/x-dm-encounter';
+  box.addEventListener('dragstart', (e) => {
+    const row = e.target.closest?.('[data-enc], [data-folder]');
+    if (!row) return;
+    e.dataTransfer.setData(TYPE, JSON.stringify(row.dataset.enc ? { enc: row.dataset.enc } : { folder: row.dataset.folder }));
+    e.dataTransfer.effectAllowed = 'move';
+    row.classList.add('dragging');
+  });
+  box.addEventListener('dragend', () => box.querySelectorAll('.dragging, .drop-here').forEach(el => el.classList.remove('dragging', 'drop-here')));
+  box.addEventListener('dragover', (e) => {
+    const target = e.target.closest?.('[data-drop-folder]');
+    if (!target || ![...e.dataTransfer.types].includes(TYPE)) return;
+    e.preventDefault();
+    box.querySelectorAll('.drop-here').forEach((el) => { if (el !== target) el.classList.remove('drop-here'); });
+    target.classList.add('drop-here');
+  });
+  box.addEventListener('dragleave', (e) => {
+    const target = e.target.closest?.('[data-drop-folder]');
+    if (target && !target.contains(e.relatedTarget)) target.classList.remove('drop-here');
+  });
+  box.addEventListener('drop', (e) => {
+    const target = e.target.closest?.('[data-drop-folder]');
+    const raw = e.dataTransfer.getData(TYPE);
+    if (!target || !raw) return;
+    e.preventDefault();
+    const into = target.dataset.dropFolder;
+    const what = JSON.parse(raw);
+    if (what.enc) { moveEncounter(_encounters.find(x => x.id === what.enc), into); return; }
+    const f = _folders.find(x => x.id === what.folder);
+    if (!f || f.id === into || folderPath(into).some(x => x.id === f.id)) return; // never into itself
+    f.parent = into;
+    saveFolders();
+    renderList();
   });
 }
 
-function finishedBoxOpen() {
-  try { return !!localStorage.getItem('dm-enc-finished-open'); } catch { return false; }
+function moveEncounter(enc, into) {
+  if (!enc || (enc.folder || '') === into) return;
+  enc.folder = into;
+  saveNow(enc);
+  renderList();
+  if (enc.id === _selectedId) renderSheet();
+}
+
+async function askName(title, start = '') {
+  let typed = start;
+  const answer = await openDmModal({
+    title,
+    html: `<input class="dm-input" id="encFolderName" value="${escapeHtml(start)}" maxlength="60" placeholder="Name">`,
+    buttons: [{ label: 'Cancel', value: null }, { label: 'Save', kind: 'primary', value: 'save' }],
+    onOpen: (body, close) => {
+      const input = body.querySelector('#encFolderName');
+      setTimeout(() => input.select(), 0);
+      input.addEventListener('input', () => { typed = input.value.trim(); });
+      input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') close('save'); });
+    },
+  });
+  return answer === 'save' && typed ? typed : null;
+}
+
+async function newFolder() {
+  const name = await askName('New folder');
+  if (!name) return;
+  _folders.push({ id: newId('efold'), name, parent: _folder });
+  await saveFolders();
+  renderList();
+}
+
+/** A folder's ✎ / ✕. Deleted, what's in it -- encounters and folders -- moves up into the folder it was in. */
+async function folderAction(act, f) {
+  if (!f) return;
+  if (act === 'rename') {
+    const name = await askName('Rename the folder', f.name);
+    if (!name || name === f.name) return;
+    f.name = name;
+  } else if (act === 'delete') {
+    const encs = _encounters.filter(e => e.folder === f.id);
+    const subs = _folders.filter(x => x.parent === f.id);
+    const what = encs.length || subs.length ? ` Its ${[encs.length && `${encs.length} encounter${encs.length === 1 ? '' : 's'}`, subs.length && `${subs.length} folder${subs.length === 1 ? '' : 's'}`].filter(Boolean).join(' and ')} move up a level -- nothing is deleted.` : '';
+    if (!await showCombatConfirm(`Delete the folder "${f.name}"?${what}`, { title: 'Delete folder', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+    encs.forEach((e) => { e.folder = f.parent || ''; saveNow(e); });
+    subs.forEach((x) => { x.parent = f.parent || ''; });
+    _folders = _folders.filter(x => x.id !== f.id);
+    if (_folder === f.id) _folder = f.parent || '';
+  } else return;
+  await saveFolders();
+  renderList();
+  renderSheet();
+}
+
+/** Every folder as a tree -> the one picked ('' = the top), or null. */
+async function pickFolder(title, here) {
+  const rows = [];
+  const walk = (parent, depth) => _folders.filter(f => f.parent === parent).sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((f) => { rows.push({ f, depth }); walk(f.id, depth + 1); });
+  walk('', 1);
+  const into = await openDmModal({
+    title,
+    html: `<div class="dm-disp-movelist">
+      <button class="dm-species-item${here ? '' : ' selected'}" data-into=""><span class="dm-species-name">⚔️ All encounters <small>(no folder)</small></span></button>
+      ${rows.map(({ f, depth }) => `<button class="dm-species-item${f.id === here ? ' selected' : ''}" data-into="${escapeHtml(f.id)}" style="padding-left:${0.6 + depth}rem"><span class="dm-species-name">📁 ${escapeHtml(f.name)}</span></button>`).join('')}
+    </div>${rows.length ? '' : '<div class="dm-hint">No folders yet -- make one with ＋ Folder.</div>'}`,
+    buttons: [{ label: 'Cancel', value: null }],
+    onOpen: (body, close) => body.addEventListener('click', (ev) => { const b = ev.target.closest('[data-into]'); if (b) close(b.dataset.into); }),
+  });
+  return into === null || into === undefined ? null : into;
 }
 
 function npcById(id) {
@@ -220,7 +403,6 @@ function renderSheet() {
   const box = document.getElementById('encSheet');
   if (!box) return;
   const enc = current();
-  renderSaved(); // its ＋ adds to the open encounter
   renderNotes(enc);
   if (!enc) {
     box.innerHTML = `<div class="dm-cs-empty">${_encounters.length ? 'Pick an encounter on the left.' : 'No encounters yet.'}</div>`;
@@ -235,8 +417,8 @@ function renderSheet() {
     <div class="dm-enc-head">
       <input class="dm-input dm-enc-name" id="encName" data-f="name" value="${escapeHtml(enc.name)}" placeholder="Encounter name">
       <div class="dm-enc-actions">
-        ${enc.finished ? '<span class="dm-pill ok" title="Kept under Finished encounters on the left">✓ Finished</span>' : ''}
-        <button class="dm-btn" id="encFinish" title="${enc.finished ? 'Back among the encounters still to come' : 'Done with it -- kept under Finished encounters on the left, out of the way'}">${enc.finished ? '↺ Not finished' : '✓ Mark finished'}</button>
+        ${enc.folder && _folders.some(f => f.id === enc.folder) ? `<span class="dm-pill ok" title="The folder it's in">📁 ${escapeHtml(folderLabel(enc.folder))}</span>` : ''}
+        <button class="dm-btn" id="encMove" title="Put it in a folder (or drag it onto one on the left)">📁 Move to…</button>
         <button class="dm-btn" id="encSaveBtn" title="Save it on the Pi now (it also saves on its own a moment after each change)">💾 Save encounter</button>
         ${enc.id === _runId
           ? '<span class="dm-enc-live dm-enc-inplay" title="This is the next battle -- changes here go straight into it">● In play</span><button class="dm-btn primary" id="encPlace">📍 Place on the map</button>'
@@ -262,6 +444,7 @@ function renderSheet() {
           <span class="dm-row dm-enc-titlebtns">
             <button class="dm-btn small" data-act="mon-add">🔍 Add</button>
             <button class="dm-btn small" data-act="mon-random">🎲 Random</button>
+            <button class="dm-btn small" data-act="mon-saved" title="Pokémon kept with 💾 Save, for any encounter">📚 Add saved Pokémon${_saved.length ? ` (${_saved.length})` : ''}</button>
           </span></div>
         ${_adding ? `<div class="dm-enc-add"><input class="dm-input" id="encMonSearch" placeholder="Search name, type or habitat…" autocomplete="off"><div class="dm-cs-species dm-enc-results" id="encMonResults"></div></div>` : ''}
         <div class="dm-enc-mons">${enc.pokemon.length ? enc.pokemon.map(monRowHtml).join('') : '<div class="dm-hint">No wild Pokémon yet.</div>'}</div>
@@ -294,12 +477,11 @@ function renderSheet() {
   if (_adding) { renderMonResults(); document.getElementById('encMonSearch')?.focus(); }
   enc.pokemon.filter(p => _customizing.has(p.id)).forEach(loadCalc);
   document.getElementById('encLoad')?.addEventListener('click', () => loadIntoSetup(enc));
-  document.getElementById('encFinish').addEventListener('click', () => {
-    if (enc.finished) { delete enc.finished; delete enc.finishedAt; } else { enc.finished = true; enc.finishedAt = new Date().toISOString(); }
-    saveNow(enc);
-    renderList();
-    renderSheet();
-    toast(enc.finished ? `"${enc.name}" moved to Finished encounters.` : `"${enc.name}" is back among the encounters.`);
+  document.getElementById('encMove').addEventListener('click', async () => {
+    const into = await pickFolder(`📁 Move "${enc.name}" to…`, enc.folder || '');
+    if (into === null) return;
+    moveEncounter(enc, into);
+    toast(`"${enc.name}" moved to ${into ? folderLabel(into) : 'All encounters'}.`);
   });
   document.getElementById('encSaveBtn')?.addEventListener('click', async () => {
     await saveNow(enc); // says so itself if it couldn't
@@ -373,17 +555,22 @@ function monRowHtml(p) {
           <label>Lv <input class="dm-input" data-k="level" type="number" min="1" max="20" value="${p.level}"></label>
           <select class="dm-select" data-k="nature">${natureOptions(p.nature)}</select>
           <input class="dm-input" data-k="item" value="${escapeHtml(p.item || '')}" placeholder="Held item" list="encItems">
-          <label title="Shiny"><input type="checkbox" data-k="shiny" ${p.shiny ? 'checked' : ''}>✨</label>
-          <label title="Starts hidden -- only you see it until it's shown (see-through on the map, or joining later if not placed)"><input type="checkbox" data-k="heldBack" ${p.heldBack ? 'checked' : ''}>Hidden</label>
         </div>
-        <div class="dm-enc-mon-sum"><span data-sum="abil">✦ ${escapeHtml(abilityNames(p, sp))}</span>${bonuses.length ? `<span class="dm-enc-bonus-sum">${escapeHtml(bonuses.join(' · '))}</span>` : ''}</div>
+        <div class="dm-enc-mon-sum">
+          <span data-sum="abil">✦ ${escapeHtml(abilityNames(p, sp))}</span>
+          <label title="Shiny"><input type="checkbox" data-k="shiny" ${p.shiny ? 'checked' : ''}>✨ Shiny</label>
+          <label title="Starts hidden -- only you see it until it's shown (see-through on the map, or joining later if not placed)"><input type="checkbox" data-k="heldBack" ${p.heldBack ? 'checked' : ''}>Hidden</label>
+          ${bonuses.length ? `<span class="dm-enc-bonus-sum">${escapeHtml(bonuses.join(' · '))}</span>` : ''}
+        </div>
       </div>
       <div class="dm-enc-mon-btns">
-        <button class="dm-icon-btn" data-act="mon-info" title="Everything about the species -- behaviour, habitat, senses, how to catch it">ℹ️</button>
-        <button class="dm-btn small${open ? ' primary' : ''}" data-act="mon-more" title="Abilities and stat bonuses">⚙ Customize</button>
-        <button class="dm-icon-btn" data-act="mon-save" title="Save to the Pokémon library, for other encounters">💾</button>
-        <button class="dm-icon-btn" data-act="mon-dup" title="One more of these">⧉</button>
-        <button class="dm-icon-btn danger" data-act="mon-del" title="Remove">✕</button>
+        <div class="dm-enc-mon-grid">
+          <button class="dm-btn small" data-act="mon-info" title="Everything about the species -- behaviour, habitat, senses, how to catch it">ℹ️ Info</button>
+          <button class="dm-btn small${open ? ' primary' : ''}" data-act="mon-more" title="Abilities and stat bonuses">⚙ Customize</button>
+          <button class="dm-btn small" data-act="mon-save" title="Keep it for other encounters (📚 Add saved Pokémon)">💾 Save</button>
+          <button class="dm-btn small" data-act="mon-dup" title="One more of these">⧉ Duplicate</button>
+        </div>
+        <button class="dm-btn small danger dm-enc-mon-del" data-act="mon-del" title="Take it out of this encounter">✕ Remove</button>
       </div>
       ${open ? `
       <div class="dm-enc-more">
@@ -531,6 +718,7 @@ async function onAction(e) {
   if (act === 'mon-more') { if (!_customizing.delete(monId)) _customizing.add(monId); renderSheet(); return; }
   if (act === 'bonus-reset') { enc.pokemon.find(x => x.id === monId).bonus = {}; changed(); return; }
   if (act === 'mon-random') { randomEncounterDialog(enc); return; }
+  if (act === 'mon-saved') { savedPokemonDialog(enc); return; }
   if (act === 'mon-del') { enc.pokemon = enc.pokemon.filter(p => p.id !== monId); relabel(enc); changed(); return; }
   if (act === 'mon-dup') {
     const p = enc.pokemon.find(x => x.id === monId);
@@ -642,45 +830,56 @@ async function saveToLibrary(p) {
   delete entry.heldBack;
   _saved.push(entry);
   try { await DmAPI.saveState('saved-pokemon', _saved); } catch (err) { showCombatAlert(err.message, { title: 'Save Pokémon' }); return; }
-  toast(`${p.name} saved to the Pokémon library.`);
-  renderSaved();
+  toast(`${p.name} saved -- add it to any encounter with 📚 Add saved Pokémon.`);
+  if (current()) renderSheet(); // (the count on the button)
 }
 
-/** The saved-Pokemon library, under the encounter list: ＋ adds one to the open encounter. */
-function renderSaved() {
-  const box = document.getElementById('encSavedList');
-  if (!box) return;
-  const count = document.getElementById('encSavedCount');
-  if (count) count.textContent = _saved.length ? String(_saved.length) : '';
-  const enc = current();
-  box.innerHTML = _saved.length ? _saved.map(sv => `
-    <div class="dm-enc-savedrow" data-saved="${escapeHtml(sv.id)}">
-      <span class="dm-enc-thumb" data-img="${escapeHtml(speciesByName(sv.species)?.image || '')}"></span>
-      <span><strong>${escapeHtml(sv.name)}</strong><small>${escapeHtml(sv.species)} · Lv ${sv.level}${sv.nature ? ` · ${escapeHtml(sv.nature)}` : ''}${sv.item ? ` · holds ${escapeHtml(sv.item)}` : ''}${sv.shiny ? ' · ✨' : ''}</small></span>
-      <button class="dm-btn small" data-act="use" ${enc ? '' : 'disabled'} title="${enc ? `Add to ${escapeHtml(enc.name)}` : 'Pick an encounter first'}">＋ Add</button>
-      <button class="dm-icon-btn danger" data-act="drop" title="Delete from the library">✕</button>
-    </div>`).join('') : '<div class="dm-hint">Use 💾 on a wild Pokémon to keep it here for other encounters.</div>';
-  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
-}
-
-async function onSavedClick(e) {
-  const act = e.target.closest('[data-act]')?.dataset.act;
-  const sv = _saved.find(x => x.id === e.target.closest('[data-saved]')?.dataset.saved);
-  if (!act || !sv) return;
-  if (act === 'use') {
-    const enc = current();
-    if (!enc) return;
-    enc.pokemon.push({ ...JSON.parse(JSON.stringify(sv)), id: newId('mon'), heldBack: false, nature: sv.nature || randomNature() });
-    relabel(enc);
-    scheduleSave(enc);
-    renderSheet();
-    renderList();
-    return;
-  }
-  if (!await showCombatConfirm(`Delete ${sv.name} from the saved Pokémon?`, { title: 'Saved Pokémon', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
-  _saved = _saved.filter(x => x !== sv);
-  await DmAPI.saveState('saved-pokemon', _saved).catch(err => showCombatAlert(err.message, { title: 'Saved Pokémon' }));
-  renderSaved();
+/** Wild Pokémon's 📚 Add saved Pokémon: the saved-Pokemon library in a popup -- ＋ Add puts one in `enc` (the popup stays
+ * open to add more), ✕ deletes it from the library. */
+async function savedPokemonDialog(enc) {
+  const draw = (box) => {
+    const q = (box.querySelector('#savedSearch')?.value || '').trim().toLowerCase();
+    const list = box.querySelector('#savedList');
+    const shown = _saved.filter(sv => !q || `${sv.name} ${sv.species}`.toLowerCase().includes(q));
+    list.innerHTML = shown.length ? shown.map(sv => `
+      <div class="dm-enc-savedrow" data-saved="${escapeHtml(sv.id)}">
+        <span class="dm-enc-thumb" data-img="${escapeHtml(speciesByName(sv.species)?.image || '')}"></span>
+        <span><strong>${escapeHtml(sv.name)}</strong><small>${escapeHtml(sv.species)} · Lv ${sv.level}${sv.nature ? ` · ${escapeHtml(sv.nature)}` : ''}${sv.item ? ` · holds ${escapeHtml(sv.item)}` : ''}${sv.shiny ? ' · ✨' : ''}</small></span>
+        <button class="dm-btn small primary" data-saved-act="use" title="Add to ${escapeHtml(enc.name)}">＋ Add</button>
+        <button class="dm-icon-btn danger" data-saved-act="drop" title="Delete from the saved Pokémon">✕</button>
+      </div>`).join('')
+      : `<div class="dm-hint">${_saved.length ? 'None match that.' : 'Nothing saved yet -- use 💾 Save on a wild Pokémon to keep it here for other encounters.'}</div>`;
+    list.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
+  };
+  await openDmModal({
+    title: `📚 Saved Pokémon → ${enc.name}`,
+    html: `<input class="dm-input" id="savedSearch" placeholder="Search…" autocomplete="off" style="margin-bottom:0.5rem">
+      <div class="dm-enc-saved dm-enc-saveddlg" id="savedList"></div>`,
+    buttons: [{ label: 'Done', value: null }],
+    onOpen: (body) => {
+      draw(body);
+      body.querySelector('#savedSearch').addEventListener('input', () => draw(body));
+      body.addEventListener('click', async (e) => {
+        const act = e.target.closest('[data-saved-act]')?.dataset.savedAct;
+        const sv = _saved.find(x => x.id === e.target.closest('[data-saved]')?.dataset.saved);
+        if (!act || !sv) return;
+        if (act === 'use') {
+          enc.pokemon.push({ ...JSON.parse(JSON.stringify(sv)), id: newId('mon'), heldBack: false, nature: sv.nature || randomNature() });
+          relabel(enc);
+          scheduleSave(enc);
+          if (enc === current()) renderSheet();
+          renderList();
+          toast(`${sv.name} added to "${enc.name}".`);
+          return;
+        }
+        if (!await showCombatConfirm(`Delete ${sv.name} from the saved Pokémon?`, { title: 'Saved Pokémon', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+        _saved = _saved.filter(x => x !== sv);
+        await DmAPI.saveState('saved-pokemon', _saved).catch(err => showCombatAlert(err.message, { title: 'Saved Pokémon' }));
+        draw(body);
+        if (enc === current()) renderSheet();
+      });
+    },
+  });
 }
 
 // ---- Exclusions (left out of the random generators) ----
@@ -1027,8 +1226,8 @@ export async function importEncounterDialog() {
   const id = await openDmModal({
     title: '📥 Import an encounter',
     html: `<input class="dm-input" id="impSearch" placeholder="Search…" autocomplete="off" style="margin-bottom:0.5rem">
-      <div class="dm-enc-savedmaps" id="impList">${[..._encounters].sort((a, b) => !!a.finished - !!b.finished).map(e => `<button class="dm-species-item" data-enc="${escapeHtml(e.id)}" data-search="${escapeHtml(e.name.toLowerCase())}">
-        <span><span class="dm-species-name">${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' · ● in play' : ''}${e.finished ? ' · ✓ finished' : ''}</span>
+      <div class="dm-enc-savedmaps" id="impList">${_encounters.map(e => `<button class="dm-species-item" data-enc="${escapeHtml(e.id)}" data-search="${escapeHtml(e.name.toLowerCase())}">
+        <span><span class="dm-species-name">${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' · ● in play' : ''}${e.folder && _folders.some(f => f.id === e.folder) ? ` · 📁 ${escapeHtml(folderLabel(e.folder))}` : ''}</span>
         <span class="dm-species-meta">${escapeHtml(summary(e))}${e.map ? ` · 🗺️ its own map (${e.map.rows} × ${e.map.cols})` : ''}</span></span></button>`).join('')}</div>`,
     buttons: [{ label: 'Cancel', value: null }],
     onOpen: (body, close) => {

@@ -19,7 +19,8 @@ import { drawMoves, onReviewCount } from './admin-moves.js';
 import { transferButtonsHtml, wireTransfer } from './admin-transfer.js';
 
 const TAB_KEY = 'dmAdminTab';
-const TABS = ['items', 'moves', 'species', 'pictures', 'splashes', 'logs', 'events', 'locations', 'statuses'];
+// (in the order the tabs are shown -- the most used first, the user's call, 2026-11-11)
+const TABS = ['events', 'locations', 'species', 'logs', 'pictures', 'moves', 'items', 'statuses', 'splashes'];
 const MOVE_LEVELS = ['1', '2', '6', '10', '14', '18'];
 const MOVEMENT = ['walking', 'climbing', 'flying', 'hovering', 'swimming', 'burrowing'];
 const SENSES = ['sight', 'hearing', 'smell', 'tremorsense', 'echolocation', 'telepathy', 'blindsight', 'darkvision', 'truesight'];
@@ -33,7 +34,7 @@ const PICTURE_SLOTS = [['still', false, 'Still', 'still'], ['still', true, 'Stil
 const LIST_MAX = 250; // rows drawn in a list at once -- the search narrows it down
 
 let _root = null;
-let _tab = 'items';
+let _tab = 'events';
 let _items = null;           // [{name, category, price, description, effect, image, edited}]
 let _item = null;            // the item on the form ({...} -- `isNew` while it hasn't been saved)
 let _speciesName = null;     // the Pokedex entry on the form (null: a new one)
@@ -44,19 +45,19 @@ let _splashes = null;
 export function renderAdmin(section) {
   if (_root === section) return;
   _root = section;
-  try { _tab = TABS.includes(localStorage.getItem(TAB_KEY)) ? localStorage.getItem(TAB_KEY) : 'items'; } catch (e) { /* default */ }
+  try { _tab = TABS.includes(localStorage.getItem(TAB_KEY)) ? localStorage.getItem(TAB_KEY) : 'events'; } catch (e) { /* default */ }
   section.innerHTML = `
     <div class="dm-admin">
       <div class="dm-enc-tabs" id="admTabs">
-        <button data-atab="items">🎒 Items</button>
-        <button data-atab="moves">💥 Moves <span class="dm-pill todo" id="admMoveCount" title="Moves that need a look" hidden></span></button>
-        <button data-atab="species">📕 Pokédex entries</button>
-        <button data-atab="pictures">🌲 Map pictures</button>
-        <button data-atab="splashes">🖼️ Splash screens</button>
-        <button data-atab="logs">📜 Battle logs</button>
         <button data-atab="events">📅 Events</button>
         <button data-atab="locations">📍 Locations</button>
+        <button data-atab="species">📕 Pokédex entries</button>
+        <button data-atab="logs">📜 Battle logs</button>
+        <button data-atab="pictures">🌲 Map pictures</button>
+        <button data-atab="moves">💥 Moves <span class="dm-pill todo" id="admMoveCount" title="Moves that need a look" hidden></span></button>
+        <button data-atab="items">🎒 Items</button>
         <button data-atab="statuses">🌀 Status conditions</button>
+        <button data-atab="splashes">🖼️ Splash screens</button>
       </div>
       <div class="dm-admin-body" id="admBody"></div>
     </div>`;

@@ -912,7 +912,16 @@ async function portrait(dataUrl) {
 
 const KIND_LABEL = { pve: 'PvE', pvp: 'PvP', adventure: 'Adventure' };
 let _logFile = null;
-const logWhen = ts => (ts ? new Date(ts).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '');
+// Which battles the list shows (the user's call, 2026-11-11): today's only, or all of them -- remembered
+const LOG_DAY_KEY = 'dmAdminLogDay';
+let _logDay = localStorage.getItem(LOG_DAY_KEY) === 'all' ? 'all' : 'today';
+/** Whether a battle started today (the device's own day). */
+const isToday = (ts) => {
+  if (!ts) return false;
+  const d = new Date(ts), now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+};
+const logWhen =ts => (ts ? new Date(ts).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '');
 
 /** A battle's name: the DM's own (the user's call, 2026-10-20), else its players with the date and time. */
 function logTitle(l) {
@@ -933,11 +942,15 @@ async function drawBattleLogs(body) {
   body.innerHTML = `
     <div class="dm-editor">
       <aside class="dm-editor-tools">
-        <div class="dm-editor-head"><h2>📜 Battle logs</h2><span class="dm-pill ok">${logs.length}</span></div>
+        <div class="dm-editor-head"><h2>📜 Battle logs</h2><span class="dm-pill ok" id="admLogCount">${logs.length}</span></div>
         <input class="dm-input" id="admLogFilter" placeholder="Find a battle (its name, who was in it)…" autocomplete="off">
+        <div class="dm-seg dm-adm-logday" id="admLogDay">
+          <button data-day="today" class="${_logDay === 'today' ? 'active' : ''}">Today</button><button data-day="all" class="${_logDay === 'all' ? 'active' : ''}">All</button>
+        </div>
+        <div class="dm-hint" id="admLogNone" hidden></div>
         <div class="dm-pdx-list" id="admLogList">
           ${logs.map(l => `
-            <button class="dm-pdx-row dm-adm-logrow${l.file === _logFile ? ' selected' : ''}" data-log="${escapeHtml(l.file)}" data-search="${escapeHtml(`${logTitle(l)} ${logWhen(l.started)} ${l.who.join(' ')} ${l.kind}`.toLowerCase())}">
+            <button class="dm-pdx-row dm-adm-logrow${l.file === _logFile ? ' selected' : ''}" data-log="${escapeHtml(l.file)}" data-today="${isToday(l.started) ? '1' : ''}" data-search="${escapeHtml(`${logTitle(l)} ${logWhen(l.started)} ${l.who.join(' ')} ${l.kind}`.toLowerCase())}">
               <span class="dm-adm-logkind ${escapeHtml(l.kind)}">${escapeHtml(KIND_LABEL[l.kind] || l.kind)}</span>
               <span class="dm-pdx-main"><strong class="dm-adm-logname">${escapeHtml(logTitle(l))}</strong><small class="dm-adm-logdate" ${l.name ? '' : 'hidden'}>${escapeHtml(logWhen(l.started))}</small>
                 <small>${escapeHtml(l.who.slice(0, 6).join(', ') || 'Nobody joined')}${l.who.length > 6 ? ` +${l.who.length - 6}` : ''}</small>
@@ -947,10 +960,29 @@ async function drawBattleLogs(body) {
       </aside>
       <section class="dm-editor-canvas" id="admLogView"><div class="dm-cs-empty">Pick a battle on the left.</div></section>
     </div>`;
-  document.getElementById('admLogFilter').addEventListener('input', (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    body.querySelectorAll('[data-log]').forEach(r => { r.hidden = !!q && !r.dataset.search.includes(q); });
+  // The search and the day together: a battle shows when it matches both
+  const applyFilter = () => {
+    const q = document.getElementById('admLogFilter').value.trim().toLowerCase();
+    let shown = 0;
+    body.querySelectorAll('[data-log]').forEach((r) => {
+      r.hidden = (!!q && !r.dataset.search.includes(q)) || (_logDay === 'today' && !r.dataset.today);
+      if (!r.hidden) shown++;
+    });
+    document.getElementById('admLogCount').textContent = shown === logs.length ? `${logs.length}` : `${shown} of ${logs.length}`;
+    const none = document.getElementById('admLogNone');
+    none.hidden = !logs.length || shown > 0;
+    none.textContent = q ? 'No battle matches that.' : 'No battles today -- press All to see the earlier ones.';
+  };
+  document.getElementById('admLogFilter').addEventListener('input', applyFilter);
+  document.getElementById('admLogDay').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-day]');
+    if (!b) return;
+    _logDay = b.dataset.day;
+    localStorage.setItem(LOG_DAY_KEY, _logDay);
+    body.querySelectorAll('#admLogDay [data-day]').forEach(x => x.classList.toggle('active', x === b));
+    applyFilter();
   });
+  applyFilter();
   document.getElementById('admLogList').addEventListener('click', (e) => {
     const row = e.target.closest('[data-log]');
     if (!row) return;

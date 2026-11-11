@@ -1372,6 +1372,8 @@ span.dm-trap-pick { cursor: default; }
 .dm-adm-mappic-name { font-size: 0.76rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 1.6rem; }
 .dm-adm-mappic .dm-icon-btn { position: absolute; right: 0.3rem; bottom: 0.25rem; }
 /* Admin: battle logs */
+.dm-adm-logday { display: flex; }
+.dm-adm-logday button { flex: 1; }
 .dm-adm-logrow { grid-template-columns: 4.4rem 1fr auto; }
 .dm-adm-logrow small + small { margin-top: 1px; }
 .dm-adm-logrow .dm-adm-logdate[hidden] { display: none; }

@@ -148,9 +148,10 @@ function segmentInBox(ax, ay, bx, by, x0, y0, x1, y1) {
 }
 
 export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false, namesTurned = false, onPick, onPartyMove, loadingText = 'Loading the map…' } = {}) {
-  // `onPartyMove([x, y])` (the DM's PokeNav, the user's call, 2026-11-12): the party's marker can be dragged anywhere --
-  // the players gone off between the locations -- and this is told where it was put down (in the first map's pixels,
-  // so it stays put whichever map is in use).
+  // `onPartyMove(spot, locationId)` (the DM's PokeNav, the user's call, 2026-11-12): the party's marker can be dragged
+  // anywhere -- the players gone off between the locations -- and this is told where it was put down: `spot` ([x, y] in
+  // the first map's pixels, so it stays put whichever map is in use), or, let go on a town, that town (`locationId`,
+  // spot null).
   // `namesTurned` (the table's board screen, js/pages/battle-map.js, the user's call, 2026-11-12): the players sit along
   // the screen's long side, their "up" its right edge -- the names and the party's marker are turned a quarter right
   // with the map, so they read the right way up from the chairs.
@@ -937,6 +938,20 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     }
     return px;
   }
+  /** The town (a location marked with a pin) the dragged marker's foot, at client point (fx, fy), is on: the nearest
+   * one showing whose pin is within SNAP_PX of it -- or whose icon it's over -- or null. */
+  const SNAP_PX = 20;
+  function snapTarget(fx, fy) {
+    const r = canvas.getBoundingClientRect();
+    let best = null, bestD = Infinity;
+    for (const l of labels) {
+      if (l.kind !== 'town' || !l.locId || l.el.style.display === 'none' || l.el.classList.contains('behind')) continue;
+      dragNdc.copy(l.at).project(camera);
+      const d = Math.hypot(r.left + ((dragNdc.x + 1) / 2) * r.width - fx, r.top + ((1 - dragNdc.y) / 2) * r.height - fy);
+      if (d <= Math.max(SNAP_PX, l.half || 0) && d < bestD) { best = l; bestD = d; }
+    }
+    return best;
+  }
   if (onPartyMove && !viewOnly) {
     labelLayer.addEventListener('pointerdown', (e) => {
       const el = e.target.closest('.rmap-label.party.draggable');
@@ -954,27 +969,37 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     });
     labelLayer.addEventListener('pointermove', (e) => {
       if (!dragging || e.pointerId !== dragging.pointerId) return;
-      const px = groundUnder(e.clientX - dragging.dx, e.clientY - dragging.dy);
+      const fx = e.clientX - dragging.dx, fy = e.clientY - dragging.dy;
+      const px = groundUnder(fx, fy);
       if (!px) return;
       dragging.moved = true;
       dragging.label.x = px[0];
       dragging.label.y = px[1];
       dragging.label.at = toWorld(px[0], px[1], heightAt(px[0], px[1]));
       dragging.label.el.classList.remove('on-icon');
+      // the town it would be put on if let go here, lit up
+      const snap = snapTarget(fx, fy);
+      if (snap !== dragging.snap) {
+        dragging.snap?.el.classList.remove('snap');
+        snap?.el.classList.add('snap');
+        dragging.snap = snap;
+      }
       dirty = true;
       wake();
     });
     const drop = (e) => {
       if (!dragging || e.pointerId !== dragging.pointerId) return;
-      const { label, moved } = dragging;
+      const { label, moved, snap } = dragging;
       dragging = null;
       label.el.classList.remove('held');
+      snap?.el.classList.remove('snap');
       if (!moved) return;
-      partyAt = null;
-      partySpot = toBase(label.x, label.y);
+      // let go on a town (the user's call, 2026-11-12): the party is there, like picking it in the list
+      partyAt = snap ? snap.locId : null;
+      partySpot = snap ? null : toBase(label.x, label.y);
       buildLabels();
       drawOverlay();
-      onPartyMove(partySpot);
+      onPartyMove(partySpot, partyAt);
     };
     labelLayer.addEventListener('pointerup', drop);
     labelLayer.addEventListener('pointercancel', drop);
@@ -1073,6 +1098,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       const half = l.kind === 'party' ? (dragging || !partyAt ? 0 : halfIcon.get(partyAt)) : halfIcon.get(l.locId);
       if (l.kind === 'town' || l.kind === 'region') l.el.style.setProperty('--below', `${Math.round(half || 0)}px`);
       if (l.kind === 'town') l.el.classList.toggle('iconed', !!half);
+      l.half = half || 0; // (how far its icon reaches: the party's marker let go on it snaps to it, snapTarget)
       if (l.kind === 'party') l.el.classList.toggle('on-icon', !!half);
       if (l.border) fitRealmName(l, lx, ly, half || 0, toLayer);
       // The party's marker as big on any screen and at any zoom (the user's call, 2026-10-20): a share of the screen's

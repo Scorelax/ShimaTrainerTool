@@ -173,13 +173,13 @@ async function saveParty(next) {
   }
 }
 
-/** The party moves to `id` (null: not set). The map flies there. */
-async function setPartyAt(id) {
+/** The party moves to `id` (null: not set). The map flies there, unless not `fly` (the marker dragged onto it). */
+async function setPartyAt(id, { fly = true } = {}) {
   const prev = _party?.locationId;
   if ((id || null) === (prev || null) && !_party?.spot) return;
   await saveParty({ ..._party, locationId: id || null, spot: null, at: id ? clockStamp() : '', recent: [prev, ...(_party?.recent || [])].filter((x, i, a) => x && x !== id && a.indexOf(x) === i).slice(0, 5) });
   _map?.setParty(_party.locationId);
-  if (_party.locationId) {
+  if (_party.locationId && fly) {
     _lit = null;
     _map?.highlight(null);
     _map?.flyToLocation(_party.locationId, { sectionOnly: true });
@@ -188,8 +188,10 @@ async function setPartyAt(id) {
 }
 
 /** The party's marker dragged to `spot` (the map's onPartyMove): out in the open, at none of the locations -- the one it
- * was at goes on the recent list. The map has put it there already. */
-async function setPartySpot(spot) {
+ * was at goes on the recent list. The map has put it there already. Let go on a town (`locationId`): the party is there,
+ * as if picked in the list -- the map stays where it is. */
+async function setPartySpot(spot, locationId) {
+  if (locationId) { await setPartyAt(locationId, { fly: false }); return; }
   const prev = _party?.locationId;
   await saveParty({ ..._party, locationId: null, spot, at: clockStamp(), recent: [prev, ...(_party?.recent || [])].filter((x, i, a) => x && a.indexOf(x) === i).slice(0, 5) });
   drawLocations();

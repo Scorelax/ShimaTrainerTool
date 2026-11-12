@@ -107,6 +107,9 @@
 .rmap-label.party.draggable { pointer-events: auto; cursor: grab; touch-action: none; }
 .rmap-label.party.held { cursor: grabbing; z-index: 3; }
 .rmap-label.party.held .rmap-party-marker { animation: none !important; opacity: 1; }
+/* ...and the town it snaps to if let go there, in gold (its name shown even from far out) */
+.rmap .rmap-label.town.snap .rmap-name { display: block; background: linear-gradient(#fff6d0, #ffd23f); border-color: #7a5a00; box-shadow: 0 0 0 2px rgba(255, 210, 63, 0.5), 0 1px 4px rgba(0, 0, 0, 0.35); }
+.rmap .rmap-label.town.snap .rmap-pin { display: block; background: #ffd23f; border-color: #7a5a00; }
 /* on a location with an icon: in the middle of the picture, so it's plainly at that place (the user's call, 2026-10-20) */
 .rmap .rmap-label.party.on-icon { translate: -50% -50%; }
 .rmap-party-marker {

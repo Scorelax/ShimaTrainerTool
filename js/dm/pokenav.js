@@ -12,7 +12,7 @@ import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, toast, openDmModal } from './dm-common.js';
 import { loadLocations, loadEvents, LOCATION_TYPES, readFolded, toggleFold } from './admin-world.js';
 import { shapeDistance } from '../region-map/map-features.js';
-import { currentMap, kmPerPx, parentOf, isTopLocation, withInside, routeSections } from '../region-map/map-version.js';
+import { currentMap, kmPerPx, parentOf, isTopLocation, withInside, routeSections, apply, invert, IDENTITY } from '../region-map/map-version.js';
 import { getClock, formatDate, formatTime } from './world-clock.js';
 import { renderAdventure, startAdventure } from './adventure.js';
 import { regionPicture, wantsRegionPicture } from './region-picture.js';
@@ -104,7 +104,8 @@ export async function renderPokenav(section, { session } = {}) {
       DmAPI.getState('region-map-view').catch(() => null),
     ]);
     // Turned a quarter like the battle maps (north to the right); the compass in the corner goes back to that view.
-    _map = mountRegionMap(document.getElementById('navMap'), { title: false, rememberStyle: false, onView: queue, homeAzimuth: HOME_AZIMUTH, turned: true });
+    // The party's marker can be dragged anywhere on it (the user's call, 2026-11-12): out in the open, between locations.
+    _map = mountRegionMap(document.getElementById('navMap'), { title: false, rememberStyle: false, onView: queue, homeAzimuth: HOME_AZIMUTH, turned: true, onPartyMove: setPartySpot });
     // Drawn without the graphics card (hardware acceleration off in the browser): it moves slowly, and that's why.
     if (_map.graphics.software) {
       const slow = document.getElementById('navSlow');
@@ -113,7 +114,7 @@ export async function renderPokenav(section, { session } = {}) {
       slow.title = 'Turn on hardware acceleration in the browser\'s settings (System), then restart it';
     }
     if (saved) _map.setView(saved); // (for the map style it was left in)
-    Promise.all([loadLocations(), _party || loadParty()]).then(([list]) => { _map?.setLocations(list); _map?.setParty(_party?.locationId); }).catch(() => {});
+    Promise.all([loadLocations(), _party || loadParty()]).then(([list]) => { _map?.setLocations(list); _map?.setParty(_party?.locationId, _party?.spot); }).catch(() => {});
     await _map.ready;
     // Every start opens on the default view -- the compass's: straight down, north to the right, the whole painting
     // (the user's call, 2026-10-19) -- and the board screen follows (the move is sent like any other).
@@ -145,7 +146,9 @@ const insideRank = (l) => { const i = INSIDE_ORDER.indexOf(l.type || 'city'); re
 const insideOrder = (a, b) => insideRank(a) - insideRank(b) || String(a.name).localeCompare(String(b.name));
 
 let _lit = null;     // the location drawn onto the map here
-let _party = null;   // { locationId, onBoard, at (the world clock's date and time), recent: [ids] }
+// { locationId, spot ([x, y] in the first map's pixels: the marker dragged there, out in the open -- with no locationId),
+//   onBoard, at (the world clock's date and time), recent: [ids] }
+let _party = null;
 
 async function loadParty() {
   const saved = await DmAPI.getState('party-location').catch(() => null);
@@ -173,14 +176,22 @@ async function saveParty(next) {
 /** The party moves to `id` (null: not set). The map flies there. */
 async function setPartyAt(id) {
   const prev = _party?.locationId;
-  if ((id || null) === (prev || null)) return;
-  await saveParty({ ..._party, locationId: id || null, at: id ? clockStamp() : '', recent: [prev, ...(_party?.recent || [])].filter((x, i, a) => x && x !== id && a.indexOf(x) === i).slice(0, 5) });
+  if ((id || null) === (prev || null) && !_party?.spot) return;
+  await saveParty({ ..._party, locationId: id || null, spot: null, at: id ? clockStamp() : '', recent: [prev, ...(_party?.recent || [])].filter((x, i, a) => x && x !== id && a.indexOf(x) === i).slice(0, 5) });
   _map?.setParty(_party.locationId);
   if (_party.locationId) {
     _lit = null;
     _map?.highlight(null);
     _map?.flyToLocation(_party.locationId, { sectionOnly: true });
   }
+  drawLocations();
+}
+
+/** The party's marker dragged to `spot` (the map's onPartyMove): out in the open, at none of the locations -- the one it
+ * was at goes on the recent list. The map has put it there already. */
+async function setPartySpot(spot) {
+  const prev = _party?.locationId;
+  await saveParty({ ..._party, locationId: null, spot, at: clockStamp(), recent: [prev, ...(_party?.recent || [])].filter((x, i, a) => x && a.indexOf(x) === i).slice(0, 5) });
   drawLocations();
 }
 
@@ -201,7 +212,8 @@ function eventRowHtml(e, where = '') {
     <small>${escapeHtml([where, e.timeframe, e.trigger && `Trigger: ${e.trigger}`].filter(Boolean).join(' · ')) || 'No trigger or time yet'}</small></button>`;
 }
 
-function partyHtml(locations, events) {
+/** `open`: the party out in the open (its marker dragged there) as a pin, in the map in use's pixels -- or null. */
+function partyHtml(locations, events, open) {
   const here = locations.find(l => l.id === _party?.locationId);
   // (a region isn't a place the players can be -- the party is put on a location in it: the user's call, 2026-10-21)
   const opts = Object.entries(LOCATION_TYPES).filter(([k]) => k !== 'region').map(([k, label]) => {
@@ -218,11 +230,20 @@ function partyHtml(locations, events) {
       <div class="dm-cs-group-title">📅 Nearby <small>${near.length}</small></div>
       ${!here.shape ? '<div class="dm-hint dm-nav-locnone">Mark it on the map to see what\'s near it.</div>'
         : near.map(({ e, l, km }) => eventRowHtml(e, `${l.name || 'Unnamed'}, ${kmText(km)}`)).join('') || `<div class="dm-hint dm-nav-locnone">Nothing planned within ${NEAR_KM} km.</div>`}`;
+  } else if (open) {
+    // out in the open: only what's planned near the spot
+    const near = nearby(open, locations).flatMap(({ l, km }) => events.filter(e => e.locationId === l.id).map(e => ({ e, l, km })));
+    eventsHtml = `
+      <div class="dm-cs-group-title">📅 Nearby <small>${near.length}</small></div>
+      ${near.map(({ e, l, km }) => eventRowHtml(e, `${l.name || 'Unnamed'}, ${kmText(km)}`)).join('') || `<div class="dm-hint dm-nav-locnone">Nothing planned within ${NEAR_KM} km.</div>`}`;
   }
+  const dragHint = 'Drag the marker on the map to move the party off the locations.';
   return `<div class="dm-card-title"><span>${PARTY_ICON} The party</span></div>
     <div class="dm-nav-party">
-      <select class="dm-select" id="navPartyAt"><option value="">— Not set —</option>${opts}</select>
-      ${here ? `<div class="dm-hint">${here.shape ? '' : 'Not marked on the map, so it can\'t be shown there. '}${_party.at ? `Since ${escapeHtml(_party.at)}.` : ''}</div>` : '<div class="dm-hint">Pick where the players are -- the map lights it up and shows what\'s planned there and nearby.</div>'}
+      <select class="dm-select" id="navPartyAt"><option value="">— Not set —</option>${open ? '<option value="__open" selected>📍 Out in the open</option>' : ''}${opts}</select>
+      ${here ? `<div class="dm-hint">${here.shape ? '' : 'Not marked on the map, so it can\'t be shown there. '}${_party.at ? `Since ${escapeHtml(_party.at)}. ` : ''}${here.shape ? dragHint : ''}</div>`
+        : open ? `<div class="dm-hint">Where the marker was dragged, at none of the locations.${_party.at ? ` Since ${escapeHtml(_party.at)}.` : ''} Drag it again, or pick a location to put it back on one.</div>`
+        : '<div class="dm-hint">Pick where the players are -- the map lights it up and shows what\'s planned there and nearby. Then the marker can be dragged anywhere on the map.</div>'}
       <label class="dm-check"><input type="checkbox" id="navPartyBoard" ${_party?.onBoard !== false ? 'checked' : ''}><span>📺 Show it on the table's map
         <small>${here?.secret ? '🔒 This location is secret, so the table\'s map doesn\'t show it -- untick Secret in Admin once they\'ve found it.' : 'Untick for a journey the players shouldn\'t see on the map.'}</small></span></label>
       ${eventsHtml}
@@ -232,15 +253,19 @@ function partyHtml(locations, events) {
 async function drawLocations() {
   const box = document.getElementById('navLocations');
   if (!box) return;
-  let locations, events;
+  let locations, events, mapInUse;
   try {
     [locations, events] = await Promise.all([loadLocations(), loadEvents(), _party ? null : loadParty()]);
+    mapInUse = await currentMap();
   } catch (err) {
     box.innerHTML = `<div class="dm-card-title"><span>📍 Locations</span></div><div class="dm-hint">Couldn't load them: ${escapeHtml(err.message)}</div>`;
     return;
   }
   _map?.setLocations(locations);
-  _map?.setParty(_party?.locationId);
+  _map?.setParty(_party?.locationId, _party?.spot);
+  // out in the open (the marker dragged there): the spot as a pin on the map in use, for what's near it
+  const open = !_party?.locationId && Array.isArray(_party?.spot)
+    ? (([x, y]) => ({ id: '__open', shape: { kind: 'pin', x, y } }))(apply(invert(mapInUse?.toBase || IDENTITY), ..._party.spot)) : null;
   if (_lit && !locations.some(l => l.id === _lit && l.shape)) { _lit = null; _map?.highlight(null); }
   // a location inside another under it, a step in (the user's call, 2026-10-20) -- picked, what it's part of lights up too
   // one with others inside folds up (▾ / ▸, remembered on this computer)
@@ -263,7 +288,7 @@ async function drawLocations() {
   // there, and the locations -- their groups flowing into as many columns as fit. Each scrolls on its own, and keeps its
   // place when the list is drawn again (a fold, the party moving).
   const scrolled = [...box.querySelectorAll('.dm-nav-col')].map(c => c.scrollTop);
-  box.innerHTML = `<div class="dm-nav-col dm-nav-partycol">${partyHtml(locations, events)}</div>
+  box.innerHTML = `<div class="dm-nav-col dm-nav-partycol">${partyHtml(locations, events, open)}</div>
     <div class="dm-nav-col dm-nav-placescol">
       <div class="dm-card-title"><span>📍 Locations</span></div>
       <div class="dm-nav-groups">${Object.entries(LOCATION_TYPES).map(([k, label]) => {
@@ -279,7 +304,7 @@ async function drawLocations() {
       <div class="dm-hint">Locations are added and marked on the map in the Admin module (📍 Locations).</div>
     </div>`;
   box.querySelectorAll('.dm-nav-col').forEach((c, i) => { c.scrollTop = scrolled[i] || 0; });
-  box.querySelector('#navPartyAt').onchange = e => setPartyAt(e.target.value);
+  box.querySelector('#navPartyAt').onchange = (e) => { if (e.target.value !== '__open') setPartyAt(e.target.value); };
   box.querySelector('#navPartyBoard').onchange = e => saveParty({ ..._party, onBoard: e.target.checked });
   box.onclick = (e) => {
     const fb = e.target.closest('[data-fold]');

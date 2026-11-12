@@ -47,6 +47,7 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
   let map = null;
   let destroyed = false;
   let partyAt = null;       // where the party is, when the players may see it (null: not shown)
+  let partySpot = null;     // ...or the spot the DM dragged its marker to, out in the open (region-map.js setParty)
   let shownIds = new Set(); // the locations on the map (the secret ones left out)
   const off = [];
   const on = (type, fn) => { window.addEventListener(type, fn); off.push(() => window.removeEventListener(type, fn)); };
@@ -102,13 +103,15 @@ export function mountPlayerPokenav(root, { onBack } = {}) {
     const p = await DmAPI.getState('party-location').catch(() => undefined);
     if (p === undefined || destroyed) return;
     partyAt = p && p.onBoard !== false ? p.locationId || null : null;
-    map?.setParty(partyAt);
+    // ...or out in the open, where the DM dragged the marker (the user's call, 2026-11-12)
+    partySpot = p && p.onBoard !== false && !partyAt && Array.isArray(p.spot) ? p.spot : null;
+    map?.setParty(partyAt, partySpot);
     syncParty();
   };
   // the party button: only while the party's marker is on the map (a secret place shows nothing) -- flies there, turning
   // the map north up on the way (the user's call, 2026-10-22)
-  const syncParty = () => { partyBtn.hidden = !(partyAt && shownIds.has(partyAt)); };
-  partyBtn.addEventListener('click', () => { if (partyAt) map?.flyToLocation(partyAt, { azimuth: HOME_AZIMUTH, sectionOnly: true }); });
+  const syncParty = () => { partyBtn.hidden = !((partyAt && shownIds.has(partyAt)) || partySpot); };
+  partyBtn.addEventListener('click', () => map?.flyToParty({ azimuth: HOME_AZIMUTH }));
 
   const mount = async () => {
     const { mountRegionMap } = await import('../region-map/region-map.js');

@@ -103,6 +103,10 @@
    over, standing on its location's spot; its size (--mk) set from the screen and the zoom in region-map.js's
    placeLabels */
 .rmap-label.party { translate: -50% -92%; pointer-events: none; z-index: 2; }
+/* the DM's PokeNav (region-map.js onPartyMove): the marker picked up and put anywhere -- not fading while it's held */
+.rmap-label.party.draggable { pointer-events: auto; cursor: grab; touch-action: none; }
+.rmap-label.party.held { cursor: grabbing; z-index: 3; }
+.rmap-label.party.held .rmap-party-marker { animation: none !important; opacity: 1; }
 /* on a location with an icon: in the middle of the picture, so it's plainly at that place (the user's call, 2026-10-20) */
 .rmap .rmap-label.party.on-icon { translate: -50% -50%; }
 .rmap-party-marker {

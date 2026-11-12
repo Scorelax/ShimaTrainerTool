@@ -34,7 +34,7 @@
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { shapeBounds, iconSpot, tagSpot, ringsToMask, ringArea } from './map-features.js';
-import { currentMap, isMajor, partOfChain, routeSections, FIRST_ID, loadMapState, treeAreasOn, routeColour, tagInk } from './map-version.js';
+import { currentMap, isMajor, partOfChain, routeSections, FIRST_ID, loadMapState, treeAreasOn, routeColour, tagInk, apply, invert, IDENTITY } from './map-version.js';
 import { addLandDetail } from './land-detail.js';
 import { addRegionDetail } from './region-detail.js';
 import { addRegionBorders } from './region-borders.js';
@@ -147,7 +147,10 @@ function segmentInBox(ax, ay, bx, by, x0, y0, x1, y1) {
   return true;
 }
 
-export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false, namesTurned = false, onPick, loadingText = 'Loading the map…' } = {}) {
+export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false, namesTurned = false, onPick, onPartyMove, loadingText = 'Loading the map…' } = {}) {
+  // `onPartyMove([x, y])` (the DM's PokeNav, the user's call, 2026-11-12): the party's marker can be dragged anywhere --
+  // the players gone off between the locations -- and this is told where it was put down (in the first map's pixels,
+  // so it stays put whichever map is in use).
   // `namesTurned` (the table's board screen, js/pages/battle-map.js, the user's call, 2026-11-12): the players sit along
   // the screen's long side, their "up" its right edge -- the names and the party's marker are turned a quarter right
   // with the map, so they read the right way up from the chairs.
@@ -249,6 +252,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   let locations = null;     // the DM's locations (setLocations), or null: the towns in places.json
   let highlighted = null;   // the id of the location drawn onto the land (the DM looking at it)
   let partyAt = null;       // the id of the location the party is at (outlined in gold, marked)
+  let partySpot = null;     // ...or, at none, the spot the DM dragged its marker to: [x, y] in the first map's pixels
   let overlay = null;       // ...drawn here: { canvas, ctx, tex, mesh } -- the land's surface again, see-through
   const icons = [];         // the locations' icons standing on the land (pictures facing south)
   // one square, standing up facing south (+z, down the painting), every icon a copy of it scaled to its picture
@@ -263,6 +267,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
 
   // Painting pixel -> world: x to the east, z to the south, y up (metres scaled by vert).
   const toWorld = (x, y, metres = 0) => new THREE.Vector3(x - land.W / 2, Math.max(metres, 0) * land.vert, y - land.H / 2);
+  // This map's pixels <-> the first map's (where the party's dragged spot is kept)
+  const fromBase = ([x, y]) => apply(invert(version?.toBase || IDENTITY), x, y);
+  const toBase = (x, y) => apply(version?.toBase || IDENTITY, x, y).map(v => Math.round(v * 10) / 10);
   function heightAt(x, y) {
     const i = Math.min(land.H - 1, Math.max(0, Math.round(y))) * land.W + Math.min(land.W - 1, Math.max(0, Math.round(x)));
     return land.kind[i] === 0 ? 0 : land.metres[i];
@@ -392,7 +399,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       if (kind === 'town') el.innerHTML = `<span class="rmap-pin"></span><span class="rmap-name">${esc(name)}</span>`;
       else if (kind === 'spot') el.innerHTML = '<span class="rmap-spot"></span>';
       // the players' marker (assets/MapMarker.png, the user's pixel-art trainer, kept 32 x 32 here and drawn crisp)
-      else if (kind === 'party') el.innerHTML = `<img class="rmap-party-marker" src="${BASE}party-marker.png" alt="The party">`;
+      else if (kind === 'party') el.innerHTML = `<img class="rmap-party-marker" src="${BASE}party-marker.png" alt="The party" draggable="false">`;
       else el.textContent = name;
       if (tag) { el.style.setProperty('--tag', tag); el.style.setProperty('--ink', tagInk(tag)); }
       if (kind === 'town' || kind === 'region') el.dataset.fly = labels.length;
@@ -440,6 +447,11 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     const party = partyAt && locations?.find(l => l.id === partyAt);
     const pb = shapeBounds(party?.shape);
     if (pb) add('party', '', pb.mid[0], pb.mid[1], party.icon?.url ? 0 : party.shape.kind === 'pin' ? 40 : 30);
+    // ...or standing on the ground where the DM dragged it (out in the open, at none of the locations)
+    else if (!partyAt && partySpot) { const [sx, sy] = fromBase(partySpot); add('party', '', sx, sy, 0); }
+    // the DM's PokeNav (onPartyMove): the marker can be picked up and put anywhere
+    const marker = labels.find(l => l.kind === 'party');
+    if (marker && onPartyMove && !viewOnly) marker.el.classList.add('draggable');
     markLabels();
     dirty = true;
     wake();
@@ -885,12 +897,87 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     if (land) drawOverlay();
   }
 
-  /** Where the party is (a location's id; null: nowhere shown) -- outlined in gold and marked. */
-  function setParty(id) {
+  /** Where the party is (a location's id; null: nowhere shown) -- outlined in gold and marked. With no location, `spot`
+   * ([x, y] in the first map's pixels, where the DM dragged the marker): marked there. */
+  function setParty(id, spot = null) {
     partyAt = id || null;
-    if (!land) return;
+    partySpot = !partyAt && Array.isArray(spot) && spot.every(Number.isFinite) ? spot : null;
+    if (!land || dragging) return; // (being dragged: put where it's let go)
     buildLabels();
     drawOverlay();
+  }
+
+  /** Flies to the party's marker -- its location, or the spot it was dragged to (in close, like over a town). */
+  function flyToParty({ ms = 900, azimuth = controls.getAzimuthalAngle() } = {}) {
+    if (partyAt) return flyToLocation(partyAt, { ms, azimuth, sectionOnly: true });
+    if (!partySpot || !land) return false;
+    const [x, y] = fromBase(partySpot);
+    flyTo(toWorld(x, y), land.fit * PIN_ZOOM, PIN_POLAR, azimuth, ms);
+    return true;
+  }
+
+  // Dragging the party's marker (onPartyMove): it follows the pointer over the land -- held by where it was picked up,
+  // so it doesn't jump -- and is put down where it's let go.
+  let dragging = null;  // { label, dx, dy (the pointer from the marker's foot, px), moved, pointerId }
+  const dragNdc = new THREE.Vector3();
+  const dragRay = new THREE.Raycaster();
+  const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const dragHit = new THREE.Vector3();
+  /** The map pixel under the client point (cx, cy): where the line of sight meets the ground -- a flat plane at the
+   * ground's height there, found again a few times (cheaper than the whole fine mesh, and close enough to stand on). */
+  function groundUnder(cx, cy) {
+    const r = canvas.getBoundingClientRect();
+    dragRay.setFromCamera({ x: ((cx - r.left) / r.width) * 2 - 1, y: -((cy - r.top) / r.height) * 2 + 1 }, camera);
+    let y = 0, px = null;
+    for (let i = 0; i < 4; i++) {
+      dragPlane.constant = -y;
+      if (!dragRay.ray.intersectPlane(dragPlane, dragHit)) break;
+      px = [Math.min(land.W - 1, Math.max(0, dragHit.x + land.W / 2)), Math.min(land.H - 1, Math.max(0, dragHit.z + land.H / 2))];
+      y = Math.max(0, heightAt(px[0], px[1])) * land.vert;
+    }
+    return px;
+  }
+  if (onPartyMove && !viewOnly) {
+    labelLayer.addEventListener('pointerdown', (e) => {
+      const el = e.target.closest('.rmap-label.party.draggable');
+      const label = el && labels.find(l => l.el === el);
+      if (!label || !land || !e.isPrimary) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // the pointer from the marker's foot (its spot on the screen), kept while it's dragged
+      const r = canvas.getBoundingClientRect();
+      dragNdc.copy(label.at).project(camera);
+      const fx = r.left + ((dragNdc.x + 1) / 2) * r.width, fy = r.top + ((1 - dragNdc.y) / 2) * r.height;
+      dragging = { label, dx: e.clientX - fx, dy: e.clientY - fy, moved: false, pointerId: e.pointerId };
+      el.setPointerCapture(e.pointerId);
+      el.classList.add('held');
+    });
+    labelLayer.addEventListener('pointermove', (e) => {
+      if (!dragging || e.pointerId !== dragging.pointerId) return;
+      const px = groundUnder(e.clientX - dragging.dx, e.clientY - dragging.dy);
+      if (!px) return;
+      dragging.moved = true;
+      dragging.label.x = px[0];
+      dragging.label.y = px[1];
+      dragging.label.at = toWorld(px[0], px[1], heightAt(px[0], px[1]));
+      dragging.label.el.classList.remove('on-icon');
+      dirty = true;
+      wake();
+    });
+    const drop = (e) => {
+      if (!dragging || e.pointerId !== dragging.pointerId) return;
+      const { label, moved } = dragging;
+      dragging = null;
+      label.el.classList.remove('held');
+      if (!moved) return;
+      partyAt = null;
+      partySpot = toBase(label.x, label.y);
+      buildLabels();
+      drawOverlay();
+      onPartyMove(partySpot);
+    };
+    labelLayer.addEventListener('pointerup', drop);
+    labelLayer.addEventListener('pointercancel', drop);
   }
 
   /** Flies to a location: in close over a town, far enough back over a route or a forest to see all of it. Turned the way
@@ -982,7 +1069,8 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       // from far away only the towns: the spots and the sea names come in closer
       if (l.kind === 'spot' || l.kind === 'water') l.el.classList.toggle('far', dist > land.fit * 0.75);
       if (l.kind === 'town' || l.kind === 'region') l.el.classList.toggle('unnamed', minorAway && l.el.classList.contains('minor'));
-      const half = halfIcon.get(l.kind === 'party' ? partyAt : l.locId);
+      // (the party's marker dragged, or put down out in the open: on no icon)
+      const half = l.kind === 'party' ? (dragging || !partyAt ? 0 : halfIcon.get(partyAt)) : halfIcon.get(l.locId);
       if (l.kind === 'town' || l.kind === 'region') l.el.style.setProperty('--below', `${Math.round(half || 0)}px`);
       if (l.kind === 'town') l.el.classList.toggle('iconed', !!half);
       if (l.kind === 'party') l.el.classList.toggle('on-icon', !!half);
@@ -1493,5 +1581,5 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     if (box) box.textContent = `Couldn't load the map: ${err.message}`;
     throw err;
   });
-  return { ready, destroy, getView, setView, home, setLocations, highlight, setParty, flyToLocation, graphics: gpu, get mapId() { return version?.id || null; } };
+  return { ready, destroy, getView, setView, home, setLocations, highlight, setParty, flyToParty, flyToLocation, graphics: gpu, get mapId() { return version?.id || null; } };
 }

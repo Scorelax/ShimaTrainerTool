@@ -36,7 +36,7 @@ _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclu
                'events', 'locations', 'status-conditions',
                'battle-reminders',  # the Battle module's DM-only reminders: {logFile, list: [...]} (js/dm/battle-live.js)
                'region-map',  # the region map's own record: {townsSeeded (places.json's towns made locations once, js/dm/admin-world.js), current, versions (the maps the DM uploaded, js/region-map/map-version.js)}
-               'party-location'}  # where the party is: {locationId, onBoard, at, recent} (js/dm/pokenav.js)
+               'party-location'}  # where the party is: {locationId, spot (dragged out in the open), onBoard, at, recent} (js/dm/pokenav.js)
 # Saved here and heard of live by other screens ({'type': 'dm-state', 'key'}): the locations are the board screen's
 # region map's names and the party's place is lit up on it (js/pages/battle-map.js), the user's call, 2026-10-20.
 _LIVE_STATE_KEYS = {'locations', 'party-location', 'region-map'}  # region-map: the DM switched maps (js/region-map/map-version.js)

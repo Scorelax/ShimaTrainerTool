@@ -65,7 +65,8 @@ async function mountRegion() {
     // ...and where the party is (the DM's PokeNav, 'party-location'), unless the DM keeps it off this screen
     const showParty = async () => {
       const p = await DmAPI.getState('party-location').catch(() => undefined);
-      if (p !== undefined) map.setParty(p && p.onBoard !== false ? p.locationId : null);
+      // (its location, or the spot the DM dragged it to)
+      if (p !== undefined) map.setParty(...(p && p.onBoard !== false ? [p.locationId, p.spot] : [null]));
     };
     showLocations();
     showParty();

@@ -51,7 +51,9 @@ async function mountRegion() {
       import('../region-map/map-version.js'),
       DmAPI.getState('region-map-view').catch(() => null),
     ]);
-    let map = mountRegionMap(document.getElementById('mapRegionMap'), { viewOnly: true, rememberStyle: false });
+    // the names and the party's marker turned with the map, the right way up for the players (namesTurned)
+    const opts = { viewOnly: true, rememberStyle: false, namesTurned: true };
+    let map = mountRegionMap(document.getElementById('mapRegionMap'), opts);
     // Its names: the DM's locations marked on the map (not the secret ones), fetched again when the DM changes them; the
     // towns the map was made with until any are marked.
     const showLocations = async () => {
@@ -71,7 +73,7 @@ async function mountRegion() {
       const next = await currentMap({ fresh: true });
       if (next.id === map.mapId) return;
       map.destroy();
-      map = mountRegionMap(document.getElementById('mapRegionMap'), { viewOnly: true, rememberStyle: false });
+      map = mountRegionMap(document.getElementById('mapRegionMap'), opts);
       showLocations();
       showParty();
       await map.ready;

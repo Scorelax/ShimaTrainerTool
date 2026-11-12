@@ -24,6 +24,9 @@
 
 /* the labels over the canvas: each placed at its spot by a transform, centred on it */
 .rmap-labels { position: absolute; inset: 0; pointer-events: none; }
+/* turned a quarter right with the map, for the players round the table's board screen (region-map.js namesTurned sets its
+   size and place: the screen's height wide, its width tall, on its middle) */
+.rmap-labels.turned { inset: auto; transform: rotate(90deg); }
 .rmap-label { position: absolute; left: 0; top: 0; will-change: transform; }
 .rmap-label > * { position: relative; }
 .rmap-label.town {
@@ -183,7 +186,9 @@
    to a touch, and the names are a size up to read from the chairs. */
 .rmap.view-only, .rmap.view-only * { pointer-events: none !important; }
 .rmap.view-only .rmap-canvas { cursor: default; }
-.rmap.view-only .rmap-name { font-size: 0.79rem; padding: 2px 7px; }
+/* the towns' name tags 30 % smaller than they were (the user's call, 2026-11-12: too big, the major ones most -- from
+   far out they're the only ones named) */
+.rmap.view-only .rmap-name { font-size: 0.55rem; padding: 1px 5px; }
 .rmap.view-only .rmap-label.region { font-size: 0.68rem; }
 .rmap.view-only .rmap-label.region.realm { font-size: 1.1rem; }
 .rmap.view-only .rmap-pin { width: 12px; height: 12px; }

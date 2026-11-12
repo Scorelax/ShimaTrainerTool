@@ -147,7 +147,10 @@ function segmentInBox(ax, ay, bx, by, x0, y0, x1, y1) {
   return true;
 }
 
-export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false, onPick, loadingText = 'Loading the map…' } = {}) {
+export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null, turned = false, namesTurned = false, onPick, loadingText = 'Loading the map…' } = {}) {
+  // `namesTurned` (the table's board screen, js/pages/battle-map.js, the user's call, 2026-11-12): the players sit along
+  // the screen's long side, their "up" its right edge -- the names and the party's marker are turned a quarter right
+  // with the map, so they read the right way up from the chairs.
   // `onPick(locationId)` (the players' PokéNav, the user's call, 2026-10-21): a location's name or icon tapped -- the map
   // flies there and lights it up, and this is told (to show what's there).
   // `turned` (the DM's PokeNav, the user's call, 2026-10-20): this screen is the table's 16:9 board screen seen from the
@@ -921,8 +924,20 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
 
   const v = new THREE.Vector3();
   const corner = new THREE.Vector3();
+  let layerSize = '';
   function placeLabels() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
+    // Where a point on the screen (-1..1 both ways, y up) is in the names' layer, in px. Turned (namesTurned): the layer
+    // is h wide and w tall, turned a quarter right about the screen's middle (region-map.css .rmap-labels.turned) -- its
+    // top along the screen's right edge, its "down" toward the screen's left.
+    const toLayer = namesTurned
+      ? (x, y) => [((1 - y) / 2) * h, ((1 - x) / 2) * w]
+      : (x, y) => [((x + 1) / 2) * w, ((1 - y) / 2) * h];
+    if (namesTurned && layerSize !== `${w}x${h}`) {
+      layerSize = `${w}x${h}`;
+      labelLayer.classList.add('turned');
+      Object.assign(labelLayer.style, { width: `${h}px`, height: `${w}px`, left: `${(w - h) / 2}px`, top: `${(h - w) / 2}px` });
+    }
     const dist = camera.position.distanceTo(controls.target);
     // A minor location's name only closer in than 60 % of the painting filling the screen (the user's call, 2026-10-20:
     // the compass's view then): from far out only the major locations are named.
@@ -933,23 +948,25 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
     const halfIcon = new Map();
     icons.forEach((sp) => {
       if (!sp.visible) return;
-      const mid = v.copy(sp.position).project(camera).y;
+      v.copy(sp.position).project(camera);
+      const mid = toLayer(v.x, v.y)[1];
       let low = 0;
       for (const [cx, cy] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) {
         corner.set(cx, cy, 0).applyMatrix4(sp.matrixWorld).project(camera);
-        low = Math.max(low, ((mid - corner.y) / 2) * h);
+        low = Math.max(low, toLayer(corner.x, corner.y)[1] - mid);
       }
       halfIcon.set(sp.userData.locId, low);
     });
     // a model: how far its box reaches down the screen from its foot
     models.forEach((m) => {
       if (!m.visible) return;
-      const mid = v.copy(m.position).project(camera).y;
+      v.copy(m.position).project(camera);
+      const mid = toLayer(v.x, v.y)[1];
       const { min, max } = m.userData.box;
       let low = 0;
       for (const cx of [min.x, max.x]) for (const cy of [min.y, max.y]) for (const cz of [min.z, max.z]) {
         corner.set(cx, cy, cz).project(camera);
-        low = Math.max(low, ((mid - corner.y) / 2) * h);
+        low = Math.max(low, toLayer(corner.x, corner.y)[1] - mid);
       }
       halfIcon.set(m.userData.locId, low);
     });
@@ -960,7 +977,8 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       if (!visible) continue;
       // a town (its pin and name) or a red spot behind a mountain stays behind it (the user's call, 2026-10-22)
       if (l.kind === 'town' || l.kind === 'spot') l.el.classList.toggle('behind', behindLand(l.at));
-      l.el.style.transform = `translate(${((v.x + 1) / 2 * w).toFixed(1)}px, ${((1 - v.y) / 2 * h).toFixed(1)}px)`;
+      const [lx, ly] = toLayer(v.x, v.y);
+      l.el.style.transform = `translate(${lx.toFixed(1)}px, ${ly.toFixed(1)}px)`;
       // from far away only the towns: the spots and the sea names come in closer
       if (l.kind === 'spot' || l.kind === 'water') l.el.classList.toggle('far', dist > land.fit * 0.75);
       if (l.kind === 'town' || l.kind === 'region') l.el.classList.toggle('unnamed', minorAway && l.el.classList.contains('minor'));
@@ -968,7 +986,7 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
       if (l.kind === 'town' || l.kind === 'region') l.el.style.setProperty('--below', `${Math.round(half || 0)}px`);
       if (l.kind === 'town') l.el.classList.toggle('iconed', !!half);
       if (l.kind === 'party') l.el.classList.toggle('on-icon', !!half);
-      if (l.border) fitRealmName(l, (v.x + 1) / 2 * w, (1 - v.y) / 2 * h, half || 0, w, h);
+      if (l.border) fitRealmName(l, lx, ly, half || 0, toLayer);
       // The party's marker as big on any screen and at any zoom (the user's call, 2026-10-20): a share of the screen's
       // height, a little bigger closer in -- never lost when the whole island is in view, never huge up close.
       if (l.kind === 'party') {
@@ -1002,14 +1020,14 @@ ${shader.vertexShader.replace('#include <project_vertex>', `#include <project_ve
    * until the box round it fits inside the region as it is on the screen now -- and hidden when even small it doesn't. */
   const MIN_REALM_PX = 6.5;
   const bv = new THREE.Vector3();
-  function fitRealmName(l, cx, cy, below, w, h) {
+  function fitRealmName(l, cx, cy, below, toLayer) {
     const el = l.el;
     if (!l.size) {
       el.style.fontSize = '';
       l.size = { base: parseFloat(getComputedStyle(el).fontSize), w: el.offsetWidth, h: el.offsetHeight };
       if (!l.size.w) { l.size = null; return; } // not laid out yet
     }
-    const rings = l.border.map(r => r.map((p) => { bv.copy(p).project(camera); return [(bv.x + 1) / 2 * w, (1 - bv.y) / 2 * h]; }));
+    const rings = l.border.map(r => r.map((p) => { bv.copy(p).project(camera); return toLayer(bv.x, bv.y); }));
     const fits = (k) => {
       const hw = (l.size.w * k) / 2 + 3, hh = (l.size.h * k) / 2 + 2;
       // with an icon, the name hangs just under it (region-map.css's .has-icon)

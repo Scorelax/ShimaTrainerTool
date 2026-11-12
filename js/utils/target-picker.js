@@ -22,6 +22,7 @@ import { filterTargetable, markOutOfRange } from './targetability.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
 import { renderAbilityDiceInputs, abilityDiceSum } from './ability-dice-inputs.js';
 import { commitMove } from './move-commit.js';
+import { pickTargetOnMap, canPickOnMap, mapPickOptions } from './map-target-picker.js';
 
 function _injectStyles() {
   if (document.getElementById('target-picker-styles')) return;
@@ -35,6 +36,8 @@ function _injectStyles() {
     .combat-popup-close { position: absolute; top: 0.8rem; right: 0.8rem; background: rgba(0,0,0,0.3); border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 1.2rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; color: inherit; }
     .combat-move-popup-body { padding: 1rem 1.2rem; }
     .combat-use-move-btn { width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #4CAF50, #45A049); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    .target-picker-map-btn { width: 100%; margin-bottom: 0.3rem; padding: 0.55rem; border: 1px solid rgba(140,170,255,0.45); border-radius: 8px; background: rgba(140,170,255,0.12); color: #cfd8ff; font-weight: 700; font-size: 0.9rem; cursor: pointer; font-family: inherit; }
+    .target-picker-map-btn:hover { background: rgba(140,170,255,0.25); }
     .target-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.6rem; margin-top: 0.5rem; }
     .target-picker-card {
       background: rgba(255,255,255,0.06); border: 2px solid transparent; border-radius: 10px;
@@ -177,6 +180,7 @@ export function setMoveAbilityResolver(fn) { _moveAbilityResolver = typeof fn ==
 // it can't resolve this itself). '' when they don't know one -- no "Use
 // Feint" offer at all then, same as today.
 let _feintMoveName = '';
+let _targetList = null; // pickTarget's creatures to pick from (filterTargetable's list), for "Pick on the map"
 let _selectedTargetId = null;
 let _selectedTarget = null;
 let _selectedTargetName = '';
@@ -372,6 +376,7 @@ function _ensureDom() {
       </div>
       <div class="combat-move-popup-body">
         <div id="targetPickerStep1">
+          <button type="button" class="target-picker-map-btn" id="targetPickerMapBtn" hidden>🗺️ Pick on the map</button>
           <div class="target-picker-grid" id="targetPickerGrid"></div>
           <button class="combat-use-move-btn target-picker-skip" id="targetPickerSkip">No Target (self-only move)</button>
         </div>
@@ -422,6 +427,7 @@ function _ensureDom() {
   document.getElementById('targetPickerClose').addEventListener('click', () => _close(null));
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(null); });
   document.getElementById('targetPickerSkip').addEventListener('click', () => _close(null));
+  document.getElementById('targetPickerMapBtn').addEventListener('click', _pickOnMap);
   document.getElementById('targetPickerBack').addEventListener('click', _showStep1);
   document.getElementById('targetPickerBackToAttack').addEventListener('click', _backFromDamage);
   document.getElementById('targetPickerMiss').addEventListener('click', _confirmMiss);
@@ -472,6 +478,26 @@ function _step1Title() {
   document.getElementById('targetPickerTitle').textContent = _isMulti() && _splitTargets
     ? `Attack ${_slots.length + 1} of ${_attackCount}: Choose a Target`
     : 'Choose a Target';
+}
+
+/** "Pick on the map" (the user's call, 2026-11-12): the battle map instead of the cards (map-target-picker.js) -- the
+ * creature picked there goes on as if its card was tapped. A move whose attacks each pick their own target: the map
+ * comes back for the next attack until they're all picked (closing it leaves the cards to pick the rest from). */
+async function _pickOnMap() {
+  const list = _targetList;
+  if (!list || !_session) return;
+  const opts = mapPickOptions(list);
+  for (;;) {
+    const title = _isMulti() && _splitTargets ? `Attack ${_slots.length + 1} of ${_attackCount}: Choose a Target` : `${_moveName || 'Choose a Target'}`;
+    const id = await pickTargetOnMap({ session: _session, casterId: _attacker?.id, title, ...opts });
+    const card = id && document.querySelector(`#targetPickerGrid [data-target-id="${CSS.escape(id)}"]`);
+    if (!card || card.disabled || !_session.participants[id]) return;
+    const p = _session.participants[id];
+    const slotsBefore = _slots.length;
+    _onTargetCard(card, p, visibleToViewer(p, 'name') ? p.name : '???');
+    // (another attack still to aim, and the cards still up: the map again for it)
+    if (!(_isMulti() && _splitTargets && _slots.length > slotsBefore && _slots.length < _attackCount)) return;
+  }
 }
 
 /** A target card was clicked. One attack (or several at one target): that's the target. Several attacks that may
@@ -1299,6 +1325,9 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   const grid = document.getElementById('targetPickerGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
   markOutOfRange(grid, participants); // beyond the move's reach or behind full cover: greyed out, not pickable
+  // ...or picked on the battle map instead, when there is one (map-target-picker.js)
+  _targetList = participants;
+  document.getElementById('targetPickerMapBtn').hidden = !canPickOnMap(session, participants.map(p => p.id));
   grid.querySelectorAll('[data-target-id]').forEach(card => {
     card.addEventListener('click', () => {
       const p = session.participants[card.dataset.targetId];

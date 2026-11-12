@@ -619,3 +619,6 @@ function _creatureAt(stage, session, ids, e, current = null) {
   const i = here.indexOf(current);
   return here[(i + 1) % here.length];
 }
+
+// For the "pick a target on the map" picker (map-target-picker.js): the same map, tokens and tap rules.
+export { _injectStyles as injectPickerStyles, _buildTokens as buildPickerTokens, _creatureAt as creatureAt };

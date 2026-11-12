@@ -15,6 +15,7 @@ import { pickTerrainArea } from './terrain-area-picker.js';
 import { pickLineArea, pickConeArea, pickWallArea } from './line-area-picker.js';
 import { footprintCells, footprintForSize } from './battle-map-grid.js';
 import { coverBetween, coverFromCell, coverText } from './cover.js';
+import { pickTargetOnMap, canPickOnMap, mapPickOptions } from './map-target-picker.js';
 
 function _injectStyles() {
   if (document.getElementById('multi-target-picker-styles')) return;
@@ -149,7 +150,11 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
 
   const mapBtn = document.getElementById('mtpMapBtn');
   const hasBoard = !!session.board?.tokens?.[casterId] || Object.keys(session.board?.tokens || {}).length > 0;
-  mapBtn.hidden = !(area && hasBoard);
+  // No area to place (an ally pick, a move that hits whoever it names): the creatures tapped on the map instead (the
+  // user's call, 2026-11-12, map-target-picker.js) -- ticked here, still adjustable.
+  const tapOnMap = !area && canPickOnMap(session, participants.map(p => p.id));
+  mapBtn.hidden = !((area && hasBoard) || tapOnMap);
+  mapBtn.textContent = area ? '🗺️ Select from the map' : '🗺️ Pick on the map';
   // Lines and cones start at the caster: whoever is behind full cover from there isn't caught (targetability.js).
   const aimableIds = participants.filter(p => !participants.noSight?.has(p.id)).map(p => p.id);
   const blockedNotes = participants.noSight || null;
@@ -157,6 +162,12 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   // edge a miss; a move that rolls to hit ('disadvantage') keeps its hits -- the attack roll gets disadvantage instead.
   const partialCover = participants.partialCover || null;
   mapBtn.onclick = async () => {
+    if (!area) {
+      const ids = await pickTargetOnMap({ session, casterId, title: moveName || "Who's caught in it?", multiple: true, selected: [..._selected], ...mapPickOptions(participants) });
+      if (!ids) return;
+      grid.querySelectorAll('[data-target-id]').forEach(card => toggle(card, ids.includes(card.dataset.targetId)));
+      return;
+    }
     if (area.wallFt) {
       // A wall from a point (Smokescreen): placed on the map, then whoever it covers is ticked. Nobody in it -- it still
       // goes on the map, so the move is done right away.

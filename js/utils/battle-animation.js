@@ -62,6 +62,18 @@ export async function getBattleAnimationUrl(speciesName) {
 // own -- combat-wip.js registers how (CombatAPI.playAnimation, the server's live 'combat-animation' cue).
 let _announcer = null;
 export function setAnimationAnnouncer(fn) { _announcer = typeof fn === 'function' ? fn : null; }
+// The shared battle holds a move's animation back until its hit has landed and every reaction to it is over (the user's
+// call after the 2026-11-12 playtest: Malphite's clip went off on the display while Ninetales was still reacting, long
+// before the hit). combat-wip.js registers where it goes; the popups (target-picker.js, save-picker.js) hand it over at
+// the point they used to play it. The old combat page registers nothing and plays it in its popups, as before.
+let _deferral = null;
+export function setAnimationDeferral(fn) { _deferral = typeof fn === 'function' ? fn : null; }
+/** The move earned its animation (a hit's damage confirmed, a failed save): true when the battle plays it later instead. */
+export function deferAnimation(speciesName) {
+  if (!_deferral || !speciesName) return false;
+  try { return _deferral(speciesName) === true; } catch { return false; }
+}
+
 export function announceAnimation(speciesName) {
   if (!speciesName) return;
   try { _announcer?.(speciesName); } catch { /* the display missing it never stops the move */ }

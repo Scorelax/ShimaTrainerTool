@@ -111,7 +111,8 @@ function overScene() {
 }
 
 function preloadAllAnimations() {
-  Object.values(session.participants).forEach(p => preloadBattleAnimation(p.name));
+  // By species, as the cue names it (a nickname found no clip, so it was fetched only when the cue came)
+  Object.values(session.participants).forEach(p => { if (p.combatantType !== 'trainer') preloadBattleAnimation(p.speciesName || p.name); });
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +287,13 @@ async function playAnimationOverlay(species) {
   overlay.appendChild(video);
   overlay.hidden = false;
 
-  try { await video.play(); } catch (err) { /* autoplay blocked -- leave the overlay showing a paused frame */ }
+  try {
+    await video.play();
+  } catch {
+    // Sound blocked (a screen nobody has clicked on yet): played muted rather than left as a still frame
+    video.muted = true;
+    try { await video.play(); } catch { /* still blocked -- the overlay closes at the safety cap below */ }
+  }
 
   await new Promise((resolve) => {
     video.addEventListener('ended', resolve, { once: true });

@@ -17,7 +17,7 @@
 import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
-import { getBattleAnimationUrl, announceAnimation } from './battle-animation.js';
+import { getBattleAnimationUrl, announceAnimation, deferAnimation } from './battle-animation.js';
 import { filterTargetable, markOutOfRange } from './targetability.js';
 import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor, saveAutoFails } from './move-effects.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
@@ -458,6 +458,7 @@ function _confirmFail() {
 
 async function _playAnimation() {
   if (!_speciesName) return;
+  if (deferAnimation(_speciesName)) return; // the shared battle plays it once the hit's reactions are over
   const url = await getBattleAnimationUrl(_speciesName);
   if (!url) return;
   const media = document.getElementById('savePickerAnimMedia');

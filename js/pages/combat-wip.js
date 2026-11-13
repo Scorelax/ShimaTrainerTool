@@ -11,7 +11,7 @@
 import { allCachedPokemon, displayName, pokemonKey } from '../utils/owned-pokemon.js';
 import { CombatAPI, PokemonAPI, TrainerAPI, DmAPI } from '../api.js';
 import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setMoveRowResolver, setWeatherAttackModeResolver, setCoverAttackModeResolver, setCritResolver } from '../utils/target-picker.js';
-import { setAnimationAnnouncer } from '../utils/battle-animation.js';
+import { setAnimationAnnouncer, setAnimationDeferral, preloadBattleAnimation } from '../utils/battle-animation.js';
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
 import { pickSwitchTile } from '../utils/token-placement-picker.js';
 import { waitForOpenWindow, playerOf } from '../utils/reaction-window.js';
@@ -744,6 +744,7 @@ export async function renderCombatWip() {
   const result = await CombatAPI.getState();
   session = result.status === 'success' ? result.data : { active: false };
   setAbilitySession(session); // ability-mods.js reads weather, round and positions from it
+  _preloadClips(session);
   _reminderLogSeen = session.log?.length || 0; // only reminders from now on pop up
   return _renderCurrentView();
 }
@@ -1148,10 +1149,18 @@ function _onTargetCheck(casterId, moveName, found) {
  * sorted out first (_twoStageFlow). */
 function _moveFlow(handler) {
   return async (args) => {
+    // A reaction played on this same screen runs its own move while the attack it answers is still waiting: that
+    // attack's held-back animation is kept aside meanwhile, not lost.
+    const outerAnimation = _pendingAnimation;
+    _pendingAnimation = null;
+    _moveFlowDepth++;
     try {
       if ((await _twoStageFlow(args, handler)) === 'handled') return;
       return await handler(args);
     } finally {
+      _moveFlowDepth--;
+      _playPendingAnimation(); // one the move earned that no hit has played yet (a hit refused...)
+      _pendingAnimation = outerAnimation;
       abandonMove(args?.combatantId);
       _flowNoConcentration = null;
       _flowBonusRelease = null;
@@ -1525,6 +1534,30 @@ setCritResolver((moveName, attackerId, attackRoll, targetId, { first = true } = 
   const block = target ? abilityEffectsOf(target).find(({ effect: e }) => e.kind === 'immunity' && e.critDamage) : null;
   return { crit: true, blockedBy: block ? `${target.name}'s ${block.ability || 'ability'}` : null };
 });
+// A move's animation waits until its hit has landed and every reaction to it is over (the user's call after the
+// 2026-11-12 playtest): the attack / save popups hand it over here instead of playing it (battle-animation.js), and it
+// plays -- here and on the display screen -- right after the hit's 'damaged' reactions (_landHit), or else when the move
+// is done (_moveFlow).
+// The battle's creatures' clips, by species, loaded ahead (each only once): an animation only plays from a clip already
+// loaded -- the battle page never loaded them, so the DM's screen had none and a phone only the ones the trainer's
+// Pokemon pages happened to load.
+function _preloadClips(s) {
+  for (const p of Object.values(s?.participants || {})) {
+    if (p.combatantType !== 'trainer') preloadBattleAnimation(p.speciesName || p.name);
+  }
+}
+let _pendingAnimation = null;
+let _moveFlowDepth = 0;
+setAnimationDeferral((species) => {
+  if (!_moveFlowDepth) return false; // not one of this page's moves (a popup opened elsewhere): it plays as before
+  _pendingAnimation = species;
+  return true;
+});
+function _playPendingAnimation() {
+  const species = _pendingAnimation;
+  _pendingAnimation = null;
+  if (species) playBattleAnimationFloating(species);
+}
 // The display screen plays a move's animation the moment the app starts its own (battle-animation.js).
 setAnimationAnnouncer((species) => {
   const id = session?.reactingParticipantId || session?.turnOrder?.[session?.turnIndex] || Object.keys(session?.participants || {})[0];
@@ -3436,6 +3469,7 @@ export function attachCombatWipListeners() {
     if (incoming?.version && session?.version && incoming.version <= session.version) return;
     session = incoming;
     setAbilitySession(session);
+    _preloadClips(session);
     // Waiting for an adventure / for the DM to open it: drawn again, which moves on once it's there.
     if (document.getElementById('advWaitScreen')) { _rerenderFull(); return; }
     // The DM closed joining while this trainer was still joining: wait (picked up again when it opens).
@@ -6341,6 +6375,7 @@ async function _landHit({ attackerId, targetId, damage, moveType, speciesName, m
   const dmgResult = await CombatAPI.applyDamage(attackerId, targetId, damage, moveType, speciesName, moveName, !!crit, pool, soften);
   // 'damaged'-family reactions fire right here -- after the damage lands, before anything else about this hit.
   await waitForDamagedReactions(targetId, attackerId, moveName);
+  _playPendingAnimation(); // the move's animation, now every reaction to the hit is over
   await _maybeMeleeRetaliate(attackerId, targetId, moveName);
   // The server's own HP before / after (this device's copy may lag a hit behind on a multi-hit move).
   await _abilityHitTriggers({ attackerId, targetId, moveName, move, attackRoll, damageDealt: dmgResult?.damageApplied,

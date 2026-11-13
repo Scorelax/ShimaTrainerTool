@@ -13,7 +13,7 @@
 import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
-import { getBattleAnimationUrl, announceAnimation } from './battle-animation.js';
+import { getBattleAnimationUrl, announceAnimation, deferAnimation } from './battle-animation.js';
 import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString, mergeRollMode, isMeleeMoveRow, guaranteedCritStatusId } from './move-effects.js';
 import { targetAbilityDamage, moveAbilityMods, attackRollReminders } from './ability-mods.js';
 import { waitForReactionWindow, reactionWaitHtml, reactingNow } from './reaction-window.js';
@@ -969,6 +969,7 @@ function _autoHit(p, name) {
  * registered battle animation. */
 async function _playAnimation() {
   if (!_speciesName) return;
+  if (deferAnimation(_speciesName)) return; // the shared battle plays it once the hit's reactions are over
   const url = await getBattleAnimationUrl(_speciesName);
   if (!url) return;
   const media = document.getElementById('targetPickerAnimMedia');

@@ -75,13 +75,21 @@ export function mapStageHtml(setup, { interactive = false, selectedId = null, pr
     return `<div class="dm-map-token${c.id === selectedId ? ' selected' : ''}${c.hidden || c.heldBack ? ' dm-token-hidden' : ''}" data-token="${c.id}" title="${escapeHtml(c.name)}${c.hidden || c.heldBack ? ' (hidden from the players)' : ''}"
       style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"><div class="dm-map-token-art" data-img="${escapeHtml(c.participant?.image || '')}" style="--face:${face}"></div></div>`;
   }).join('');
+  // Where the players' trainers and Pokemon stood on the adventure this map came from (the adventure's "Start encounter",
+  // the user's call, 2026-11-13): faded, under everyone else, for reference only -- the players join from their app.
+  const players = (setup.players || []).filter(p => p.col >= 0 && p.row >= 0 && p.col < m.cols && p.row < m.rows).map((p) => {
+    const r = tokenScreenRect(m, p.col, p.row, footprintForSize(p.size));
+    const face = spriteTransform((Number(p.facing) || 0) + 90);
+    return `<div class="dm-map-token dm-token-player" title="${escapeHtml(p.name)}${p.owner ? ` (${escapeHtml(p.owner)})` : ''} stood here on the adventure -- the players place themselves when they join"
+      style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"><div class="dm-map-token-art" data-img="${escapeHtml(p.image || '')}" style="--face:${face}"></div></div>`;
+  }).join('');
   // shown upright: the map in a box of its turned shape, turned a quarter left inside it (dm-console.css)
   return `${upright ? `<div class="dm-map-turn" style="aspect-ratio:${m.cols} / ${m.rows}">` : ''}
     <div class="dm-map-stage${preview ? ' dm-map-preview' : ''}${m.background ? ' has-bg' : ''}" style="aspect-ratio:${m.rows} / ${m.cols}">
       <div class="dm-map-bg"${m.background ? ` style="background-image:url('${escapeHtml(m.background)}')"` : ''}></div>
       <div class="dm-map-grid" style="grid-template-columns:repeat(${m.rows},1fr);grid-template-rows:repeat(${m.cols},1fr)">${cells.join('')}</div>
       <div class="bmap-objects">${mapObjectsHtml(boardOf(setup), { tv: true, all: true })}</div>
-      <div class="dm-map-tokens">${tokens}</div>
+      <div class="dm-map-tokens">${players}${tokens}</div>
       <div class="dm-map-ghost"></div>
     </div>${upright ? '</div>' : ''}`;
 }
@@ -94,7 +102,7 @@ export const PLACED_FACING = 180;
  * shown...) as one text: the same text, the same map, so a change elsewhere needn't draw it again. */
 export function stageKey(setup, ...extra) {
   return JSON.stringify([setup.map, (setup.creatures || []).map(c => [c.id, c.name, c.position, c.z, c.participant?.size,
-    c.participant?.image, !!(c.hidden || c.heldBack)]), ...extra]);
+    c.participant?.image, !!(c.hidden || c.heldBack)]), setup.players || [], ...extra]);
 }
 
 /** The sprites showing in `box`'s picture holders (patchPortraitMedia's), kept before it's drawn again. The returned

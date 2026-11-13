@@ -693,7 +693,11 @@ body.dm-console .combat-alert-overlay { z-index: 10070; }
 .dm-enc-live { font-size: 0.7rem; color: #5fe39a; font-weight: 700; }
 .dm-enc-head { display: flex; gap: 0.8rem; align-items: center; }
 .dm-enc-name { font-size: 1.3rem; font-weight: 800; color: var(--dm-gold); flex: 1; }
-.dm-enc-actions { display: flex; gap: 0.4rem; align-items: center; }
+/* The name, with its folder / own-map labels under it */
+.dm-enc-titlebox { flex: 1; min-width: 12rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.dm-enc-titlebox .dm-enc-name { flex: none; width: 100%; box-sizing: border-box; }
+.dm-enc-pills { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.dm-enc-actions { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .dm-enc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 0.9rem; }
 .dm-enc-wide { grid-column: 1 / -1; }
 .dm-enc-grid textarea.dm-input { resize: vertical; font-family: inherit; }
@@ -1211,8 +1215,10 @@ span.dm-trap-pick { cursor: default; }
 .dm-sp-terrains b { color: var(--dm-text, #e8ecff); }
 
 /* Encounter setup: an encounter's own map; pick lists (saved maps, Import) */
-.dm-enc-mapview { max-width: 520px; }
-.dm-enc-mapview .dm-map-stage { width: 100%; }
+/* An encounter that brings its own map: a pill in its header, ✕ takes the map off */
+.dm-enc-ownmap { display: inline-flex; align-items: center; gap: 0.35rem; }
+.dm-pill-x { background: none; border: none; color: inherit; cursor: pointer; padding: 0 0.1rem; font-size: 0.85em; opacity: 0.7; }
+.dm-pill-x:hover { opacity: 1; color: #ff8a8a; }
 .dm-enc-savedmaps { display: flex; flex-direction: column; gap: 0.3rem; max-height: 55vh; overflow-y: auto; }
 .dm-enc-savedmaps .dm-species-item[hidden] { display: none; }
 
@@ -1485,6 +1491,8 @@ span.dm-trap-pick { cursor: default; }
 .dm-stepper .dm-input::-webkit-outer-spin-button, .dm-stepper .dm-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 /* The map editor: a creature hidden from the players (see-through), and the object being turned */
 .dm-map-token.dm-token-hidden { opacity: 0.5; outline: 2px dashed rgba(255, 255, 255, 0.6); outline-offset: -2px; border-radius: 50%; }
+/* Where a player's trainer / Pokemon stood on the adventure (Map setup, for reference): faded, a blue dashed ring */
+.dm-map-token.dm-token-player { opacity: 0.45; filter: grayscale(0.4); outline: 2px dashed rgba(90, 170, 255, 0.85); outline-offset: -2px; border-radius: 50%; }
 .dm-map-stage.dm-turning { cursor: grabbing; }
 /* Display -> Backgrounds: several pictures picked at once */
 .dm-disp-tick { position: absolute; top: 5px; left: 5px; z-index: 2; width: 1.45rem; height: 1.45rem; padding: 0; border-radius: 50%;

@@ -35,6 +35,9 @@
 // 2026-11-11 (the user's call): Add to the map and the tools are one row -- Pokémon, Items, Objects, Terrain, Traps, Eraser.
 // Map setup's Pokémon places who's in the next battle (from Encounter setup) -- before, they only showed on the map. The
 // object being placed (or Items, being placed) clicked again lets go of it.
+//
+// 2026-11-13 (the user's call): Map setup is where a battle's map is made -- an encounter no longer has a map editor of
+// its own. A map that came from the adventure ("Start encounter") shows where the players stood, faded (map-view.js).
 import { CombatAPI, DmAPI } from '../api.js';
 import { mapObjectHtml, objectScreenRect, objectCells, footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
@@ -566,6 +569,7 @@ async function loadSavedMap(id) {
       const fits = col >= 0 && col < st.map.cols && row >= 0 && row < st.map.rows && st.map.marks?.[`${col},${row}`] !== 'blocked';
       if (!fits) c.position = null;
     });
+    if (st.players) st.players = []; // where the players stood was on the old map
   });
   toast(`Loaded "${sm.name}"`);
   renderMapEditor(_root, _opts); // the size and background fields show the loaded map
@@ -1235,7 +1239,7 @@ function renderBattleCreaturePanel(panel, hint) {
     <div class="dm-cs-list">${all.length ? [
       ...trainers.map(t => `<div class="dm-cs-group">${row(t)}${all.filter(x => x.kind === 'pokemon' && x.trainerId === t.id).map(x => row(x, true)).join('')}</div>`),
       wild.length ? `<div class="dm-cs-group">${trainers.length ? '<div class="dm-cs-group-title">Wild Pokémon</div>' : ''}${wild.map(x => row(x)).join('')}</div>` : '',
-    ].join('') : '<div class="dm-hint">Nobody in the next battle yet -- they come from Encounter setup (or 📥 Import encounter on Map setup).</div>'}</div>
+    ].join('') : '<div class="dm-hint">Nobody in the next battle yet -- they come from Encounter setup (▶ Use for the next battle).</div>'}</div>
     <button class="dm-btn wide" id="bcToEnc" style="margin-top:0.6rem" title="Who's in the battle is chosen in Encounter setup"><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Change who's in it</button>`;
   panel.querySelectorAll('[data-img]').forEach((x) => {
     if (!x.dataset.img) x.innerHTML = '<span style="font-size:1.5rem">👤</span>';

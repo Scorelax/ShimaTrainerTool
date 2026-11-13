@@ -6,6 +6,9 @@
 //   map: { cols, rows, lockRatio, background, objects: [...board.objects], marks: {"col,row": kind}, ready, terrain, weather },
 //   creatures: [{ id, kind: 'pokemon'|'trainer', name, config, participant, computed, initiativeBonus, heldBack,
 //                 trainerId, position: {col, row, facing} | null }],
+//   players: [{ name, owner, image, size, col, row, facing }] -- where the players' trainers and Pokemon stood on the
+//            adventure the map came from (adventure.js's "Start encounter"): shown faded on the map, for reference only,
+//            and gone with that map,
 //   startedAt,
 // }
 // `map` uses board coordinates (routes_combat.py's board: cols x rows, objects anchored top-left); the map editor shows
@@ -33,6 +36,7 @@ export function emptySetup() {
       terrain: 'flat', weather: 'world',
     },
     creatures: [],
+    players: [],
     startedAt: null,
   };
 }
@@ -44,6 +48,7 @@ export async function loadSetup() {
   // A map saved before the forest default that was never set up yet gets it too.
   if (!_setup.map.ready && !_setup.map.background) _setup.map.background = DEFAULT_BACKGROUND;
   _setup.creatures = _setup.creatures || [];
+  _setup.players = Array.isArray(_setup.players) ? _setup.players : [];
   return _setup;
 }
 
@@ -83,6 +88,7 @@ export function resetMap() {
   updateSetup(s => {
     s.map = emptySetup().map;
     s.creatures.forEach(c => { c.position = null; });
+    s.players = []; // (they stood on the old map)
   });
 }
 

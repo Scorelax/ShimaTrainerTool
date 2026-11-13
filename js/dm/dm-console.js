@@ -1,7 +1,8 @@
 // DM console (dm-console.html) -- the landscape page the DM runs the game from, on their laptop. A separate page with
 // its own URL, like display.html and battle-map.html: no trainer login, no player SPA around it.
 //
-// The battle module: with no battle running, three tabs. Encounter setup (encounters.js) is who the players will face --
+// The battle module: with no battle running, three tabs. Encounter setup (encounters.js, the first -- the user's call,
+// 2026-11-13: who's in it first, then placing them on the map) is who the players will face --
 // the encounter library; the one put in play becomes the next battle's NPC trainers and Pokemon, and keeps it up to date
 // as it's changed. Map setup is the map (map-editor.js), where everyone starts on it (creature-setup.js) -- both kept on
 // the Pi (setup-store.js) -- and Start battle, the moment the players can join. Post battle (encounters.js) hands out
@@ -26,7 +27,7 @@ import { renderPokedex, pokedexHasUnsaved } from './pokedex.js';
 import { renderParty } from './party.js';
 import { renderNpcs, npcsHaveUnsaved } from './npcs.js';
 import { renderClock } from './clock.js';
-import { renderEncounters, encountersHaveUnsaved, importEncounterDialog } from './encounters.js';
+import { renderEncounters, encountersHaveUnsaved } from './encounters.js';
 import { adventureSessionChanged } from './adventure.js';
 import { loadClock, renderTopWidget, tickTurnTimers, getClock, WEATHER } from './world-clock.js';
 import { TERRAIN, WEATHER_ROLL_MOD } from './encounter-rules.js';
@@ -37,7 +38,7 @@ import { renderAdmin } from './admin.js';
 enableDmMode(DM);
 
 let session = { active: false, participants: {}, turnOrder: [] };
-let battleTab = 'setup'; // with no battle running: 'setup' (Map setup) | 'library' (Encounter setup) | 'aftermath' (Post battle)
+let battleTab = 'library'; // with no battle running: 'library' (Encounter setup) | 'setup' (Map setup) | 'aftermath' (Post battle)
 let setupView = 'home'; // the setup tab: 'home' | 'map' | 'creatures'
 let liveMounted = false;
 let starting = false;
@@ -148,7 +149,7 @@ function setVideosPlaying(section, playing) {
   });
 }
 
-/** The battle module's tabs, with no battle running: Map setup, Encounter setup, Post battle. */
+/** The battle module's tabs, with no battle running: Encounter setup, Map setup, Post battle. */
 function showBattleTab(name) {
   battleTab = name;
   document.querySelectorAll('#dmBattleTabs [data-btab]').forEach(b => b.classList.toggle('active', b.dataset.btab === name));
@@ -232,7 +233,7 @@ function route({ redraw = true } = {}) {
   document.getElementById('dmLiveMap').hidden = true;
   tabs.hidden = false;
   if (battleTab !== 'setup') {
-    if (wasLive) showBattleTab(battleTab);
+    if (wasLive || !enc.dataset.drawn) { enc.dataset.drawn = '1'; showBattleTab(battleTab); }
     return;
   }
   document.querySelectorAll('#dmBattleTabs [data-btab]').forEach(b => b.classList.toggle('active', b.dataset.btab === 'setup'));
@@ -330,6 +331,7 @@ function renderHome(view) {
           <div class="dm-home-preview">${mapPreviewHtml(s)}</div>
           <div class="dm-hint">${m.rows} × ${m.cols} squares · ${escapeHtml(bgLabel)} · ${objects} object${objects === 1 ? '' : 's'}
             · ${marks.filter(k => k === 'difficult').length} difficult · ${marks.filter(k => k === 'blocked').length} blocked</div>
+          ${(s.players || []).length ? '<div class="dm-hint">Faded, with a blue ring: where the players\' trainers and Pokémon stood on the adventure -- they place themselves when they join.</div>' : ''}
           <div class="dm-row dm-home-setting">
             <div class="dm-field"><label for="homeTerrain">Terrain <span class="dm-label-note">(added to a throw's accuracy DC)</span></label>
               <select class="dm-select" id="homeTerrain">${Object.entries(TERRAIN).map(([k, t]) => `<option value="${k}" ${k === (m.terrain || 'flat') ? 'selected' : ''}>${escapeHtml(t.name)} (+${t.mod})</option>`).join('')}</select></div>
@@ -347,12 +349,11 @@ function renderHome(view) {
             <span class="dm-pill ${okBattle ? 'ok' : 'todo'}">${okBattle ? `✓ ${s.creatures.length} ready` : 'Nobody yet'}</span>
           </div>
           <div class="dm-hint" id="homeEncName"></div>
-          <div class="dm-home-creatures" id="homeParts">${s.creatures.length ? s.creatures.map(line).join('') : '<div class="dm-hint">Nobody yet -- import an encounter (📥), or build one under Encounter setup.</div>'}</div>
+          <div class="dm-home-creatures" id="homeParts">${s.creatures.length ? s.creatures.map(line).join('') : '<div class="dm-hint">Nobody yet -- build an encounter under Encounter setup and use it for the next battle (▶).</div>'}</div>
           ${unplaced.length && okMap ? `<div class="dm-hint dm-warn">${unplaced.length} not placed on the map yet -- place them here, or from the battle once it starts.</div>` : ''}
           <div class="dm-home-actions">
             <button class="dm-btn primary" id="homeCreatures" ${okMap && okBattle ? '' : 'disabled'} title="${okMap ? '' : 'Set up the map first'}">📍 Place on the map</button>
-            <button class="dm-btn primary" id="homeImport" title="An encounter from Encounter setup becomes the next battle -- its creatures, and its map if it has one">📥 Import encounter</button>
-            <button class="dm-btn" id="homeToEnc"><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Encounter setup</button>
+            <button class="dm-btn" id="homeToEnc" title="Who's in the battle is chosen in Encounter setup"><img class="dm-tab-icon" src="assets/VS-small.png" alt="">Change who's in it</button>
             <button class="dm-btn danger" id="homeResetBattle" ${battleTouched ? '' : 'disabled'} title="Take everyone out of the next battle">Clear</button>
           </div>
         </div>
@@ -390,10 +391,6 @@ function renderHome(view) {
     renderHome(view); // (what's left to place changes with it)
   });
   document.getElementById('homeToEnc').addEventListener('click', () => showBattleTab('library'));
-  document.getElementById('homeImport').addEventListener('click', async () => {
-    await importEncounterDialog(); // brings the DM back here when it's in (dm:show-module)
-    if (battleTab === 'setup' && setupView === 'home') renderHome(view);
-  });
   document.getElementById('homeStart').addEventListener('click', startBattle);
   document.getElementById('homeReset').addEventListener('click', async () => {
     if (!await showCombatConfirm('Reset the map and take everyone out of the next battle? (The encounters themselves stay.)', { title: 'Clear battle', yesLabel: 'Clear it', noLabel: 'Cancel' })) return;

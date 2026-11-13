@@ -14,10 +14,15 @@
 // Who's in the next battle is decided here and only here (Map setup doesn't add anyone), so the two never disagree.
 //
 // Since the 2026-10-16 playtest it's a builder that never starts anything by itself: it's reachable while a battle runs
-// (the running battle's third tab, battle-live.js), an encounter can carry its own map (made here with the map editor --
-// map-store.js), the Battle module imports one (importEncounterDialog: its creatures and its map become the next
-// battle), each wild Pokemon's ℹ️ shows everything its species is known for (species-info.js), and an encounter's NPC
-// opens in the NPC module to change it for good.
+// (the running battle's third tab, battle-live.js), an encounter can carry its own map (the adventure's "Start
+// encounter" makes one with the adventure's map), each wild Pokemon's ℹ️ shows everything its species is known for
+// (species-info.js), and an encounter's NPC opens in the NPC module to change it for good.
+//
+// 2026-11-13 (the user's call): Encounter setup is the battle module's first tab and only about the encounter -- who's in
+// it. Its map card (make / edit a map here, copy Map setup's, a saved one) is gone: the map is made in Map setup. An
+// encounter that brings its own map says so in its header (✕ takes it off). Map setup's Import is gone too -- "Use for
+// the next battle" here does it. The adventure's "Start encounter" puts its new encounter in play at once
+// (startEncounterFromAdventure).
 //
 // The encounter list has folders (the user's call, 2026-11-11 -- the way the Display module's backgrounds do): [{id, name,
 // parent}] in dm_state 'encounter-folders', an encounter keeps its folder's id (`folder`, '' = the top). Drag an
@@ -42,8 +47,6 @@ import {
   encounterPool, generateEncounter, generateTrainer, rangePick, evolutionStage, STAGE_LABEL,
 } from './encounter-rules.js';
 import { xpOrStart } from './xp.js';
-import { mapPreviewHtml, renderMapEditor } from './map-editor.js';
-import { createMapStore } from './map-store.js';
 import { openSpeciesInfo } from './species-info.js';
 import { openNpcFromEncounter } from './npcs.js';
 
@@ -415,30 +418,25 @@ function renderSheet() {
   }
   box.innerHTML = `
     <div class="dm-enc-head">
-      <input class="dm-input dm-enc-name" id="encName" data-f="name" value="${escapeHtml(enc.name)}" placeholder="Encounter name">
+      <div class="dm-enc-titlebox">
+        <input class="dm-input dm-enc-name" id="encName" data-f="name" value="${escapeHtml(enc.name)}" placeholder="Encounter name">
+        ${(enc.folder && _folders.some(f => f.id === enc.folder)) || enc.map ? `<div class="dm-enc-pills">
+          ${enc.folder && _folders.some(f => f.id === enc.folder) ? `<span class="dm-pill ok" title="The folder it's in">📁 ${escapeHtml(folderLabel(enc.folder))}</span>` : ''}
+          ${enc.map ? `<span class="dm-pill ok dm-enc-ownmap" title="Put in play, this map (${enc.map.rows} × ${enc.map.cols} squares) becomes Map setup's -- change it there">🗺️ Brings its own map
+            <button class="dm-pill-x" data-act="map-del" title="Take its map off -- the battle uses whatever map is in Map setup">✕</button></span>` : ''}
+        </div>` : ''}
+      </div>
       <div class="dm-enc-actions">
-        ${enc.folder && _folders.some(f => f.id === enc.folder) ? `<span class="dm-pill ok" title="The folder it's in">📁 ${escapeHtml(folderLabel(enc.folder))}</span>` : ''}
         <button class="dm-btn" id="encMove" title="Put it in a folder (or drag it onto one on the left)">📁 Move to…</button>
         <button class="dm-btn" id="encSaveBtn" title="Save it on the Pi now (it also saves on its own a moment after each change)">💾 Save encounter</button>
         ${enc.id === _runId
           ? '<span class="dm-enc-live dm-enc-inplay" title="This is the next battle -- changes here go straight into it">● In play</span><button class="dm-btn primary" id="encPlace">📍 Place on the map</button>'
-          : '<button class="dm-btn primary" id="encLoad" title="Make this the next battle (its creatures and its map) -- the same as Import in the Battle module">▶ Use for the next battle</button>'}
+          : `<button class="dm-btn primary" id="encLoad" title="Make this the next battle${enc.map ? ' (its creatures and its own map)' : ''} -- then place everyone in Map setup">▶ Use for the next battle</button>`}
         <button class="dm-btn" id="encDup">Duplicate</button>
         <button class="dm-btn danger" id="encDel">Delete</button>
       </div>
     </div>
     <div class="dm-enc-grid">
-      <div class="dm-card dm-enc-wide dm-enc-mapcard">
-        <div class="dm-card-title"><span>🗺️ Map</span>
-          <span class="dm-row dm-enc-titlebtns">
-            <button class="dm-btn small primary" data-act="map-edit">${enc.map ? '✏️ Edit map' : '+ Make a map'}</button>
-            <button class="dm-btn small" data-act="map-from-setup" title="A copy of the map in the Battle module's Map setup">📋 Copy Map setup's</button>
-            <button class="dm-btn small" data-act="map-from-saved">💾 From saved maps</button>
-            ${enc.map ? '<button class="dm-btn small danger" data-act="map-del">✕ No map</button>' : ''}
-          </span></div>
-        ${enc.map ? `<div class="dm-enc-mapview">${mapPreviewHtml({ map: enc.map, creatures: [] })}</div>`
-          : '<div class="dm-hint">No map of its own -- the battle uses whatever map is in Map setup. Make one here to bring it along when the encounter is imported.</div>'}
-      </div>
       <div class="dm-card dm-enc-wide">
         <div class="dm-card-title"><span>Wild Pokémon (${enc.pokemon.length})</span>
           <span class="dm-row dm-enc-titlebtns">
@@ -734,18 +732,8 @@ async function onAction(e) {
     openNpcFromEncounter(btn.closest('[data-npc]').dataset.npc, enc.name);
     return;
   }
-  if (act === 'map-edit') { editEncounterMap(enc); return; }
-  if (act === 'map-from-setup') {
-    if (enc.map && !await showCombatConfirm(`Replace "${enc.name}"'s map with a copy of Map setup's?`, { title: 'Map', yesLabel: 'Replace', noLabel: 'Cancel' })) return;
-    const m = getSetup()?.map;
-    if (!m) { showCombatAlert('Map setup has no map yet.', { title: 'Map' }); return; }
-    enc.map = { ...JSON.parse(JSON.stringify(m)), ready: true };
-    changed();
-    return;
-  }
-  if (act === 'map-from-saved') { pickSavedMap(enc); return; }
   if (act === 'map-del') {
-    if (!await showCombatConfirm(`Take the map off "${enc.name}"? The battle will use Map setup's map instead.`, { title: 'Map', yesLabel: 'Take it off', noLabel: 'Cancel' })) return;
+    if (!await showCombatConfirm(`Take its own map off "${enc.name}"? Put in play, it then uses whatever map is in Map setup.`, { title: 'Map', yesLabel: 'Take it off', noLabel: 'Cancel' })) return;
     enc.map = null;
     changed();
     return;
@@ -1182,69 +1170,10 @@ export function monConfig(p) {
   };
 }
 
-// ---- An encounter's own map ----
-
-/** The encounter's map in the map editor (a store of its own, map-store.js), over the page until Done / Back. */
-function editEncounterMap(enc) {
-  document.getElementById('encMapEditor')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'encMapEditor';
-  overlay.className = 'dm-live-map-overlay';
-  const root = document.createElement('div');
-  root.className = 'dm-live-map-root';
-  overlay.appendChild(root);
-  document.body.appendChild(overlay);
-  const store = createMapStore(enc.map, (m) => { enc.map = m; return saveNow(enc); });
-  renderMapEditor(root, {
-    store, backLabel: '← Encounter', title: `Map · ${enc.name}`,
-    onDone: () => { enc.map = { ...store.getSetup().map, ready: true }; overlay.remove(); renderSheet(); renderList(); },
-  });
-}
-
-async function pickSavedMap(enc) {
-  const maps = await DmAPI.getState('saved-maps').catch(() => null) || [];
-  if (!maps.length) { showCombatAlert('No saved maps yet -- save one from the map editor (Map setup).', { title: 'Saved maps' }); return; }
-  const id = await openDmModal({
-    title: `A saved map for "${enc.name}"`,
-    html: `<div class="dm-enc-savedmaps">${maps.map(m => `<button class="dm-species-item" data-map="${escapeHtml(m.id)}"><span><span class="dm-species-name">${escapeHtml(m.name)}</span>
-      <span class="dm-species-meta">${m.map?.rows} × ${m.map?.cols} squares · ${(m.map?.objects || []).length} objects</span></span></button>`).join('')}</div>`,
-    buttons: [{ label: 'Cancel', value: null }],
-    onOpen: (body, close) => body.addEventListener('click', (e) => { const b = e.target.closest('[data-map]'); if (b) close(b.dataset.map); }),
-  });
-  const picked = maps.find(m => m.id === id);
-  if (!picked) return;
-  enc.map = { ...JSON.parse(JSON.stringify(picked.map)), ready: true };
-  scheduleSave(enc);
-  renderSheet();
-}
-
-/** The Battle module's Import: pick an encounter, and it becomes the next battle -- its creatures, and its map if it has
- * one (loadIntoSetup). Works without this tab ever having been opened. */
-export async function importEncounterDialog() {
-  try { await loadLibraryData(); } catch (err) { showCombatAlert(err.message, { title: 'Import encounter' }); return; }
-  if (!_encounters.length) { showCombatAlert('No encounters yet -- build one under Encounter setup.', { title: 'Import encounter' }); return; }
-  const id = await openDmModal({
-    title: '📥 Import an encounter',
-    html: `<input class="dm-input" id="impSearch" placeholder="Search…" autocomplete="off" style="margin-bottom:0.5rem">
-      <div class="dm-enc-savedmaps" id="impList">${_encounters.map(e => `<button class="dm-species-item" data-enc="${escapeHtml(e.id)}" data-search="${escapeHtml(e.name.toLowerCase())}">
-        <span><span class="dm-species-name">${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' · ● in play' : ''}${e.folder && _folders.some(f => f.id === e.folder) ? ` · 📁 ${escapeHtml(folderLabel(e.folder))}` : ''}</span>
-        <span class="dm-species-meta">${escapeHtml(summary(e))}${e.map ? ` · 🗺️ its own map (${e.map.rows} × ${e.map.cols})` : ''}</span></span></button>`).join('')}</div>`,
-    buttons: [{ label: 'Cancel', value: null }],
-    onOpen: (body, close) => {
-      body.querySelector('#impSearch').addEventListener('input', (e) => {
-        const q = e.target.value.trim().toLowerCase();
-        body.querySelectorAll('[data-enc]').forEach(b => { b.hidden = !!q && !b.dataset.search.includes(q); });
-      });
-      body.addEventListener('click', (e) => { const b = e.target.closest('[data-enc]'); if (b) close(b.dataset.enc); });
-    },
-  });
-  const enc = _encounters.find(e => e.id === id);
-  if (enc) await loadIntoSetup(enc);
-}
-
-/** A new encounter built around a map (the Adventure's "Start encounter"), opened in Encounter setup -- with `creatures`
- * (the adventure's Pokemon and NPCs, adventure.js's liveCreatures shape): each Pokemon an entry of its own, each NPC from
- * the NPC library, both remembering where they stood (position; npcPlacement) and whether they were hidden. */
+/** A new encounter built around a map (the Adventure's "Start encounter") -- with `creatures` (the adventure's Pokemon
+ * and NPCs, adventure.js's liveCreatures shape): each Pokemon an entry of its own, each NPC from the NPC library, both
+ * remembering where they stood (position; npcPlacement) and whether they were hidden. Opened in Encounter setup, on the
+ * top of the list. */
 export async function createEncounterWithMap(map, name, { creatures = [] } = {}) {
   try { await loadLibraryData(); } catch { /* the new one is saved either way */ }
   const { creatures: _onIt, ...plain } = map || {};
@@ -1263,7 +1192,20 @@ export async function createEncounterWithMap(map, name, { creatures = [] } = {})
   await saveNow(enc);
   _encounters.unshift(enc);
   _selectedId = enc.id;
+  _folder = ''; // (a new one is at the top -- in view)
   return enc;
+}
+
+/** The adventure's "Start encounter" (the user's call, 2026-11-13): a new encounter with the adventure's map, its Pokemon
+ * and NPCs (createEncounterWithMap), put in play at once -- Map setup gets the map with them standing where they stood,
+ * and where the players' trainers and Pokemon stood (`players`, faded, for reference -- the players join from their
+ * app). Resolves to {enc, inPlay}: not in play while a battle is running (made, to put in play once it's over). */
+export async function startEncounterFromAdventure(map, name, { creatures = [], players = [] } = {}) {
+  const enc = await createEncounterWithMap(map, name, { creatures });
+  const state = await CombatAPI.getState().catch(() => null);
+  if (battleOn(state?.data)) return { enc, inPlay: false };
+  await putInPlay(enc, { replace: true, useMap: true, players });
+  return { enc, inPlay: true };
 }
 
 /** A battle (PvE or PvP) is running -- a running adventure isn't one: it pauses when the battle starts. */
@@ -1301,52 +1243,61 @@ async function loadIntoSetup(enc) {
   });
   if (choice !== 'load') return;
   const body = loadIntoSetup._body;
-  const replace = body.dataset.mode !== 'add';
   try {
-    const built = [];
-    for (const p of enc.pokemon) built.push(await buildEncounterMon(enc, p, null));
-    const useMap = !!enc.map && body.dataset.map === '1';
-    // On its own map, each one starts where it stood when the encounter was made (the adventure's "Start encounter") --
-    // a hidden one too: on its square, hidden from the players until it's shown
-    if (useMap) built.forEach((c, i) => { if (enc.pokemon[i]?.position) c.position = { ...enc.pokemon[i].position }; });
-    updateSetup((s) => {
-      if (replace) s.creatures = [];
-      if (useMap) {
-        // The encounter's own map -- where anyone already stood belonged to the old one.
-        s.map = { ...JSON.parse(JSON.stringify(enc.map)), weather: s.map.weather, ready: true, terrain: enc.map.terrain || s.map.terrain };
-        s.creatures.forEach((c) => { c.position = null; });
-      }
-      // Encounters made before terrain and weather moved to Map setup had their own.
-      if (enc.terrain && enc.terrain !== 'flat') s.map.terrain = enc.terrain;
-      if (enc.weather && enc.weather !== 'world') s.map.weather = enc.weather;
-      s.creatures.push(...built);
-    });
-    const missing = [];
-    for (const id of enc.npcs) {
-      const npc = npcById(id);
-      if (!npc) { missing.push(id); continue; }
-      const tid = await addEncounterNpc(enc, npc);
-      const placed = enc.npcPlacement?.[id];
-      if (placed) {
-        updateSetup((s) => {
-          const c = s.creatures.find(x => x.id === tid);
-          if (!c) return;
-          if (useMap && placed.position) c.position = { ...placed.position };
-          if (placed.hidden) c.heldBack = true;
-        });
-      }
-    }
-    await flushSetup();
-    await DmAPI.saveState('encounter-run', { ...runFields(enc), eventState: {}, loadedAt: new Date().toISOString(), linked: true });
-    _runId = enc.id;
-    _runLinked = true;
-    renderList();
-    renderSheet();
+    const { missing } = await putInPlay(enc, { replace: body.dataset.mode !== 'add', useMap: !!enc.map && body.dataset.map === '1' });
     toast(`"${enc.name}" is the next battle${missing.length ? ` (${missing.length} NPC no longer in the library was left out)` : ''} -- place everyone and start it.`);
     window.dispatchEvent(new CustomEvent('dm:show-module', { detail: { name: 'battle' } }));
   } catch (err) {
     showCombatAlert(err.message, { title: `Couldn't load "${enc.name}"` });
   }
+}
+
+/** `enc` becomes the next battle (the encounter in play): its creatures into the setup -- `replace` who's there, or
+ * added to them -- and, `useMap`, its own map as Map setup's, each creature where it stood when the encounter was made.
+ * `players`: where the players stood on that map (the adventure's "Start encounter"; setup-store.js). Resolves to
+ * {missing}: the NPCs no longer in the library, left out. */
+async function putInPlay(enc, { replace = true, useMap = false, players = [] } = {}) {
+  const built = [];
+  for (const p of enc.pokemon) built.push(await buildEncounterMon(enc, p, null));
+  useMap = useMap && !!enc.map;
+  // On its own map, each one starts where it stood when the encounter was made (the adventure's "Start encounter") --
+  // a hidden one too: on its square, hidden from the players until it's shown
+  if (useMap) built.forEach((c, i) => { if (enc.pokemon[i]?.position) c.position = { ...enc.pokemon[i].position }; });
+  updateSetup((s) => {
+    if (replace) s.creatures = [];
+    if (useMap) {
+      // The encounter's own map -- where anyone already stood belonged to the old one.
+      s.map = { ...JSON.parse(JSON.stringify(enc.map)), weather: s.map.weather, ready: true, terrain: enc.map.terrain || s.map.terrain };
+      s.creatures.forEach((c) => { c.position = null; });
+      s.players = JSON.parse(JSON.stringify(players || []));
+    }
+    // Encounters made before terrain and weather moved to Map setup had their own.
+    if (enc.terrain && enc.terrain !== 'flat') s.map.terrain = enc.terrain;
+    if (enc.weather && enc.weather !== 'world') s.map.weather = enc.weather;
+    s.creatures.push(...built);
+  });
+  const missing = [];
+  for (const id of enc.npcs) {
+    const npc = npcById(id);
+    if (!npc) { missing.push(id); continue; }
+    const tid = await addEncounterNpc(enc, npc);
+    const placed = enc.npcPlacement?.[id];
+    if (placed) {
+      updateSetup((s) => {
+        const c = s.creatures.find(x => x.id === tid);
+        if (!c) return;
+        if (useMap && placed.position) c.position = { ...placed.position };
+        if (placed.hidden) c.heldBack = true;
+      });
+    }
+  }
+  await flushSetup();
+  await DmAPI.saveState('encounter-run', { ...runFields(enc), eventState: {}, loadedAt: new Date().toISOString(), linked: true });
+  _runId = enc.id;
+  _runLinked = true;
+  renderList();
+  renderSheet();
+  return { missing };
 }
 
 // ---- The encounter in play: the next battle follows it ----

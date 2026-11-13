@@ -4,7 +4,7 @@
 // the trainer card) with their trainer and, if they like, any of their party Pokemon, and walk around on it -- no turns, no
 // initiative, no movement limit (routes_combat.py's start_adventure). The DM decides when the players may join / place
 // themselves and when they may move (the switches on the running adventure's bar). Meanwhile the DM changes the map live,
-// moves anyone (the live map editor), and can turn the map into an encounter (Encounter setup) or the next battle's map.
+// moves anyone (the live map editor), and can turn the map into the next battle ("Start encounter").
 // The capture guide shows how hard each Pokemon is to catch, before anyone meets one.
 //
 // Later on 2026-10-19 (the user's call): no more "Start adventure". The DM prepares the map with its Pokemon and NPCs
@@ -12,6 +12,11 @@
 // opens it to the players (it goes live then, with everything on it; ticking it off again closes joining). "Start
 // encounter" takes the map as it is -- objects, Pokemon and NPCs where they stand, hidden ones too -- into a new encounter
 // in Encounter setup, so several maps and encounters can be prepared ahead of time.
+//
+// 2026-11-13 (the user's call): "Start encounter" puts that encounter in play at once -- Map setup gets the map with the
+// DM's Pokemon and NPCs where they stand, and where the players' trainers and Pokemon stand (faded, for reference: the
+// players join the battle from their app) -- and opens it in Encounter setup to add anyone else. "Copy to an encounter"
+// (an encounter with only the map) is gone: Save map does that, and Map setup loads saved maps.
 import { CombatAPI, DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
@@ -21,7 +26,8 @@ import { renderMapEditor, saveMapDialog } from './map-editor.js';
 import { keepSprites } from './map-view.js';
 import { createMapStore } from './map-store.js';
 import { setLiveSession } from './live-map-store.js';
-import { createEncounterWithMap } from './encounters.js';
+import { startEncounterFromAdventure } from './encounters.js';
+import { getSetup } from './setup-store.js';
 import { captureRulesHtml, speciesDetail, openSpeciesInfo, paintSpeciesImages } from './species-info.js';
 import { getClock, WEATHER } from './world-clock.js';
 import { TERRAIN } from './encounter-rules.js';
@@ -158,8 +164,7 @@ async function drawSetup() {
       <button class="dm-btn small" id="advLoad" title="Replace this map with another one: a saved map, an encounter's map, or the Battle module's Map setup">📂 Load a map…</button>
       <button class="dm-btn small" id="advSave" title="Keep this map under a name, to load again later (the Pokémon and NPCs on it aren't kept)">💾 Save map…</button>
       <button class="dm-btn small" id="advGuide" title="How hard each Pokémon is to catch">🔴 Capture guide</button>
-      <button class="dm-btn small" id="advToBattle" title="A new encounter in the encounter builder with a copy of this map (background, objects, terrain, traps) -- for a battle later. You stay here.">📋 Copy to an encounter</button>
-      <button class="dm-btn primary" id="advToEnc" title="A new encounter in Encounter setup with this map -- its objects, Pokémon and NPCs where they stand, hidden ones too">⚔️ Start encounter</button>
+      <button class="dm-btn primary" id="advToEnc" title="The next battle, on this map: a new encounter with your Pokémon and NPCs where they stand (hidden ones too), put in play">⚔️ Start encounter</button>
     </span>`;
   const body = document.getElementById('advBody');
   body.innerHTML = '<div class="dm-adv-editor" id="advEditor"></div>';
@@ -172,26 +177,6 @@ async function drawSetup() {
     encounterOnMap(_store.getSetup().map, _store.getSetup().creatures);
   });
   document.getElementById('advGuide').addEventListener('click', () => captureGuide(_store.getSetup().map.terrain));
-  document.getElementById('advToBattle').addEventListener('click', async () => {
-    await _store.flushSetup().catch(() => {});
-    copyToEncounter(_store.getSetup().map);
-  });
-}
-
-/** "Copy to an encounter" (the user's call, 2026-10-20: a new encounter, not the Battle module's Map setup): a new
- * encounter in the encounter builder with a copy of this map -- background, objects, terrain and traps; the adventure's
- * Pokemon and NPCs stay here ("Start encounter" takes them along). The DM stays on the adventure. */
-async function copyToEncounter(map) {
-  if (!map?.cols) { showCombatAlert('Make the map first.', { title: 'Copy to an encounter' }); return; }
-  const name = await askEncounterName('📋 Copy to an encounter', 'Adventure map',
-    'A new encounter in the encounter builder (Encounters) with a copy of this map -- background, objects, terrain and traps. Add the creatures there. The adventure map stays as it is.');
-  if (name === null) return;
-  try {
-    const enc = await createEncounterWithMap(map, name || 'Adventure map');
-    toast(`"${enc.name}" is in the encounter builder.`);
-  } catch (err) {
-    showCombatAlert(err.message, { title: 'Copy to an encounter' });
-  }
 }
 
 /** The new encounter's name -- null when cancelled. */
@@ -232,7 +217,6 @@ async function loadOtherMap() {
     ...(maps || []).map(m => ({ key: `saved:${m.id}`, label: `💾 ${m.name}`, map: m.map })),
     ...((encs?.data) || []).filter(e => e.map).map(e => ({ key: `enc:${e.id}`, label: `⚔️ ${e.name} (encounter)`, map: e.map })),
   ];
-  const { getSetup } = await import('./setup-store.js');
   if (getSetup()?.map) choices.unshift({ key: 'setup', label: '🗺️ Map setup\'s map (the next battle)', map: getSetup().map });
   if (!choices.length) { showCombatAlert('No other maps yet.', { title: 'Use another map' }); return; }
   const key = await openDmModal({
@@ -261,8 +245,7 @@ function drawRunning() {
     <span class="dm-adv-btns">
       <button class="dm-btn small" id="advSave" title="Keep this map as it is now under a name, to load again later (the Pokémon and NPCs on it aren't kept)">💾 Save map…</button>
       <button class="dm-btn small" id="advGuide" title="How hard each Pokémon is to catch">🔴 Capture guide</button>
-      <button class="dm-btn small" id="advToBattle" title="A new encounter in the encounter builder with a copy of this map (background, objects, terrain, traps) -- for a battle later. You stay here.">📋 Copy to an encounter</button>
-      <button class="dm-btn primary" id="advToEnc" title="A new encounter in Encounter setup with this map as it is now -- its objects, your Pokémon and NPCs where they stand, hidden ones too">⚔️ Start encounter</button>
+      <button class="dm-btn primary" id="advToEnc" title="The next battle, on this map as it is now: a new encounter with your Pokémon and NPCs where they stand (hidden ones too), put in play -- with where the players stand shown in Map setup">⚔️ Start encounter</button>
       <button class="dm-btn danger" id="advEnd" title="The players leave the map -- everything you put on it stays for next time">■ Close the map</button>
     </span>`;
   renderPlayers();
@@ -281,8 +264,9 @@ function drawRunning() {
   setLiveSession(_session);
   renderMapEditor(document.getElementById('advEditor'), { live: true, adventure: true, title: 'The adventure, live' });
   document.getElementById('advGuide').addEventListener('click', () => captureGuide(_store?.getSetup().map.terrain));
-  document.getElementById('advToEnc').addEventListener('click', () => encounterOnMap(boardAsMap(_session), liveCreatures(_session)));
-  document.getElementById('advToBattle').addEventListener('click', () => copyToEncounter(boardAsMap(_session)));
+  // (the running board doesn't keep "Keep the table TV's shape" -- the prepared map does; a new map has it on)
+  document.getElementById('advToEnc').addEventListener('click', () => encounterOnMap({ ...boardAsMap(_session), lockRatio: _store?.getSetup().map.lockRatio ?? true },
+    liveCreatures(_session), playerSpots(_session)));
   document.getElementById('advSave').addEventListener('click', () => saveMapDialog({ ...boardAsMap(_session), lockRatio: _store?.getSetup().map.lockRatio }));
   document.getElementById('advEnd').addEventListener('click', async () => {
     if (!await showCombatConfirm('Close the map? The players leave it. Everything on it -- your Pokémon and NPCs too -- stays as the adventure map for next time.', { title: 'Close the map', yesLabel: 'Close it', noLabel: 'Cancel' })) return;
@@ -324,24 +308,36 @@ function renderPlayers() {
   el.querySelectorAll('[data-img]').forEach(x => { if (x.dataset.img && !putShown(x)) patchPortraitMedia(x, x.dataset.img, ''); });
 }
 
-/** "Start encounter": a new encounter in Encounter setup with this map and everything on it -- the DM's Pokemon (each
- * where it stands; a hidden one starts hidden, on its square) and NPCs (the same) -- opened there. */
-async function encounterOnMap(map, creatures = []) {
+/** Where the players' trainers and Pokemon stand on the running adventure (setup-store.js's `players`). */
+function playerSpots(session) {
+  return Object.values(session?.participants || {}).filter(p => (p.owner || DM) !== DM).map((p) => {
+    const t = session.board?.tokens?.[p.id];
+    return t ? { name: p.name, owner: p.owner, image: p.image || '', size: p.size || '', col: t.col, row: t.row, facing: t.facing || 0 } : null;
+  }).filter(Boolean);
+}
+
+/** "Start encounter": a new encounter with this map and everything on it -- the DM's Pokemon (each where it stands; a
+ * hidden one starts hidden, on its square) and NPCs (the same) -- put in play at once (Map setup gets the map, with
+ * `players` where the players stand) and opened in Encounter setup. */
+async function encounterOnMap(map, creatures = [], players = []) {
   if (!map?.cols) { showCombatAlert('Make the map first.', { title: 'Start encounter' }); return; }
   const mons = creatures.filter(c => c.kind === 'pokemon' && c.config?.species);
   const npcs = creatures.filter(c => c.kind === 'npc' && c.npcId);
-  const what = [mons.length && `${mons.length} Pokémon`, npcs.length && `${npcs.length} NPC${npcs.length === 1 ? '' : 's'}`,
-    (map.objects || []).length && `${map.objects.length} object${map.objects.length === 1 ? '' : 's'}`].filter(Boolean);
+  const what = [mons.length && `${mons.length} Pokémon`, npcs.length && `${npcs.length} NPC${npcs.length === 1 ? '' : 's'}`].filter(Boolean);
+  const before = getSetup()?.creatures?.length || 0;
   const name = await askEncounterName('⚔️ Start encounter', 'Adventure encounter',
-    `A new encounter in Encounter setup with a copy of this map${what.length ? ` and ${what.join(', ')} on it -- where they stand, hidden ones too` : ''}. Add more there, then import it in the Battle module.`);
+    `The next battle, on this map${what.length ? ` with ${what.join(' and ')} where they stand (hidden ones too)` : ''}${players.length ? ', and where the players stand shown faded in Map setup' : ''}.
+    It's saved as a new encounter and opened in Encounter setup -- add anyone else there, then place them in Map setup.${before ? `<br><b>It replaces the next battle being set up now (${before} creature${before === 1 ? '' : 's'}, and Map setup's map).</b>` : ''}`);
   if (name === null) return;
+  let res;
   try {
-    await createEncounterWithMap(map, String(name).trim() || 'Adventure encounter', { creatures });
+    res = await startEncounterFromAdventure(map, String(name).trim() || 'Adventure encounter', { creatures, players });
   } catch (err) {
     showCombatAlert(err.message, { title: 'Start encounter' });
     return;
   }
-  toast('Made -- it\'s open in Encounter setup. Import it in the Battle module to play it.');
+  toast(res.inPlay ? `"${res.enc.name}" is the next battle -- add anyone else, then place everyone in Map setup.`
+    : `"${res.enc.name}" is saved in Encounter setup -- a battle is running, so use it for the next battle once that's over.`);
   window.dispatchEvent(new CustomEvent('dm:open-encounters'));
 }
 

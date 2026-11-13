@@ -997,46 +997,32 @@ def _clean_spots(spots):
 
 
 def _battle_onto_adventure(adv, battle):
-    """The adventure `adv` (coming back after `battle`) as the battle ended: the battle's map (with whatever the DM changed
-    on it), the DM's creatures still standing where they ended (a caught or fainted one is gone, a hidden one stays
-    hidden), and each player's creature moved to where it ended the battle (or where it stood when it left)."""
+    """The adventure `adv` (coming back after `battle`) exactly as the battle map was when it ended (the user's call,
+    2026-11-13: that's how things stand now): the battle's map, with whatever the DM changed on it, and everyone on it --
+    the DM's creatures and the players', those sent out only during the battle too, a fainted one where it fell, a hidden
+    one still hidden -- where they stood. Whoever wasn't on the battle map at the end (caught, called back, or never in
+    the battle) isn't on the adventure either; a player who left the battle stays where they left it (the last one to
+    leave ends it). A player who's not on it any more joins the adventure again from their app."""
     b_board, a_board = battle.get('board') or {}, adv.setdefault('board', {})
     for key in ('grid', 'backgroundImage', 'objects', 'marks', 'traps'):
         if key in b_board:
             a_board[key] = copy.deepcopy(b_board[key])
     cols, rows = a_board['grid']['cols'], a_board['grid']['rows']
-    tokens = a_board.setdefault('tokens', {})
-    parts = adv.setdefault('participants', {})
-
-    # The DM's: the battle's own, as they ended
-    for pid in [pid for pid, p in parts.items() if (p.get('owner') or DM_OWNER) == DM_OWNER]:
-        parts.pop(pid, None)
-        tokens.pop(pid, None)
-    for pid, p in (battle.get('participants') or {}).items():
-        token = (b_board.get('tokens') or {}).get(pid)
-        if (p.get('owner') or DM_OWNER) != DM_OWNER or not token or (js_parse_int(p.get('currentHP')) or 0) <= 0:
+    on_map = [(pid, p, ((b_board.get('tokens') or {}).get(pid))) for pid, p in (battle.get('participants') or {}).items()]
+    on_map += [(e['participant'].get('id'), e['participant'], e.get('token')) for e in battle.get('leftOnMap') or []
+               if isinstance(e, dict) and isinstance(e.get('participant'), dict)]
+    parts, tokens = {}, {}
+    for pid, p, token in on_map:
+        if not pid or not token:
             continue
-        parts[pid] = {**copy.deepcopy(p), 'initiative': 0}
-        tokens[pid] = {'col': token.get('col'), 'row': token.get('row'), 'facing': token.get('facing') or 0, 'z': token.get('z') or 0}
-
-    # The players': moved to where they ended it
-    ended = _player_spots(battle) + list(battle.get('leftSpots') or [])
-    for pid, p in parts.items():
-        if (p.get('owner') or DM_OWNER) == DM_OWNER:
+        col, row = js_parse_int(token.get('col')), js_parse_int(token.get('row'))
+        if col is None or row is None or not (0 <= col < cols and 0 <= row < rows):
             continue
-        mine = _spot_of(p, {})
-        spot = next((sp for sp in ended if sp['owner'] == mine['owner'] and sp['name'] == mine['name']
-                     and (not sp['kind'] or not mine['kind'] or sp['kind'] == mine['kind'])), None)
-        if not spot:
-            continue
-        ended.remove(spot)
-        if spot['col'] is not None and spot['row'] is not None and 0 <= spot['col'] < cols and 0 <= spot['row'] < rows:
-            tokens[pid] = {**(tokens.get(pid) or {}), 'col': spot['col'], 'row': spot['row'], 'facing': spot['facing']}
-            p['placed'] = True
-    # (anyone now off a smaller map isn't on it)
-    for pid in [pid for pid, t in tokens.items()
-                if not (0 <= (js_parse_int(t.get('col')) or 0) < cols and 0 <= (js_parse_int(t.get('row')) or 0) < rows)]:
-        tokens.pop(pid, None)
+        parts[pid] = {**copy.deepcopy(p), 'initiative': 0, 'placed': True}
+        tokens[pid] = {'col': col, 'row': row, 'facing': (js_parse_int(token.get('facing')) or 0) % 360,
+                       'z': js_parse_int(token.get('z')) or 0}
+    adv['participants'] = parts
+    a_board['tokens'] = tokens
 
 
 def start_adventure(conn, m, settings=None):
@@ -1739,8 +1725,9 @@ def _leave_session(conn, owner):
         for pid in leaving:
             state.setdefault('departed', {})[pid] = _battle_memory(state['participants'][pid], left=True)
             spot = state['board']['tokens'].get(pid)
-            if spot and state.get('fromAdventureMap'):  # where they ended the battle (_battle_onto_adventure)
-                state.setdefault('leftSpots', []).append(_spot_of(state['participants'][pid], spot))
+            if spot and state.get('fromAdventureMap'):  # on the adventure where they left it (_battle_onto_adventure)
+                state.setdefault('leftOnMap', []).append({'participant': copy.deepcopy(state['participants'][pid]),
+                                                          'token': copy.deepcopy(spot)})
             state['participants'].pop(pid, None)
             state['board']['tokens'].pop(pid, None)
         _log_event(state, 'leave', text=f"{owner} left the {'adventure' if state.get('battleType') == 'adventure' else 'battle'}", actorName=owner)

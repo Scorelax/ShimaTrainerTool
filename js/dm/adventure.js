@@ -82,7 +82,7 @@ function drawPaused() {
   document.getElementById('advBar').innerHTML = `
     <h2>🧭 Adventure <span class="dm-pill todo" title="A battle is on -- the adventure waits">Paused</span></h2>
     <span class="dm-hint">${_session?.fromAdventureMap
-      ? "A battle is running on the adventure's map. When it ends, the adventure comes back as the battle left it -- its map, everyone where they ended (caught and fainted Pokémon gone)."
+      ? "A battle is running on the adventure's map. When it ends, the adventure comes back exactly as the battle map is then -- the map, and everyone on it where they stand."
       : 'A battle is running. The adventure comes back just as it was -- the players, your Pokémon and NPCs where they stood -- when the battle ends.'}</span>
     <span class="dm-adv-btns">
       <button class="dm-btn danger" id="advDrop" title="The adventure won't come back when the battle ends -- everything on it stays as the adventure map for next time">■ Don't bring it back</button>

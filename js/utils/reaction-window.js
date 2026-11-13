@@ -9,6 +9,7 @@
 // polling/timeout logic exists in exactly one place.
 import { CombatAPI } from '../api.js';
 import { visibleToViewer } from './combat-visibility.js';
+import { whileWaitingOnOthers } from './popup-queue.js';
 
 // --- What the wait is for (the user's call after the 2026-11-12 playtest): who may react, who has answered, who is reacting
 // right now and whose screen that is -- so the table can see which player has to do something.
@@ -125,7 +126,13 @@ export async function waitForReactionWindow(trigger, anchorId, attackerId, moveN
  * than the attacker's own client opening it. Without a client running the clock, a reactor nobody answers for (a DM's enemy) would
  * leave it open forever. Same resolve shape as waitForReactionWindow.
  */
-export async function waitForOpenWindow(onStatus) {
+export function waitForOpenWindow(onStatus) {
+  // A wait on other screens: the popups queued on this one (a reaction offer for a creature played here too) may open
+  // meanwhile, and the move carries on only once they're answered (popup-queue.js)
+  return whileWaitingOnOthers(_waitForOpenWindow(onStatus));
+}
+
+async function _waitForOpenWindow(onStatus) {
   // Captured from the first poll that sees the window at all, so an outcome
   // reported later (session.reactionBlock / session.reactionDamageMultiplier,
   // each set by a separate call the reactor's own move triggers -- see

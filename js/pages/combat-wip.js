@@ -12,10 +12,11 @@ import { allCachedPokemon, displayName, pokemonKey } from '../utils/owned-pokemo
 import { CombatAPI, PokemonAPI, TrainerAPI, DmAPI } from '../api.js';
 import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setMoveRowResolver, setWeatherAttackModeResolver, setCoverAttackModeResolver, setCritResolver } from '../utils/target-picker.js';
 import { setAnimationAnnouncer, setAnimationDeferral, preloadBattleAnimation } from '../utils/battle-animation.js';
+import { enqueuePopup, setPopupBusyCheck, waitingOnOthersCount, whileWaitingOnOthers } from '../utils/popup-queue.js';
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
 import { pickSwitchTile } from '../utils/token-placement-picker.js';
 import { waitForOpenWindow, playerOf } from '../utils/reaction-window.js';
-import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget, setRemoteSaveHandler, isSavePickerBusy, promptAreaDamageRoll } from '../utils/save-picker.js';
+import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget, setRemoteSaveHandler, promptAreaDamageRoll } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
@@ -1548,6 +1549,9 @@ function _preloadClips(s) {
 }
 let _pendingAnimation = null;
 let _moveFlowDepth = 0;
+// The popups that open by themselves (popup-queue.js) wait while a move is being played here -- unless every move under
+// way is only waiting on other screens (a reaction window, another player's save).
+setPopupBusyCheck(() => _moveFlowDepth > waitingOnOthersCount());
 setAnimationDeferral((species) => {
   if (!_moveFlowDepth) return false; // not one of this page's moves (a popup opened elsewhere): it plays as before
   _pendingAnimation = species;
@@ -1848,13 +1852,13 @@ function _maybePromptForcedSwitch(state) {
   const name = state.participants?.[req.pokemonId]?.name || 'Your Pokémon';
   const available = _benchFor(state, req.owner).filter(b => (b.currentHp ?? 1) > 0);
   if (!available.length) {
-    showCombatAlert(`${name} is hit by ${req.moveName || 'a forced switch'}, but you have no other Pokémon to send in -- it stays.`, { title: req.moveName || 'Switch' });
     CombatAPI.clearForcedSwitch().catch(() => {});
+    enqueuePopup(`forced-switch:${key}`, () => showCombatAlert(`${name} is hit by ${req.moveName || 'a forced switch'}, but you have no other Pokémon to send in -- it stays.`, { title: req.moveName || 'Switch' }));
     return;
   }
-  showCombatAlert(`${name} is too frightened to stay in battle (${req.moveName || 'forced switch'}) -- choose who to send in.`, { title: 'Switch Pokémon' })
-    .then(() => openSwitchPopup({}))
-    .catch(() => {});
+  // In turn with the screen's other popups (popup-queue.js); the switch picker it opens then holds the next ones back
+  enqueuePopup(`forced-switch:${key}`, () => showCombatAlert(`${name} is too frightened to stay in battle (${req.moveName || 'forced switch'}) -- choose who to send in.`, { title: 'Switch Pokémon' })
+    .then(() => openSwitchPopup({})), { stillWanted: () => session?.pendingForcedSwitch?.pokemonId === req.pokemonId });
 }
 
 /** Sing: "Roll 5d8 + MOVE; the total is how many hit points of creatures this move can affect. Creatures within 30 feet of you
@@ -6679,7 +6683,7 @@ async function _resolveAreaSaves({ combatantId, moveName, computedData, targetId
         if (outcome) { local.outcome = outcome; local.state = 'ready'; } else { local.state = 'skipped'; local.note = 'save closed -- left out'; }
         continue;
       }
-      await new Promise(r => setTimeout(r, 300)); // waiting on the other screens
+      await whileWaitingOnOthers(new Promise(r => setTimeout(r, 300))); // waiting on the other screens (popup-queue.js)
     }
   } finally {
     entries.filter(e => e.state === 'remote').forEach(e => CombatAPI.clearPrompt(e.promptId).catch(() => {}));
@@ -7159,9 +7163,11 @@ function _maybePromptHazards(state) {
     const p = state.participants?.[h.participantId];
     if (!p || (p.owner && p.owner !== me)) continue;
     _hazardsPrompted.add(h.id);
-    promptHazard(h).then(res => {
+    enqueuePopup(`hazard:${h.id}`, () => promptHazard(h).then(res => {
       if (res) return CombatAPI.resolveHazard(h.id, res.roll, res.saved, res.failedBy);
-    }).catch(err => showCombatAlert(err.message, { title: 'Error' }));
+    }).catch(err => showCombatAlert(err.message, { title: 'Error' })), {
+      stillWanted: () => (session?.pendingHazards || []).some(x => x.id === h.id),
+    });
   }
 }
 
@@ -7178,18 +7184,29 @@ async function _maybePromptStartOfTurnSaves(state) {
   if (!pendingTurnSaves(p, 'start_of_turn').length && !pendingTurnHeals(p, 'start_of_turn').length && !hasParalyzed && !hasConfused
     && !_abilityTurnPrompts(p, 'start_of_turn').length) return;
   _promptingSaves = true;
-  try {
-    await _promptTurnSaves(activeId, 'start_of_turn');
-    await _promptTurnHeals(activeId, 'start_of_turn');
-    await _promptAbilityTurn(activeId, 'start_of_turn'); // Hydra's Resilience
-    // Paralysis is checked first and, on a failed roll, suppresses the
-    // confusion check entirely for this turn -- see _promptParalysisCheck's
-    // own docstring for the rulebook's explicit ordering.
-    const locked = await _promptParalysisCheck(activeId);
-    if (!locked) await _promptConfusionCheck(activeId);
-  } finally {
-    _promptingSaves = false;
-  }
+  // The whole start-of-turn round of popups is one turn in the screen's popup queue (popup-queue.js), so nothing else
+  // opens in between them
+  const queued = enqueuePopup(`turn-start:${key}`, async () => {
+    try {
+      await _promptTurnSaves(activeId, 'start_of_turn');
+      await _promptTurnHeals(activeId, 'start_of_turn');
+      await _promptAbilityTurn(activeId, 'start_of_turn'); // Hydra's Resilience
+      // Paralysis is checked first and, on a failed roll, suppresses the
+      // confusion check entirely for this turn -- see _promptParalysisCheck's
+      // own docstring for the rulebook's explicit ordering.
+      const locked = await _promptParalysisCheck(activeId);
+      if (!locked) await _promptConfusionCheck(activeId);
+    } finally {
+      _promptingSaves = false;
+    }
+  }, {
+    stillWanted: () => { // still that creature's turn (dropped, unprompted, once it isn't)
+      const live = !!session?.started && session.turnOrder?.[session.turnIndex] === activeId && session.round === state.round;
+      if (!live) _promptingSaves = false;
+      return live;
+    },
+  });
+  if (!queued) _promptingSaves = false;
 }
 
 /** Shows the reactor-side "you may react" popup (reaction-prompt-popup.js)
@@ -7415,7 +7432,8 @@ function _askRemote(participant, kind, args, label) {
     let promptId = null;
     try { promptId = (await CombatAPI.askPrompt(participant.id, kind, args, me))?.promptId || null; } catch { /* asked here instead */ }
     if (!promptId) return { answered: false };
-    const result = await _waitForPromptAnswer(promptId, owner, label);
+    // A wait on another screen: the popups queued here may open meanwhile (popup-queue.js)
+    const result = await whileWaitingOnOthers(_waitForPromptAnswer(promptId, owner, label));
     CombatAPI.clearPrompt(promptId).catch(() => {});
     return result;
   })();
@@ -7471,69 +7489,58 @@ function _answerPromptsForMe(s) {
   for (const p of Object.values(pending)) {
     if (p.answered || p.owner !== me || p.askedBy === me || _promptsShown.has(p.id)) continue;
     _promptsShown.add(p.id);
-    // One at a time: an area move asks every creature's save at once, and a player with two creatures in it gets two
-    // questions -- the save popup is a single one, so the second would have taken over the first (never answered).
-    _promptQueue = _promptQueue.then(async () => {
-      const stillPending = () => session?.pendingPrompts?.[p.id] && !session.pendingPrompts[p.id].answered;
-      // A save of this player's own already up (a concentration check...) finishes first
-      while (p.kind === 'save' && isSavePickerBusy() && stillPending()) await new Promise(r => setTimeout(r, 300));
-      if (!stillPending()) return; // taken back while it waited its turn
+    // One at a time, in the screen's popup queue (popup-queue.js): an area move asks every creature's save at once, and
+    // a player with two creatures in it gets two questions; a reaction offer or a concentration check may be up too.
+    const stillPending = () => !!session?.pendingPrompts?.[p.id] && !session.pendingPrompts[p.id].answered;
+    enqueuePopup(`prompt:${p.id}`, async () => {
       _promptsOpen.set(p.id, p.kind);
       const answer = await _runPrompt(p.kind, p.args || {}).catch(() => null);
       if (_promptsOpen.delete(p.id)) await CombatAPI.answerPrompt(p.id, answer ?? null).catch(() => {});
-    }).catch(() => {});
+    }, { stillWanted: stillPending }); // taken back while it waited its turn: dropped
   }
 }
 const _promptsOpen = new Map(); // prompt id -> kind, while its popup is up on this screen
-let _promptQueue = Promise.resolve(); // the questions for this player, answered one after another
 
 /** The DM's own status conditions (the Admin module's, the user's call, 2026-10-20) that went off on one of this player's
  * creatures (routes_combat.py's _fire_custom_status): a popup with what it does, and the effect it had by itself
  * (damage, heal, VP), for them to handle the rest -- one at a time, each once, then it's taken off the list. */
-let _statusNoticeOpen = null;
 const _statusNoticesShown = new Set();
 function _showStatusNotices(s) {
   const me = _currentTrainerName();
-  if (!me || _spectating || _statusNoticeOpen) return;
-  const n = (s?.statusNotices || []).find(x => x.owner === me && !_statusNoticesShown.has(x.id));
-  if (!n) return;
-  _statusNoticesShown.add(n.id);
-  _statusNoticeOpen = n.id;
-  const text = [n.effect ? `${n.name} ${n.effect}.` : '', n.description].filter(Boolean).join(String.fromCharCode(10, 10));
-  // Queued: an alert already up (a roll's result, a reminder) is read first, never replaced.
-  queueCombatAlert(text || `${n.name}'s ${n.status} went off.`, { title: `🌀 ${n.name}: ${n.status}` })
-    .finally(() => {
-      _statusNoticeOpen = null;
-      CombatAPI.dismissNotice(n.id).catch(() => {});
-      if (session) _showStatusNotices(session);
-    });
+  if (!me || _spectating) return;
+  for (const n of (s?.statusNotices || []).filter(x => x.owner === me && !_statusNoticesShown.has(x.id))) {
+    _statusNoticesShown.add(n.id);
+    const text = [n.effect ? `${n.name} ${n.effect}.` : '', n.description].filter(Boolean).join(String.fromCharCode(10, 10));
+    // In turn with the screen's other popups (popup-queue.js); an alert already up is read first, never replaced.
+    enqueuePopup(`notice:${n.id}`, () => queueCombatAlert(text || `${n.name}'s ${n.status} went off.`, { title: `🌀 ${n.name}: ${n.status}` })
+      .finally(() => CombatAPI.dismissNotice(n.id).catch(() => {})));
+  }
 }
 
 /** The server's concentration checks for this player's creatures (routes_combat.py _check_concentration_after_damage):
  * a Constitution save, DC half the damage (at least 10); a failure ends every move it concentrates on. One at a time,
  * and only when the save popup is free (a save or attack under way here goes first -- the next push picks it up). */
-let _concentrationCheckOpen = null;
 function _answerConcentrationChecks(s) {
   const me = _currentTrainerName();
-  if (!me || _spectating || _concentrationCheckOpen || isSavePickerBusy()) return;
-  const check = Object.values(s?.concentrationChecks || {}).find(c => c.owner === me);
-  if (!check) return;
-  const holder = s.participants?.[check.participantId];
-  // Gone, or nothing left to keep (an earlier failed save, a Drop): no popup.
-  if (!holder || !(holder.statuses || []).some(st => st.kind === 'condition' && st.apply === 'concentrating')) {
-    _concentrationCheckOpen = check.id;
-    CombatAPI.concentrationSave(check.id, 'skip').catch(() => {}).finally(() => { _concentrationCheckOpen = null; });
-    return;
+  if (!me || _spectating) return;
+  for (const check of Object.values(s?.concentrationChecks || {}).filter(c => c.owner === me)) {
+    // In turn with the screen's other popups (popup-queue.js) -- each check once
+    enqueuePopup(`concentration:${check.id}`, async () => {
+      const holder = session?.participants?.[check.participantId];
+      // Gone, or nothing left to keep (an earlier failed save, a Drop): no popup.
+      if (!holder || !(holder.statuses || []).some(st => st.kind === 'condition' && st.apply === 'concentrating')) {
+        await CombatAPI.concentrationSave(check.id, 'skip').catch(() => {});
+        return;
+      }
+      const moves = check.moves.join(', ');
+      const outcome = await confirmSecondarySave(holder, holder.name, {
+        dc: check.dc, ability: 'CON', title: 'Concentration Save', hasDamage: false,
+        note: `${holder.name} took ${check.damage} damage while concentrating on ${moves}: DC ${check.dc} (half the damage, at least 10). A failure ends ${check.moves.length > 1 ? 'all of them' : 'it'}.`,
+      }).catch(() => null);
+      await CombatAPI.concentrationSave(check.id, !outcome ? 'skip' : outcome.passed ? 'pass' : 'fail',
+        outcome?.saveTotal != null ? `rolled ${outcome.saveTotal}` : '').catch(() => {});
+    }, { stillWanted: () => !!session?.concentrationChecks?.[check.id] });
   }
-  _concentrationCheckOpen = check.id;
-  const moves = check.moves.join(', ');
-  confirmSecondarySave(holder, holder.name, {
-    dc: check.dc, ability: 'CON', title: 'Concentration Save', hasDamage: false,
-    note: `${holder.name} took ${check.damage} damage while concentrating on ${moves}: DC ${check.dc} (half the damage, at least 10). A failure ends ${check.moves.length > 1 ? 'all of them' : 'it'}.`,
-  }).then((outcome) => CombatAPI.concentrationSave(check.id, !outcome ? 'skip' : outcome.passed ? 'pass' : 'fail',
-    outcome?.saveTotal != null ? `rolled ${outcome.saveTotal}` : ''))
-    .catch(() => {})
-    .finally(() => { _concentrationCheckOpen = null; if (session) _answerConcentrationChecks(session); });
 }
 // The button that closes each kind's popup without an answer.
 const _PROMPT_CLOSE_BUTTON = { roll: 'healPopupClose', confirm: 'combatConfirmNo2', save: 'savePickerClose' };

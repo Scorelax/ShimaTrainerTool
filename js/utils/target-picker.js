@@ -466,7 +466,7 @@ function _close(result) {
 
 function _showStep1() {
   document.getElementById('targetPickerStep1').hidden = false;
-  document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside');
+  document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside', 'popup-waiting');
   document.getElementById('targetPickerStep2').hidden = true;
   document.getElementById('targetPickerStep3').hidden = true;
   _selectedTargetId = null;
@@ -559,7 +559,7 @@ async function _afterTargetsSelected() {
     }
     if (!bypassed) { g.blocked = true; g.blockerName = reaction.blockerName; }
   }
-  document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside');
+  document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside', 'popup-waiting');
   if (_groups.every((g) => g.blocked)) {
     _close({ results: _groups.map((g) => ({ targetId: g.p.id, blocked: true, blockerName: g.blockerName })) });
     return;
@@ -784,6 +784,7 @@ function _showReactionWait(status) {
   document.getElementById('targetPickerReactionWaitTimer').textContent = secs > 0 ? `${secs}s` : '';
   document.getElementById('targetPickerReactionWaitDetail').innerHTML = reactionWaitHtml(status);
   _overlay.classList.toggle('rw-aside', reactingNow(status));
+  _overlay.classList.add('popup-waiting'); // only waiting: the popups queued on this screen may open over it (popup-queue.js)
 }
 
 async function _afterTargetSelected(p, name) {
@@ -794,7 +795,7 @@ async function _afterTargetSelected(p, name) {
   document.getElementById('targetPickerReactionWaitTimer').textContent = '';
   document.getElementById('targetPickerReactionWaitDetail').innerHTML = '';
   const reaction = await waitForReactionWindow('targeted', p.id, _attacker?.id, _moveName, _showReactionWait);
-  document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside');
+  document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside', 'popup-waiting');
   // A reaction that only softens the hit (Protect used again: half the damage drains VP) rides along to the damage step.
   _reactionDamage = reaction?.multiplier ? { multiplier: reaction.multiplier, pool: reaction.pool || null } : null;
   if (reaction?.blocked) {

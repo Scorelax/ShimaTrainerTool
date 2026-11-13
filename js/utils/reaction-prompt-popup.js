@@ -12,6 +12,7 @@
 // something here (an unopened reaction is a real answer -- opting out -- not
 // merely a popup nobody happened to click through).
 import { CombatAPI } from '../api.js';
+import { enqueuePopup } from './popup-queue.js';
 
 function _injectStyles() {
   if (document.getElementById('reaction-prompt-styles')) return;
@@ -62,6 +63,9 @@ function _hide() {
   if (_tickTimer) { clearInterval(_tickTimer); _tickTimer = null; }
   _shownWindowId = null;
   _declinedThisWindow = new Set();
+  const done = _resolveShown;
+  _resolveShown = null;
+  done?.(); // the popup queue's turn for it is over
 }
 
 async function _declineAll() {
@@ -85,6 +89,10 @@ async function _react(participantId, onReacted) {
 }
 
 let _currentMine = new Set(); // the participant ids this device is currently being asked about
+// The offer waits its turn in the screen's popup queue (popup-queue.js -- one popup at a time, a reaction offer ahead of
+// the others): the latest push's window and this device's undecided creatures in it, read when its turn comes.
+let _latest = { pr: null, mine: [], getName: null, onReacted: null };
+let _resolveShown = null;
 
 /**
  * Call on every session update. `session` is the live combat state,
@@ -96,15 +104,26 @@ let _currentMine = new Set(); // the participant ids this device is currently be
 export function showReactionPromptIfEligible(session, myParticipantIds, { getName, onReacted } = {}) {
   const pr = session?.pendingReaction;
   const mineSet = myParticipantIds instanceof Set ? myParticipantIds : new Set(myParticipantIds || []);
+  const mine = pr ? Object.keys(pr.eligible || {}).filter(id => mineSet.has(id) && !pr.eligible[id].responded) : [];
+  _latest = { pr, mine, getName, onReacted };
 
-  if (!pr) { _hide(); return; }
-
-  const mine = Object.keys(pr.eligible || {}).filter(id => mineSet.has(id) && !pr.eligible[id].responded);
-  if (!mine.length) { _hide(); return; }
+  if (!pr || !mine.length) { if (_shownWindowId) _hide(); return; }
 
   _currentMine = new Set(mine);
+  if (_shownWindowId === pr.id) return;
+  const windowId = pr.id;
+  enqueuePopup(`reaction:${windowId}`, () => _showWindow(windowId), {
+    urgent: true, stillWanted: () => _latest.pr?.id === windowId && _latest.mine.length > 0,
+  });
+}
 
-  if (_shownWindowId !== pr.id) {
+/** Opens the offer for window `windowId` (its turn in the popup queue came); resolves once it's closed. */
+function _showWindow(windowId) {
+  const { pr, mine, getName, onReacted } = _latest;
+  if (!pr || pr.id !== windowId || !mine.length) return Promise.resolve();
+  return new Promise((resolve) => {
+    _resolveShown = resolve;
+    _currentMine = new Set(mine);
     _ensureDom();
     _shownWindowId = pr.id;
     _declinedThisWindow = new Set();
@@ -131,5 +150,5 @@ export function showReactionPromptIfEligible(session, myParticipantIds, { getNam
       if (el) el.textContent = `${Math.max(0, Math.ceil(msLeft / 1000))}s`;
       if (msLeft <= 0) _declineAll();
     }, 250);
-  }
+  });
 }

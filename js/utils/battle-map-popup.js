@@ -597,6 +597,7 @@ function _renderTokens() {
     const classes = ['bmap-token', p.side];
     if (isMine) classes.push('mine');
     if (isMyTurn) classes.push('my-turn');
+    if (_session.started && !_adventure() && id === activeId) classes.push('turn'); // everyone sees whose turn it is
     if (id === _selectedTokenId) classes.push('selected');
     if ((pos.z || 0) > 0) classes.push('airborne');
 

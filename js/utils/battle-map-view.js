@@ -190,6 +190,12 @@ export function injectBattleMapStyles() {
     .bmap-token-portrait img, .bmap-token-portrait video, .placement-token-portrait img, .placement-token-portrait video {
       width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.85));
     }
+    /* whose turn it is (or who's reacting): a green halo pulsing round its side-coloured ring (battle-map-popup.js) */
+    .bmap-token.turn .bmap-token-portrait { animation: bmapTurn 1.6s ease-in-out infinite; }
+    @keyframes bmapTurn {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(var(--ring), 0.95), 0 0 0 4px rgba(80,255,140,0.9), 0 0 10px 3px rgba(80,255,140,0.5), inset 0 0 10px rgba(0,0,0,0.5); }
+      50% { box-shadow: 0 0 0 2px rgba(var(--ring), 0.95), 0 0 0 5px rgba(80,255,140,1), 0 0 22px 7px rgba(80,255,140,0.75), inset 0 0 10px rgba(0,0,0,0.5); }
+    }
     .bmap-token.selected .bmap-token-portrait { animation: bmapPulse 1.5s ease-in-out infinite; }
     @keyframes bmapPulse {
       0%, 100% { box-shadow: 0 0 0 2px rgb(255,215,0), 0 0 12px 1px rgba(255,215,0,0.7), inset 0 0 10px rgba(0,0,0,0.6); }

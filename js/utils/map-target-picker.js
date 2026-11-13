@@ -15,8 +15,9 @@ function _injectStyles() {
   style.id = 'map-target-picker-styles';
   style.textContent = `
     .mtgt-stage { cursor: pointer; }
-    .mtgt-stage .bmap-token.picked .bmap-token-portrait { box-shadow: 0 0 0 3px #ffd700, 0 0 18px 4px rgba(255,215,0,0.85); }
-    .mtgt-picked { font-size: 0.9rem; font-weight: 700; color: #ffe07a; min-height: 1.3em; }
+    /* magenta, so it can't be mixed up with the caster's own gold ring or the blue / red sides */
+    .mtgt-stage .bmap-token.picked .bmap-token-portrait { box-shadow: 0 0 0 3px #ff4fd8, 0 0 18px 5px rgba(255,79,216,0.85); }
+    .mtgt-picked { font-size: 0.9rem; font-weight: 700; color: #ff8be6; min-height: 1.3em; }
     .mtgt-picked .why { color: #ff8a80; }
     .mtgt-picked .cover { color: #f0b232; font-weight: 600; }
     .mtgt-card .lap-title { color: #ffe07a; }

@@ -112,9 +112,21 @@ export function showReactionPromptIfEligible(session, myParticipantIds, { getNam
   _currentMine = new Set(mine);
   if (_shownWindowId === pr.id) return;
   const windowId = pr.id;
-  enqueuePopup(`reaction:${windowId}`, () => _showWindow(windowId), {
+  const queued = enqueuePopup(`reaction:${windowId}`, () => _showWindow(windowId), {
     urgent: true, stillWanted: () => _latest.pr?.id === windowId && _latest.mine.length > 0,
   });
+  // Waiting its turn behind another popup here: the server holds these creatures' clock until it's on screen (_showWindow).
+  if (queued && _shownWindowId !== windowId) CombatAPI.reactionOfferSeen(windowId, mine, false).catch(() => {});
+}
+
+/** The time this screen's creatures have left to decide, in ms -- null while the clock is held (the attacker still
+ * rolling, or the server hasn't heard yet that the offer is up). Read from the latest push of window `windowId`. */
+function _msLeft(windowId) {
+  const pr = _latest.pr;
+  if (!pr || pr.id !== windowId || pr.preparing) return null;
+  const ends = [..._currentMine].map(id => pr.eligible?.[id]).filter(e => e && !e.responded).map(e => e.expiresAt);
+  if (!ends.length || ends.some(t => t == null)) return null;
+  return Math.max(...ends) - Date.now();
 }
 
 /** Opens the offer for window `windowId` (its turn in the popup queue came); resolves once it's closed. */
@@ -129,7 +141,12 @@ function _showWindow(windowId) {
     _declinedThisWindow = new Set();
     const anchorName = getName?.(pr.anchorId) || 'a participant';
     const triggerText = pr.trigger === 'damaged' ? `${anchorName} just took damage` : pr.trigger === 'moved_away' ? `${anchorName} is moving away` : pr.trigger === 'switch_out' ? `${anchorName} is being switched out` : pr.trigger === 'switch_in' ? `${anchorName} was just sent out` : `${anchorName} is being targeted`;
-    document.getElementById('reactionPromptDesc').textContent = `${triggerText}. You may react.`;
+    // Opened as the attacker started rolling: reacting now comes before the attack lands (the attacker's popup waits).
+    const attackerName = pr.attackerId && pr.attackerId !== pr.anchorId ? getName?.(pr.attackerId) : '';
+    const by = attackerName ? ` by ${attackerName}${pr.moveName ? `'s ${pr.moveName}` : ''}` : '';
+    document.getElementById('reactionPromptDesc').textContent = pr.preparing
+      ? `${triggerText}${by} -- the attack is being rolled. React now to act before it lands.`
+      : `${triggerText}${by && pr.trigger === 'targeted' ? by : ''}. You may react.`;
     document.getElementById('reactionPromptOptions').innerHTML = mine.map(id => `
       <div class="reaction-prompt-option" data-participant-id="${id}">
         <div>
@@ -142,13 +159,20 @@ function _showWindow(windowId) {
       btn.addEventListener('click', () => _react(btn.dataset.reactFor, onReacted));
     });
     _overlay.style.display = 'flex';
+    // Up on screen now: these creatures' 10 seconds start (the server's clock, _msLeft)
+    CombatAPI.reactionOfferSeen(windowId, mine, true).catch(() => {});
 
     if (_tickTimer) clearInterval(_tickTimer);
-    _tickTimer = setInterval(() => {
-      const msLeft = pr.expiresAt - Date.now();
+    const tick = () => {
+      const msLeft = _msLeft(windowId);
       const el = document.getElementById('reactionPromptTimer');
-      if (el) el.textContent = `${Math.max(0, Math.ceil(msLeft / 1000))}s`;
-      if (msLeft <= 0) _declineAll();
-    }, 250);
+      if (el) {
+        el.textContent = msLeft !== null ? `${Math.max(0, Math.ceil(msLeft / 1000))}s`
+          : _latest.pr?.preparing ? 'until the attack is rolled' : '10s';
+      }
+      if (msLeft !== null && msLeft <= 0) _declineAll();
+    };
+    tick();
+    _tickTimer = setInterval(tick, 250);
   });
 }

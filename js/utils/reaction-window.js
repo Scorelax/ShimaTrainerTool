@@ -63,6 +63,7 @@ export function reactionWaitHtml(status) {
     const p = s.participants?.[id];
     const player = playerOf(p);
     const [cls, st] = id === reactingId ? ['reacting', '⚡ reacting now']
+      : !e.responded && e.queuedAt && !e.shownAt ? ['deciding', '… offer waiting on their screen'] // (their clock holds)
       : !e.responded ? ['deciding', '… deciding']
       : p?.reactionUsed ? ['done', '✓ reacted'] : ['done', '– no reaction'];
     return { cls, html: `<div class="rw-row ${cls}"><span class="who">${_esc(nameOf(p))}${player ? ` <small>(${_esc(player)})</small>` : ''}</span><span class="st">${st}</span></div>` };
@@ -126,13 +127,100 @@ export async function waitForReactionWindow(trigger, anchorId, attackerId, moveN
  * than the attacker's own client opening it. Without a client running the clock, a reactor nobody answers for (a DM's enemy) would
  * leave it open forever. Same resolve shape as waitForReactionWindow.
  */
-export function waitForOpenWindow(onStatus) {
+export function waitForOpenWindow(onStatus, windowId = null) {
   // A wait on other screens: the popups queued on this one (a reaction offer for a creature played here too) may open
   // meanwhile, and the move carries on only once they're answered (popup-queue.js)
-  return whileWaitingOnOthers(_waitForOpenWindow(onStatus));
+  return whileWaitingOnOthers(_waitForOpenWindow(onStatus, windowId));
 }
 
-async function _waitForOpenWindow(onStatus) {
+/** What window `windowId`'s reactions did so far, read off `session` into `out`: a block (Protect -- unless the attacker
+ * bypassed it with Feint) and a damage multiplier (Wide Guard, Protect used again). */
+function _readOutcome(session, windowId, out) {
+  const rb = session?.reactionBlock;
+  if (rb?.windowId && rb.windowId === windowId) {
+    out.blocked = !rb.negated;
+    out.blockerName = rb.blockerName;
+  }
+  const rm = session?.reactionDamageMultiplier;
+  if (rm?.windowId && rm.windowId === windowId) {
+    Object.assign(out, { multiplier: rm.multiplier, reactorName: rm.reactorName, ...(rm.pool ? { pool: rm.pool } : {}) });
+  }
+  return out;
+}
+
+/**
+ * A 'targeted' window opened as the attacker starts rolling (the user's call, 2026-11-13): it stays open through the
+ * attack roll and the damage roll, so the target -- or anyone else who may -- can react while the attack is being
+ * prepared (some reactions only work before an attack lands), and the attack waits for the reaction to be over. Resolves
+ * to null when nobody may react (nothing to watch), else a handle:
+ *  - `onChange({pendingReaction, session, reacting})` is called on every poll while the attacker prepares; `reacting`
+ *    while one of the creatures the window was offered to is reacting right now (the attacker's popup pauses then);
+ *  - `outcome()`: what the reactions did so far -- {blocked, blockerName, multiplier, pool, reactorIds};
+ *  - `finish(onStatus)`: the attacker is done rolling -- waits out whoever is still deciding (as waitForOpenWindow, with
+ *    `onStatus` the same) and resolves to outcome();
+ *  - `abandon()`: the attack was dropped -- stops watching and closes the window (once a reaction under way is over);
+ *    resolves once the server has it.
+ */
+export async function openPreparationWindow(anchorId, attackerId, moveName, onChange) {
+  let opened;
+  try {
+    opened = await CombatAPI.openReactionWindow('targeted', anchorId, attackerId, moveName, { preparing: true });
+  } catch {
+    return null;
+  }
+  if (!opened?.opened || !opened.windowId) return null;
+  const windowId = opened.windowId;
+  const out = { blocked: false };
+  const reactorIds = new Set();
+  let stopped = false;
+  let finishing = false;
+  const seeReactor = (session) => {
+    const pr = session?.pendingReaction?.id === windowId ? session.pendingReaction : null;
+    const rid = session?.reactingParticipantId;
+    const reacting = !!(pr && rid && pr.eligible?.[rid]);
+    if (reacting) reactorIds.add(rid);
+    return { pr, reacting };
+  };
+  (async () => {
+    while (!stopped && !finishing) {
+      let session = null;
+      try {
+        const res = await CombatAPI.getState();
+        session = res?.status === 'success' ? res.data : null;
+      } catch { /* transient -- poll again */ }
+      if (stopped || finishing) break;
+      if (session) {
+        _readOutcome(session, windowId, out);
+        const { pr, reacting } = seeReactor(session);
+        try { onChange?.({ pendingReaction: pr, session, reacting }); } catch (err) { console.error('[reaction-window]', err); }
+        if (!pr) break; // closed: everyone answered (a reaction that just ended was reported above)
+      }
+      await _sleep(POLL_MS);
+    }
+  })();
+  const outcome = () => ({ ...out, reactorIds: [...reactorIds] });
+  return {
+    windowId,
+    outcome,
+    async finish(onStatus) {
+      finishing = true;
+      try { await CombatAPI.reactionWindowReady(windowId); } catch { /* the window runs out by its own clock anyway */ }
+      const res = await waitForOpenWindow((status) => {
+        seeReactor(status.session);
+        onStatus?.(status);
+      }, windowId);
+      Object.assign(out, res);
+      return outcome();
+    },
+    abandon() {
+      if (stopped || finishing) return Promise.resolve(); // (finish() closes it itself)
+      stopped = true;
+      return CombatAPI.reactionWindowReady(windowId, { dropped: true }).catch(() => {});
+    },
+  };
+}
+
+async function _waitForOpenWindow(onStatus, knownWindowId = null) {
   // Captured from the first poll that sees the window at all, so an outcome
   // reported later (session.reactionBlock / session.reactionDamageMultiplier,
   // each set by a separate call the reactor's own move triggers -- see
@@ -142,8 +230,8 @@ async function _waitForOpenWindow(onStatus) {
   // can be visible on a poll well before pendingReaction goes null -- checked
   // opportunistically every iteration rather than only once at the end, so a
   // late/slow final poll can't miss it.
-  let windowId = null;
-  let result = { blocked: false };
+  let windowId = knownWindowId;
+  const result = { blocked: false };
   // eslint-disable-next-line no-constant-condition
   while (true) {
     let session = null;
@@ -153,24 +241,23 @@ async function _waitForOpenWindow(onStatus) {
     } catch {
       // transient -- fall through and poll again rather than giving up on the wait
     }
-    const pr = session?.pendingReaction;
+    if (!session) { await _sleep(POLL_MS); continue; }
+    let pr = session.pendingReaction;
     if (!windowId && pr) windowId = pr.id;
-    if (session?.reactionBlock?.windowId && session.reactionBlock.windowId === windowId) {
-      result = { blocked: true, blockerName: session.reactionBlock.blockerName };
-    }
-    if (session?.reactionDamageMultiplier?.windowId && session.reactionDamageMultiplier.windowId === windowId) {
-      result = { ...result, multiplier: session.reactionDamageMultiplier.multiplier, reactorName: session.reactionDamageMultiplier.reactorName,
-        ...(session.reactionDamageMultiplier.pool ? { pool: session.reactionDamageMultiplier.pool } : {}) }; // Protect's repeat use: VP
-    }
+    if (pr && pr.id !== windowId) pr = null; // ours already closed (another one is open now)
+    _readOutcome(session, windowId, result);
     if (!pr) return result; // closed -- everyone answered, or someone's client already timed it out
 
-    const msLeft = pr.expiresAt - Date.now();
-    onStatus?.({ opened: true, msLeft: Math.max(0, msLeft), pendingReaction: pr, session });
-    if (msLeft <= 0) {
-      try { await CombatAPI.closeReactionWindow(); } catch { /* someone's still reacting -- retry shortly */ }
+    // The clock is held (null) while a reactor's offer waits behind another popup on their screen -- or, at the latest,
+    // until its hard limit (staleAt) -- see routes_combat.py's _refresh_window_clock.
+    const msLeft = pr.expiresAt != null ? pr.expiresAt - Date.now() : null;
+    const due = pr.expiresAt != null ? pr.expiresAt : pr.staleAt;
+    onStatus?.({ opened: true, msLeft: msLeft === null ? null : Math.max(0, msLeft), pendingReaction: pr, session });
+    if (due != null && due - Date.now() <= 0) {
+      try { await CombatAPI.closeReactionWindow(); } catch { /* someone's still reacting, or not quite time -- retry shortly */ }
       await _sleep(RETRY_CLOSE_MS);
       continue;
     }
-    await _sleep(Math.min(POLL_MS, Math.max(200, msLeft)));
+    await _sleep(msLeft === null ? POLL_MS : Math.min(POLL_MS, Math.max(200, msLeft)));
   }
 }

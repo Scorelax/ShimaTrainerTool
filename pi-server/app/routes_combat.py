@@ -401,11 +401,29 @@ def _handle(conn, action, params):
             raise ValueError('trigger must be targeted, damaged, or beneficial')
         if not params.get('anchorId') or not params.get('attackerId'):
             raise ValueError('Missing anchorId or attackerId')
+        # `preparing`: opened as the attacker starts rolling -- it stays open until they're done (reaction-window-ready).
+        preparing = str(params.get('preparing', '')) in ('1', 'true')
         outcome = {}
         result = _mutate(conn, lambda s: outcome.update(_open_reaction_window(
-            s, trigger, params['anchorId'], params['attackerId'], params.get('moveName', ''))))
+            s, trigger, params['anchorId'], params['attackerId'], params.get('moveName', ''), preparing=preparing)))
         result.update(outcome)
         return result
+
+    if action == 'reaction-offer-seen':
+        # A reactor's screen: its "React?" offer is waiting behind another popup there (shown=0) or is up now (shown=1).
+        ids = [i for i in str(params.get('ids', '')).split(',') if i]
+        if not ids or not params.get('windowId'):
+            raise ValueError('Missing ids or windowId')
+        shown = str(params.get('shown', '')) in ('1', 'true')
+        return _mutate(conn, lambda s: _reaction_offer_seen(s, params['windowId'], ids, shown))
+
+    if action == 'reaction-window-ready':
+        # The attacker is done rolling: the window it opened while they prepared runs out the usual way from here.
+        # dropped=1: the attack was cancelled (or another target picked) -- nothing left to react to, the window closes.
+        if not params.get('windowId'):
+            raise ValueError('Missing windowId')
+        dropped = str(params.get('dropped', '')) in ('1', 'true')
+        return _mutate(conn, lambda s: _reaction_window_ready(s, params['windowId'], dropped))
 
     if action == 'switch-pokemon':
         if not params.get('id') or not params.get('inId'):
@@ -2139,6 +2157,11 @@ def _advance_turn(state, after_departure=None):
     if not state['turnOrder']:
         return
     _close_stale_reaction_window(state)
+    pr = state.get('pendingReaction')
+    if pr and pr.get('preparing'):
+        # An attack whose rolls were never finished (the popup was left open, the phone went away): its window goes with the turn.
+        state['pendingReaction'] = None
+        _log_event(state, 'reaction-window-close', text='Reaction window closed (the attack was never finished)')
     state['started'] = True
     if after_departure:
         ending_id = None
@@ -2422,6 +2445,7 @@ def _reaction_start(state, pid):
     pr = state.get('pendingReaction')
     if pr and pid in pr['eligible']:
         pr['eligible'][pid]['responded'] = True
+        _refresh_window_clock(state)
     _log_event(state, 'reaction-start', text=f"{participant['name']} used a reaction", actorId=pid, actorName=participant['name'])
 
 
@@ -2671,17 +2695,108 @@ def _close_stale_reaction_window(state):
     client that opened it runs that clock (_close_reaction_window) -- a phone that went to sleep meanwhile never does,
     and the stale window would otherwise refuse every later one for the rest of the battle."""
     pr = state.get('pendingReaction')
-    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    if pr and not _reaction_in_progress(state) and now_ms > (pr.get('expiresAt') or 0) + _STALE_WINDOW_GRACE_MS:
+    if pr and not _reaction_in_progress(state) and _now_ms() > (pr.get('staleAt') or pr.get('expiresAt') or 0) + _STALE_WINDOW_GRACE_MS:
         state['pendingReaction'] = None
         _log_event(state, 'reaction-window-close', text='Reaction window closed (time expired)')
         _finish_pending_switch(state)
 
 
 _STALE_WINDOW_GRACE_MS = 5000  # past its expiry, so the opener's own countdown (and its retry) always gets there first
+_REACTION_DECIDE_MS = 10000  # how long a creature has to decide, from the moment the offer is on its player's screen
+_QUEUED_OFFER_CAP_MS = 120000  # an offer waiting behind another popup holds the clock this long at most
+_PREPARING_CAP_MS = 15 * 60 * 1000  # a window held open by an attack that was never finished (the attacker's phone went away)
 
 
-def _open_reaction_window(state, trigger, anchor_id, attacker_id, move_name, only_ids=None):
+def _now_ms():
+    return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+
+def _refresh_window_clock(state):
+    """When the open reaction window runs out (the user's call, 2026-11-13). Every creature it was offered to gets its 10
+    seconds from the moment the offer is on its player's screen (`shownAt`); an offer still waiting behind another popup
+    there (`queuedAt`) holds the clock; a screen that never said anything (a phone asleep) counts from the opening, as
+    before. A window opened while the attacker prepares (`preparing` -- rolls the attack and the damage) stays open until
+    they're done. `expiresAt` (the window's, and each creature's own) is None while the clock is held; `staleAt` is the
+    latest it may be closed at regardless (_close_stale_reaction_window, _close_reaction_window)."""
+    pr = state.get('pendingReaction')
+    if not pr:
+        return
+    opened = pr.get('openedAt') or _now_ms()
+    preparing = bool(pr.get('preparing'))
+    owns, caps = [], []
+    for e in pr['eligible'].values():
+        if e.get('responded'):
+            e['expiresAt'] = None
+            continue
+        if e.get('shownAt'):
+            own = e['shownAt'] + _REACTION_DECIDE_MS
+        elif e.get('queuedAt'):
+            own = None
+            caps.append(e['queuedAt'] + _QUEUED_OFFER_CAP_MS)
+        else:
+            own = opened + _REACTION_DECIDE_MS
+        if own is not None:
+            owns.append(own)
+        e['expiresAt'] = None if preparing else own
+    if preparing:
+        pr['expiresAt'] = None
+        pr['staleAt'] = opened + _PREPARING_CAP_MS
+    elif caps:
+        pr['expiresAt'] = None
+        pr['staleAt'] = max(caps + owns)
+    else:
+        pr['expiresAt'] = max(owns, default=opened + _REACTION_DECIDE_MS)
+        pr['staleAt'] = pr['expiresAt']
+
+
+def _close_reaction_window_if_due(state):
+    """Closes the window now if its time has run out and nobody is reacting -- right after something moved its clock."""
+    pr = state.get('pendingReaction')
+    if not pr or _reaction_in_progress(state):
+        return
+    due = pr.get('expiresAt')
+    if due is not None and _now_ms() >= due:
+        state['pendingReaction'] = None
+        _log_event(state, 'reaction-window-close', text='Reaction window closed (time expired)')
+        _finish_pending_switch(state)
+
+
+def _reaction_offer_seen(state, window_id, ids, shown):
+    """A reactor's screen reports its offer: waiting behind another popup there (the clock holds for those creatures) or
+    up on screen now (their 10 seconds start). For a window that's already gone, nothing to do."""
+    pr = state.get('pendingReaction')
+    if not pr or pr.get('id') != window_id:
+        return
+    now = _now_ms()
+    for pid in ids:
+        e = pr['eligible'].get(pid)
+        if not e or e.get('responded'):
+            continue
+        if shown:
+            e['shownAt'] = e.get('shownAt') or now
+        elif not e.get('shownAt'):
+            e['queuedAt'] = e.get('queuedAt') or now
+    _refresh_window_clock(state)
+
+
+def _reaction_window_ready(state, window_id, dropped=False):
+    """The attacker finished rolling (attack and damage, or a miss): the window they opened as they started stops being
+    held open. Anyone who has had their offer up for 10 seconds by now is out of time; the others keep what's left.
+    `dropped`: the attack was cancelled instead -- nobody is asked any more, and the window closes (once a reaction
+    under way, if any, is over)."""
+    pr = state.get('pendingReaction')
+    if not pr or pr.get('id') != window_id or not pr.get('preparing'):
+        return
+    pr['preparing'] = False
+    if dropped:
+        for e in pr['eligible'].values():
+            e['responded'] = True
+    _refresh_window_clock(state)
+    _maybe_close_reaction_window(state)
+    _close_reaction_window_if_due(state)
+
+
+def _open_reaction_window(state, trigger, anchor_id, attacker_id, move_name, only_ids=None, preparing=False):
     _close_stale_reaction_window(state)
     if state['pendingReaction']:
         raise ValueError('A reaction window is already open')
@@ -2690,18 +2805,20 @@ def _open_reaction_window(state, trigger, anchor_id, attacker_id, move_name, onl
     eligible = _eligible_reactors(state, _load_move_data_file(), trigger, anchor_id, attacker_id, move_name, only_ids)
     if not eligible:
         return {'opened': False}  # nothing to wait for -- caller's flow proceeds immediately
-    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    window_id = uuid.uuid4().hex[:8]
     state['pendingReaction'] = {
-        'id': uuid.uuid4().hex[:8],
+        'id': window_id,
         'trigger': trigger, 'anchorId': anchor_id, 'attackerId': attacker_id, 'moveName': move_name,
-        'expiresAt': now_ms + 10000,
-        'eligible': {pid: {'moves': names, 'responded': False} for pid, names in eligible.items()},
+        'openedAt': _now_ms(), 'preparing': bool(preparing),
+        'eligible': {pid: {'moves': names, 'responded': False, 'queuedAt': None, 'shownAt': None}
+                     for pid, names in eligible.items()},
     }
+    _refresh_window_clock(state)
     anchor_name = state['participants'][anchor_id]['name']
     _log_event(state, 'reaction-window-open',
                text=f"Reaction window open -- {', '.join(state['participants'][p]['name'] for p in eligible)} may react to {anchor_name}",
                targetId=anchor_id, targetName=anchor_name)
-    return {'opened': True}
+    return {'opened': True, 'windowId': window_id}
 
 
 def _decline_reaction(state, pid):
@@ -2712,6 +2829,7 @@ def _decline_reaction(state, pid):
     if not entry:
         raise ValueError('Not eligible to react to this')
     entry['responded'] = True
+    _refresh_window_clock(state)
     _maybe_close_reaction_window(state)
 
 
@@ -2875,6 +2993,11 @@ def _close_reaction_window(state):
         return
     if _reaction_in_progress(state):
         raise ValueError('Someone is still reacting -- try again shortly')
+    # Not before its time (a little leeway for the caller's clock): a reactor whose offer only just came up on their
+    # screen, or that is still waiting behind another popup there, keeps their 10 seconds (_refresh_window_clock).
+    due = pr.get('expiresAt') if pr.get('expiresAt') is not None else pr.get('staleAt')
+    if due is not None and _now_ms() + 1500 < due:
+        raise ValueError('The reaction window is still open -- try again shortly')
     state['pendingReaction'] = None
     _log_event(state, 'reaction-window-close', text='Reaction window closed (time expired)')
     _finish_pending_switch(state)

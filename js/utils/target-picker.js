@@ -16,7 +16,8 @@ import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl, announceAnimation, deferAnimation } from './battle-animation.js';
 import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString, mergeRollMode, isMeleeMoveRow, guaranteedCritStatusId } from './move-effects.js';
 import { targetAbilityDamage, moveAbilityMods, attackRollReminders } from './ability-mods.js';
-import { waitForReactionWindow, reactionWaitHtml, reactingNow } from './reaction-window.js';
+import { waitForReactionWindow, openPreparationWindow, reactionWaitHtml, reactingNow, playerOf } from './reaction-window.js';
+import { whileWaitingOnOthers } from './popup-queue.js';
 import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
 import { filterTargetable, markOutOfRange } from './targetability.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
@@ -84,6 +85,10 @@ function _injectStyles() {
     .target-picker-anim-media img, .target-picker-anim-media video { max-width: 100%; max-height: 40vh; border-radius: 12px; object-fit: contain; }
     .target-picker-reaction-wait-text { text-align: center; font-size: 1rem; color: #e0e0e0; padding: 1.5rem 0 0.5rem; }
     .target-picker-reaction-wait-timer { text-align: center; font-size: 0.85rem; color: #a0a0c0; padding-bottom: 0.6rem; }
+    .target-picker-prep-note { margin-bottom: 0.7rem; font-size: 0.82rem; }
+    .target-picker-prep-note .prep-may { color: #ffd166; background: rgba(255,209,102,0.08); border-radius: 8px; padding: 0.4rem 0.6rem; }
+    .target-picker-prep-note .prep-reacted { color: #ffe07a; background: rgba(255,215,0,0.12); box-shadow: inset 0 0 0 1px rgba(255,215,0,0.45); border-radius: 8px; padding: 0.5rem 0.6rem; margin-bottom: 0.4rem; }
+    .target-picker-prep-note .prep-cancel { display: block; width: 100%; margin-top: 0.45rem; padding: 0.45rem; border: none; border-radius: 8px; background: rgba(231,76,60,0.85); color: #fff; font-weight: 700; cursor: pointer; font-family: inherit; }
     #targetPickerReactionWaitDetail { padding-bottom: 1rem; }
     /* someone is reacting: the popup steps aside to the bottom (clear of the card's End Turn at its top), so a reactor
        played on this same screen can act */
@@ -380,6 +385,8 @@ function _ensureDom() {
         <h2 id="targetPickerTitle">Choose a Target</h2>
       </div>
       <div class="combat-move-popup-body">
+        <!-- Who may still react while the attack is rolled -- or who just did, with a way out (_renderPrepNote) -->
+        <div class="target-picker-prep-note" id="targetPickerPrepNote" hidden></div>
         <div id="targetPickerStep1">
           <button type="button" class="target-picker-map-btn" id="targetPickerMapBtn" hidden>🗺️ Pick on the map</button>
           <div class="target-picker-grid" id="targetPickerGrid"></div>
@@ -430,6 +437,9 @@ function _ensureDom() {
   `;
   document.body.appendChild(_overlay);
 
+  document.getElementById('targetPickerPrepNote').addEventListener('click', (e) => {
+    if (e.target.closest('[data-prep-cancel]')) _close(null); // the reaction made the attack fail
+  });
   document.getElementById('targetPickerClose').addEventListener('click', () => _close(null));
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(null); });
   document.getElementById('targetPickerSkip').addEventListener('click', () => _close(null));
@@ -450,6 +460,7 @@ function _ensureDom() {
 }
 
 function _close(result) {
+  _endPrep(); // (a window still held open for this attack runs out on its own)
   // Several attacks, closed half-way through their damage: the targets already done still count (the rest is dropped).
   if (result === null && _isMulti() && _multiResults.length) {
     _consumeMulti();
@@ -465,6 +476,7 @@ function _close(result) {
 }
 
 function _showStep1() {
+  _endPrep(); // back to choosing: the window opened for the target picked before goes
   document.getElementById('targetPickerStep1').hidden = false;
   document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside', 'popup-waiting');
   document.getElementById('targetPickerStep2').hidden = true;
@@ -537,6 +549,13 @@ async function _afterTargetsSelected() {
   }
   _groups = [...byId.values()];
   document.getElementById('targetPickerStep1').hidden = true;
+  if (_groups.length === 1) {
+    // All the attacks at one creature: reactions may come while they're rolled, as with one attack (_openPrep)
+    if (!(await _openPrep(_groups[0].p.id))) return;
+    _showMultiStep2();
+    return;
+  }
+  // (several creatures: one window each, waited out before the rolls -- the server has one open at a time)
   document.getElementById('targetPickerReactionWait').hidden = false;
   document.getElementById('targetPickerTitle').textContent = 'Reaction Window';
   for (const g of _groups) {
@@ -679,7 +698,7 @@ function _updateMultiTotals() {
 
 /** Attack, for several attacks: every roll checked on its own against its target's AC (or the table's tick), a crit
  * counted per attack. A target nothing hit is a miss; the rest go on to the damage step, one target at a time. */
-function _confirmMultiAttack() {
+async function _confirmMultiAttack() {
   const rows = [...document.querySelectorAll('#targetPickerMultiRolls [data-slot]')];
   const empty = rows.find((r) => Number.isNaN(parseInt(r.querySelector('[data-slot-input]').value, 10)));
   if (empty) { empty.querySelector('[data-slot-input]').focus(); return; }
@@ -709,6 +728,7 @@ function _confirmMultiAttack() {
   }
   _damageQueue = _groups.filter((g) => !g.blocked && g.hits > 0);
   if (!_damageQueue.length) {
+    if (!(await _finishPrep())) return; // (a reaction at the last moment: the rolls are checked again)
     _consumeMulti();
     _close({ results: _multiResults });
     return;
@@ -789,39 +809,232 @@ function _showReactionWait(status) {
 
 async function _afterTargetSelected(p, name) {
   document.getElementById('targetPickerStep1').hidden = true;
-  document.getElementById('targetPickerReactionWait').hidden = false;
-  document.getElementById('targetPickerTitle').textContent = 'Reaction Window';
-  document.getElementById('targetPickerReactionWaitText').textContent = 'Waiting for possible reactions…';
-  document.getElementById('targetPickerReactionWaitTimer').textContent = '';
-  document.getElementById('targetPickerReactionWaitDetail').innerHTML = '';
-  const reaction = await waitForReactionWindow('targeted', p.id, _attacker?.id, _moveName, _showReactionWait);
-  document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside', 'popup-waiting');
-  // A reaction that only softens the hit (Protect used again: half the damage drains VP) rides along to the damage step.
-  _reactionDamage = reaction?.multiplier ? { multiplier: reaction.multiplier, pool: reaction.pool || null } : null;
-  if (reaction?.blocked) {
-    if (_feintMoveName) {
-      const useFeint = await showCombatConfirm(
-        `${reaction.blockerName} blocked the attack. Use ${_feintMoveName} to bypass it and resolve the attack normally?`,
-        { title: 'Blocked!', yesLabel: `Use ${_feintMoveName}`, noLabel: 'Accept the block' },
-      );
-      if (useFeint) {
-        try {
-          await CombatAPI.negateReactionBlock(_attacker.id);
-          if (_skipsAttackRoll()) _autoHit(p, name);
-          else _showStep2(p, name);
-          return;
-        } catch (err) {
-          showCombatAlert(err.message, { title: 'Error' });
-          // Falls through to the ordinary blocked-close below -- whatever
-          // went wrong, the block itself still stands.
-        }
-      }
-    }
-    _close({ targetId: p.id, blocked: true, blockerName: reaction.blockerName });
-    return;
-  }
+  // The window opens now and stays open while the attack is rolled (_openPrep) -- no waiting before the roll.
+  if (!(await _openPrep(p.id))) return;
   if (_skipsAttackRoll()) _autoHit(p, name);
   else _showStep2(p, name);
+}
+
+// --- Reactions while the attack is rolled (the user's call, 2026-11-13). Some reactions only work before an attack lands,
+// so the 'targeted' window opens as soon as the target is picked and stays open through the attack roll and the damage
+// roll. Someone reacting pauses the attack (the step steps aside for the reaction wait); once the reaction is over the
+// attacker carries on -- back at the attack roll, their roll still filled in, since the reaction may have changed the
+// numbers -- or cancels the attack if the reaction made it fail. A block (Protect...) ends it by itself, Feint aside. The
+// attack only lands (Confirm Damage, or a miss) once everyone the window was offered to has answered or run out of time.
+
+let _prep = null;        // the window held open for this attack (reaction-window.js openPreparationWindow), or null
+let _prepToken = 0;      // which attack's window the callbacks belong to (an earlier one's are ignored)
+let _prepPaused = null;  // while someone reacts: {step, title, release, settled}
+let _prepSeen = 0;       // how many of the window's reactors the attacker has already carried on after
+let _prepReacted = '';   // the "X reacted -- carry on or cancel" line, once someone has
+let _prepDropping = null; // the previous window being closed (a new one can only open once it is)
+let _prepStep = null;     // the step that was up when the attack last paused
+let _prepResuming = false; // carrying on after a reaction (a popup that opened meanwhile is answered first)
+
+const _STEP_IDS = ['targetPickerStep1', 'targetPickerStep2', 'targetPickerStep3'];
+function _visibleStep() { return _STEP_IDS.find(id => !document.getElementById(id).hidden) || null; }
+
+/** Opens the window for the target just picked. False when the popup was closed (or another target picked) meanwhile. */
+async function _openPrep(anchorId) {
+  _endPrep();
+  const token = ++_prepToken;
+  await _prepDropping;
+  const handle = await openPreparationWindow(anchorId, _attacker?.id, _moveName, (st) => {
+    if (token === _prepToken) _onPrepChange(st);
+  });
+  if (token !== _prepToken || !_resolve) { handle?.abandon(); return false; }
+  _prep = handle;
+  _prepSeen = 0;
+  _prepReacted = '';
+  _renderPrepNote(null, null);
+  return true;
+}
+
+/** Done with this attack's window (closed, landed, or another target picked): stop watching; it runs out on its own. */
+function _endPrep() {
+  _prepToken++;
+  if (_prep) _prepDropping = _prep.abandon();
+  _prep = null;
+  _prepPaused?.release();
+  _prepPaused = null;
+  _prepReacted = '';
+  _prepStep = null;
+  const note = document.getElementById('targetPickerPrepNote');
+  if (note) { note.hidden = true; note.innerHTML = ''; }
+}
+
+function _nameOf(p) { return p && visibleToViewer(p, 'name') ? p.name : '???'; }
+
+/** The line above the steps: who may still react while the attack is rolled, and -- once someone has -- what to do now. */
+function _renderPrepNote(pr, session) {
+  const note = document.getElementById('targetPickerPrepNote');
+  if (!note) return;
+  const undecided = pr && session ? Object.entries(pr.eligible || {}).filter(([, e]) => !e.responded)
+    .map(([id]) => { const p = session.participants?.[id]; const who = playerOf(p); return `${_nameOf(p)}${who ? ` (${who})` : ''}`; }) : [];
+  const parts = [];
+  if (_prepReacted) parts.push(_prepReacted);
+  if (undecided.length) parts.push(`<div class="prep-may">⚡ May still react before this attack lands: ${undecided.join(', ')}</div>`);
+  note.innerHTML = parts.join('');
+  note.hidden = !parts.length;
+}
+
+/** A poll while the attack is being rolled. */
+function _onPrepChange(st) {
+  if (st.reacting) {
+    if (!_prepPaused) _pausePrep();
+    _showReactionWait({ opened: true, msLeft: null, pendingReaction: st.pendingReaction, session: st.session });
+    return;
+  }
+  if (_prepPaused) { _resumePrep(st.session); return; }
+  if (!_prepResuming) _renderPrepNote(st.pendingReaction, st.session);
+}
+
+/** Someone is reacting: the step that's up steps aside (what's typed in it stays) for the reaction wait. */
+function _pausePrep() {
+  const step = _visibleStep() || _prepStep; // (another reaction straight after the last one: the same step)
+  _prepStep = step;
+  let release;
+  const over = new Promise((r) => { release = r; });
+  // A wait on another screen: a popup queued on this one may open meanwhile (popup-queue.js), and is answered before
+  // the attack carries on.
+  _prepPaused = { step, title: document.getElementById('targetPickerTitle').textContent, release, settled: whileWaitingOnOthers(over) };
+  if (step) document.getElementById(step).hidden = true;
+  document.getElementById('targetPickerPrepNote').hidden = true;
+  document.getElementById('targetPickerTitle').textContent = 'Reaction!';
+  document.getElementById('targetPickerReactionWaitText').textContent = 'The attack waits until the reaction is over…';
+  document.getElementById('targetPickerReactionWaitTimer').textContent = '';
+  document.getElementById('targetPickerReactionWait').hidden = false;
+}
+
+/** The reaction is over: a block ends the attack (Feint aside); anything else -- back to the rolls, to carry on or cancel. */
+async function _resumePrep(session) {
+  const paused = _prepPaused;
+  _prepPaused = null;
+  const token = _prepToken;
+  _prepResuming = true;
+  paused.release();
+  try {
+    await paused.settled;
+    if (token !== _prepToken || !_resolve || _prepPaused) return; // (closed meanwhile, or someone else is reacting now)
+    document.getElementById('targetPickerReactionWait').hidden = true;
+    _overlay.classList.remove('rw-aside', 'popup-waiting');
+    document.getElementById('targetPickerTitle').textContent = paused.title;
+    await _afterReactions(_prep?.outcome() || { blocked: false, reactorIds: [] }, session, paused.step);
+  } finally {
+    _prepResuming = false;
+  }
+}
+
+/** What the reactions did, acted on. True when the attack may go on as it stands; false when it was blocked (the popup
+ * closed) or someone reacted since the attacker last carried on (back to the rolls, with a note). */
+async function _afterReactions(out, session, step) {
+  if (session) _refreshRecords(session);
+  // A reaction that only softens the hit (Protect used again: half the damage drains VP) rides along to the damage step.
+  if (out.multiplier) {
+    _reactionDamage = { multiplier: out.multiplier, pool: out.pool || null };
+    if (_isMulti() && _groups[0]) _groups[0].reactionDamage = _reactionDamage;
+  }
+  if (out.blocked) {
+    if (!(await _blockedNow(out.blockerName))) return false;
+  } else if ((out.reactorIds || []).length <= _prepSeen) {
+    if (step) document.getElementById(step).hidden = false;
+    _renderPrepNote(null, null);
+    return true;
+  }
+  _prepSeen = (out.reactorIds || []).length;
+  const names = (out.reactorIds || []).map(id => _nameOf(session?.participants?.[id])).join(', ');
+  _prepReacted = `<div class="prep-reacted">⚡ ${names || 'A reaction'} reacted. Check the attack against the numbers now and carry on -- or cancel it if the reaction made it fail.
+    <button type="button" class="prep-cancel" data-prep-cancel>Cancel the attack</button></div>`;
+  _backToRolls(step);
+  _renderPrepNote(null, null);
+  return false;
+}
+
+/** The latest records of the attacker and the targets: a reaction may have changed their statuses, AC, position... */
+function _refreshRecords(session) {
+  _session = session;
+  const fresh = (p) => (p && session.participants?.[p.id]) || p;
+  _attacker = fresh(_attacker);
+  _selectedTarget = fresh(_selectedTarget);
+  _slots.forEach((s) => { s.p = fresh(s.p); });
+  _groups.forEach((g) => { g.p = fresh(g.p); });
+}
+
+/** Back to the attack roll with what was rolled still filled in (a guaranteed hit with nothing to roll for: the damage
+ * step, its roll kept) -- the roll is checked again against the numbers as they are now. */
+function _backToRolls(step) {
+  if (_isMulti()) {
+    const typed = [...document.querySelectorAll('#targetPickerMultiRolls [data-slot]')].map((row) => row.querySelector('[data-slot-input]').value);
+    const rolled = step === 'targetPickerStep3' ? (_groups[0]?.rolls || []).map(String) : typed;
+    _multiResults = [];
+    _damageQueue = [];
+    _groupIndex = 0;
+    _showMultiStep2();
+    document.querySelectorAll('#targetPickerMultiRolls [data-slot-input]').forEach((input, i) => { if (rolled[i] != null) input.value = rolled[i]; });
+    _updateAttackTotal();
+    return;
+  }
+  if (_skipsAttackRoll()) {
+    const typed = document.getElementById('targetPickerRollInput').value;
+    _showStep3();
+    document.getElementById('targetPickerRollInput').value = typed;
+    _updateRollTotal();
+    return;
+  }
+  const typed = step === 'targetPickerStep3' ? (_attackRoll ?? '') : document.getElementById('targetPickerAttackInput').value;
+  _showStep2();
+  document.getElementById('targetPickerAttackInput').value = typed;
+  _updateAttackTotal();
+}
+
+/** A reaction blocked the attack (Protect...). The attacker may bypass it with Feint -- true, carry on. Otherwise the
+ * popup closes with the block (false). */
+async function _blockedNow(blockerName) {
+  if (_feintMoveName) {
+    const useFeint = await showCombatConfirm(
+      `${blockerName} blocked the attack. Use ${_feintMoveName} to bypass it and resolve the attack normally?`,
+      { title: 'Blocked!', yesLabel: `Use ${_feintMoveName}`, noLabel: 'Accept the block' },
+    );
+    if (useFeint) {
+      try {
+        await CombatAPI.negateReactionBlock(_attacker.id);
+        return true;
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' }); // the block itself still stands
+      }
+    }
+  }
+  _close(_isMulti()
+    ? { results: _groups.map((g) => ({ targetId: g.p.id, blocked: true, blockerName })) }
+    : { targetId: _selectedTargetId, blocked: true, blockerName });
+  return false;
+}
+
+/** The attack is about to land (Confirm Damage, or a miss): waits out whoever may still react. True -- land it; false --
+ * it was blocked, closed meanwhile, or someone reacted at the last moment (back to the rolls). */
+async function _finishPrep() {
+  const handle = _prep;
+  if (!handle) return true;
+  const token = _prepToken;
+  const step = _visibleStep();
+  let lastSession = null;
+  const out = await handle.finish((status) => {
+    if (!status.opened || token !== _prepToken) return;
+    lastSession = status.session;
+    if (step) document.getElementById(step).hidden = true;
+    document.getElementById('targetPickerPrepNote').hidden = true;
+    document.getElementById('targetPickerReactionWaitText').textContent = 'Waiting for possible reactions before the attack lands…';
+    document.getElementById('targetPickerReactionWait').hidden = false;
+    _showReactionWait(status);
+  });
+  if (token !== _prepToken || !_resolve) return false;
+  _prep = null; // this attack's window is over: carrying on from here lands it
+  document.getElementById('targetPickerReactionWait').hidden = true;
+  _overlay.classList.remove('rw-aside', 'popup-waiting');
+  if (!lastSession && ((out.reactorIds || []).length > _prepSeen || out.blocked)) {
+    try { const res = await CombatAPI.getState(); if (res?.status === 'success') lastSession = res.data; } catch { /* the records we have */ }
+  }
+  return _afterReactions(out, lastSession, step);
 }
 
 /** A guaranteed hit still gets the attack roll -- only to see whether it crits (any roll hits). The one exception is a
@@ -906,10 +1119,11 @@ function _updateAttackTotal() {
 /** Only reachable when the target's AC is unknown and _showStep2 fell back to the
  * two-button choice (see its own comment) -- the human declares a miss themselves,
  * same as the app would have on a failed AC comparison. */
-function _confirmMiss() {
+async function _confirmMiss() {
   commitMove(); // the attack was rolled -- the move is paid for now, hit or miss (move-commit.js)
   const attackRoll = _currentAttackRoll();
   const rollMode = _atkCtx?.mode || 'normal';
+  if (!(await _finishPrep())) return; // (a reaction at the last moment: the roll is checked again)
   _consume(_atkCtx);
   _close({ targetId: _selectedTargetId, hit: false, attackRoll, rollMode });
 }
@@ -1217,6 +1431,10 @@ async function _confirmDamageRoll() {
       _showMultiDamage();
       return;
     }
+    if (!(await _finishPrep())) { btn.disabled = false; return; } // (a reaction at the last moment: back to the rolls)
+    // (a reaction that softened the hit while it was rolled)
+    const last = _multiResults[_multiResults.length - 1];
+    if (last && group.reactionDamage && !last.reactionMultiplier) Object.assign(last, { reactionMultiplier: group.reactionDamage.multiplier, reactionPool: group.reactionDamage.pool });
     _consumeMulti();
     await _playAnimation();
     _close({ results: _multiResults });
@@ -1232,8 +1450,9 @@ async function _confirmDamageRoll() {
     targetId: _selectedTargetId, hit: true, rawRoll: raw + _targetFlatBonus + _damageDiceExtra + abilityRoll,
     attackRoll: _attackRoll, attackTotal: _attackRoll === null ? null : _attackRoll + _effectiveAttackMod(),
     rollMode: _atkCtx?.mode || 'normal',
-    ...(_reactionDamage ? { reactionMultiplier: _reactionDamage.multiplier, reactionPool: _reactionDamage.pool } : {}),
   };
+  if (!(await _finishPrep())) { btn.disabled = false; return; } // (a reaction at the last moment: back to the rolls)
+  if (_reactionDamage) Object.assign(result, { reactionMultiplier: _reactionDamage.multiplier, reactionPool: _reactionDamage.pool });
   _consume(_atkCtx);
   await _playAnimation();
   _close(result);

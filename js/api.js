@@ -864,8 +864,21 @@ export class CombatAPI {
    * right after applying it). Resolves to {opened: false} when nobody's
    * eligible (proceed immediately, nothing to wait for) or {opened: true} (see
    * utils/reaction-window.js for actually waiting it out). */
-  static async openReactionWindow(trigger, anchorId, attackerId, moveName) {
-    return API.request('combat', 'open-reaction-window', { trigger, anchorId, attackerId, moveName }, { useCache: false });
+  static async openReactionWindow(trigger, anchorId, attackerId, moveName, { preparing = false } = {}) {
+    // preparing: opened as the attacker starts rolling -- held open until reactionWindowReady (reaction-window.js)
+    return API.request('combat', 'open-reaction-window', { trigger, anchorId, attackerId, moveName, ...(preparing ? { preparing: 1 } : {}) }, { useCache: false });
+  }
+
+  /** The reactor's screen: its "React?" offer for window `windowId` is waiting behind another popup (shown false -- the
+   * clock holds for these creatures) or is up now (shown true -- their 10 seconds start). */
+  static async reactionOfferSeen(windowId, ids, shown) {
+    return API.request('combat', 'reaction-offer-seen', { windowId, ids: [...ids].join(','), shown: shown ? 1 : 0 }, { useCache: false });
+  }
+
+  /** The attacker finished rolling: the window opened with `preparing` runs out the usual way from now. */
+  static async reactionWindowReady(windowId, { dropped = false } = {}) {
+    // dropped: the attack was cancelled -- the window closes instead
+    return API.request('combat', 'reaction-window-ready', { windowId, ...(dropped ? { dropped: 1 } : {}) }, { useCache: false });
   }
 
   static async declineReaction(id) {

@@ -141,9 +141,13 @@ function _readOutcome(session, windowId, out) {
     out.blocked = !rb.negated;
     out.blockerName = rb.blockerName;
   }
+  // Every block of the window -- an area move's may have several, each protecting the creatures in `anchors`
+  const blocks = (session?.reactionBlocks || []).filter(b => b.windowId && b.windowId === windowId);
+  if (blocks.length) out.blocks = blocks.map(b => ({ blockerId: b.blockerId, blockerName: b.blockerName, anchors: b.anchors || [b.anchorId] }));
   const rm = session?.reactionDamageMultiplier;
   if (rm?.windowId && rm.windowId === windowId) {
-    Object.assign(out, { multiplier: rm.multiplier, reactorName: rm.reactorName, ...(rm.pool ? { pool: rm.pool } : {}) });
+    Object.assign(out, { multiplier: rm.multiplier, reactorName: rm.reactorName, reactorId: rm.reactorId,
+      anchors: rm.anchors || [rm.anchorId], ...(rm.pool ? { pool: rm.pool } : {}) });
   }
   return out;
 }
@@ -155,16 +159,18 @@ function _readOutcome(session, windowId, out) {
  * to null when nobody may react (nothing to watch), else a handle:
  *  - `onChange({pendingReaction, session, reacting})` is called on every poll while the attacker prepares; `reacting`
  *    while one of the creatures the window was offered to is reacting right now (the attacker's popup pauses then);
- *  - `outcome()`: what the reactions did so far -- {blocked, blockerName, multiplier, pool, reactorIds};
+ *  - `outcome()`: what the reactions did so far -- {blocked, blockerName, blocks, multiplier, pool, anchors, reactorIds};
  *  - `finish(onStatus)`: the attacker is done rolling -- waits out whoever is still deciding (as waitForOpenWindow, with
  *    `onStatus` the same) and resolves to outcome();
  *  - `abandon()`: the attack was dropped -- stops watching and closes the window (once a reaction under way is over);
  *    resolves once the server has it.
  */
 export async function openPreparationWindow(anchorId, attackerId, moveName, onChange) {
+  // (an array: an area move's creatures, all in the one window)
+  const anchorIds = Array.isArray(anchorId) ? anchorId : null;
   let opened;
   try {
-    opened = await CombatAPI.openReactionWindow('targeted', anchorId, attackerId, moveName, { preparing: true });
+    opened = await CombatAPI.openReactionWindow('targeted', anchorIds ? anchorIds[0] : anchorId, attackerId, moveName, { preparing: true, anchorIds });
   } catch {
     return null;
   }

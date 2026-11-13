@@ -221,6 +221,10 @@ let _remoteSave = null;
 export function setRemoteSaveHandler(fn) { _remoteSave = typeof fn === 'function' ? fn : null; }
 /** True while a save is being asked here (shown, or waiting on another screen) -- the popup is single-use. */
 export function isSavePickerBusy() { return !!_resolve; }
+
+/** Closes the save / damage roll popup if one is up, as its × would (combat-wip.js: an area move cancelled after a
+ * reaction drops what it was still asking here). */
+export function closeSavePicker() { if (_resolve) _close(null); }
 let _saveTitle = null; // confirmSecondarySave's own title for the save step
 let _askHere = false; // confirmSecondarySave's `askHere`: made on this screen even for another player's creature
 let _areaNote = ''; // promptAreaDamageRoll's line on the damage step (no single target to show there)

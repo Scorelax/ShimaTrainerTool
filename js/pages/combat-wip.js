@@ -15,8 +15,8 @@ import { setAnimationAnnouncer, setAnimationDeferral, preloadBattleAnimation } f
 import { enqueuePopup, setPopupBusyCheck, waitingOnOthersCount, whileWaitingOnOthers } from '../utils/popup-queue.js';
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
 import { pickSwitchTile } from '../utils/token-placement-picker.js';
-import { waitForOpenWindow, playerOf } from '../utils/reaction-window.js';
-import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget, setRemoteSaveHandler, promptAreaDamageRoll } from '../utils/save-picker.js';
+import { waitForOpenWindow, playerOf, openPreparationWindow } from '../utils/reaction-window.js';
+import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget, setRemoteSaveHandler, promptAreaDamageRoll, closeSavePicker } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
@@ -36,7 +36,7 @@ import { showCombatAlert, showCombatConfirm, showCombatPrompt, queueCombatAlert 
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
-import { waitForDamagedReactions, waitForTargetedAoeReactions, waitForBeneficialReactions } from '../utils/reaction-wait-overlay.js';
+import { waitForDamagedReactions, waitForBeneficialReactions, showReactionPause, hideReactionPause } from '../utils/reaction-wait-overlay.js';
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { pickOneStatus, pickOneMoveName, pickOneAbility } from '../utils/status-picker.js';
 import { promptHealRoll, promptDrainRoll, promptValueRoll, promptDamageRoll } from '../utils/heal-popup.js';
@@ -6450,25 +6450,10 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
     ? `${coverEdge[id]} from ${attackerName}'s ${moveName}` : `On the edge of ${attackerName}'s ${moveName}`;
   const halvesOnSave = _halvesOnSave(moveName);
 
-  // Wide Guard's own reaction: this app has no real blast-center/positional-
-  // radius concept, so the first target actually picked stands in for "is
-  // the reactor in range of the blast" (see waitForTargetedAoeReactions's
-  // own note). A `damage_multiplier` effect (Wide Guard) scales every
-  // target's own damage below; a `block_attack` effect (Protect et al, also
-  // eligible here since this reuses the same 'targeted' family) only ever
-  // protects its OWN user -- filtered out of this AoE's target list rather
-  // than aborting the whole thing, since nothing about blocking one
-  // participant's share says anything about anyone else's.
-  const anchorId = targetIds[0];
-  const aoeReaction = await waitForTargetedAoeReactions(anchorId, combatantId, moveName);
-  if (aoeReaction?.blocked) {
-    targetIds = targetIds.filter((id) => id !== anchorId);
-    if (!targetIds.length) return false; // that was the only target -- nothing left to resolve
-  }
-  // Wide Guard halves everyone's share; Protect used again (half, to VP) only the protected creature's own.
-  const vpHalfId = aoeReaction?.pool === 'vp' ? anchorId : null;
-  const damageMultiplier = vpHalfId ? 1 : (aoeReaction?.multiplier || 1);
-
+  // Reactions (the user's call, 2026-11-13 -- as with a single attack): a save move opens one window for every creature
+  // in the area, held open while the saves come in and the damage is rolled (_openAreaReactions / _resolveAreaSaves). A
+  // move that rolls to hit (or always hits) goes creature by creature through the attack popup, which opens each one's
+  // own window while its attack is rolled (target-picker.js) -- a Wide Guard used there halves the rest of the move too.
   const isSaveTriggered = moveCategoriesFor(moveName).includes('trigger_saving_throw');
   const guaranteedHit = moveCategoriesFor(moveName).includes('guaranteed_hit');
   const attackModifier = computedData.attackBonus || 0;
@@ -6495,11 +6480,15 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
 
   // A save move: every creature's save at once, each dealt with as it comes in (_resolveAreaSaves)
   if (isSaveTriggered) {
-    totalDamageDealt = await _resolveAreaSaves({
-      combatantId, moveName, computedData, targetIds, edgeIds, edgeWhere, edgeNote, halvesOnSave, damageMultiplier, vpHalfId,
+    const react = await _openAreaReactions(combatantId, moveName, targetIds);
+    const res = await _resolveAreaSaves({
+      combatantId, moveName, computedData, targetIds, edgeIds, edgeWhere, edgeNote, halvesOnSave, react,
       speciesName, moveType, attackerName, dc, hasDamage, damageModifier,
     });
+    if (res.cancelled) return false; // a reaction made it fail -- nothing more of it
+    totalDamageDealt = res.total;
   }
+  let carriedMultiplier = 1; // Wide Guard, used on one creature's attack: the rest of the move is halved too
   for (const targetId of (isSaveTriggered ? [] : targetIds)) {
     const target = session?.participants?.[targetId];
     if (!target) continue;
@@ -6525,7 +6514,9 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
       edgeMultiplier = 0.5;
     }
     const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName: '', guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, });
-    await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier: damageMultiplier * edgeMultiplier });
+    await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier: carriedMultiplier * edgeMultiplier });
+    // (Protect used again only spares its own user -- to VP --, not the rest)
+    if (picked?.reactionMultiplier && picked.reactionPool !== 'vp') carriedMultiplier = picked.reactionMultiplier;
   }
 
   if (isSaveTriggered && moveEffectsFor(moveName).some(e => e.target === 'self')) {
@@ -6563,8 +6554,14 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
  * creature takes some -- all of it, half or none by its save), the log line, the move's effects on it. A panel shows who
  * has answered and whose screen the others are waiting on. Returns the damage dealt in all (a drain heals off it). */
 async function _resolveAreaSaves({ combatantId, moveName, computedData, targetIds, edgeIds, edgeWhere, edgeNote, halvesOnSave,
-  damageMultiplier, vpHalfId, speciesName, moveType, attackerName, dc, hasDamage, damageModifier }) {
+  react, speciesName, moveType, attackerName, dc, hasDamage, damageModifier }) {
   const me = _currentTrainerName();
+  // What the reactions did (react: _openAreaReactions): Wide Guard halves everyone's share; Protect used again (half, to
+  // VP) only its own user's; a block (Protect...) takes the creatures it protects out of the move.
+  let damageMultiplier = 1;
+  let vpHalfIds = new Set();
+  let cancelled = false; // the attacker cancelled the move after a reaction
+  let landing = null;    // the wait before the move lands (gate), once started
   const ability = _saveAbilityFor(moveName);
   const mover = session?.participants?.[combatantId] || null;
   const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
@@ -6593,7 +6590,65 @@ async function _resolveAreaSaves({ combatantId, moveName, computedData, targetId
     if (e.state !== 'remote') return;
     CombatAPI.clearPrompt(e.promptId).catch(() => {}); // closes it on their screen
     e.state = 'here';
-  } });
+  }, onCancel: () => { cancelled = true; closeSavePicker(); } }); // (a save or the damage roll it was asking here goes too)
+
+  const applyOutcome = (out) => {
+    for (const b of out?.blocks || []) {
+      for (const e of entries.filter(x => (b.anchors || []).includes(x.id) && x.state !== 'done' && x.state !== 'skipped')) {
+        e.blockedBy = `${b.blockerName} blocked it`;
+        if (e.state === 'remote' || e.state === 'here') { // (asked here / answered meanwhile: left out in deal)
+          if (e.promptId) CombatAPI.clearPrompt(e.promptId).catch(() => {});
+          e.state = 'skipped';
+          e.note = `protected -- ${e.blockedBy}`;
+        }
+      }
+    }
+    if (out?.multiplier) {
+      if (out.pool === 'vp') vpHalfIds = new Set(out.anchors || []);
+      else damageMultiplier = out.multiplier;
+    }
+  };
+  if (react) {
+    // A reaction just ended while the saves were out: what it did, and a way to cancel the move if it made it fail
+    react.afterReaction = () => {
+      const out = react.handle.outcome();
+      applyOutcome(out);
+      const names = (out.reactorIds || []).map(nameOf).join(', ');
+      panel.setNote(`⚡ ${names || 'A reaction'} reacted. Carry on -- or cancel the move if the reaction made it fail.`);
+    };
+    react.status = () => panel.render();
+  }
+
+  // Before anything of the move lands (the first damage or effect): waits out whoever may still react -- the window was
+  // held open while the saves came in and the damage was rolled. Someone who reacted at the last moment: land it, or
+  // cancel. False -- cancelled.
+  const gate = () => {
+    if (!react) return Promise.resolve(!cancelled);
+    if (!landing) {
+      landing = (async () => {
+        const out = await react.handle.finish((status) => {
+          if (!status.opened) return;
+          const rid = status.session?.reactingParticipantId;
+          showReactionPause(status, rid
+            ? { aside: _myParticipantIds.has(rid) }
+            : { text: `Waiting for possible reactions before ${moveName} lands…` });
+        });
+        react.stop();
+        applyOutcome(out);
+        const blockers = new Set((out.blocks || []).map(b => b.blockerId));
+        const late = (out.reactorIds || []).slice(react.seenReactors || 0).filter(id => !blockers.has(id));
+        if (late.length && !cancelled) {
+          const go = await showCombatConfirm(`${late.map(nameOf).join(', ')} reacted to ${moveName}. Land the move now -- or cancel it, if the reaction made it fail?`,
+            { title: 'Reaction', yesLabel: 'Land it', noLabel: 'Cancel the move' });
+          if (!go) cancelled = true;
+        }
+        panel.render();
+        return !cancelled;
+      })();
+    }
+    return landing;
+  };
+  const leaveOut = (e, why) => { e.state = 'skipped'; e.note = why; };
 
   let damageRoll = null; // rolled once, the first time a creature takes damage
   let total = 0;
@@ -6606,6 +6661,7 @@ async function _resolveAreaSaves({ combatantId, moveName, computedData, targetId
     const target = session?.participants?.[e.id];
     if (!target) { e.state = 'skipped'; e.note = 'left the battle'; return; }
     commitMove(); // a save was made -- the move is paid for now (move-commit.js)
+    if (e.blockedBy) { leaveOut(e, `protected -- ${e.blockedBy}`); return; }
     const outcome = e.outcome;
     const passed = !!outcome.passed;
     const rollNote = _saveRollNote(outcome);
@@ -6615,26 +6671,30 @@ async function _resolveAreaSaves({ combatantId, moveName, computedData, targetId
       e.state = 'done';
       return; // nothing happens to it -- no damage, no effects
     }
-    if (e.edge) log(e, `${target.name} was ${edgeWhere(e.id)} and failed the saving throw${rollNote}${hasDamage ? ' -- half damage' : ''}`);
     // Its share: all of it on a failure; half on the edge of a line or cone, or on a pass against a "half as much on a
     // success" move (unless Magic Guard...); none on any other pass.
     const share = !hasDamage ? 0 : e.edge ? 0.5 : !passed ? 1 : (halvesOnSave && !noDamageOnPassedSave(target)) ? 0.5 : 0;
     let dealt = null;
-    if (share > 0) {
-      if (damageRoll === null) {
-        damageRoll = await promptAreaDamageRoll({ moveName, damageModifier, damageDice: computedData.damageDice, abilityDice: computedData.abilityDice });
-      }
+    if (share > 0 && damageRoll === null) {
+      damageRoll = await promptAreaDamageRoll({ moveName, damageModifier, damageDice: computedData.damageDice, abilityDice: computedData.abilityDice });
       if (damageRoll === null) { // closed without a roll: this one's left out (asked again for the next)
         e.state = 'skipped';
         e.note = `${passed ? 'passed' : 'failed'}${rollNote} -- no damage roll entered, nothing applied`;
         return;
       }
+    }
+    // The move lands from here on: not before the reactions are over (a block may have taken this one out meanwhile)
+    if (!(await gate())) { leaveOut(e, 'move cancelled'); return; }
+    if (e.blockedBy) { leaveOut(e, `protected -- ${e.blockedBy}`); return; }
+    if (e.edge) log(e, `${target.name} was ${edgeWhere(e.id)} and failed the saving throw${rollNote}${hasDamage ? ' -- half damage' : ''}`);
+    if (share > 0) {
       try {
         const rawTotal = damageRoll + damageModifier;
-        const m = damageMultiplier * _stateDamageMultiplier(moveName, e.id) * (e.id === vpHalfId ? 0.5 : 1) * share;
+        const vpHalf = vpHalfIds.has(e.id);
+        const m = (vpHalf ? 1 : damageMultiplier) * _stateDamageMultiplier(moveName, e.id) * (vpHalf ? 0.5 : 1) * share;
         const finalDamage = m !== 1 ? Math.floor(rawTotal * m) : rawTotal;
         const dmgResult = await _applyPrimaryDamage(combatantId, e.id, finalDamage, moveType, speciesName, moveName, false,
-          e.id === vpHalfId ? 'vp' : null);
+          vpHalf ? 'vp' : null);
         if (Number.isFinite(dmgResult?.damageApplied)) { dealt = dmgResult.damageApplied; total += dealt; }
         if (passed) log(e, `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}${rollNote}, but still takes reduced damage`);
       } catch (err) {
@@ -6657,7 +6717,7 @@ async function _resolveAreaSaves({ combatantId, moveName, computedData, targetId
   };
 
   try {
-    while (entries.some(e => e.state !== 'done' && e.state !== 'skipped')) {
+    while (!cancelled && entries.some(e => e.state !== 'done' && e.state !== 'skipped')) {
       // Answers in from the other screens (one closed without an answer, or not answered in time, is asked here)
       for (const e of entries.filter(x => x.state === 'remote')) {
         const p = session?.pendingPrompts?.[e.promptId];
@@ -6688,15 +6748,62 @@ async function _resolveAreaSaves({ combatantId, moveName, computedData, targetId
   } finally {
     entries.filter(e => e.state === 'remote').forEach(e => CombatAPI.clearPrompt(e.promptId).catch(() => {}));
     panel.remove();
+    if (react) {
+      if (!landing) react.handle.abandon(); // (cancelled before anything landed: the window closes)
+      react.stop();
+    }
   }
-  return total;
+  if (cancelled) {
+    CombatAPI.logEvent({ type: 'note', actorId: combatantId, actorName: attackerName,
+      text: `${attackerName}'s ${moveName} was cancelled after a reaction${total ? ` (${total} damage had already landed)` : ''}` }).catch(() => {});
+  }
+  return { total, cancelled };
+}
+
+/** An area save move's reactions (the user's call, 2026-11-13 -- as with a single attack): one window for every creature
+ * in the area, opened as the area is picked and held open while the saves come in and the damage is rolled; someone
+ * reacting pauses the move (the screen is covered meanwhile -- a banner when the reactor is played here too). null when
+ * nobody may react. _resolveAreaSaves sets `afterReaction` (a reaction ended) and `status` (a poll), and waits the
+ * window out before the move lands (handle.finish). */
+async function _openAreaReactions(attackerId, moveName, targetIds) {
+  let paused = null; // while someone reacts: {release}
+  const ctl = { handle: null, afterReaction: null, status: null, seenReactors: 0 };
+  const handle = await openPreparationWindow(targetIds, attackerId, moveName, (st) => {
+    if (st.reacting) {
+      if (!paused) {
+        let release;
+        // a wait on another screen: popups queued here may open meanwhile (popup-queue.js -- a reactor played here too)
+        whileWaitingOnOthers(new Promise((r) => { release = r; }));
+        paused = { release };
+      }
+      const rid = st.session?.reactingParticipantId;
+      showReactionPause({ opened: true, msLeft: null, pendingReaction: st.pendingReaction, session: st.session },
+        { aside: !!rid && _myParticipantIds.has(rid) });
+      return;
+    }
+    if (paused) {
+      paused.release();
+      paused = null;
+      hideReactionPause();
+      ctl.seenReactors = (ctl.handle?.outcome().reactorIds || []).length;
+      ctl.afterReaction?.();
+    }
+    ctl.status?.(st);
+  });
+  if (!handle) return null;
+  ctl.handle = handle;
+  ctl.stop = () => {
+    if (paused) { paused.release(); paused = null; }
+    hideReactionPause();
+  };
+  return ctl;
 }
 
 /** The attacker's panel while an area move's saves are out (_resolveAreaSaves): a row per creature -- done (passed /
  * failed, the roll, the damage), on whose screen it's waiting (with "Enter it here" for a player who's away), or to be
  * rolled here -- and a line saying who still has to do something. Sits under the popups, so a save or roll asked here
  * comes first. */
-function _areaSavePanel({ moveName, dc, ability, entries, onEnterHere }) {
+function _areaSavePanel({ moveName, dc, ability, entries, onEnterHere, onCancel }) {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const el = document.createElement('div');
   el.className = 'area-save-panel';
@@ -6704,7 +6811,9 @@ function _areaSavePanel({ moveName, dc, ability, entries, onEnterHere }) {
     + 'max-height:60vh;overflow-y:auto;background:#1a1d36;border:1px solid rgba(255,203,5,0.6);border-radius:14px;'
     + 'padding:0.7rem 0.8rem;color:#e8ecff;box-shadow:0 8px 30px rgba(0,0,0,0.6);font-size:0.86rem;';
   document.body.appendChild(el);
+  let note = ''; // a reaction's "carry on or cancel" line (setNote)
   el.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-cancel-move]')) { onCancel?.(); note = 'Cancelling the move…'; render(); return; }
     const id = ev.target.closest('[data-enter-here]')?.dataset.enterHere;
     const e = id && entries.find(x => x.id === id);
     if (e) { onEnterHere(e); render(); }
@@ -6732,12 +6841,15 @@ function _areaSavePanel({ moveName, dc, ability, entries, onEnterHere }) {
     const head = !left ? 'All saves are in.'
       : waitingOn.size ? `Waiting for ${[...waitingOn].join(', ')} to roll their save${waitingOn.size > 1 ? 's' : ''}`
       : 'Saves to roll on this screen';
+    const noteHtml = !note ? '' : `<div style="margin-top:0.45rem;padding:0.45rem 0.55rem;border-radius:8px;background:rgba(255,215,0,0.12);box-shadow:inset 0 0 0 1px rgba(255,215,0,0.45);color:#ffe07a;">${esc(note)}`
+      + (note.startsWith('Cancelling') ? '' : '<button type="button" data-cancel-move style="display:block;width:100%;margin-top:0.4rem;padding:0.4rem;border:none;border-radius:8px;background:rgba(231,76,60,0.85);color:#fff;font-weight:700;cursor:pointer;font-family:inherit;">Cancel the move</button>')
+      + '</div>';
     el.innerHTML = `<div style="font-weight:800;color:#ffe07a;">🛡️ ${esc(moveName)}: ${ability ? `${esc(ability)} ` : ''}saves, DC ${dc}</div>`
-      + `<div style="margin-top:0.15rem;color:#cfd0e0;">${esc(head)} (${entries.length - left}/${entries.length} done)</div>${rows.join('')}`;
+      + `<div style="margin-top:0.15rem;color:#cfd0e0;">${esc(head)} (${entries.length - left}/${entries.length} done)</div>${noteHtml}${rows.join('')}`;
   };
   const timer = setInterval(render, 500); // answers arriving while a popup here is up show at once
   render();
-  return { render, remove: () => { clearInterval(timer); el.remove(); } };
+  return { render, setNote: (text) => { note = text; render(); }, remove: () => { clearInterval(timer); el.remove(); } };
 }
 
 async function _handleSecondarySave(combatantId, targetId, moveName, computedData) {
@@ -7219,7 +7331,9 @@ async function _maybePromptStartOfTurnSaves(state) {
  * (reaction-start succeeds), so the next thing the player sees is the card
  * they'll actually use their reaction move from. */
 function _maybeShowReactionPrompt(state) {
-  if (!state?.pendingReaction) return;
+  if (!state) return;
+  // (also with no window open: an offer still up for one that closed goes -- one held open while an attack is rolled has
+  // no countdown of its own to end it)
   showReactionPromptIfEligible(state, _myParticipantIds, {
     getName: (id) => state.participants?.[id]?.name,
     onReacted: (participantId) => _setFocus(participantId),

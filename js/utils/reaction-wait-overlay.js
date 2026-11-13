@@ -69,6 +69,27 @@ async function _waitForReactions(trigger, anchorId, attackerId, moveName) {
   return result;
 }
 
+/** A move paused while someone reacts to it (combat-wip.js's area moves, the user's call 2026-11-13): covers the screen
+ * -- the move's own popups underneath wait -- with who is reacting. `aside`: the reactor is played on this screen too,
+ * so it's a banner at the bottom instead and the reactor's card stays usable. `text` replaces the headline (the wait
+ * before the move lands). */
+export function showReactionPause(status, { aside = false, text = 'The move waits until the reaction is over…' } = {}) {
+  _ensureDom();
+  _overlay.style.display = 'flex';
+  _overlay.querySelector('.msg').textContent = text;
+  const secs = status?.msLeft != null ? Math.ceil(status.msLeft / 1000) : 0;
+  document.getElementById('reactionWaitOverlayTimer').textContent = secs > 0 ? `${secs}s` : '';
+  document.getElementById('reactionWaitOverlayDetail').innerHTML = reactionWaitHtml(status);
+  _overlay.classList.toggle('rw-aside', !!aside);
+}
+
+export function hideReactionPause() {
+  if (!_overlay) return;
+  _overlay.style.display = 'none';
+  _overlay.classList.remove('rw-aside');
+  _overlay.querySelector('.msg').textContent = 'Waiting for possible reactions…';
+}
+
 export async function waitForDamagedReactions(anchorId, attackerId, moveName) {
   return _waitForReactions('damaged', anchorId, attackerId, moveName);
 }

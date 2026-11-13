@@ -403,9 +403,12 @@ def _handle(conn, action, params):
             raise ValueError('Missing anchorId or attackerId')
         # `preparing`: opened as the attacker starts rolling -- it stays open until they're done (reaction-window-ready).
         preparing = str(params.get('preparing', '')) in ('1', 'true')
+        # `anchorIds`: an area move -- every creature in it may be reacted for (anchorId is the first of them).
+        anchor_ids = [i for i in str(params.get('anchorIds', '')).split(',') if i] or None
         outcome = {}
         result = _mutate(conn, lambda s: outcome.update(_open_reaction_window(
-            s, trigger, params['anchorId'], params['attackerId'], params.get('moveName', ''), preparing=preparing)))
+            s, trigger, params['anchorId'], params['attackerId'], params.get('moveName', ''), preparing=preparing,
+            anchor_ids=anchor_ids)))
         result.update(outcome)
         return result
 
@@ -2796,25 +2799,36 @@ def _reaction_window_ready(state, window_id, dropped=False):
     _close_reaction_window_if_due(state)
 
 
-def _open_reaction_window(state, trigger, anchor_id, attacker_id, move_name, only_ids=None, preparing=False):
+def _open_reaction_window(state, trigger, anchor_id, attacker_id, move_name, only_ids=None, preparing=False, anchor_ids=None):
+    """`anchor_ids`: an area move's creatures -- whoever may react for any of them is offered it, and each reactor's
+    entry remembers which of them it was offered for (`anchors`: a block protects those, see _block_pending_attack)."""
     _close_stale_reaction_window(state)
     if state['pendingReaction']:
         raise ValueError('A reaction window is already open')
-    if anchor_id not in state['participants']:
+    anchors = [a for a in (anchor_ids or [anchor_id]) if a in state['participants']]
+    if anchor_id not in state['participants'] or not anchors:
         raise ValueError('Unknown anchor participant: ' + anchor_id)
-    eligible = _eligible_reactors(state, _load_move_data_file(), trigger, anchor_id, attacker_id, move_name, only_ids)
+    moves_data = _load_move_data_file()
+    eligible, via = {}, {}
+    for a in anchors:
+        for pid, names in _eligible_reactors(state, moves_data, trigger, a, attacker_id, move_name, only_ids).items():
+            eligible.setdefault(pid, [])
+            eligible[pid] += [n for n in names if n not in eligible[pid]]
+            via.setdefault(pid, []).append(a)
     if not eligible:
         return {'opened': False}  # nothing to wait for -- caller's flow proceeds immediately
     window_id = uuid.uuid4().hex[:8]
     state['pendingReaction'] = {
         'id': window_id,
         'trigger': trigger, 'anchorId': anchor_id, 'attackerId': attacker_id, 'moveName': move_name,
+        **({'anchorIds': anchors} if anchor_ids else {}),
         'openedAt': _now_ms(), 'preparing': bool(preparing),
-        'eligible': {pid: {'moves': names, 'responded': False, 'queuedAt': None, 'shownAt': None}
+        'eligible': {pid: {'moves': names, 'responded': False, 'queuedAt': None, 'shownAt': None, 'anchors': via[pid]}
                      for pid, names in eligible.items()},
     }
     _refresh_window_clock(state)
-    anchor_name = state['participants'][anchor_id]['name']
+    anchor_name = state['participants'][anchor_id]['name'] if not anchor_ids else \
+        ', '.join(state['participants'][a]['name'] for a in anchors)
     _log_event(state, 'reaction-window-open',
                text=f"Reaction window open -- {', '.join(state['participants'][p]['name'] for p in eligible)} may react to {anchor_name}",
                targetId=anchor_id, targetName=anchor_name)
@@ -2867,7 +2881,11 @@ def _block_pending_attack(state, pid, move_name=''):
     state['reactionBlock'] = {
         'windowId': pr['id'], 'anchorId': pr['anchorId'], 'attackerId': pr['attackerId'],
         'blockerId': pid, 'blockerName': participant['name'], 'moveName': move_name,
+        # who it protects: the creatures it was offered the reaction for (an area move's window has several)
+        'anchors': list(pr['eligible'][pid].get('anchors') or [pr['anchorId']]),
     }
+    # Every block of the window, kept (two creatures caught in one area move may both use Protect) -- the latest few.
+    state['reactionBlocks'] = ((state.get('reactionBlocks') or []) + [dict(state['reactionBlock'])])[-10:]
     _log_event(state, 'reaction-block', text=f"{participant['name']} blocks the attack!",
                actorId=pid, actorName=participant['name'])
 
@@ -2956,6 +2974,7 @@ def _apply_reaction_damage_multiplier(state, pid, multiplier, pool=None):
         raise ValueError('No pending reaction to apply this to')
     state['reactionDamageMultiplier'] = {
         'windowId': pr['id'], 'anchorId': pr['anchorId'], 'attackerId': pr['attackerId'],
+        'anchors': list(pr['eligible'][pid].get('anchors') or [pr['anchorId']]),
         'reactorId': pid, 'reactorName': participant['name'], 'multiplier': multiplier,
         **({'pool': pool} if pool else {}),
     }

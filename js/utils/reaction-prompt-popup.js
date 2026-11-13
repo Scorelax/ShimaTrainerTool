@@ -139,8 +139,13 @@ function _showWindow(windowId) {
     _ensureDom();
     _shownWindowId = pr.id;
     _declinedThisWindow = new Set();
-    const anchorName = getName?.(pr.anchorId) || 'a participant';
-    const triggerText = pr.trigger === 'damaged' ? `${anchorName} just took damage` : pr.trigger === 'moved_away' ? `${anchorName} is moving away` : pr.trigger === 'switch_out' ? `${anchorName} is being switched out` : pr.trigger === 'switch_in' ? `${anchorName} was just sent out` : `${anchorName} is being targeted`;
+    // (an area move: the creatures caught in it that this screen's creatures may react for)
+    const anchorIds = pr.anchorIds?.length > 1 ? [...new Set(mine.flatMap(id => pr.eligible[id]?.anchors || []))] : null;
+    const anchorName = anchorIds?.length
+      ? (anchorIds.length > 3 ? `${anchorIds.slice(0, 3).map(id => getName?.(id) || '?').join(', ')} and ${anchorIds.length - 3} more`
+        : anchorIds.map(id => getName?.(id) || '?').join(', ').replace(/, ([^,]*)$/, ' and $1'))
+      : getName?.(pr.anchorId) || 'a participant';
+    const triggerText = pr.trigger === 'damaged' ? `${anchorName} just took damage` : pr.trigger === 'moved_away' ? `${anchorName} is moving away` : pr.trigger === 'switch_out' ? `${anchorName} is being switched out` : pr.trigger === 'switch_in' ? `${anchorName} was just sent out` : anchorIds?.length > 1 ? `${anchorName} are being targeted` : `${anchorName} is being targeted`;
     // Opened as the attacker started rolling: reacting now comes before the attack lands (the attacker's popup waits).
     const attackerName = pr.attackerId && pr.attackerId !== pr.anchorId ? getName?.(pr.attackerId) : '';
     const by = attackerName ? ` by ${attackerName}${pr.moveName ? `'s ${pr.moveName}` : ''}` : '';

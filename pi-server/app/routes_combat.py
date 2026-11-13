@@ -261,7 +261,7 @@ def _handle(conn, action, params):
             else:
                 _log_event(state, 'session-end', text='Battle ended')
                 _remember_battle(conn, state)
-                return _save_and_publish(conn, _after_battle(conn))  # the adventure it interrupted, back
+                return _save_and_publish(conn, _after_battle(conn, state))  # the adventure it interrupted, back
         return _save_and_publish(conn, dict(_EMPTY_STATE))
 
     if action == 'drop-paused-adventure':
@@ -831,6 +831,12 @@ def start_prepared_session(conn, setup):
         _board_from_map(board, setup.get('map') or {})
         cols, rows = board['grid']['cols'], board['grid']['rows']
         _log_event(state, 'session-start', text='Battle started (PVE)')
+        if (setup.get('map') or {}).get('fromAdventure'):
+            # On the adventure's own map (its "Start encounter"): each player's creatures start placing on the square
+            # they stood on (startSpots), and the adventure carries on from how the battle ends (_battle_onto_adventure).
+            state['fromAdventureMap'] = True
+            spots = (_player_spots(current) if state['adventurePaused'] else []) or _clean_spots(setup.get('players'))
+            state['startSpots'] = [sp for sp in spots if 0 <= sp['col'] < cols and 0 <= sp['row'] < rows]
 
         for creature in setup.get('creatures') or []:
             data = dict(creature.get('participant') or {})
@@ -945,13 +951,92 @@ def _take_paused_adventure(conn):
     return json.loads(row[0]) if row[0] else None
 
 
-def _after_battle(conn):
-    """The session once a battle has ended: the adventure it interrupted, back as it was -- or none."""
+def _after_battle(conn, battle=None):
+    """The session once a battle has ended: the adventure it interrupted, back as it was -- or none. A battle fought on the
+    adventure's own map (`battle`'s fromAdventureMap) leaves the adventure as the battle ended (_battle_onto_adventure)."""
     state = _take_paused_adventure(conn)
     if not (state and state.get('active') and state.get('battleType') == 'adventure'):
         return dict(_EMPTY_STATE)
-    _log_event(state, 'session-resume', text='Adventure back after the battle')
+    if (battle or {}).get('fromAdventureMap'):
+        _battle_onto_adventure(state, battle)
+        _log_event(state, 'session-resume', text='Adventure back after the battle -- as the battle ended')
+    else:
+        _log_event(state, 'session-resume', text='Adventure back after the battle')
     return state
+
+
+# A battle on the adventure's own map (the DM console's "Start encounter", the user's call, 2026-11-13): the players'
+# creatures start placing on the square they stood on, and the adventure carries on from how the battle ended. A player's
+# creature is a new participant (a new id) each time it joins, so it's known by its owner, kind and name.
+
+def _spot_of(p, token):
+    return {'owner': p.get('owner') or '', 'name': p.get('name') or '', 'kind': p.get('combatantType') or '',
+            'col': js_parse_int(token.get('col')), 'row': js_parse_int(token.get('row')),
+            'facing': (js_parse_int(token.get('facing')) or 0) % 360}
+
+
+def _player_spots(session):
+    """Where each player's creature stands on `session`'s map: [{owner, name, kind, col, row, facing}]."""
+    tokens = (session.get('board') or {}).get('tokens') or {}
+    return [_spot_of(p, tokens[pid]) for pid, p in (session.get('participants') or {}).items()
+            if p.get('owner') and p.get('owner') != DM_OWNER and pid in tokens]
+
+
+def _clean_spots(spots):
+    """The DM console's record of where the players stood (its setup's `players`), in _player_spots' shape."""
+    out = []
+    for sp in spots if isinstance(spots, list) else []:
+        if not isinstance(sp, dict) or not sp.get('owner') or not sp.get('name'):
+            continue
+        col, row = js_parse_int(sp.get('col')), js_parse_int(sp.get('row'))
+        if col is None or row is None:
+            continue
+        out.append({'owner': str(sp['owner']), 'name': str(sp['name']), 'kind': str(sp.get('kind') or ''),
+                    'col': col, 'row': row, 'facing': (js_parse_int(sp.get('facing')) or 0) % 360})
+    return out
+
+
+def _battle_onto_adventure(adv, battle):
+    """The adventure `adv` (coming back after `battle`) as the battle ended: the battle's map (with whatever the DM changed
+    on it), the DM's creatures still standing where they ended (a caught or fainted one is gone, a hidden one stays
+    hidden), and each player's creature moved to where it ended the battle (or where it stood when it left)."""
+    b_board, a_board = battle.get('board') or {}, adv.setdefault('board', {})
+    for key in ('grid', 'backgroundImage', 'objects', 'marks', 'traps'):
+        if key in b_board:
+            a_board[key] = copy.deepcopy(b_board[key])
+    cols, rows = a_board['grid']['cols'], a_board['grid']['rows']
+    tokens = a_board.setdefault('tokens', {})
+    parts = adv.setdefault('participants', {})
+
+    # The DM's: the battle's own, as they ended
+    for pid in [pid for pid, p in parts.items() if (p.get('owner') or DM_OWNER) == DM_OWNER]:
+        parts.pop(pid, None)
+        tokens.pop(pid, None)
+    for pid, p in (battle.get('participants') or {}).items():
+        token = (b_board.get('tokens') or {}).get(pid)
+        if (p.get('owner') or DM_OWNER) != DM_OWNER or not token or (js_parse_int(p.get('currentHP')) or 0) <= 0:
+            continue
+        parts[pid] = {**copy.deepcopy(p), 'initiative': 0}
+        tokens[pid] = {'col': token.get('col'), 'row': token.get('row'), 'facing': token.get('facing') or 0, 'z': token.get('z') or 0}
+
+    # The players': moved to where they ended it
+    ended = _player_spots(battle) + list(battle.get('leftSpots') or [])
+    for pid, p in parts.items():
+        if (p.get('owner') or DM_OWNER) == DM_OWNER:
+            continue
+        mine = _spot_of(p, {})
+        spot = next((sp for sp in ended if sp['owner'] == mine['owner'] and sp['name'] == mine['name']
+                     and (not sp['kind'] or not mine['kind'] or sp['kind'] == mine['kind'])), None)
+        if not spot:
+            continue
+        ended.remove(spot)
+        if spot['col'] is not None and spot['row'] is not None and 0 <= spot['col'] < cols and 0 <= spot['row'] < rows:
+            tokens[pid] = {**(tokens.get(pid) or {}), 'col': spot['col'], 'row': spot['row'], 'facing': spot['facing']}
+            p['placed'] = True
+    # (anyone now off a smaller map isn't on it)
+    for pid in [pid for pid, t in tokens.items()
+                if not (0 <= (js_parse_int(t.get('col')) or 0) < cols and 0 <= (js_parse_int(t.get('row')) or 0) < rows)]:
+        tokens.pop(pid, None)
 
 
 def start_adventure(conn, m, settings=None):
@@ -1653,6 +1738,9 @@ def _leave_session(conn, owner):
             state['pendingForcedSwitch'] = None
         for pid in leaving:
             state.setdefault('departed', {})[pid] = _battle_memory(state['participants'][pid], left=True)
+            spot = state['board']['tokens'].get(pid)
+            if spot and state.get('fromAdventureMap'):  # where they ended the battle (_battle_onto_adventure)
+                state.setdefault('leftSpots', []).append(_spot_of(state['participants'][pid], spot))
             state['participants'].pop(pid, None)
             state['board']['tokens'].pop(pid, None)
         _log_event(state, 'leave', text=f"{owner} left the {'adventure' if state.get('battleType') == 'adventure' else 'battle'}", actorName=owner)
@@ -1661,7 +1749,7 @@ def _leave_session(conn, owner):
     if not any(p.get('owner') and p.get('owner') != DM_OWNER for p in state['participants'].values()):
         _log_event(state, 'session-end', text='Battle ended (all players left)')
         _remember_battle(conn, state)
-        return _save_and_publish(conn, _after_battle(conn))  # the adventure it interrupted, back
+        return _save_and_publish(conn, _after_battle(conn, state))  # the adventure it interrupted, back
     _rebuild_turn_order(state)
     return _save_and_publish(conn, state)
 

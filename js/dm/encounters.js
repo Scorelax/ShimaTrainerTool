@@ -1204,7 +1204,7 @@ export async function startEncounterFromAdventure(map, name, { creatures = [], p
   const enc = await createEncounterWithMap(map, name, { creatures });
   const state = await CombatAPI.getState().catch(() => null);
   if (battleOn(state?.data)) return { enc, inPlay: false };
-  await putInPlay(enc, { replace: true, useMap: true, players });
+  await putInPlay(enc, { replace: true, useMap: true, players, fromAdventure: true });
   return { enc, inPlay: true };
 }
 
@@ -1254,9 +1254,10 @@ async function loadIntoSetup(enc) {
 
 /** `enc` becomes the next battle (the encounter in play): its creatures into the setup -- `replace` who's there, or
  * added to them -- and, `useMap`, its own map as Map setup's, each creature where it stood when the encounter was made.
- * `players`: where the players stood on that map (the adventure's "Start encounter"; setup-store.js). Resolves to
+ * `players`: where the players stood on that map, `fromAdventure`: it's the adventure's (its "Start encounter";
+ * setup-store.js). Resolves to
  * {missing}: the NPCs no longer in the library, left out. */
-async function putInPlay(enc, { replace = true, useMap = false, players = [] } = {}) {
+async function putInPlay(enc, { replace = true, useMap = false, players = [], fromAdventure = false } = {}) {
   const built = [];
   for (const p of enc.pokemon) built.push(await buildEncounterMon(enc, p, null));
   useMap = useMap && !!enc.map;
@@ -1270,6 +1271,10 @@ async function putInPlay(enc, { replace = true, useMap = false, players = [] } =
       s.map = { ...JSON.parse(JSON.stringify(enc.map)), weather: s.map.weather, ready: true, terrain: enc.map.terrain || s.map.terrain };
       s.creatures.forEach((c) => { c.position = null; });
       s.players = JSON.parse(JSON.stringify(players || []));
+      // The adventure's own map: the players start placing where they stood, and when the battle ends the adventure
+      // carries on from how it ended (routes_combat.py's startSpots / _battle_onto_adventure). Another map loaded over
+      // it in Map setup drops this.
+      if (fromAdventure) s.map.fromAdventure = true;
     }
     // Encounters made before terrain and weather moved to Map setup had their own.
     if (enc.terrain && enc.terrain !== 'flat') s.map.terrain = enc.terrain;

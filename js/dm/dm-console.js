@@ -331,7 +331,8 @@ function renderHome(view) {
           <div class="dm-home-preview">${mapPreviewHtml(s)}</div>
           <div class="dm-hint">${m.rows} × ${m.cols} squares · ${escapeHtml(bgLabel)} · ${objects} object${objects === 1 ? '' : 's'}
             · ${marks.filter(k => k === 'difficult').length} difficult · ${marks.filter(k => k === 'blocked').length} blocked</div>
-          ${(s.players || []).length ? '<div class="dm-hint">Faded, with a blue ring: where the players\' trainers and Pokémon stood on the adventure -- they place themselves when they join.</div>' : ''}
+          ${m.fromAdventure ? `<div class="dm-hint">🧭 The adventure's map: ${(s.players || []).length ? 'faded, with a blue ring, is where the players\' trainers and Pokémon stood -- ' : ''}the players start placing where they stood, and when the battle ends the adventure carries on from how it ended.</div>`
+            : (s.players || []).length ? '<div class="dm-hint">Faded, with a blue ring: where the players\' trainers and Pokémon stood on the adventure -- they place themselves when they join.</div>' : ''}
           <div class="dm-row dm-home-setting">
             <div class="dm-field"><label for="homeTerrain">Terrain <span class="dm-label-note">(added to a throw's accuracy DC)</span></label>
               <select class="dm-select" id="homeTerrain">${Object.entries(TERRAIN).map(([k, t]) => `<option value="${k}" ${k === (m.terrain || 'flat') ? 'selected' : ''}>${escapeHtml(t.name)} (+${t.mod})</option>`).join('')}</select></div>

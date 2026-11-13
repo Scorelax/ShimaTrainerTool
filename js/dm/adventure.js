@@ -81,7 +81,9 @@ async function draw() {
 function drawPaused() {
   document.getElementById('advBar').innerHTML = `
     <h2>🧭 Adventure <span class="dm-pill todo" title="A battle is on -- the adventure waits">Paused</span></h2>
-    <span class="dm-hint">A battle is running. The adventure comes back just as it was -- the players, your Pokémon and NPCs where they stood -- when the battle ends.</span>
+    <span class="dm-hint">${_session?.fromAdventureMap
+      ? "A battle is running on the adventure's map. When it ends, the adventure comes back as the battle left it -- its map, everyone where they ended (caught and fainted Pokémon gone)."
+      : 'A battle is running. The adventure comes back just as it was -- the players, your Pokémon and NPCs where they stood -- when the battle ends.'}</span>
     <span class="dm-adv-btns">
       <button class="dm-btn danger" id="advDrop" title="The adventure won't come back when the battle ends -- everything on it stays as the adventure map for next time">■ Don't bring it back</button>
     </span>`;
@@ -312,7 +314,7 @@ function renderPlayers() {
 function playerSpots(session) {
   return Object.values(session?.participants || {}).filter(p => (p.owner || DM) !== DM).map((p) => {
     const t = session.board?.tokens?.[p.id];
-    return t ? { name: p.name, owner: p.owner, image: p.image || '', size: p.size || '', col: t.col, row: t.row, facing: t.facing || 0 } : null;
+    return t ? { name: p.name, owner: p.owner, kind: p.combatantType || '', image: p.image || '', size: p.size || '', col: t.col, row: t.row, facing: t.facing || 0 } : null;
   }).filter(Boolean);
 }
 

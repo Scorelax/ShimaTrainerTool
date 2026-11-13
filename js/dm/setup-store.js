@@ -3,10 +3,11 @@
 // shortly after it's made.
 //
 // Shape: {
-//   map: { cols, rows, lockRatio, background, objects: [...board.objects], marks: {"col,row": kind}, ready, terrain, weather },
+//   map: { cols, rows, lockRatio, background, objects: [...board.objects], marks: {"col,row": kind}, ready, terrain, weather,
+//          fromAdventure (the adventure's own map -- its "Start encounter": routes_combat.py's startSpots) },
 //   creatures: [{ id, kind: 'pokemon'|'trainer', name, config, participant, computed, initiativeBonus, heldBack,
 //                 trainerId, position: {col, row, facing} | null }],
-//   players: [{ name, owner, image, size, col, row, facing }] -- where the players' trainers and Pokemon stood on the
+//   players: [{ name, owner, kind, image, size, col, row, facing }] -- where the players' trainers and Pokemon stood on the
 //            adventure the map came from (adventure.js's "Start encounter"): shown faded on the map, for reference only,
 //            and gone with that map,
 //   startedAt,

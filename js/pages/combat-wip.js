@@ -2263,7 +2263,9 @@ function renderPlacementPhase(state, currentId) {
         <div class="placement-title">${state.battleType === 'adventure' ? 'Adventure' : '📍 Place Your Team'}</div>
       </div>
       <div class="placement-body">
-        <div class="placement-prompt">Click a cell to preview <strong>${current?.name || '…'}</strong>'s position, then confirm it.</div>
+        <div class="placement-prompt">${_adventureSpotFor(state, currentId)
+          ? `<strong>${current?.name || '…'}</strong> starts on the same square as on the adventure -- confirm it, or click another cell.`
+          : `Click a cell to preview <strong>${current?.name || '…'}</strong>'s position, then confirm it.`}</div>
         <div class="placement-actions" id="placementActions"></div>
         <div class="placement-stage${bg ? ' has-bg' : ''}" id="placementStage"
              style="aspect-ratio:${cols} / ${rows};${bg ? ` background-image:url(${bg});` : ''}">
@@ -2476,10 +2478,28 @@ function _renderPlacementTokens(state, currentId) {
   });
 }
 
+/** A battle on the adventure's own map (the DM's "Start encounter", the user's call, 2026-11-13): the square
+ * `currentId` stood on in the adventure (routes_combat.py's startSpots -- known by owner, kind and name, since a creature
+ * joins as a new participant), if it's still free -- null otherwise. */
+function _adventureSpotFor(state, currentId) {
+  const p = state.participants?.[currentId];
+  if (!p?.owner || p.owner === 'DM' || !Array.isArray(state.startSpots)) return null;
+  return state.startSpots.find(s => s.owner === p.owner && s.name === p.name
+    && (!s.kind || !p.combatantType || s.kind === p.combatantType)
+    && !_isCellTaken(state, s.col, s.row, currentId)) || null;
+}
+
 function attachPlacementListeners(state, currentId) {
   _stagedPosition = null;
   _stagedFacing = 0;
   _stagedZ = 0;
+  // Starts on its square from the adventure -- Confirm, or click another one
+  const spot = _adventureSpotFor(state, currentId);
+  if (spot) {
+    _stagedPosition = { col: spot.col, row: spot.row };
+    _stagedFacing = spot.facing || 0;
+    CombatAPI.hoverToken(currentId, spot.col, spot.row).catch(() => {}); // held for it, as a click would
+  }
   _renderPlacementActions(currentId);
   _renderPlacementTokens(state, currentId);
   _refreshCellTakenStates(state, currentId);

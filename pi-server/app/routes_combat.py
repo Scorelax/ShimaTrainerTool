@@ -63,6 +63,9 @@ _EMPTY_STATE = {
     # happened to occupy index 0 before the roster was even final.
     'started': False,
     'reactingParticipantId': None,
+    # A creature taking an extra action (Rapid Orders, a held action, a turn from the DM, Tragic Hero's extra turn) that
+    # someone reacted to mid-way: it waits here while the reactor holds the floor, and gets it back when the reaction ends.
+    'suspendedFloorId': None,
     # A live "does anyone want to react?" window (see _open_reaction_window and
     # move-effects-schema.md's own reaction section) -- None when closed. While
     # open: {id, trigger:'targeted'|'damaged', anchorId, attackerId, moveName,
@@ -323,6 +326,8 @@ def _handle(conn, action, params):
             actorId=params.get('actorId'), actorName=params.get('actorName'),
             targetId=params.get('targetId'), targetName=params.get('targetName'),
             **({'move': params['move']} if params.get('move') else {}),
+            # what the move cost (a 'move-used' line) -- Spite drains exactly that from the attacker
+            **({'vpCost': js_parse_int(params['vpCost'])} if js_parse_int(params.get('vpCost')) is not None else {}),
         ))
 
     if action == 'add-participant':
@@ -1872,6 +1877,8 @@ def _perform_switch(state, pending):
     state['resortAtRound'] = True
     if state.get('reactingParticipantId') == out_id:
         state['reactingParticipantId'] = in_id
+    if state.get('suspendedFloorId') == out_id:
+        state['suspendedFloorId'] = in_id
 
     out['status'], inn['status'] = 'spectating', 'participating'
     out_token = state['board']['tokens'].pop(out_id, None)
@@ -2061,8 +2068,13 @@ def _rebuild_turn_order(state):
     # Whoever holds the floor mid-reaction must still be in the fight: one who left, or was benched/fainted out to spectating
     # (a switch, set-status), would otherwise hold it forever -- no card left to press End Turn on, and advance-turn refuses.
     reacting = state['participants'].get(state['reactingParticipantId'])
+    suspended = state['participants'].get(state.get('suspendedFloorId'))
+    if not suspended or suspended.get('status') != 'participating':
+        state['suspendedFloorId'] = None
     if not reacting or reacting.get('status') != 'participating':
-        state['reactingParticipantId'] = None
+        # ...and a creature whose extra action that reaction interrupted takes it back
+        state['reactingParticipantId'] = state.get('suspendedFloorId')
+        state['suspendedFloorId'] = None
     # A reaction window whose anchor or attacker left (or stopped participating,
     # e.g. fainted out) mid-window no longer means anything -- close it
     # outright. One whose eligible list just shrank the same way (an
@@ -2384,8 +2396,14 @@ def _reaction_start(state, pid):
         raise ValueError('Only participating combatants can react')
     if participant['reactionUsed']:
         raise ValueError('Reaction already used this cycle')
-    if state['reactingParticipantId']:
-        raise ValueError('Another reaction is already in progress')
+    holder_id = state['reactingParticipantId']
+    if holder_id:
+        # A creature taking an extra action (Rapid Orders...) can be reacted to like on any turn (playtest 2026-11-12: its
+        # attack's window could never close and its target could never react): the reactor takes the floor, and the extra
+        # action carries on once the reaction ends (_reaction_end). A reaction itself can't be reacted to.
+        holder = state['participants'].get(holder_id) or {}
+        if not holder.get('extraActionFrom') or state.get('suspendedFloorId') or holder_id == pid:
+            raise ValueError('Another reaction is already in progress')
     if state['turnOrder'] and state['turnOrder'][state['turnIndex']] == pid:
         raise ValueError("It's already this participant's turn")
     blocking = next((s for s in _statuses_of(participant)
@@ -2394,6 +2412,8 @@ def _reaction_start(state, pid):
         raise ValueError(f"{participant['name']} is {blocking['apply']} and can't react")
 
     state['started'] = True  # see _rebuild_turn_order -- a reaction means turn order is now live
+    if holder_id:
+        state['suspendedFloorId'] = holder_id
     state['reactingParticipantId'] = pid
     participant['reactionUsed'] = True
     # If a reaction WINDOW is open and this is one of the participants it was
@@ -2483,20 +2503,29 @@ def _reaction_end(state):
     # to exactly where the normal order left off.
     state['reactingParticipantId'] = None
     if reactor and reactor.get('extraActionFrom'):
-        # Rapid Orders (_rapid_orders), a held action (_use_held_action) or the DM's turn (_dm_give_turn) is over: the floor
-        # goes back to whoever's turn it is.
-        what = 'turn from the DM' if reactor['extraActionFrom'] == 'turn from the DM' else f"extra action ({reactor['extraActionFrom']})"
+        # Rapid Orders (_rapid_orders), a held action (_use_held_action), the DM's turn (_dm_give_turn) or Tragic Hero's
+        # extra turn is over: the floor goes back to whoever's turn it is.
+        from_ = reactor['extraActionFrom']
+        what = from_ if from_ in ('turn from the DM', 'extra turn') else f"extra action ({from_})"
         _log_event(state, 'extra-action-end', text=f"{reactor['name']}'s {what} ended",
                    actorId=reactor['id'], actorName=reactor['name'])
         reactor['extraActionFrom'] = None
     elif reactor:
         _log_event(state, 'reaction-end', text=f"{reactor['name']}'s reaction ended", actorId=reactor['id'], actorName=reactor['name'])
+        # This reaction interrupted someone's extra action (_reaction_start): it carries on now.
+        suspended = state['participants'].get(state.get('suspendedFloorId'))
+        if suspended and suspended.get('status') == 'participating':
+            state['reactingParticipantId'] = suspended['id']
+    state['suspendedFloorId'] = None
     # The window (if this reactor came from one) may have been waiting on
     # them specifically -- now that they've released the floor, see if
     # everyone eligible has answered and it can close.
     _maybe_close_reaction_window(state)
     # Tragic Hero: "granted a new turn immediately after this reaction" -- the ally takes the floor right now, with a fresh
-    # movement budget and bonus action, and gives it back the usual way (End Turn -> reaction-end).
+    # movement budget and bonus action, and gives it back the usual way (End Turn -> reaction-end). If the reaction
+    # interrupted an extra action, that's finished first (the grant waits for the next reaction-end).
+    if state['reactingParticipantId']:
+        return
     extra_id = state.get('pendingExtraTurn')
     state['pendingExtraTurn'] = None
     extra = state['participants'].get(extra_id) if extra_id else None
@@ -2505,6 +2534,7 @@ def _reaction_end(state):
         extra['bonusActionUsed'] = False
         extra['actionUsed'] = False
         extra['disengaged'] = False
+        extra['extraActionFrom'] = 'extra turn'  # an extra turn, not a reaction: it can be reacted to, and windows close
         state['reactingParticipantId'] = extra_id
         _log_event(state, 'extra-turn', text=f"{extra['name']} takes an extra turn", actorId=extra_id, actorName=extra['name'])
 
@@ -2642,7 +2672,7 @@ def _close_stale_reaction_window(state):
     and the stale window would otherwise refuse every later one for the rest of the battle."""
     pr = state.get('pendingReaction')
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    if pr and not state.get('reactingParticipantId') and now_ms > (pr.get('expiresAt') or 0) + _STALE_WINDOW_GRACE_MS:
+    if pr and not _reaction_in_progress(state) and now_ms > (pr.get('expiresAt') or 0) + _STALE_WINDOW_GRACE_MS:
         state['pendingReaction'] = None
         _log_event(state, 'reaction-window-close', text='Reaction window closed (time expired)')
         _finish_pending_switch(state)
@@ -2824,7 +2854,7 @@ def _maybe_close_reaction_window(state):
     currently holds the floor -- see _close_reaction_window's own note on
     never cutting a reaction off mid-use."""
     pr = state['pendingReaction']
-    if not pr or state['reactingParticipantId']:
+    if not pr or _reaction_in_progress(state):
         return
     if all(e['responded'] for e in pr['eligible'].values()):
         state['pendingReaction'] = None
@@ -2843,11 +2873,19 @@ def _close_reaction_window(state):
     pr = state['pendingReaction']
     if not pr:
         return
-    if state['reactingParticipantId']:
+    if _reaction_in_progress(state):
         raise ValueError('Someone is still reacting -- try again shortly')
     state['pendingReaction'] = None
     _log_event(state, 'reaction-window-close', text='Reaction window closed (time expired)')
     _finish_pending_switch(state)
+
+
+def _reaction_in_progress(state):
+    """Someone is in the middle of a reaction -- not a creature taking an extra action (Rapid Orders, a held action, a turn
+    from the DM, an extra turn), which holds the floor the same way (reactingParticipantId) but is no reaction anyone is
+    waiting on: a reaction window opened by its own attack closes as usual (playtest 2026-11-12, it never did)."""
+    rid = state.get('reactingParticipantId')
+    return bool(rid) and not (state['participants'].get(rid) or {}).get('extraActionFrom')
 
 
 def _active_participant_id(state):

@@ -9,7 +9,7 @@
 // same "nothing to show it in" situation as 'damaged', just a different
 // trigger. Just a small blocking indicator with a live countdown; nothing to
 // click, it closes itself once the wait resolves.
-import { waitForReactionWindow } from './reaction-window.js';
+import { waitForReactionWindow, reactionWaitHtml, reactingNow } from './reaction-window.js';
 
 function _injectStyles() {
   if (document.getElementById('reaction-wait-overlay-styles')) return;
@@ -20,6 +20,11 @@ function _injectStyles() {
     .reaction-wait-box { background: #1e1e34; border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 1.2rem 1.6rem; text-align: center; color: #e0e0e0; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
     .reaction-wait-box .msg { font-size: 0.95rem; margin-bottom: 0.4rem; }
     .reaction-wait-box .timer { font-size: 0.82rem; color: #a0a0c0; }
+    .reaction-wait-box { max-width: 92vw; max-height: 80vh; overflow-y: auto; }
+    /* someone is reacting: a banner at the bottom (clear of the card's End Turn at its top), so a reactor played on this
+       same screen can act */
+    .reaction-wait-overlay.rw-aside { background: transparent; pointer-events: none; align-items: flex-end; padding-bottom: 0.6rem; box-sizing: border-box; }
+    .reaction-wait-overlay.rw-aside .reaction-wait-box { pointer-events: auto; padding: 0.6rem 1rem; max-height: 32vh; }
   `;
   document.head.appendChild(style);
 }
@@ -36,6 +41,7 @@ function _ensureDom() {
     <div class="reaction-wait-box">
       <div class="msg">Waiting for possible reactions…</div>
       <div class="timer" id="reactionWaitOverlayTimer"></div>
+      <div id="reactionWaitOverlayDetail"></div>
     </div>`;
   document.body.appendChild(_overlay);
 }
@@ -54,9 +60,12 @@ async function _waitForReactions(trigger, anchorId, attackerId, moveName) {
     if (!status.opened) return;
     if (!shown) { shown = true; _overlay.style.display = 'flex'; }
     const secs = Math.ceil(status.msLeft / 1000);
-    document.getElementById('reactionWaitOverlayTimer').textContent = `${secs}s`;
+    document.getElementById('reactionWaitOverlayTimer').textContent = secs > 0 ? `${secs}s` : '';
+    document.getElementById('reactionWaitOverlayDetail').innerHTML = reactionWaitHtml(status); // who's deciding / reacting
+    _overlay.classList.toggle('rw-aside', reactingNow(status));
   });
   if (shown) _overlay.style.display = 'none';
+  _overlay.classList.remove('rw-aside');
   return result;
 }
 

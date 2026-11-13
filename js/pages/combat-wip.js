@@ -14,8 +14,8 @@ import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolve
 import { setAnimationAnnouncer } from '../utils/battle-animation.js';
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
 import { pickSwitchTile } from '../utils/token-placement-picker.js';
-import { waitForOpenWindow } from '../utils/reaction-window.js';
-import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget, setRemoteSaveHandler, isSavePickerBusy } from '../utils/save-picker.js';
+import { waitForOpenWindow, playerOf } from '../utils/reaction-window.js';
+import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget, setRemoteSaveHandler, isSavePickerBusy, promptAreaDamageRoll } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
@@ -23,7 +23,7 @@ import { showAdventureMap, updateAdventureMap } from '../utils/adventure-map.js'
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
 import { lineFtFromRange } from '../utils/line-area.js';
 import { coneFtFromRange } from '../utils/line-area-picker.js';
-import { setAbilitySession, abilityTriggers, abilityEffectsOf, activatedAbilityEffects } from '../utils/ability-mods.js';
+import { setAbilitySession, abilityTriggers, abilityEffectsOf, activatedAbilityEffects, noDamageOnPassedSave } from '../utils/ability-mods.js';
 import { injectBattleMapStyles, zoneKind, spriteTransform } from '../utils/battle-map-view.js';
 import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
 import { playBattleAnimationFloating } from '../utils/move-popup.js';
@@ -991,8 +991,9 @@ function _enterBattleSync() {
   _battleSyncActive = true;
   setCombatStateKey(WIP_COMBAT_STATE_KEY);
   setOnCombatStateSave(_onLocalCombatStateSave);
-  setOnLogEvent(({ spend, ...event }) => { // `spend` (what a move cost) is local bookkeeping -- not sent to the server
-    const sent = CombatAPI.logEvent(event).catch(() => {});
+  setOnLogEvent(({ spend, ...event }) => { // `spend` (what a move cost) is local bookkeeping -- only its VP cost is sent,
+    // on the 'move-used' line, where Spite reads how much to drain (_vpCostOfMoveUsed)
+    const sent = CombatAPI.logEvent({ ...event, ...(Number.isFinite(spend?.vpCost) ? { vpCost: spend.vpCost } : {}) }).catch(() => {});
     _lastLogSent = sent; // _repeatUseCheck counts move-used entries -- it waits for this one to land first
     if (event.type === 'move-used' && event.move) sent.then(() => _abilityMoveUsed(event.actorId, event.move)); // Protean, Dancer...
   });
@@ -4779,6 +4780,9 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         dice: effect.dice, vpCostFromLog: !!effect.vpCostFromLog,
         healPool: effect.healPool, healFraction: effect.healFraction, requireZeroHp: !!effect.requireZeroHp,
         ability: effect.ability || 'WIS', vpCostMultiplierDice: effect.vpCostMultiplierDice || null,
+        // The attacker's save, when the move's own save step already asked it of this very creature (Spite's "pick who
+        // saves" first): not asked a second time (playtest 2026-11-12, it was)
+        save: ctx?.save && pick.targetId === targetId ? ctx.save : null,
       });
       continue;
     }
@@ -5876,7 +5880,10 @@ function _vpCostOfMoveUsed(pid, moveName) {
   for (let i = log.length - 1; i >= 0; i--) {
     const e = log[i];
     if (e.type === 'move-used' && e.actorId === pid && e.move === moveName) {
-      return Number.isFinite(e.vpCost) ? e.vpCost : null;
+      if (Number.isFinite(e.vpCost)) return e.vpCost;
+      // A line logged before the cost was sent along with it: "Volt used Thunder Punch (-7 VP)"
+      const m = String(e.text || '').match(/\(-(\d+) VP\)/);
+      return m ? Number(m[1]) : null;
     }
   }
   return null;
@@ -5905,7 +5912,7 @@ function _vpCostOfMoveUsed(pid, moveName) {
  * one set per move. Grudge's own "subsequent uses this encounter need a
  * DC15 d20 roll for the healing to land" escalating cost is left manual,
  * same precedent as the whole Protect family's own escalating cost. */
-async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName, dc, dice, vpCostFromLog, healPool, healFraction, requireZeroHp, ability = 'WIS', vpCostMultiplierDice = null }) {
+async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName, dc, dice, vpCostFromLog, healPool, healFraction, requireZeroHp, ability = 'WIS', vpCostMultiplierDice = null, save = null }) {
   const reactor = session?.participants?.[reactorId];
   const originalAttacker = session?.participants?.[originalAttackerId];
   if (!reactor || !originalAttacker) return;
@@ -5913,11 +5920,18 @@ async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName,
     showCombatAlert(`${moveName} only triggers when that hit reduces you to 0 HP -- this one didn't.`, { title: moveName });
     return;
   }
-  const outcome = await confirmSecondarySave(originalAttacker, originalAttacker.name, {
+  // The move that hit: noted now, while the reaction window is still open -- the save may come back from the attacker's
+  // screen after the reaction (and its window) has ended (playtest 2026-11-12: Spite then never drained anything).
+  const pr = session?.pendingReaction;
+  const attackingMoveName = (pr?.attackerId === originalAttackerId && pr.moveName) || (session ? _lastMoveUsedBy(session, originalAttackerId) : null);
+  if (save) { // already made (and logged) by the move's own save step
+    if (save.passed) return;
+  }
+  const outcome = save || await confirmSecondarySave(originalAttacker, originalAttacker.name, {
     dc, ability, title: 'Saving Throw', moveUser: reactor,
   });
   if (!outcome) return;
-  CombatAPI.logEvent({
+  if (!save) CombatAPI.logEvent({
     type: 'save', actorId: reactorId, actorName: reactor.name, targetId: originalAttackerId, targetName: originalAttacker.name,
     text: `${originalAttacker.name} ${outcome.passed ? 'succeeded' : 'failed'} the saving throw against ${reactor.name}'s ${moveName}${_saveRollNote(outcome)}`,
   }).catch(() => {});
@@ -5925,7 +5939,6 @@ async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName,
 
   let drained;
   if (vpCostFromLog) {
-    const attackingMoveName = session?.pendingReaction?.moveName;
     drained = attackingMoveName ? _vpCostOfMoveUsed(originalAttackerId, attackingMoveName) : null;
     if (!Number.isFinite(drained)) {
       showCombatAlert(`Couldn't find how much VP ${originalAttacker.name}'s move cost -- apply ${moveName}'s drain by hand.`, { title: moveName });
@@ -5944,8 +5957,11 @@ async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName,
     drained = Math.max(0, rolled);
   }
   if (drained <= 0) return;
+  // Today's numbers -- the save took a while, and the battle moved on meanwhile
+  const attackerNow = session?.participants?.[originalAttackerId] || originalAttacker;
+  const reactorNow = session?.participants?.[reactorId] || reactor;
   try {
-    await CombatAPI.updateStats(originalAttackerId, { currentVP: originalAttacker.currentVP - drained });
+    await CombatAPI.updateStats(originalAttackerId, { currentVP: (Number(attackerNow.currentVP) || 0) - drained });
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
     return;
@@ -5954,8 +5970,8 @@ async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName,
   if (healAmount > 0) {
     const healField = healPool === 'HP' ? 'currentHP' : 'currentVP';
     const maxField = healPool === 'HP' ? 'maxHP' : 'maxVP';
-    const maxVal = Number.isFinite(reactor[maxField]) ? reactor[maxField] : Infinity;
-    const newVal = Math.min(maxVal, reactor[healField] + healAmount);
+    const maxVal = Number.isFinite(reactorNow[maxField]) ? reactorNow[maxField] : Infinity;
+    const newVal = Math.min(maxVal, (Number(reactorNow[healField]) || 0) + healAmount);
     try {
       await CombatAPI.updateStats(reactorId, { [healField]: newVal });
     } catch (err) {
@@ -6438,103 +6454,39 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
   // self-heal, so that path's damage isn't summed here.
   let totalDamageDealt = 0;
 
-  for (const targetId of targetIds) {
+  // A save move: every creature's save at once, each dealt with as it comes in (_resolveAreaSaves)
+  if (isSaveTriggered) {
+    totalDamageDealt = await _resolveAreaSaves({
+      combatantId, moveName, computedData, targetIds, edgeIds, edgeWhere, edgeNote, halvesOnSave, damageMultiplier, vpHalfId,
+      speciesName, moveType, attackerName, dc, hasDamage, damageModifier,
+    });
+  }
+  for (const targetId of (isSaveTriggered ? [] : targetIds)) {
     const target = session?.participants?.[targetId];
     if (!target) continue;
 
-    if (isSaveTriggered) {
-      // halfOn: the save-picker halves the damage roll -- on a pass for a move's own "half as much on a success"
-      // (_halvesOnSave), on a fail for a line's or cone's edge target (who takes nothing on a pass).
-      // speciesName '' -- no clip inside each target's damage popup; it plays once at the end (_handleMultiHitAoe).
-      const edge = edgeIds.has(targetId);
+    // Shock Wave-style area moves: guaranteed to hit everything in the area,
+    // so each selected target goes straight to its damage roll -- but one only
+    // on the edge of the cone makes a Dexterity save first (the move has no
+    // save of its own): nothing on a success, half damage on a failure.
+    let edgeMultiplier = 1;
+    if (edgeIds.has(targetId)) {
       const outcome = await confirmSecondarySave(target, target.name, {
-        dc, hasDamage, damageModifier, speciesName: '', ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId],
-        abilityDice: computedData.abilityDice, damageDice: computedData.damageDice,
-        halfOn: edge ? 'fail' : (halvesOnSave ? 'pass' : null),
-        note: edge ? `${edgeNote(targetId)}: a success means it misses ${target.name} entirely; a failure means ${hasDamage ? 'half damage and ' : ''}its effects.` : '',
+        dc, hasDamage: false, ability: 'DEX', title: 'Saving Throw', moveUser: session?.participants?.[combatantId],
+        note: `${edgeNote(targetId)}: a success means it misses ${target.name} entirely; a failure means half damage.`,
       });
-      if (!outcome) continue; // closed for this target -- move on to the next one
-      if (edge && outcome.passed) {
-        CombatAPI.logEvent({
-          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-          text: `${target.name} was ${edgeWhere(targetId)} and dodged it${_saveRollNote(outcome)}`,
-        }).catch(() => {});
-        continue; // nothing happens to it -- no damage, no effects
-      }
-      if (edge) {
-        CombatAPI.logEvent({
-          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-          text: `${target.name} was ${edgeWhere(targetId)} and failed the saving throw${_saveRollNote(outcome)}${hasDamage ? ' -- half damage' : ''}`,
-        }).catch(() => {});
-      }
-      const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
-      // rawRoll checked FIRST, not outcome.passed -- a passed save can still
-      // carry a damage roll now (damageOnPass above), which used to be
-      // impossible (passed and rawRoll were mutually exclusive before this),
-      // so passed alone can no longer stand in for "no damage this target".
-      if (outcome.rawRoll !== undefined) {
-        try {
-          // No "N damage applied" popup here either -- see _resolveOneHit's own note;
-          // doubly true in a loop over several AoE targets, one popup per target.
-          // damageMultiplier: see this function's own Wide Guard note above.
-          const rawTotal = outcome.rawRoll + damageModifier;
-          const targetMultiplier = damageMultiplier * _stateDamageMultiplier(moveName, targetId) * (targetId === vpHalfId ? 0.5 : 1)
-            * (outcome.halved ? 0.5 : 1); // a pass on a "half as much" move / a fail on the edge (see halfOn above)
-          const finalDamage = targetMultiplier !== 1 ? Math.floor(rawTotal * targetMultiplier) : rawTotal;
-          const dmgResult = await _applyPrimaryDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, false,
-            targetId === vpHalfId ? 'vp' : null);
-          if (Number.isFinite(dmgResult?.damageApplied)) totalDamageDealt += dmgResult.damageApplied;
-          if (outcome.passed) {
-            CombatAPI.logEvent({
-              type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-              text: `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}, but still takes reduced damage`,
-            }).catch(() => {});
-          }
-        } catch (err) {
-          showCombatAlert(err.message, { title: 'Error' });
-        }
-      } else if (outcome.passed) {
-        CombatAPI.logEvent({
-          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-          text: `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}`,
-        }).catch(() => {});
-      } else if (!edge) {
-        CombatAPI.logEvent({
-          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-          text: `${target.name} failed the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}${applyHint}`,
-        }).catch(() => {});
-      }
-      // This target's own (non-self) effects only -- the move's self effects
-      // are offered once, after the loop, with the full AoE total.
-      await _offerMoveEffects({
-        attackerId: combatantId, targetId, moveName, computedData,
-        ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: { passed: outcome.passed, failBy: outcome.failBy ?? null } },
-        includeSelf: false,
-      });
-    } else {
-      // Shock Wave-style area moves: guaranteed to hit everything in the area,
-      // so each selected target goes straight to its damage roll -- but one only
-      // on the edge of the cone makes a Dexterity save first (the move has no
-      // save of its own): nothing on a success, half damage on a failure.
-      let edgeMultiplier = 1;
-      if (edgeIds.has(targetId)) {
-        const outcome = await confirmSecondarySave(target, target.name, {
-          dc, hasDamage: false, ability: 'DEX', title: 'Saving Throw', moveUser: session?.participants?.[combatantId],
-          note: `${edgeNote(targetId)}: a success means it misses ${target.name} entirely; a failure means half damage.`,
-        });
-        if (!outcome) continue;
-        CombatAPI.logEvent({
-          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-          text: outcome.passed
-            ? `${target.name} was ${edgeWhere(targetId)} and dodged it${_saveRollNote(outcome)}`
-            : `${target.name} was ${edgeWhere(targetId)} and failed the saving throw${_saveRollNote(outcome)} -- half damage`,
-        }).catch(() => {});
-        if (outcome.passed) continue;
-        edgeMultiplier = 0.5;
-      }
-      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName: '', guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, });
-      await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier: damageMultiplier * edgeMultiplier });
+      if (!outcome) continue;
+      CombatAPI.logEvent({
+        type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
+        text: outcome.passed
+          ? `${target.name} was ${edgeWhere(targetId)} and dodged it${_saveRollNote(outcome)}`
+          : `${target.name} was ${edgeWhere(targetId)} and failed the saving throw${_saveRollNote(outcome)} -- half damage`,
+      }).catch(() => {});
+      if (outcome.passed) continue;
+      edgeMultiplier = 0.5;
     }
+    const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName: '', guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, });
+    await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier: damageMultiplier * edgeMultiplier });
   }
 
   if (isSaveTriggered && moveEffectsFor(moveName).some(e => e.target === 'self')) {
@@ -6563,6 +6515,190 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
       }
     }
   }
+}
+
+/** An area move's saves, all at once (the user's call after the 2026-11-12 playtest -- it used to be one creature at a
+ * time, back and forth between the attacker and every target). Every creature another player controls gets its save on
+ * that player's screen straight away (prompt-ask, all in one go); the rest -- this player's own, or nobody's -- are asked
+ * here in between. Each answer is dealt with the moment it's in: the damage (rolled once, for everyone, the first time a
+ * creature takes some -- all of it, half or none by its save), the log line, the move's effects on it. A panel shows who
+ * has answered and whose screen the others are waiting on. Returns the damage dealt in all (a drain heals off it). */
+async function _resolveAreaSaves({ combatantId, moveName, computedData, targetIds, edgeIds, edgeWhere, edgeNote, halvesOnSave,
+  damageMultiplier, vpHalfId, speciesName, moveType, attackerName, dc, hasDamage, damageModifier }) {
+  const me = _currentTrainerName();
+  const ability = _saveAbilityFor(moveName);
+  const mover = session?.participants?.[combatantId] || null;
+  const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
+  // state: 'remote' (on its player's screen) -> 'ready' (answered) -> 'done'; 'here' (to ask on this screen) -> 'asking'
+  // -> 'ready'; 'skipped' (a save closed without an answer, or no damage roll entered)
+  const entries = targetIds.map(id => session?.participants?.[id]).filter(Boolean).map(t => ({
+    id: t.id, edge: edgeIds.has(t.id), player: '', promptId: null, askedAt: 0, outcome: null, state: 'here', note: '',
+  }));
+  const nameOf = id => session?.participants?.[id]?.name || '?';
+  const opts = e => ({
+    dc, ability, title: `Saving Throw: ${moveName}`,
+    note: e.edge ? `${edgeNote(e.id)}: a success means it misses ${nameOf(e.id)} entirely; a failure means ${hasDamage ? 'half damage and ' : ''}its effects.` : '',
+  });
+
+  // Every other player's creatures: asked on their screens, all at once
+  await Promise.all(entries.map(async (e) => {
+    const owner = session?.participants?.[e.id]?.owner || '';
+    if (!owner || owner === me) return;
+    try {
+      const promptId = (await CombatAPI.askPrompt(e.id, 'save', { affectedId: e.id, moveUserId: combatantId, opts: opts(e) }, me))?.promptId;
+      if (promptId) Object.assign(e, { promptId, askedAt: Date.now(), state: 'remote', player: owner });
+    } catch { /* asked here instead */ }
+  }));
+
+  const panel = _areaSavePanel({ moveName, dc, ability, entries, onEnterHere: (e) => {
+    if (e.state !== 'remote') return;
+    CombatAPI.clearPrompt(e.promptId).catch(() => {}); // closes it on their screen
+    e.state = 'here';
+  } });
+
+  let damageRoll = null; // rolled once, the first time a creature takes damage
+  let total = 0;
+  const log = (e, text) => CombatAPI.logEvent({
+    type: 'save', actorId: combatantId, actorName: attackerName, targetId: e.id, targetName: nameOf(e.id), text,
+  }).catch(() => {});
+
+  // One answer: the damage, the log line and the move's effects on that creature
+  const deal = async (e) => {
+    const target = session?.participants?.[e.id];
+    if (!target) { e.state = 'skipped'; e.note = 'left the battle'; return; }
+    commitMove(); // a save was made -- the move is paid for now (move-commit.js)
+    const outcome = e.outcome;
+    const passed = !!outcome.passed;
+    const rollNote = _saveRollNote(outcome);
+    if (e.edge && passed) {
+      log(e, `${target.name} was ${edgeWhere(e.id)} and dodged it${rollNote}`);
+      e.note = `dodged it${rollNote}`;
+      e.state = 'done';
+      return; // nothing happens to it -- no damage, no effects
+    }
+    if (e.edge) log(e, `${target.name} was ${edgeWhere(e.id)} and failed the saving throw${rollNote}${hasDamage ? ' -- half damage' : ''}`);
+    // Its share: all of it on a failure; half on the edge of a line or cone, or on a pass against a "half as much on a
+    // success" move (unless Magic Guard...); none on any other pass.
+    const share = !hasDamage ? 0 : e.edge ? 0.5 : !passed ? 1 : (halvesOnSave && !noDamageOnPassedSave(target)) ? 0.5 : 0;
+    let dealt = null;
+    if (share > 0) {
+      if (damageRoll === null) {
+        damageRoll = await promptAreaDamageRoll({ moveName, damageModifier, damageDice: computedData.damageDice, abilityDice: computedData.abilityDice });
+      }
+      if (damageRoll === null) { // closed without a roll: this one's left out (asked again for the next)
+        e.state = 'skipped';
+        e.note = `${passed ? 'passed' : 'failed'}${rollNote} -- no damage roll entered, nothing applied`;
+        return;
+      }
+      try {
+        const rawTotal = damageRoll + damageModifier;
+        const m = damageMultiplier * _stateDamageMultiplier(moveName, e.id) * (e.id === vpHalfId ? 0.5 : 1) * share;
+        const finalDamage = m !== 1 ? Math.floor(rawTotal * m) : rawTotal;
+        const dmgResult = await _applyPrimaryDamage(combatantId, e.id, finalDamage, moveType, speciesName, moveName, false,
+          e.id === vpHalfId ? 'vp' : null);
+        if (Number.isFinite(dmgResult?.damageApplied)) { dealt = dmgResult.damageApplied; total += dealt; }
+        if (passed) log(e, `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}${rollNote}, but still takes reduced damage`);
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+    } else if (passed) {
+      log(e, `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}${rollNote}`);
+    } else if (!e.edge) {
+      log(e, `${target.name} failed the saving throw against ${attackerName}'s ${moveName}${rollNote}${applyHint}`);
+    }
+    e.note = `${passed ? 'passed' : 'failed'}${rollNote}${dealt !== null ? ` -- ${dealt} damage` : ''}`;
+    panel.render();
+    // This creature's own (non-self) effects -- the move's self effects come once, after everyone (_runMultiHitAoe)
+    await _offerMoveEffects({
+      attackerId: combatantId, targetId: e.id, moveName, computedData,
+      ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: { passed, failBy: outcome.failBy ?? null } },
+      includeSelf: false,
+    });
+    e.state = 'done';
+  };
+
+  try {
+    while (entries.some(e => e.state !== 'done' && e.state !== 'skipped')) {
+      // Answers in from the other screens (one closed without an answer, or not answered in time, is asked here)
+      for (const e of entries.filter(x => x.state === 'remote')) {
+        const p = session?.pendingPrompts?.[e.promptId];
+        if (p?.answered) {
+          CombatAPI.clearPrompt(e.promptId).catch(() => {});
+          if (p.answer) { e.outcome = p.answer; e.state = 'ready'; } else e.state = 'here';
+        } else if (!p || Date.now() - e.askedAt > PROMPT_WAIT_MS) {
+          if (p) CombatAPI.clearPrompt(e.promptId).catch(() => {});
+          e.state = 'here';
+        }
+      }
+      panel.render();
+      const ready = entries.find(e => e.state === 'ready');
+      if (ready) { await deal(ready); panel.render(); continue; }
+      const local = entries.find(e => e.state === 'here');
+      if (local) {
+        local.state = 'asking';
+        panel.render();
+        const target = session?.participants?.[local.id];
+        const outcome = target
+          ? await confirmSecondarySave(target, target.name, { ...opts(local), hasDamage: false, moveUser: mover, askHere: true })
+          : null;
+        if (outcome) { local.outcome = outcome; local.state = 'ready'; } else { local.state = 'skipped'; local.note = 'save closed -- left out'; }
+        continue;
+      }
+      await new Promise(r => setTimeout(r, 300)); // waiting on the other screens
+    }
+  } finally {
+    entries.filter(e => e.state === 'remote').forEach(e => CombatAPI.clearPrompt(e.promptId).catch(() => {}));
+    panel.remove();
+  }
+  return total;
+}
+
+/** The attacker's panel while an area move's saves are out (_resolveAreaSaves): a row per creature -- done (passed /
+ * failed, the roll, the damage), on whose screen it's waiting (with "Enter it here" for a player who's away), or to be
+ * rolled here -- and a line saying who still has to do something. Sits under the popups, so a save or roll asked here
+ * comes first. */
+function _areaSavePanel({ moveName, dc, ability, entries, onEnterHere }) {
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const el = document.createElement('div');
+  el.className = 'area-save-panel';
+  el.style.cssText = 'position:fixed;left:50%;top:0.8rem;transform:translateX(-50%);z-index:1100;width:min(440px,94vw);'
+    + 'max-height:60vh;overflow-y:auto;background:#1a1d36;border:1px solid rgba(255,203,5,0.6);border-radius:14px;'
+    + 'padding:0.7rem 0.8rem;color:#e8ecff;box-shadow:0 8px 30px rgba(0,0,0,0.6);font-size:0.86rem;';
+  document.body.appendChild(el);
+  el.addEventListener('click', (ev) => {
+    const id = ev.target.closest('[data-enter-here]')?.dataset.enterHere;
+    const e = id && entries.find(x => x.id === id);
+    if (e) { onEnterHere(e); render(); }
+  });
+  const render = () => {
+    const nameOf = id => { const p = session?.participants?.[id]; return p && visibleToViewer(p, 'name') ? p.name : '???'; };
+    const waitingOn = new Set();
+    const rows = entries.map((e) => {
+      const p = session?.participants?.[e.id];
+      const player = playerOf(p);
+      const answered = e.state === 'remote' && session?.pendingPrompts?.[e.promptId]?.answered;
+      let st; let color = '#a0a0c0'; let btn = '';
+      if (e.state === 'done' || e.state === 'skipped') { st = `✓ ${e.note}`; color = e.state === 'done' ? '#7bd88f' : '#ff8a80'; }
+      else if (e.state === 'ready' || answered) { st = '✓ answered -- dealing with it…'; color = '#7bd88f'; }
+      else if (e.state === 'remote') {
+        st = `⏳ ${player} is rolling`; color = '#ffd166'; waitingOn.add(player);
+        btn = `<button type="button" data-enter-here="${e.id}" style="margin-left:0.4rem;border:none;border-radius:999px;padding:0.15rem 0.55rem;font-size:0.72rem;font-weight:700;cursor:pointer;background:rgba(255,255,255,0.12);color:#e8ecff;">Enter it here</button>`;
+      } else if (e.state === 'asking') { st = '🎲 rolling on this screen now'; color = '#ffd166'; }
+      else { st = '🎲 to roll on this screen'; }
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;padding:0.3rem 0.5rem;border-radius:8px;background:rgba(255,255,255,0.05);margin-top:0.25rem;">`
+        + `<span><strong>${esc(nameOf(e.id))}</strong>${player ? ` <small style="color:#a0a0c0">(${esc(player)})</small>` : ''}</span>`
+        + `<span style="color:${color};text-align:right;">${esc(st)}${btn}</span></div>`;
+    });
+    const left = entries.filter(e => e.state !== 'done' && e.state !== 'skipped').length;
+    const head = !left ? 'All saves are in.'
+      : waitingOn.size ? `Waiting for ${[...waitingOn].join(', ')} to roll their save${waitingOn.size > 1 ? 's' : ''}`
+      : 'Saves to roll on this screen';
+    el.innerHTML = `<div style="font-weight:800;color:#ffe07a;">🛡️ ${esc(moveName)}: ${ability ? `${esc(ability)} ` : ''}saves, DC ${dc}</div>`
+      + `<div style="margin-top:0.15rem;color:#cfd0e0;">${esc(head)} (${entries.length - left}/${entries.length} done)</div>${rows.join('')}`;
+  };
+  const timer = setInterval(render, 500); // answers arriving while a popup here is up show at once
+  render();
+  return { render, remove: () => { clearInterval(timer); el.remove(); } };
 }
 
 async function _handleSecondarySave(combatantId, targetId, moveName, computedData) {
@@ -7300,16 +7436,21 @@ function _answerPromptsForMe(s) {
   for (const p of Object.values(pending)) {
     if (p.answered || p.owner !== me || p.askedBy === me || _promptsShown.has(p.id)) continue;
     _promptsShown.add(p.id);
-    _promptsOpen.set(p.id, p.kind);
-    _runPrompt(p.kind, p.args || {})
-      .then((answer) => {
-        const stillAsked = _promptsOpen.delete(p.id);
-        return stillAsked ? CombatAPI.answerPrompt(p.id, answer ?? null) : null;
-      })
-      .catch(() => {});
+    // One at a time: an area move asks every creature's save at once, and a player with two creatures in it gets two
+    // questions -- the save popup is a single one, so the second would have taken over the first (never answered).
+    _promptQueue = _promptQueue.then(async () => {
+      const stillPending = () => session?.pendingPrompts?.[p.id] && !session.pendingPrompts[p.id].answered;
+      // A save of this player's own already up (a concentration check...) finishes first
+      while (p.kind === 'save' && isSavePickerBusy() && stillPending()) await new Promise(r => setTimeout(r, 300));
+      if (!stillPending()) return; // taken back while it waited its turn
+      _promptsOpen.set(p.id, p.kind);
+      const answer = await _runPrompt(p.kind, p.args || {}).catch(() => null);
+      if (_promptsOpen.delete(p.id)) await CombatAPI.answerPrompt(p.id, answer ?? null).catch(() => {});
+    }).catch(() => {});
   }
 }
 const _promptsOpen = new Map(); // prompt id -> kind, while its popup is up on this screen
+let _promptQueue = Promise.resolve(); // the questions for this player, answered one after another
 
 /** The DM's own status conditions (the Admin module's, the user's call, 2026-10-20) that went off on one of this player's
  * creatures (routes_combat.py's _fire_custom_status): a popup with what it does, and the effect it had by itself

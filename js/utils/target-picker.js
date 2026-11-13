@@ -16,7 +16,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl, announceAnimation } from './battle-animation.js';
 import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString, mergeRollMode, isMeleeMoveRow, guaranteedCritStatusId } from './move-effects.js';
 import { targetAbilityDamage, moveAbilityMods, attackRollReminders } from './ability-mods.js';
-import { waitForReactionWindow } from './reaction-window.js';
+import { waitForReactionWindow, reactionWaitHtml, reactingNow } from './reaction-window.js';
 import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
 import { filterTargetable, markOutOfRange } from './targetability.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
@@ -83,7 +83,12 @@ function _injectStyles() {
     .target-picker-anim-media:empty { display: none; }
     .target-picker-anim-media img, .target-picker-anim-media video { max-width: 100%; max-height: 40vh; border-radius: 12px; object-fit: contain; }
     .target-picker-reaction-wait-text { text-align: center; font-size: 1rem; color: #e0e0e0; padding: 1.5rem 0 0.5rem; }
-    .target-picker-reaction-wait-timer { text-align: center; font-size: 0.85rem; color: #a0a0c0; padding-bottom: 1.5rem; }
+    .target-picker-reaction-wait-timer { text-align: center; font-size: 0.85rem; color: #a0a0c0; padding-bottom: 0.6rem; }
+    #targetPickerReactionWaitDetail { padding-bottom: 1rem; }
+    /* someone is reacting: the popup steps aside to the bottom (clear of the card's End Turn at its top), so a reactor
+       played on this same screen can act */
+    #targetPickerPopup.rw-aside { background: transparent; backdrop-filter: none; pointer-events: none; align-items: flex-end; }
+    #targetPickerPopup.rw-aside .combat-popup-content { pointer-events: auto; margin-bottom: 0.6rem; max-height: 35vh; overflow-y: auto; }
     .target-picker-dice-row { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.7rem; }
     .target-picker-dice-row:empty { display: none; margin: 0; }
     .target-picker-dice-btn { background: rgba(255,215,0,0.14) !important; border: 1px solid rgba(255,215,0,0.5) !important; color: #FFD700 !important; font-size: 0.85rem !important; padding: 0.5rem !important; }
@@ -383,6 +388,7 @@ function _ensureDom() {
         <div id="targetPickerReactionWait" hidden>
           <div class="target-picker-reaction-wait-text" id="targetPickerReactionWaitText">Waiting for possible reactions…</div>
           <div class="target-picker-reaction-wait-timer" id="targetPickerReactionWaitTimer"></div>
+          <div id="targetPickerReactionWaitDetail"></div>
         </div>
         <div id="targetPickerStep2" hidden>
           <div class="target-picker-roll-target" id="targetPickerRollTarget"></div>
@@ -460,7 +466,7 @@ function _close(result) {
 
 function _showStep1() {
   document.getElementById('targetPickerStep1').hidden = false;
-  document.getElementById('targetPickerReactionWait').hidden = true;
+  document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside');
   document.getElementById('targetPickerStep2').hidden = true;
   document.getElementById('targetPickerStep3').hidden = true;
   _selectedTargetId = null;
@@ -537,10 +543,8 @@ async function _afterTargetsSelected() {
     document.getElementById('targetPickerReactionWaitText').textContent = _groups.length > 1
       ? `Waiting for possible reactions (${g.name})…` : 'Waiting for possible reactions…';
     document.getElementById('targetPickerReactionWaitTimer').textContent = '';
-    const reaction = await waitForReactionWindow('targeted', g.p.id, _attacker?.id, _moveName, (status) => {
-      if (!status.opened) return;
-      document.getElementById('targetPickerReactionWaitTimer').textContent = `${Math.ceil(status.msLeft / 1000)}s`;
-    });
+    document.getElementById('targetPickerReactionWaitDetail').innerHTML = '';
+    const reaction = await waitForReactionWindow('targeted', g.p.id, _attacker?.id, _moveName, _showReactionWait);
     g.reactionDamage = reaction?.multiplier ? { multiplier: reaction.multiplier, pool: reaction.pool || null } : null;
     if (!reaction?.blocked) continue;
     let bypassed = false;
@@ -555,7 +559,7 @@ async function _afterTargetsSelected() {
     }
     if (!bypassed) { g.blocked = true; g.blockerName = reaction.blockerName; }
   }
-  document.getElementById('targetPickerReactionWait').hidden = true;
+  document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside');
   if (_groups.every((g) => g.blocked)) {
     _close({ results: _groups.map((g) => ({ targetId: g.p.id, blocked: true, blockerName: g.blockerName })) });
     return;
@@ -773,18 +777,24 @@ function _stepDamageModifier() {
  * here (pickTarget's own fresh-target flow), not pickTargetAgain's "hit
  * again?" continuation -- a multi-hit move's later hits against the same
  * target already had their one reaction opportunity on the first. */
+/** The reaction wait's countdown, and who's deciding / reacting (reaction-window.js's reactionWaitHtml). */
+function _showReactionWait(status) {
+  if (!status.opened) return;
+  const secs = Math.ceil(status.msLeft / 1000);
+  document.getElementById('targetPickerReactionWaitTimer').textContent = secs > 0 ? `${secs}s` : '';
+  document.getElementById('targetPickerReactionWaitDetail').innerHTML = reactionWaitHtml(status);
+  _overlay.classList.toggle('rw-aside', reactingNow(status));
+}
+
 async function _afterTargetSelected(p, name) {
   document.getElementById('targetPickerStep1').hidden = true;
   document.getElementById('targetPickerReactionWait').hidden = false;
   document.getElementById('targetPickerTitle').textContent = 'Reaction Window';
   document.getElementById('targetPickerReactionWaitText').textContent = 'Waiting for possible reactions…';
   document.getElementById('targetPickerReactionWaitTimer').textContent = '';
-  const reaction = await waitForReactionWindow('targeted', p.id, _attacker?.id, _moveName, (status) => {
-    if (!status.opened) return;
-    const secs = Math.ceil(status.msLeft / 1000);
-    document.getElementById('targetPickerReactionWaitTimer').textContent = `${secs}s`;
-  });
-  document.getElementById('targetPickerReactionWait').hidden = true;
+  document.getElementById('targetPickerReactionWaitDetail').innerHTML = '';
+  const reaction = await waitForReactionWindow('targeted', p.id, _attacker?.id, _moveName, _showReactionWait);
+  document.getElementById('targetPickerReactionWait').hidden = true; _overlay.classList.remove('rw-aside');
   // A reaction that only softens the hit (Protect used again: half the damage drains VP) rides along to the damage step.
   _reactionDamage = reaction?.multiplier ? { multiplier: reaction.multiplier, pool: reaction.pool || null } : null;
   if (reaction?.blocked) {

@@ -8,6 +8,76 @@
 // and combat-wip.js (the 'damaged' family, right after damage lands) so the
 // polling/timeout logic exists in exactly one place.
 import { CombatAPI } from '../api.js';
+import { visibleToViewer } from './combat-visibility.js';
+
+// --- What the wait is for (the user's call after the 2026-11-12 playtest): who may react, who has answered, who is reacting
+// right now and whose screen that is -- so the table can see which player has to do something.
+
+function _esc(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+/** Who plays `p`: "the DM" for the DM's creatures, else the trainer's name ('' when nobody). */
+export function playerOf(p) {
+  const owner = p?.owner || '';
+  return owner === 'DM' ? 'the DM' : owner;
+}
+
+function _injectWaitStyles() {
+  if (document.getElementById('reaction-wait-detail-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'reaction-wait-detail-styles';
+  style.textContent = `
+    .rw-detail { text-align: left; margin: 0.4rem auto 0; max-width: 340px; }
+    .rw-head { font-size: 0.92rem; color: #ffe07a; font-weight: 700; margin-bottom: 0.45rem; text-align: center; }
+    .rw-row { display: flex; justify-content: space-between; gap: 0.8rem; font-size: 0.85rem; padding: 0.3rem 0.55rem; border-radius: 8px; background: rgba(255,255,255,0.05); margin-bottom: 0.25rem; }
+    .rw-row .who small { color: #a0a0c0; font-weight: 500; }
+    .rw-row .st { white-space: nowrap; color: #a0a0c0; }
+    .rw-row.deciding .st { color: #ffd166; }
+    .rw-row.reacting { background: rgba(255,215,0,0.14); box-shadow: inset 0 0 0 1px rgba(255,215,0,0.5); }
+    .rw-row.reacting .st { color: #ffd700; font-weight: 700; }
+    .rw-row.done .st { color: #7bd88f; }
+  `;
+  document.head.appendChild(style);
+}
+
+/** Whether one of the creatures this window was offered to is reacting right now. The wait then steps aside (a banner
+ * at the bottom, not a screen-wide cover): on a screen that also plays the reactor -- the DM's enemy reacting to the DM's
+ * enemy's attack -- its card has to stay usable. */
+export function reactingNow(status) {
+  const id = status?.session?.reactingParticipantId;
+  return !!id && !!status?.pendingReaction?.eligible?.[id];
+}
+
+/** The readout for a reaction wait (`status` as waitForReactionWindow's onStatus gives it): a headline saying who has to do
+ * something, and a row per creature that may react -- deciding, no reaction, reacting now, reacted. '' when not waiting. */
+export function reactionWaitHtml(status) {
+  const pr = status?.pendingReaction;
+  const s = status?.session;
+  if (!pr || !s) return '';
+  _injectWaitStyles();
+  const nameOf = p => (p && visibleToViewer(p, 'name') ? p.name : '???');
+  const reactingId = s.reactingParticipantId && pr.eligible?.[s.reactingParticipantId] ? s.reactingParticipantId : null;
+  const rows = Object.entries(pr.eligible || {}).map(([id, e]) => {
+    const p = s.participants?.[id];
+    const player = playerOf(p);
+    const [cls, st] = id === reactingId ? ['reacting', '⚡ reacting now']
+      : !e.responded ? ['deciding', '… deciding']
+      : p?.reactionUsed ? ['done', '✓ reacted'] : ['done', '– no reaction'];
+    return { cls, html: `<div class="rw-row ${cls}"><span class="who">${_esc(nameOf(p))}${player ? ` <small>(${_esc(player)})</small>` : ''}</span><span class="st">${st}</span></div>` };
+  });
+  let head;
+  if (reactingId) {
+    const p = s.participants?.[reactingId];
+    const player = playerOf(p);
+    head = `⚡ ${_esc(nameOf(p))} is reacting${player ? ` -- waiting for ${_esc(player)} to finish (End Turn on its card)` : ''}`;
+  } else {
+    const deciding = [...new Set(Object.entries(pr.eligible || {}).filter(([, e]) => !e.responded)
+      .map(([id]) => playerOf(s.participants?.[id]) || nameOf(s.participants?.[id])))];
+    head = deciding.length ? `Waiting for ${_esc(deciding.join(', '))} to decide whether to react` : 'Everyone has answered -- carrying on…';
+  }
+  return `<div class="rw-detail"><div class="rw-head">${head}</div>${rows.map(r => r.html).join('')}</div>`;
+}
 
 const POLL_MS = 700;
 const RETRY_CLOSE_MS = 500;
@@ -88,7 +158,7 @@ export async function waitForOpenWindow(onStatus) {
     if (!pr) return result; // closed -- everyone answered, or someone's client already timed it out
 
     const msLeft = pr.expiresAt - Date.now();
-    onStatus?.({ opened: true, msLeft: Math.max(0, msLeft), pendingReaction: pr });
+    onStatus?.({ opened: true, msLeft: Math.max(0, msLeft), pendingReaction: pr, session });
     if (msLeft <= 0) {
       try { await CombatAPI.closeReactionWindow(); } catch { /* someone's still reacting -- retry shortly */ }
       await _sleep(RETRY_CLOSE_MS);

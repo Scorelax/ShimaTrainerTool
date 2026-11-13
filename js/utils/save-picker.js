@@ -54,6 +54,7 @@ function _injectStyles() {
     }
     .save-picker-dc-target .save-picker-portrait { width: 48px; height: 48px; margin: 0; flex-shrink: 0; }
     .save-picker-dc-target-name { font-weight: 700; font-size: 1.05rem; }
+    .save-picker-area-note { font-size: 0.9rem; color: #cfd0e0; text-align: center; line-height: 1.35; }
     .save-picker-dc-value { text-align: center; font-size: 1rem; margin-bottom: 1rem; }
     .save-picker-dc-value strong { color: #FFD700; font-size: 1.4rem; }
     .save-picker-outcome-actions { display: flex; gap: 0.6rem; }
@@ -221,11 +222,13 @@ export function setRemoteSaveHandler(fn) { _remoteSave = typeof fn === 'function
 /** True while a save is being asked here (shown, or waiting on another screen) -- the popup is single-use. */
 export function isSavePickerBusy() { return !!_resolve; }
 let _saveTitle = null; // confirmSecondarySave's own title for the save step
+let _askHere = false; // confirmSecondarySave's `askHere`: made on this screen even for another player's creature
+let _areaNote = ''; // promptAreaDamageRoll's line on the damage step (no single target to show there)
 
 function _showStep2(p, name) {
   if (p) { _selectedTarget = p; _selectedTargetName = name; }
   // Not a typed-in DC (the reactor's own save against whoever hit them, on their own screen anyway).
-  const remote = !_manualDc && _remoteSave
+  const remote = !_manualDc && _remoteSave && !_askHere
     ? _remoteSave(_selectedTarget, { dc: _dc, ability: _saveAbility, title: _saveTitle || 'Saving Throw', moveUserId: _moveUser?.id || null, note: _saveNote })
     : null;
   if (remote) {
@@ -484,7 +487,9 @@ function _showStep3() {
   document.getElementById('savePickerStep2').hidden = true;
   document.getElementById('savePickerStep3').hidden = false;
   document.getElementById('savePickerTitle').textContent = 'Damage Roll';
-  document.getElementById('savePickerDamageTarget').innerHTML = `
+  document.getElementById('savePickerDamageTarget').innerHTML = _areaNote
+    ? `<div class="save-picker-area-note">${_areaNote}</div>` // promptAreaDamageRoll: one roll for everyone in the area
+    : `
     <div class="save-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName, '', '', { small: true })}</div>
     <div class="save-picker-dc-target-name">${_selectedTargetName}</div>`;
   document.getElementById('savePickerModifierNote').textContent =
@@ -594,7 +599,9 @@ function _cardHtml(p) {
  * save bonuses), folds the numeric ones into the total, uses up "next roll"
  * effects once Success/Fail is chosen, and reports the net rollMode.
  */
-export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw', moveUser = null, damageOnPass = false, abilityDice = [], damageDice = '', halfOn = null, note = '' } = {}) {
+export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw', moveUser = null, damageOnPass = false, abilityDice = [], damageDice = '', halfOn = null, note = '', askHere = false } = {}) {
+  _askHere = !!askHere;
+  _areaNote = '';
   _abilityDice = abilityDice || [];
   _damageDice = damageDice || '';
   _ensureDom();
@@ -648,6 +655,8 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
   _hasDamage = hasDamage;
   _saveAbility = ability;
   _damageOnPass = false; // single-target save flow -- a move's own "half as much on a success" comes as halfOn 'pass'
+  _askHere = false;
+  _areaNote = '';
   _halfOn = halfOn;
   _saveNote = '';
   _pendingSave = null;
@@ -692,6 +701,8 @@ export async function pickManualSaveTarget(casterId, { speciesName = '' } = {}) 
   _ensureDom();
   _dc = 0;
   _manualDc = true;
+  _askHere = false;
+  _areaNote = '';
   _hasDamage = false;
   _saveAbility = null;
   _moveUser = null;
@@ -716,4 +727,31 @@ export async function pickManualSaveTarget(casterId, { speciesName = '' } = {}) 
 
   _overlay.style.display = 'flex';
   return new Promise((resolve) => { _resolve = resolve; });
+}
+
+/**
+ * An area move's damage, rolled once for everyone caught in it (the user's call after the 2026-11-12 playtest: every
+ * creature's save is asked at once, and each answer is dealt with as it comes in -- combat-wip.js's _runMultiHitAoe). The
+ * same damage step as a single save (dice, the move's modifier, Battle Dice, Blaze / Torrent's extra dice), with no target
+ * on it. Resolves the roll (with its extras, without the modifier -- the caller adds that, as for `rawRoll`), or null
+ * when closed.
+ */
+export function promptAreaDamageRoll({ moveName = '', damageModifier = 0, damageDice = '', abilityDice = [], note = '' } = {}) {
+  _ensureDom();
+  _askHere = false;
+  _abilityDice = abilityDice || [];
+  _damageDice = damageDice || '';
+  _damageModifier = damageModifier;
+  _speciesName = '';
+  _halfOn = null;
+  _pendingPassed = false;
+  _pendingSave = null;
+  _selectedTargetId = null;
+  _selectedTarget = null;
+  _areaNote = note || `Roll ${moveName}'s damage once, for everyone caught in it -- each creature takes all of it, half or none, by its save.`;
+  document.getElementById('savePickerAnimMedia').innerHTML = '';
+  document.getElementById('savePickerStep1').hidden = true;
+  _overlay.style.display = 'flex';
+  _showStep3();
+  return new Promise((resolve) => { _resolve = (r) => resolve(r ? r.rawRoll : null); });
 }

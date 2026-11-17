@@ -17,7 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import admin, db, gamedata, live, media, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews, image_copies
+from . import admin, assistant, db, gamedata, live, media, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews, image_copies
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
 
@@ -362,6 +362,19 @@ def dm_admin_splash_delete(payload: dict):
 def dm_admin_battle_log_name(payload: dict):
     """The DM's name for a battle in the Admin module's battle logs ({file, name}; an empty name: the default one)."""
     return _admin(lambda: admin.rename_battle_log(payload.get('file'), payload.get('name')))
+
+
+@app.post('/api/dm/assistant')
+def dm_assistant(payload: dict):
+    """A question to the DM console's assistant ({conversation, message}) -- see assistant.py. Can take a while (it
+    looks things up); runs in FastAPI's thread pool like the other plain-def endpoints."""
+    return _admin(lambda: assistant.ask(payload.get('conversation'), payload.get('message')))
+
+
+@app.get('/api/dm/assistant-status')
+def dm_assistant_status():
+    """Whether the assistant is set up on the Pi, its model, and today's spend against the cap."""
+    return JSONResponse({'status': 'success', 'data': assistant.status()})
 
 
 @app.post('/api/dm/admin-picture')

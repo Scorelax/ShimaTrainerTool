@@ -106,6 +106,31 @@ serve is the only way in, nothing is exposed on the LAN or internet.
 Also set a **DHCP reservation** for the Pi in the router so SSH stays at a
 predictable address. A dynamic public IP is irrelevant — Tailscale handles it.
 
+### The DM assistant (Claude API)
+
+The DM console's 💬 Assistant (`app/assistant.py`, its handbook in
+`assistant/dm-handbook.md`) asks Claude through the Anthropic API — a pay-as-you-go
+account at console.anthropic.com (separate from a Claude subscription), with a
+spending limit set there too. Without a key the panel just says it isn't set up.
+
+```bash
+cd ~/pokemon-dnd/pi-server && .venv/bin/pip install -r requirements.txt   # the anthropic package
+sudo nano /etc/pokedex-assistant.env      # one line: ANTHROPIC_API_KEY=sk-ant-...
+sudo chmod 600 /etc/pokedex-assistant.env # only root can read it; systemd reads it before starting the app
+```
+
+In `pokedex.service`, under `[Service]`: `EnvironmentFile=/etc/pokedex-assistant.env`,
+then `sudo systemctl daemon-reload && sudo systemctl restart pokedex`.
+The key is never in the repo.
+
+Optional, in the same file: `ASSISTANT_MODEL` (default `claude-haiku-5-5`),
+`ASSISTANT_DAILY_LIMIT_USD` (default `1.00` — the Pi stops asking once a day's
+spend reaches it). What it has cost per day: `data/assistant-usage.json`; every
+question, the lookups it made, the answer and its cost: `data/assistant-log.jsonl`.
+
+When a DM console feature changes, update `assistant/dm-handbook.md` with it —
+it's the assistant's map of the console (it searches the code for the rest).
+
 ### Backups (nightly)
 
 From `crontab -e` (user `scorelax` on the live Pi):

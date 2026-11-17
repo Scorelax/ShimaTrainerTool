@@ -34,6 +34,7 @@ import { TERRAIN, WEATHER_ROLL_MOD } from './encounter-rules.js';
 import { renderDisplay, displayAway, displaySessionChanged } from './display.js';
 import { renderPokenav, pokenavSessionChanged } from './pokenav.js';
 import { renderAdmin } from './admin.js';
+import { initAssistant } from './assistant.js';
 
 enableDmMode(DM);
 
@@ -60,6 +61,7 @@ async function init() {
     return;
   }
   renderTopWidget(document.getElementById('dmTopWidgets'), () => showModule('clock'));
+  initAssistant(); // the 💬 at the bottom of the rail (assistant.js)
   const res = await CombatAPI.getState().catch(() => null);
   if (res?.status === 'success') session = res.data;
   route();

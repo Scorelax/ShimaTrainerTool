@@ -1805,6 +1805,17 @@ button.dm-nav-fold:hover, .dm-world-fold:hover { color: var(--dm-gold); }
 
 /* ---- The Assistant (js/dm/assistant.js): the 💬 at the bottom of the rail, and its chat drawer on the right ---- */
 .dm-rail-assistant { margin-top: auto; }
+
+/* ---- Patch Notes (js/dm/patch-notes.js): the 📜 on the rail just above ShimAI, and its popup ---- */
+.dm-rail-patchnotes { position: relative; margin-top: auto; }
+.dm-rail-patchnotes + .dm-rail-assistant { margin-top: 0; }
+.dm-rail-newdot { position: absolute; top: 6px; right: 12px; width: 9px; height: 9px; border-radius: 50%; background: var(--dm-gold); box-shadow: 0 0 6px rgba(255, 215, 0, 0.8); }
+.dm-patch-notes .patch-notes-entry + .patch-notes-entry { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--dm-line); }
+.dm-patch-notes .patch-notes-title { margin: 0.2rem 0 0.4rem; color: var(--dm-gold); font-size: 0.98rem; }
+.dm-patch-notes .patch-notes-intro { margin: 0 0 0.6rem; color: var(--dm-text); font-size: 0.9rem; line-height: 1.45; }
+.dm-patch-notes .patch-notes-list { list-style: none; margin: 0; padding: 0; }
+.dm-patch-notes .patch-notes-list li { padding: 0.4rem 0; border-bottom: 1px solid var(--dm-line); color: var(--dm-muted); font-size: 0.87rem; line-height: 1.45; }
+.dm-patch-notes .patch-notes-list li:last-child { border-bottom: none; }
 .dm-assistant {
   position: fixed; top: 52px; right: 0; bottom: 0; z-index: 10045; width: min(440px, 92vw);
   display: flex; flex-direction: column; background: var(--dm-panel); border-left: 1px solid var(--dm-line);

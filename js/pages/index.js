@@ -2,6 +2,7 @@
 import { ON_OLD_GITHUB_ADDRESS } from '../api.js';
 import { audioManager } from '../utils/audio.js';
 import { getSettings, saveSettings } from '../utils/settings.js';
+import { patchNotesHtml, hasUnseenPatchNotes, markPatchNotesSeen } from '../patch-notes.js';
 
 export function renderIndex() {
   return `
@@ -168,6 +169,24 @@ export function renderIndex() {
           font-size: clamp(1rem, 2.5vw, 1.3rem);
         }
 
+        /* Patch Notes Button -- the Settings button's twin, in the top left corner */
+        .patch-notes-button {
+          right: auto;
+          left: clamp(15px, 3vw, 20px);
+        }
+
+        .patch-notes-dot {
+          position: absolute;
+          top: -5px;
+          right: -5px;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #FFDE00;
+          border: 2px solid #970909;
+          box-shadow: 0 0 8px rgba(255,222,0,0.8);
+        }
+
         @media (max-width: 1024px) {
           .landing-buttons {
             max-width: min(65vw, 75vh);
@@ -205,6 +224,64 @@ export function renderIndex() {
             padding: clamp(0.5rem, 1.2vh, 0.7rem) clamp(0.8rem, 2vw, 1rem);
             font-size: clamp(0.75rem, 1.8vw, 0.9rem);
           }
+        }
+
+        /* Patch Notes Modal */
+        .patch-notes-modal {
+          max-width: min(560px, 92vw);
+          max-height: 85vh;
+          display: flex;
+          flex-direction: column;
+          text-align: left;
+        }
+
+        .patch-notes-modal .cache-modal-title,
+        .patch-notes-modal .cache-modal-icon {
+          text-align: center;
+        }
+
+        .patch-notes-body {
+          min-height: 0;
+          overflow-y: auto;
+          margin: 0 -0.5rem 1.25rem;
+          padding: 0 0.5rem;
+        }
+
+        .patch-notes-entry + .patch-notes-entry {
+          margin-top: 1.5rem;
+          padding-top: 1.25rem;
+          border-top: 1px solid rgba(255,255,255,0.15);
+        }
+
+        .patch-notes-title {
+          font-size: clamp(0.95rem, 2.4vw, 1.1rem);
+          color: #FFDE00;
+          margin: 0 0 0.5rem;
+        }
+
+        .patch-notes-intro {
+          font-size: clamp(0.85rem, 2.1vw, 0.95rem);
+          color: rgba(255,255,255,0.9);
+          margin: 0 0 0.75rem;
+          line-height: 1.5;
+        }
+
+        .patch-notes-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
+
+        .patch-notes-list li {
+          font-size: clamp(0.82rem, 2vw, 0.92rem);
+          color: rgba(255,255,255,0.85);
+          line-height: 1.5;
+          padding: 0.45rem 0;
+          border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+
+        .patch-notes-list li:last-child {
+          border-bottom: none;
         }
 
         @media (max-width: 360px) {
@@ -501,6 +578,25 @@ export function renderIndex() {
         </div>
       </div>
 
+      <!-- Patch Notes Modal -->
+      <div id="patchNotesModal" class="cache-modal-overlay" style="display:none;">
+        <div class="cache-modal patch-notes-modal">
+          <div class="cache-modal-icon">📜</div>
+          <h2 class="cache-modal-title">Patch Notes</h2>
+          <div class="patch-notes-body">${patchNotesHtml('players')}</div>
+          <div class="cache-modal-buttons">
+            <button class="cache-modal-btn cache-modal-ok" id="patchNotesCloseButton" style="max-width:none;">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Patch Notes Button -->
+      <button class="cache-reset-button patch-notes-button" id="patchNotesButton">
+        <span class="cache-reset-icon">📜</span>
+        <span>Patch Notes</span>
+        ${hasUnseenPatchNotes() ? '<span class="patch-notes-dot" id="patchNotesDot" title="New stuff!"></span>' : ''}
+      </button>
+
       <!-- Settings Button -->
       <button class="cache-reset-button" id="settingsButton">
         <span class="cache-reset-icon">⚙️</span>
@@ -586,6 +682,17 @@ export function attachIndexListeners() {
 
   // Close on overlay click
   cacheModal?.addEventListener('click', (e) => { if (e.target === cacheModal) hideCacheModal(); });
+
+  // Patch notes modal
+  const patchNotesModal = document.getElementById('patchNotesModal');
+  const hidePatchNotes = () => { patchNotesModal.style.display = 'none'; };
+  patchNotesModal?.addEventListener('click', (e) => { if (e.target === patchNotesModal) hidePatchNotes(); });
+  document.getElementById('patchNotesCloseButton')?.addEventListener('click', hidePatchNotes);
+  document.getElementById('patchNotesButton')?.addEventListener('click', () => {
+    patchNotesModal.style.display = 'flex';
+    markPatchNotesSeen();
+    document.getElementById('patchNotesDot')?.remove();
+  });
 
   // Settings modal
   const settingsModal = document.getElementById('settingsModal');

@@ -35,6 +35,7 @@ import { renderDisplay, displayAway, displaySessionChanged } from './display.js'
 import { renderPokenav, pokenavSessionChanged } from './pokenav.js';
 import { renderAdmin } from './admin.js';
 import { initAssistant } from './assistant.js';
+import { initPatchNotes } from './patch-notes.js';
 
 enableDmMode(DM);
 
@@ -61,6 +62,7 @@ async function init() {
     return;
   }
   renderTopWidget(document.getElementById('dmTopWidgets'), () => showModule('clock'));
+  initPatchNotes(); // the 📜 just above ShimAI on the rail (patch-notes.js)
   initAssistant(); // the 💬 at the bottom of the rail (assistant.js)
   const res = await CombatAPI.getState().catch(() => null);
   if (res?.status === 'success') session = res.data;

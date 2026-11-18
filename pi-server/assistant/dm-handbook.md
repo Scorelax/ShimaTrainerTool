@@ -2,7 +2,8 @@
 
 The DM console is its own page (dm-console.html), run on the DM's laptop. Across the top: the brand, a status line
 (the battle, whose turn it is), and the world clock / weather / pinned timers (click it to open the Clock module).
-Down the left is the **rail** of modules: **Battle, Party, Pokédex, NPCs, Clock, PokéNav, Display, Admin** — and the
+Down the left is the **rail** of modules: **Battle, Party, Pokédex, NPCs, Clock, PokéNav, Display, Admin** — and at the bottom
+**📜 Patch Notes** (what's new in the DM console since the last session; a gold dot means there's something unread) and
 **💬 ShimAI** (this chat, the assistant). The module open last opens again after a reload. Most things save to the Pi on their own a
 moment after a change; there is rarely a Save button.
 

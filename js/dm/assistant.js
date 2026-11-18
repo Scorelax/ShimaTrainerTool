@@ -183,6 +183,7 @@ function draw() {
     if (!blank) { send(text); return; }
     const box = _drawer.querySelector('textarea');
     box.value = text;
+    box.dataset.blanks = '1';   // Enter / Tab go from blank to blank (the box is made anew once it's sent)
     box.focus();
     box.setSelectionRange(blank.index, blank.index + blank[0].length);
   }));
@@ -192,13 +193,21 @@ function draw() {
   const form = _drawer.querySelector('form');
   const box = form.querySelector('textarea');
   form.addEventListener('submit', (e) => { e.preventDefault(); send(box.value); });
+  // A suggestion with blanks in the box (the user's call, 2026-11-18): Enter and Tab select the next blank still
+  // untouched, onwards from where the cursor is (a blank selected and left as it is is skipped). With none further on,
+  // Enter sends (an untouched [title] is taken out) and Tab does what it always does.
+  const nextBlank = () => {
+    const all = [...box.value.matchAll(new RegExp(BLANK.source, 'g'))];
+    const here = all.find(m => m.index === box.selectionStart && m.index + m[0].length === box.selectionEnd);
+    return here ? all.find(m => m.index > here.index) : all.find(m => m.index >= box.selectionEnd);
+  };
+  const selectBlank = (m) => box.setSelectionRange(m.index, m.index + m[0].length);
+  box.addEventListener('input', () => { if (!box.value.trim()) delete box.dataset.blanks; });   // emptied: a message of its own
   box.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(box.value); }
-    // Tab: the next blank left to fill in (X, Y, Z of a suggestion)
-    if (e.key === 'Tab' && !e.shiftKey) {
-      const blank = box.value.match(BLANK);
-      if (blank) { e.preventDefault(); box.setSelectionRange(blank.index, blank.index + blank[0].length); }
-    }
+    if (e.shiftKey || e.isComposing || (e.key !== 'Enter' && e.key !== 'Tab')) return;
+    const next = box.dataset.blanks ? nextBlank() : null;
+    if (next) { e.preventDefault(); selectBlank(next); return; }
+    if (e.key === 'Enter') { e.preventDefault(); send(box.value); }
   });
 }
 

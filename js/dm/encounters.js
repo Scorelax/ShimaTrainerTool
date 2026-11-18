@@ -169,6 +169,15 @@ window.addEventListener('dm:exclusions-changed', (e) => {
   if (b) b.textContent = `🚫 Exclusions (${_exclusions.length})`;
 });
 
+// ShimAI (assistant.js) saved a new encounter: the list fetched again and redrawn -- the open encounter, the search
+// and changes not yet saved stay as they are (ShimAI only ever adds an encounter).
+window.addEventListener('dm:encounters-changed', async () => {
+  let encs;
+  try { encs = await DmAPI.encounters(); } catch { return; } // (it's there the next time the tab opens)
+  _encounters = (encs.data || []).map(e => (_saveTimers.has(e.id) ? _encounters.find(x => x.id === e.id) || e : e));
+  if (_tab === 'library' && document.getElementById('encList')) renderList();
+});
+
 async function renderLibrary(body) {
   body.innerHTML = '<div class="dm-loading">Loading the encounters…</div>';
   try {

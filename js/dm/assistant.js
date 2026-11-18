@@ -9,14 +9,14 @@ import { DmAPI } from '../api.js';
 import { escapeHtml } from './dm-common.js';
 
 const STORE_KEY = 'dm-assistant-chat';
-// One with blanks (X, Y, Z) goes into the message box to be filled in, with the first blank selected; the rest are
-// sent at once.
+// One with blanks (X, Y, Z) goes into the message box to be filled in, with the first blank selected (Tab selects the
+// next one); the rest are sent at once.
 const SUGGESTIONS = [
   'Summarize the last battle',
   "Party's current status",
   "Create an encounter with X Pokémon with typings Y and Z, with comparable levels to the party's active Pokémon",
 ];
-const BLANK = /[XYZ]/;
+const BLANK = /\b[XYZ]\b/;
 
 let _chat = load();         // {conversation, items: [{role: 'user'|'assistant'|'error', text, steps?, changed?}]}
 let _busy = false;
@@ -194,6 +194,11 @@ function draw() {
   form.addEventListener('submit', (e) => { e.preventDefault(); send(box.value); });
   box.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(box.value); }
+    // Tab: the next blank left to fill in (X, Y, Z of a suggestion)
+    if (e.key === 'Tab' && !e.shiftKey) {
+      const blank = box.value.match(BLANK);
+      if (blank) { e.preventDefault(); box.setSelectionRange(blank.index, blank.index + 1); }
+    }
   });
 }
 
@@ -208,6 +213,8 @@ async function send(text) {
     const res = await DmAPI.askAssistant(_chat.conversation, text);
     _chat.conversation = res.conversation;
     _chat.items.push({ role: 'assistant', text: res.reply, steps: res.steps, changed: res.changed });
+    // a new encounter saved: Encounter setup shows it at once (encounters.js)
+    if ((res.changed || []).includes('encounters')) window.dispatchEvent(new CustomEvent('dm:encounters-changed'));
     if (_status) { _status.spentToday = res.spentToday; _status.dailyLimit = res.dailyLimit; }
   } catch (err) {
     _chat.items.push({ role: 'error', text: err.message });

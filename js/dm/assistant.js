@@ -9,14 +9,14 @@ import { DmAPI } from '../api.js';
 import { escapeHtml } from './dm-common.js';
 
 const STORE_KEY = 'dm-assistant-chat';
-// One with blanks (X, Y, Z) goes into the message box to be filled in, with the first blank selected (Tab selects the
-// next one); the rest are sent at once.
+// One with blanks (X, Y, Z, [title]) goes into the message box to be filled in, with the first blank selected (Tab
+// selects the next one); the rest are sent at once. [title] may be left: it's taken out and ShimAI names the encounter.
 const SUGGESTIONS = [
   'Summarize the last battle',
   "Party's current status",
-  "Create an encounter with X Pokémon with typings Y and Z, with comparable levels to the party's active Pokémon",
+  "Create an encounter with X Pokémon with typings Y and Z, with comparable levels to the party's active Pokémon, titled [title]",
 ];
-const BLANK = /\b[XYZ]\b/;
+const BLANK = /\b[XYZ]\b|\[title\]/;
 
 let _chat = load();         // {conversation, items: [{role: 'user'|'assistant'|'error', text, steps?, changed?}]}
 let _busy = false;
@@ -184,7 +184,7 @@ function draw() {
     const box = _drawer.querySelector('textarea');
     box.value = text;
     box.focus();
-    box.setSelectionRange(blank.index, blank.index + 1);
+    box.setSelectionRange(blank.index, blank.index + blank[0].length);
   }));
   _drawer.querySelectorAll('[data-asst-open="encounters"]').forEach(b => b.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('dm:open-encounters'));
@@ -197,13 +197,13 @@ function draw() {
     // Tab: the next blank left to fill in (X, Y, Z of a suggestion)
     if (e.key === 'Tab' && !e.shiftKey) {
       const blank = box.value.match(BLANK);
-      if (blank) { e.preventDefault(); box.setSelectionRange(blank.index, blank.index + 1); }
+      if (blank) { e.preventDefault(); box.setSelectionRange(blank.index, blank.index + blank[0].length); }
     }
   });
 }
 
 async function send(text) {
-  text = String(text || '').trim();
+  text = String(text || '').replace(/,?\s*titled \[title\]/, '').trim();   // the title left to ShimAI
   if (!text || _busy) return;
   _chat.items.push({ role: 'user', text });
   _busy = true;

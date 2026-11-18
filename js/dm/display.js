@@ -749,7 +749,10 @@ async function drawSource() {
   // the locations' folders, each time the backgrounds are shown (one made or renamed in Admin meanwhile)
   if (_source === 'backgrounds') {
     const locations = await DmAPI.getState('locations').catch(() => null);
-    if (Array.isArray(locations)) _locIcons = new Map(locations.filter(l => l?.id && l.icon?.url).map(l => [l.id, l.icon.url]));
+    if (Array.isArray(locations)) {
+      _locIcons = new Map(locations.filter(l => l?.id && l.icon?.url).map(l => [l.id, l.icon.url]));
+      _locPics = new Map(locations.filter(l => l?.id && l.image).map(l => [l.id, l.image]));
+    }
     if (_folderSet === 'backgrounds' && syncLocationFolders(locations)) saveFolders();   // (not if another tab is open by now)
   }
   drawGrid();
@@ -1287,6 +1290,9 @@ const LOC_FOLDERS_SHUT = 'dm-display-locfolders-shut';
 // Each location's icon on the region map (location-icon.js), by location id -- shown on its folder (the user's call,
 // 2026-10-21): standing in the corner of the folder's first picture, or in its place when the folder has none yet.
 let _locIcons = new Map();
+// Each location's main picture (Admin › Locations), by location id -- the picture on its folder (the user's call,
+// 2026-11-18), before the folder's first picture.
+let _locPics = new Map();
 const locIconHtml = (f, cls) => (f.locId && _locIcons.has(f.locId) ? `<img class="${cls}" src="${escapeHtml(_locIcons.get(f.locId))}" alt="" draggable="false">` : '');
 let _locFoldersShut = (() => { try { return localStorage.getItem(LOC_FOLDERS_SHUT) === '1'; } catch { return false; } })();
 
@@ -1296,9 +1302,10 @@ function locationFoldersHtml(list) {
   const tile = (f) => {
     const inFolder = pics.filter(b => b.folder === f.id);
     const inside = inFolder.length + _folders.filter(x => x.parent === f.id).length;
+    const pic = _locPics.get(f.locId) || inFolder[0]?.url || '';
     return `<div class="dm-disp-locfolder${inside ? '' : ' empty'}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}" data-drag-folder="${escapeHtml(f.id)}" draggable="true" role="button" tabindex="0"
         title="${escapeHtml(f.name)}: the location's own folder -- named and removed with it in Admin › Locations. Open it, or drop pictures on it">
-      <span class="dm-disp-locfolder-pic${_locIcons.has(f.locId) ? ' has-icon' : ''}">${inFolder[0] ? `<img src="${escapeHtml(inFolder[0].url)}" alt="" loading="lazy" draggable="false">` : _locIcons.has(f.locId) ? '' : '📍'}${locIconHtml(f, `dm-disp-locicon${inFolder[0] ? '' : ' alone'}`)}</span>
+      <span class="dm-disp-locfolder-pic${_locIcons.has(f.locId) ? ' has-icon' : ''}">${pic ? `<img src="${escapeHtml(pic)}" alt="" loading="lazy" draggable="false">` : _locIcons.has(f.locId) ? '' : '📍'}${locIconHtml(f, `dm-disp-locicon${pic ? '' : ' alone'}`)}</span>
       <span class="dm-disp-locfolder-name">${escapeHtml(f.name)}<small>${inside ? `${inside} inside` : 'empty'}</small></span>
     </div>`;
   };
@@ -1313,7 +1320,9 @@ function folderCardHtml(f) {
   // a location's folder comes and goes with its location: no rename or delete here
   const kept = _source === 'backgrounds' && !!f.locId;
   return `<div class="dm-disp-folder${f.locId ? ' location' : ''}" data-open-folder="${escapeHtml(f.id)}" data-drop-folder="${escapeHtml(f.id)}" data-drag-folder="${escapeHtml(f.id)}" draggable="true" role="button" tabindex="0" title="${f.locId ? 'The location\'s own folder -- named and removed with it in Admin › Locations. ' : ''}Open it -- or drop ${_source === 'npcs' ? 'NPCs' : 'pictures'} on it">
-    <span class="dm-disp-folder-icon">${locIconHtml(f, 'dm-disp-locicon big') || (f.locId ? '📍' : '📁')}</span>
+    ${f.locId && _locPics.has(f.locId)
+    ? `<span class="dm-disp-folder-icon has-pic"><img class="dm-disp-folder-pic" src="${escapeHtml(_locPics.get(f.locId))}" alt="" loading="lazy" draggable="false">${locIconHtml(f, 'dm-disp-locicon big')}</span>`
+    : `<span class="dm-disp-folder-icon">${locIconHtml(f, 'dm-disp-locicon big') || (f.locId ? '📍' : '📁')}</span>`}
     <span class="dm-disp-bg-name">${escapeHtml(f.name)}<small>${f.locId ? 'Location · ' : ''}${inside} inside</small></span>
     ${kept ? '' : `<span class="dm-disp-bg-tools">
       <button class="dm-icon-btn" data-folder-act="rename" title="Rename">✎</button>

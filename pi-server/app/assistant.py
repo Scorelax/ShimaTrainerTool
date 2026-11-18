@@ -292,6 +292,17 @@ def game_data(kind, name):
     return json.dumps(m, ensure_ascii=False)
 
 
+def _hp_vp(o):
+    """'now/max' HP and VP of a trainer or Pokemon (a null current value means it's at the max)."""
+    combat, cur = o.get('combat') or {}, o.get('current') or {}
+    out = {}
+    for key, max_key in (('hp', 'maxHP'), ('vp', 'maxVP')):
+        mx = combat.get(max_key)
+        now = cur.get(key)
+        out[key.upper()] = f"{mx if now is None else now}/{mx}" if mx is not None else None
+    return out
+
+
 def party_overview():
     conn = db.connect()
     try:
@@ -299,14 +310,21 @@ def party_overview():
         for _, t in trainers.all_trainers(conn):
             mons = [p for _, p in owned.all_owned(conn, t.get('name'))]
             party = [p for p in mons if p.get('partySlot')]
+            members = []
+            for p in sorted(party, key=lambda p: p.get('partySlot') or 99):
+                m = {'species': p.get('name'), 'nickname': p.get('nickname') or None, 'level': p.get('level'),
+                     'types': '/'.join(x for x in ((p.get('types') or {}).get('primary'),
+                                                   (p.get('types') or {}).get('secondary')) if x),
+                     **_hp_vp(p),
+                     'statusConditions': p.get('statusConditions') or [],
+                     'heldItem': p.get('heldItem') or None}
+                now = (p.get('current') or {}).get('hp')
+                if now is not None and now <= 0:
+                    m['fainted'] = True
+                members.append(m)
             out.append({'trainer': t.get('name'), 'level': t.get('level'), 'class': t.get('trainerClass'),
-                        'trainerPath': t.get('trainerPath'),
-                        'party': [{'species': p.get('name'), 'nickname': p.get('nickname') or None,
-                                   'level': p.get('level'),
-                                   'types': '/'.join(x for x in ((p.get('types') or {}).get('primary'),
-                                                                 (p.get('types') or {}).get('secondary')) if x)}
-                                  for p in sorted(party, key=lambda p: p.get('partySlot') or 99)],
-                        'otherPokemon': len(mons) - len(party)})
+                        'trainerPath': t.get('trainerPath'), **_hp_vp(t), 'money': t.get('money'),
+                        'party': members, 'otherPokemon': len(mons) - len(party)})
         return json.dumps(out, ensure_ascii=False)
     finally:
         conn.close()
@@ -406,8 +424,10 @@ TOOLS = [
      'input_schema': _obj({'kind': {'type': 'string', 'enum': ['move', 'item', 'ability', 'nature']},
                            'name': {'type': 'string'}}, ['kind', 'name'])},
     {'name': 'party_overview',
-     'description': "The players' trainers: level, class, trainer path, and the Pokemon in each one's party (species, "
-                    "nickname, level, types). Use it to pitch an encounter at the party.",
+     'description': "The players' trainers right now: level, class, trainer path, HP and VP (now/max), money, and the "
+                    "Pokemon in each one's party (species, nickname, level, types, HP and VP now/max, status "
+                    "conditions, held item, fainted). Use it for the party's status, and to pitch an encounter at the "
+                    "party.",
      'input_schema': _obj({})},
     {'name': 'list_encounters',
      'description': "The encounters already in the DM's library (Encounter setup): name, Pokemon, NPC count, notes.",

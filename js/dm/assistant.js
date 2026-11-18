@@ -9,12 +9,14 @@ import { DmAPI } from '../api.js';
 import { escapeHtml } from './dm-common.js';
 
 const STORE_KEY = 'dm-assistant-chat';
+// One with blanks (X, Y, Z) goes into the message box to be filled in, with the first blank selected; the rest are
+// sent at once.
 const SUGGESTIONS = [
-  'How do I upload a new splash screen?',
-  'Can I make a Pokémon invisible on the battlefield?',
   'Summarize the last battle',
-  'Suggest an encounter for the party: three Water types near a lake',
+  "Party's current status",
+  "Create an encounter with X Pokémon with typings Y and Z, with comparable levels to the party's active Pokémon",
 ];
+const BLANK = /[XYZ]/;
 
 let _chat = load();         // {conversation, items: [{role: 'user'|'assistant'|'error', text, steps?, changed?}]}
 let _busy = false;
@@ -175,7 +177,15 @@ function draw() {
     draw();
     _drawer.querySelector('textarea')?.focus();
   });
-  _drawer.querySelectorAll('[data-asst-suggest]').forEach(b => b.addEventListener('click', () => send(b.dataset.asstSuggest)));
+  _drawer.querySelectorAll('[data-asst-suggest]').forEach(b => b.addEventListener('click', () => {
+    const text = b.dataset.asstSuggest;
+    const blank = text.match(BLANK);
+    if (!blank) { send(text); return; }
+    const box = _drawer.querySelector('textarea');
+    box.value = text;
+    box.focus();
+    box.setSelectionRange(blank.index, blank.index + 1);
+  }));
   _drawer.querySelectorAll('[data-asst-open="encounters"]').forEach(b => b.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('dm:open-encounters'));
   }));

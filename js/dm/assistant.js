@@ -1,4 +1,4 @@
-// DM console -- the Assistant (the user's call, 2026-11-17): a chat drawer on the right, opened from the 💬 at the
+// DM console -- ShimAI, the assistant (the user's call, 2026-11-17; named ShimAI 2026-11-18): a chat drawer on the right, opened from the 💬 at the
 // bottom of the rail, over whatever module is open (it isn't a module of its own, so the DM can ask about the screen
 // they're on). The DM asks how to do something in the app, whether something is possible, for a battle log's summary,
 // or for an encounter to their criteria; the Pi asks Claude and runs the lookups (pi-server/app/assistant.py).
@@ -86,8 +86,8 @@ export function initAssistant() {
   const btn = document.createElement('button');
   btn.className = 'dm-rail-btn dm-rail-assistant';
   btn.id = 'dmAssistantBtn';
-  btn.title = 'Assistant -- ask how to do something in the app, have a battle summarized, or get an encounter drafted';
-  btn.innerHTML = '<span>💬</span>Assistant';
+  btn.title = 'ShimAI -- ask how to do something in the app, have a battle summarized, or get an encounter drafted';
+  btn.innerHTML = '<span>💬</span>ShimAI';
   // not a module: the rail's own click handler looks for [data-module], which this hasn't got
   btn.addEventListener('click', () => toggle());
   rail.appendChild(btn);
@@ -123,12 +123,12 @@ function drawStatus() {
   const el = _drawer.querySelector('.dm-asst-status');
   if (!el || !_status) return;
   if (!_status.ready) {
-    el.innerHTML = `<div class="dm-asst-notready">${escapeHtml(_status.reason || 'The assistant is not set up.')}</div>`;
+    el.innerHTML = `<div class="dm-asst-notready">${escapeHtml(_status.reason || 'ShimAI is not set up.')}</div>`;
     return;
   }
   const spent = Number(_status.spentToday || 0);
   const shown = spent > 0 && spent < 0.01 ? 'under $0.01' : `$${spent.toFixed(2)}`;
-  el.innerHTML = `<span class="dm-hint" title="What the assistant has cost today, against the Pi's daily limit">Today: ${shown} of $${Number(_status.dailyLimit || 0).toFixed(2)}</span>`;
+  el.innerHTML = `<span class="dm-hint" title="What ShimAI has cost today, against the Pi's daily limit">Today: ${shown} of $${Number(_status.dailyLimit || 0).toFixed(2)}</span>`;
 }
 
 function itemHtml(it) {
@@ -146,7 +146,7 @@ function draw() {
   const empty = !_chat.items.length;
   _drawer.innerHTML = `
     <header class="dm-asst-head">
-      <strong>💬 Assistant</strong>
+      <strong>💬 ShimAI</strong>
       <span class="dm-asst-status"></span>
       <button class="dm-btn small" data-asst="new" title="Start over -- forget this conversation">New chat</button>
       <button class="dm-icon-btn" data-asst="close" title="Close">✕</button>

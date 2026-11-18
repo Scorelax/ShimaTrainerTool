@@ -3,7 +3,7 @@
 The DM console is its own page (dm-console.html), run on the DM's laptop. Across the top: the brand, a status line
 (the battle, whose turn it is), and the world clock / weather / pinned timers (click it to open the Clock module).
 Down the left is the **rail** of modules: **Battle, Party, Pokédex, NPCs, Clock, PokéNav, Display, Admin** — and the
-**Assistant** (this chat). The module open last opens again after a reload. Most things save to the Pi on their own a
+**💬 ShimAI** (this chat, the assistant). The module open last opens again after a reload. Most things save to the Pi on their own a
 moment after a change; there is rarely a Save button.
 
 The screens around the table:
@@ -168,7 +168,7 @@ the picture(s). They're used at once.
 **Create an event:** Admin → **📅 Events** → **＋ New event** → fill in the title, description, trigger, timeframe,
 where, and a picture if wanted. Or from a location in **📍 Locations** → **＋ New event here**.
 
-**The Assistant (this chat)** can draft an encounter and, when asked, save it into the encounter library; it then
+**ShimAI (this chat)** can draft an encounter and, when asked, save it into the encounter library; it then
 appears in Battle → Encounter setup like any other.
 
 **Run a battle from scratch:** Battle → **Encounter setup**: build or open an encounter → **▶ Use for the next battle**

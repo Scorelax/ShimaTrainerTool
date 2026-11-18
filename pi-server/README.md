@@ -106,7 +106,7 @@ serve is the only way in, nothing is exposed on the LAN or internet.
 Also set a **DHCP reservation** for the Pi in the router so SSH stays at a
 predictable address. A dynamic public IP is irrelevant — Tailscale handles it.
 
-### The DM assistant (Claude API)
+### ShimAI, the DM assistant (Claude API)
 
 The DM console's 💬 Assistant (`app/assistant.py`, its handbook in
 `assistant/dm-handbook.md`) asks Claude through the Anthropic API — a pay-as-you-go

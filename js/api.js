@@ -1711,13 +1711,13 @@ export class DmAPI {
   static async assistantStatus() {
     const res = await fetch(`${API_CONFIG.baseUrl}/dm/assistant-status`);
     const data = await res.json();
-    if (!res.ok || data.status !== 'success') throw new Error(data.error || `The assistant's status failed (${res.status})`);
+    if (!res.ok || data.status !== 'success') throw new Error(data.error || `ShimAI's status failed (${res.status})`);
     return data.data;
   }
 
   /** One question to the DM assistant -> {conversation, reply, steps, cost, spentToday, dailyLimit, changed}. */
   static async askAssistant(conversation, message) {
-    return (await DmAPI._post('assistant', { conversation, message }, 'Asking the assistant')).data;
+    return (await DmAPI._post('assistant', { conversation, message }, 'Asking ShimAI')).data;
   }
 
   static async _post(path, body, what) {

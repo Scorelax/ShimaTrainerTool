@@ -186,7 +186,7 @@ async function renderLibrary(body) {
     body.innerHTML = `<div class="dm-loading">Couldn't load the encounters: ${escapeHtml(err.message)}</div>`;
     return;
   }
-  if (_tab !== 'library') return;
+  if (_tab !== 'library' || !body.isConnected) return;   // (drawn again meanwhile: that one carries on)
   // Opens on the encounter in play, unless another one was picked.
   if (!_encounters.some(e => e.id === _selectedId)) _selectedId = _encounters.some(e => e.id === _runId) ? _runId : null;
   // The first time it's drawn, the open encounter's folder is the one open.
@@ -1450,6 +1450,36 @@ async function renderAftermath(body) {
   drawAftermath(body);
 }
 
+/** The encounter the last battle was: kept on it once its post battle is done, else the one in play -- if it was put
+ * in play before the battle ended (one can't be put in play during a battle, so a later one is the next battle's). */
+function battleRun() {
+  const last = _after.last;
+  const run = _after.run;
+  if (last?.encounter) return last.encounter;
+  if (!run) return null;
+  const loaded = Date.parse(run.loadedAt || '');
+  const ended = Date.parse(last?.endedAt || '');
+  return Number.isFinite(loaded) && Number.isFinite(ended) && loaded > ended ? null : run;
+}
+
+/** Post battle done (the user's call, 2026-11-18): the battle's encounter is finished -- no longer in play, and its
+ * creatures out of the next battle (the map stays). Its name and notes stay on the last battle for this page. */
+async function finishBattleEncounter() {
+  const last = _after.last;
+  const r = battleRun();
+  if (!r?.encounterId) return;
+  if (!last.encounter) last.encounter = { encounterId: r.encounterId, name: r.name, notes: r.notes, noteCategories: r.noteCategories };
+  const run = await DmAPI.getState('encounter-run').catch(() => undefined);
+  if (run === undefined || run?.encounterId !== r.encounterId) return;   // (another one in play by now: left alone)
+  await DmAPI.saveState('encounter-run', null);
+  _after.run = null;
+  if (_runId === r.encounterId) { _runId = null; _runLinked = false; }
+  if ((getSetup()?.creatures || []).some(c => c.encId === r.encounterId)) {
+    updateSetup((s) => { s.creatures = s.creatures.filter(c => c.encId !== r.encounterId); });
+    await flushSetup();
+  }
+}
+
 /** Everyone in the last battle, sorted into what the aftermath needs. */
 function battleSummary(last) {
   const ps = last.participants || [];
@@ -1474,7 +1504,8 @@ function tags(list, cls) {
 }
 
 function drawAftermath(body) {
-  const { last, run } = _after;
+  const { last } = _after;
+  const run = battleRun();
   if (!last) {
     body.innerHTML = '<div class="dm-cs-empty">No PvE battle has ended yet. When one does, what happened and what to hand out shows up here.</div>';
     return;
@@ -1667,6 +1698,9 @@ function wireAftermath(body, s, minutes) {
 
   body.querySelector('#afDone').addEventListener('click', async () => {
     last.done = !last.done;
+    if (last.done) {
+      try { await finishBattleEncounter(); } catch (err) { toast(`Couldn't take the encounter out of play: ${err.message}`); }
+    }
     await saveLast();
     redraw();
     window.dispatchEvent(new CustomEvent('dm:aftermath-changed'));
@@ -1739,7 +1773,7 @@ function wireAftermath(body, s, minutes) {
     if (s.defeated.length) parts.push(`Defeated: ${s.defeated.map(p => p.name).join(', ')}`);
     if (s.caught.length) parts.push(`Caught: ${s.caught.map(p => p.name).join(', ')}`);
     if (s.trainers.length) parts.push(`Trainers: ${s.trainers.join(', ')}`);
-    updateClock(cl => cl.events.push({ id: newId('evt'), year: c.year, month: c.month, day: c.day, title: _after.run?.name || 'Battle', notes: parts.join('\n'), recurring: false }));
+    updateClock(cl => cl.events.push({ id: newId('evt'), year: c.year, month: c.month, day: c.day, title: battleRun()?.name || 'Battle', notes: parts.join('\n'), recurring: false }));
     last.logged = true;
     await saveLast();
     toast(`Logged on ${formatDate(c)}.`);

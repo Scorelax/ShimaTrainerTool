@@ -83,6 +83,8 @@ While a battle runs: **Battle**, **🗺️ Map**, **📋 Encounter setup** (to b
 After a PvE battle ends: who was defeated, caught or got away, and what to hand out. Caught Pokémon go into the
 trainers' teams, loot and money into their inventories, straight away (pushed live to their phones). **XP** is
 DM-only and given here or in the Party module. A dot on the tab means the last battle's post battle isn't done yet.
+**✓ Done with this battle** marks it finished: the battle's encounter is no longer in play (its "● in play" mark goes)
+and its Pokémon and NPC trainers leave the next battle (the map stays). Put an encounter in play again to fight it again.
 
 ---
 

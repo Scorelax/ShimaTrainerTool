@@ -215,6 +215,19 @@ def save_dm_encounter(payload: dict):
     return JSONResponse({'status': 'success', 'data': encounter})
 
 
+@app.post('/api/dm/battle')
+def save_dm_battle(payload: dict):
+    """One battle the DM finished in Post battle -- its Previous battles (routes_dm.save_battle)."""
+    conn = db.connect()
+    try:
+        battle = routes_dm.save_battle(conn, payload.get('battle'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success', 'data': battle})
+
+
 @app.post('/api/dm/state')
 def save_dm_state(payload: dict):
     """One of the DM console's small records (routes_dm._STATE_KEYS), stored whole."""

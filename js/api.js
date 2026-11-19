@@ -1474,6 +1474,25 @@ export class DmAPI {
     return API.request('dm', 'delete-encounter', { id }, { useCache: false });
   }
 
+  /** Post battle's Previous battles: the battles the DM finished, the last to end first (without their log lines). */
+  static async battles() {
+    return (await API.request('dm', 'battles', {}, { useCache: false })).data || [];
+  }
+
+  /** One finished battle, whole -- null if it's not there. */
+  static async battle(id) {
+    return (await API.request('dm', 'battle', { id }, { useCache: false })).data ?? null;
+  }
+
+  /** Saves one finished battle (new or changed). */
+  static async saveBattle(battle) {
+    return (await DmAPI._post('battle', { battle }, 'Saving the battle')).data;
+  }
+
+  static async deleteBattle(id) {
+    return API.request('dm', 'delete-battle', { id }, { useCache: false });
+  }
+
   /** XP only the DM sees: `changes` = [{trainer, pokemon? (species name), add? | set?}]. Resolves to
    * [{trainer, pokemon, before, xp, level, xpLevel}]. */
   static async changeXp(changes) {

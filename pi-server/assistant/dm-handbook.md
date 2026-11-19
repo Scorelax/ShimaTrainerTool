@@ -84,8 +84,15 @@ While a battle runs: **Battle**, **🗺️ Map**, **📋 Encounter setup** (to b
 After a PvE battle ends: who was defeated, caught or got away, and what to hand out. Caught Pokémon go into the
 trainers' teams, loot and money into their inventories, straight away (pushed live to their phones). **XP** is
 DM-only and given here or in the Party module. A dot on the tab means the last battle's post battle isn't done yet.
-**✓ Done with this battle** marks it finished: the battle's encounter is no longer in play (its "● in play" mark goes)
-and its Pokémon and NPC trainers leave the next battle (the map stays). Put an encounter in play again to fight it again.
+The Experience section lists each player trainer in the battle and only their Pokémon that fought (with pictures);
+**💥 Show impact** on any of them (or on a name in the Defeated / Caught / Fainted tags at the top) opens what that
+creature did in the battle: moves used (hits, misses, damage), damage dealt per target (with KOs), damage taken per
+attacker (plus burns, weather...), healing, and its log lines round by round -- read from the battle's whole log file.
+**✓ Finish battle** marks it finished (the button then says **Done ✓**; clicking that opens it again): the battle's
+encounter is no longer in play (its "● in play" mark goes), its Pokémon and NPC trainers leave the next battle (the map
+stays), and the battle is kept under **📚 Previous battles** (the switch at the top: Last battle / Previous battles) --
+every finished battle, newest first, to open and look back at later (same view, without the world clock; Remove takes
+one out). Put an encounter in play again to fight it again.
 
 ---
 

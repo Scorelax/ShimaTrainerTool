@@ -162,6 +162,20 @@ def handle(conn, action, params):
         conn.commit()
         return {'status': 'success'}
 
+    if action == 'battles':
+        return {'status': 'success', 'data': list_battles(conn)}
+
+    if action == 'battle':
+        row = conn.execute('SELECT json FROM dm_battles WHERE id = ?', (params.get('id'),)).fetchone()
+        return {'status': 'success', 'data': json.loads(row[0]) if row and row[0] else None}
+
+    if action == 'delete-battle':
+        if not params.get('id'):
+            raise ValueError('Missing id')
+        conn.execute('DELETE FROM dm_battles WHERE id = ?', (params['id'],))
+        conn.commit()
+        return {'status': 'success'}
+
     if action == 'get-state':
         if params.get('key') not in _STATE_KEYS:
             raise ValueError('Unknown state: ' + str(params.get('key')))
@@ -603,6 +617,33 @@ def save_encounter(conn, encounter):
                  (str(encounter['id']), json.dumps(encounter, ensure_ascii=False), now))
     conn.commit()
     return encounter
+
+
+def list_battles(conn):
+    """The Post battle's Previous battles: every battle the DM finished (js/dm/encounters.js owns the shape), the last
+    to end first -- without their log lines (the one opened is fetched whole: action 'battle')."""
+    out = []
+    for (text,) in conn.execute('SELECT json FROM dm_battles').fetchall():
+        try:
+            battle = json.loads(text or 'null')
+        except ValueError:
+            continue
+        if isinstance(battle, dict):
+            battle.pop('log', None)
+            out.append(battle)
+    out.sort(key=lambda b: str(b.get('endedAt') or ''), reverse=True)
+    return out
+
+
+def save_battle(conn, battle):
+    """Stores one finished battle (POST /api/dm/battle), new or changed -- keyed by its `id`."""
+    if not isinstance(battle, dict) or not str(battle.get('id', '')).strip():
+        raise ValueError('battle needs an id')
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute('INSERT OR REPLACE INTO dm_battles (id, json, updated_at) VALUES (?, ?, ?)',
+                 (str(battle['id']), json.dumps(battle, ensure_ascii=False), now))
+    conn.commit()
+    return battle
 
 
 def save_state(conn, key, data):

@@ -1675,16 +1675,28 @@ def _battle_memory(p, **flags):
 def _remember_battle(conn, state):
     """A PvE battle that just ended, kept for the DM console's aftermath (dm_state 'last-battle'): its rounds, everyone
     who was in it -- including whoever left or was caught before the end (state['departed']) -- and the log's lines.
-    The next PvE battle to end replaces it."""
+    The next PvE battle to end replaces it (the DM's finished ones are kept in dm_battles -- js/dm/encounters.js).
+    `logFile`: its whole log (the Post battle's 💥 Impact reads it); `encounter`: the encounter in play -- this battle's,
+    as none can be put in play while a battle runs -- so Finish battle knows which one to take out of play."""
     if state.get('battleType') != 'pve':
         return
     everyone = {pid: p for pid, p in (state.get('departed') or {}).items()}
     everyone.update({pid: _battle_memory(p) for pid, p in state.get('participants', {}).items()})
     now = datetime.now(timezone.utc).isoformat()
+    row = conn.execute("SELECT json FROM dm_state WHERE key = 'encounter-run'").fetchone()
+    try:
+        run = json.loads(row[0]) if row and row[0] else None
+    except ValueError:
+        run = None
+    encounter = ({k: run.get(k) for k in ('encounterId', 'name', 'notes', 'noteCategories')}
+                 if isinstance(run, dict) and run.get('encounterId') else None)
     memory = {
+        'id': 'bat' + uuid.uuid4().hex[:10],
         'endedAt': now, 'round': state.get('round'), 'started': bool(state.get('started')),
         'participants': list(everyone.values()),
         'log': [e['text'] for e in (state.get('log') or [])[-200:] if e.get('text')],
+        'logFile': state.get('logFile'),
+        'encounter': encounter,
         'done': False,
     }
     conn.execute('INSERT OR REPLACE INTO dm_state (key, json, updated_at) VALUES (?, ?, ?)',
@@ -2223,7 +2235,7 @@ def _apply_condition_turn_damage(state, pid, point):
         leftover = _absorb_temp_hp(state, participant, amount)
         participant['currentHP'] -= leftover
         _log_event(state, 'status-damage', text=f"{participant['name']} takes {amount} damage from being {apply_name}",
-                   actorId=pid, actorName=participant['name'])
+                   actorId=pid, actorName=participant['name'], amount=amount)
 
 
 def _advance_turn(state, after_departure=None):
@@ -4058,7 +4070,8 @@ def _ability_auto(state, pid, event, **ctx):
                 hp_before = holder['currentHP']
                 holder['currentHP'] -= _absorb_temp_hp(state, holder, amount)
                 _note_faint(holder, hp_before)
-            _log_event(state, 'status-damage', text=f"{holder['name']}'s {ab}: -{amount} {e.get('pool') or 'HP'}", actorId=pid, actorName=holder['name'])
+            _log_event(state, 'status-damage', text=f"{holder['name']}'s {ab}: -{amount} {e.get('pool') or 'HP'}", actorId=pid, actorName=holder['name'],
+                       amount=amount, pool='vp' if e.get('pool') == 'VP' else 'hp')
         elif kind == 'temp_hp':
             cap = (e.get('stacks') or {}).get('capLevelMultiple')
             current = next((s for s in _statuses_of(holder) if s.get('kind') == 'temp_hp' and s.get('moveName') == ab), None)
@@ -4753,7 +4766,7 @@ def _apply_weather_damage(state, pid):
         leftover = _absorb_temp_hp(state, participant, amount)
         participant['currentHP'] -= leftover
         _log_event(state, 'status-damage', text=f"{participant['name']} takes {amount} {damage_type} damage from the {weather['name']}",
-                   actorId=pid, actorName=participant['name'])
+                   actorId=pid, actorName=participant['name'], amount=amount)
         return
 
 

@@ -31,7 +31,8 @@
 // marked finished before (the old "Finished encounters" box, 2026-10-27) go into Archived.
 //
 // Post battle: after a PvE battle ends (routes_combat._remember_battle keeps it as 'last-battle'), what happened -- who
-// was defeated, caught or got away -- and what to hand out. Unlike the old tool, which exported files or called the
+// was defeated, caught or got away, each fighter's 💥 impact -- and what to hand out. ✓ Finish battle takes its encounter
+// out of play and keeps it among the Previous battles (dm_battles). Unlike the old tool, which exported files or called the
 // Trainer Tool's API, everything goes straight into the trainers' records here: caught Pokemon into their team, loot
 // and money into their inventory, all live-pushed to their phones. XP is DM-only (xp.js -- on the records, never in what
 // the players' app gets); the old tool's XP can be imported from its trainer backup.
@@ -113,6 +114,7 @@ function blankEncounter() {
 
 /** The library and everything it uses, fresh from the Pi. */
 async function loadLibraryData() {
+  await settleFromLibrary().catch(() => {}); // (a finished battle's encounter isn't in play -- see settleLastBattle)
   const [encs, species, npcs, excl, saved, run, folders] = await Promise.all([
     DmAPI.encounters(), getSpecies(), DmAPI.npcs(), DmAPI.getState('encounter-exclusions'), DmAPI.getState('saved-pokemon'), DmAPI.getState('encounter-run'),
     DmAPI.getState(FOLDERS_KEY).catch(() => undefined), // (undefined: couldn't read them -- null: never made)
@@ -1428,70 +1430,144 @@ async function flushEncounter(enc) {
 // ---------------------------------------------------------------------------
 // Post battle
 // ---------------------------------------------------------------------------
+// Two views (the user's call, 2026-11-19): the Last battle -- the PvE battle that ended last ('last-battle', kept by
+// routes_combat._remember_battle) -- and Previous battles: every battle the DM finished (✓ Finish battle), kept in
+// dm_battles to look back at later. One opened from there shows the same way, its changes saved on its own record.
+// Who fought shows with their pictures, and each one's 💥 impact -- what it did and what was done to it, from the
+// battle's whole log -- helps the DM hand out the XP.
 
-let _after = null; // {last, run, party}
+let _after = null; // {last, run, party, list}: the last battle, the encounter in play, the party, the finished battles
+let _afterMode = 'last'; // 'last' | 'previous'
+let _afterOpen = null; // the finished battle opened from Previous battles (null: the list)
+let _settled = false; // the last battle looked over once this visit (settleLastBattle)
+const _entries = new Map(); // battle id -> its whole log (the impact popup's), once read
 const _xpAdd = { trainers: {}, pokemon: {} }; // what's typed in, not saved yet
+const _xpSkip = new Set(); // Pokemon left out of "Every Pokémon that fought" (their tick taken off)
 const lower = s => String(s || '').toLowerCase();
 const monKey = (trainer, species) => `${lower(trainer)}|${lower(species)}`;
+
+/** A battle's id: the Pi gives one since 2026-11-19 -- an older one's is made from when it ended. */
+function battleId(b) {
+  if (!b.id) b.id = `bat${Date.parse(b.endedAt || '') || 0}`;
+  return b.id;
+}
 
 async function renderAftermath(body) {
   body.innerHTML = '<div class="dm-loading">Loading the last battle…</div>';
   try {
-    const [last, run, party, npcs] = await Promise.all([
+    const [last, run, party, npcs, list] = await Promise.all([
       DmAPI.getState('last-battle'), DmAPI.getState('encounter-run'), DmAPI.party(), DmAPI.npcs(),
+      DmAPI.battles().catch(() => null), // (null: couldn't read them -- the last battle still shows)
     ]);
     _npcs = npcs.data || [];
-    _after = { last, run, party: party.data || [] };
+    _after = { last, run, party: party.data || [], list };
+    if (last) {
+      battleId(last);
+      await resolveEncounter(_after).catch(() => {});
+      await settleLastBattle(_after);
+    }
   } catch (err) {
     body.innerHTML = `<div class="dm-loading">Couldn't load the post battle: ${escapeHtml(err.message)}</div>`;
     return;
   }
-  if (_tab !== 'aftermath') return;
+  if (_tab !== 'aftermath' || !body.isConnected) return;
   drawAftermath(body);
 }
 
-/** The encounter the last battle was: kept on it once its post battle is done, else the one in play -- if it was put
- * in play before the battle ended (one can't be put in play during a battle, so a later one is the next battle's). */
-function battleRun() {
-  const last = _after.last;
-  const run = _after.run;
-  if (last?.encounter) return last.encounter;
-  if (!run) return null;
+/** Which encounter the last battle was, for one that ended before the Pi noted it (2026-11-19): the one in play, if it
+ * was put in play before the battle ended -- or after, when it's the same Pokemon (it was put in play again). */
+async function resolveEncounter({ last, run }) {
+  if (last.encounter || !run?.encounterId) return;
   const loaded = Date.parse(run.loadedAt || '');
-  const ended = Date.parse(last?.endedAt || '');
-  return Number.isFinite(loaded) && Number.isFinite(ended) && loaded > ended ? null : run;
+  const ended = Date.parse(last.endedAt || '');
+  let same = !(Number.isFinite(loaded) && Number.isFinite(ended) && loaded > ended);
+  if (!same) {
+    const enc = (await DmAPI.encounters()).data?.find(e => e.id === run.encounterId);
+    const fought = new Set((last.participants || []).filter(p => p.owner === 'DM' || !p.owner).map(p => lower(p.speciesName || p.name)));
+    same = !!enc?.pokemon?.length && enc.pokemon.every(p => fought.has(lower(p.species)));
+  }
+  if (same) last.encounter = { encounterId: run.encounterId, name: run.name, notes: run.notes, noteCategories: run.noteCategories };
 }
 
-/** Post battle done (the user's call, 2026-11-18): the battle's encounter is finished -- no longer in play, and its
- * creatures out of the next battle (the map stays). Its name and notes stay on the last battle for this page. */
-async function finishBattleEncounter() {
-  const last = _after.last;
-  const r = battleRun();
-  if (!r?.encounterId) return;
-  if (!last.encounter) last.encounter = { encounterId: r.encounterId, name: r.name, notes: r.notes, noteCategories: r.noteCategories };
+/** A last battle marked done before Finish battle took its encounter out of play for sure and kept it among the
+ * Previous battles (2026-11-19): both done now, once. Encounter setup looks too, so its "● in play" is right. */
+async function settleLastBattle(ctx) {
+  if (_settled) return;
+  const { last } = ctx;
+  if (last?.done && !last.doneAt) {
+    battleId(last);
+    await resolveEncounter(ctx).catch(() => {});
+    last.doneAt = new Date().toISOString();
+    try {
+      await finishBattleEncounter(ctx);
+      await DmAPI.saveState('last-battle', last);
+      await DmAPI.saveBattle(last);
+    } catch { return; } // (tried again next time)
+    if (ctx.list) listBattle(ctx.list, last);
+  }
+  _settled = true;
+}
+
+/** Encounter setup is drawn: the last battle looked over first (settleLastBattle). */
+async function settleFromLibrary() {
+  if (_settled) return;
+  const [last, run] = await Promise.all([DmAPI.getState('last-battle'), DmAPI.getState('encounter-run')]);
+  if (last) await settleLastBattle({ last, run, list: null });
+  else _settled = true;
+}
+
+/** Finish battle (the user's call, 2026-11-18/19): the battle's encounter is finished -- no longer in play, however it
+ * got there, and its creatures out of the next battle (the map stays). Put in play again, it can be fought again. */
+async function finishBattleEncounter(ctx) {
+  const id = ctx.last?.encounter?.encounterId;
+  if (!id) return;
   const run = await DmAPI.getState('encounter-run').catch(() => undefined);
-  if (run === undefined || run?.encounterId !== r.encounterId) return;   // (another one in play by now: left alone)
+  if (run === undefined || run?.encounterId !== id) return;   // (another one in play: left alone)
   await DmAPI.saveState('encounter-run', null);
-  _after.run = null;
-  if (_runId === r.encounterId) { _runId = null; _runLinked = false; }
-  if ((getSetup()?.creatures || []).some(c => c.encId === r.encounterId)) {
-    updateSetup((s) => { s.creatures = s.creatures.filter(c => c.encId !== r.encounterId); });
+  ctx.run = null;
+  if (_runId === id) { _runId = null; _runLinked = false; }
+  if ((getSetup()?.creatures || []).some(c => c.encId === id)) {
+    updateSetup((s) => { s.creatures = s.creatures.filter(c => c.encId !== id); });
     await flushSetup();
   }
 }
 
-/** Everyone in the last battle, sorted into what the aftermath needs. */
-function battleSummary(last) {
-  const ps = last.participants || [];
+/** `b` in the Previous battles' list (without its log lines), the last to end first. */
+function listBattle(list, b) {
+  const { log: _lines, ...copy } = b;
+  const i = list.findIndex(x => x.id === b.id);
+  if (i >= 0) list[i] = copy; else list.push(copy);
+  list.sort((x, y) => String(y.endedAt || '').localeCompare(String(x.endedAt || '')));
+}
+
+/** A battle's changes saved: the last battle on its own record (and among the Previous battles once finished), an
+ * older one on its record there. */
+async function saveBattleRecord(b) {
+  try {
+    if (b === _after.last) await DmAPI.saveState('last-battle', b);
+    if (b.done || b !== _after.last) await DmAPI.saveBattle(b);
+  } catch (err) { toast(`Couldn't save: ${err.message}`); return; }
+  if (_after.list && b.done) listBattle(_after.list, b);
+}
+
+/** Everyone in a battle, sorted into what the post battle needs. */
+function battleSummary(b) {
+  const ps = b.participants || [];
   const enemies = ps.filter(p => p.owner === 'DM' || !p.owner);
   const players = ps.filter(p => p.owner && p.owner !== 'DM');
+  const monsOf = {};
+  const trainerOf = {};
+  players.forEach((p) => {
+    if (p.combatantType === 'pokemon') (monsOf[lower(p.owner)] = monsOf[lower(p.owner)] || []).push(p);
+    else if (p.combatantType === 'trainer') trainerOf[lower(p.owner)] = p;
+  });
   return {
     caught: enemies.filter(p => p.captured),
     defeated: enemies.filter(p => !p.captured && Number(p.currentHP) <= 0),
     away: enemies.filter(p => !p.captured && Number(p.currentHP) > 0),
     fainted: players.filter(p => p.combatantType === 'pokemon' && Number(p.currentHP) <= 0),
     trainers: [...new Set(players.map(p => p.owner))],
-    present: new Set(players.filter(p => p.combatantType === 'pokemon').map(p => monKey(p.owner, p.speciesName || p.name))),
+    monsOf, trainerOf,
   };
 }
 
@@ -1500,27 +1576,105 @@ function trainerRecord(name) {
 }
 
 function tags(list, cls) {
-  return list.map(p => `<span class="dm-enc-tag ${cls}">${escapeHtml(p.name)} <small>Lv ${p.level ?? '?'}</small></span>`).join('');
+  return list.map(p => `<button class="dm-enc-tag ${cls}" data-impact="${escapeHtml(p.id)}" title="Show impact">${escapeHtml(p.name)} <small>Lv ${p.level ?? '?'}</small></button>`).join('');
 }
 
+function modesHtml() {
+  const n = _after.list?.length;
+  return `<div class="dm-seg dm-after-modes">
+    <button class="${_afterMode === 'last' ? 'active' : ''}" data-after-mode="last">Last battle</button>
+    <button class="${_afterMode === 'previous' ? 'active' : ''}" data-after-mode="previous">📚 Previous battles${n ? ` (${n})` : ''}</button>
+  </div>`;
+}
+
+function showPics(root) {
+  root.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
+}
+
+/** The tab: the last battle, or the Previous battles' list, or one opened from it. */
 function drawAftermath(body) {
-  const { last } = _after;
-  const run = battleRun();
-  if (!last) {
-    body.innerHTML = '<div class="dm-cs-empty">No PvE battle has ended yet. When one does, what happened and what to hand out shows up here.</div>';
+  if (_afterMode === 'previous' && !_afterOpen) drawPrevious(body);
+  else drawBattle(body, _afterMode === 'previous' ? _afterOpen : _after.last);
+}
+
+function wireModes(root, body) {
+  root.querySelectorAll('[data-after-mode]').forEach(btn => btn.addEventListener('click', () => {
+    if (_afterMode === btn.dataset.afterMode && !_afterOpen) return;
+    _afterMode = btn.dataset.afterMode;
+    _afterOpen = null;
+    clearXpTyped();
+    drawAftermath(body);
+  }));
+}
+
+function clearXpTyped() {
+  _xpAdd.trainers = {};
+  _xpAdd.pokemon = {};
+  _xpSkip.clear();
+}
+
+function drawPrevious(body) {
+  const list = _after.list;
+  body.innerHTML = `
+    <div class="dm-after">
+      <div class="dm-after-head">
+        <div>
+          <h2>Previous battles</h2>
+          <div class="dm-hint">Every battle you've finished -- open one to look back at what happened.</div>
+        </div>
+        ${modesHtml()}
+      </div>
+      ${list === null ? '<div class="dm-cs-empty">Couldn\'t load the previous battles.</div>'
+        : !list.length ? '<div class="dm-cs-empty">No finished battles yet. ✓ Finish battle on the last battle puts it here.</div>'
+        : `<div class="dm-after-prev">${list.map(prevCardHtml).join('')}</div>`}
+    </div>`;
+  const root = body.querySelector('.dm-after');
+  showPics(root);
+  wireModes(root, body);
+  root.addEventListener('click', async (e) => {
+    const id = e.target.closest('[data-open]')?.dataset.open;
+    if (!id) return;
+    let b;
+    try { b = _after.last && battleId(_after.last) === id ? _after.last : await DmAPI.battle(id); } catch (err) { showCombatAlert(err.message, { title: 'Previous battles' }); return; }
+    if (!b) { toast("That battle isn't there any more."); return; }
+    _afterOpen = b;
+    clearXpTyped();
+    drawAftermath(body);
+  });
+}
+
+function prevCardHtml(b) {
+  const s = battleSummary(b);
+  const enemies = [...s.defeated, ...s.caught, ...s.away];
+  return `
+    <button class="dm-after-prevcard" data-open="${escapeHtml(battleId(b))}">
+      <span class="dm-after-prevtop"><strong>${escapeHtml(b.encounter?.name || 'Battle')}</strong><small>${escapeHtml(new Date(b.endedAt).toLocaleString())}</small></span>
+      <span class="dm-after-prevmons">${enemies.slice(0, 10).map(p => `<span class="dm-enc-thumb" data-img="${escapeHtml(p.image || '')}" title="${escapeHtml(p.name)}"></span>`).join('')}</span>
+      <span class="dm-hint">${b.round || 1} round${b.round === 1 ? '' : 's'}${s.trainers.length ? ` · ${escapeHtml(s.trainers.join(', '))}` : ''} · ${s.defeated.length} defeated${s.caught.length ? ` · ${s.caught.length} caught` : ''}</span>
+    </button>`;
+}
+
+function drawBattle(body, b) {
+  if (!b) {
+    body.innerHTML = `<div class="dm-after"><div class="dm-after-head"><div><h2>Post battle</h2></div>${modesHtml()}</div>
+      <div class="dm-cs-empty">No PvE battle has ended yet. When one does, what happened and what to hand out shows up here.</div></div>`;
+    wireModes(body.querySelector('.dm-after'), body);
     return;
   }
-  const s = battleSummary(last);
-  const ended = new Date(last.endedAt);
+  const isLast = b === _after.last;
+  const fromList = _afterMode === 'previous';
+  const run = b.encounter || null;
+  const s = battleSummary(b);
+  const ended = new Date(b.endedAt);
   const allTrainers = _after.party.map(t => t.trainer?.name).filter(Boolean);
   const trainerOptions = (sel = '') => [...s.trainers, ...allTrainers.filter(t => !s.trainers.some(x => lower(x) === lower(t)))]
     .map(t => `<option ${lower(t) === lower(sel) ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('');
-  const minutes = Math.max(1, Math.ceil(((Number(last.round) || 1) * ROUND_SECONDS) / 60));
+  const minutes = Math.max(1, Math.ceil(((Number(b.round) || 1) * ROUND_SECONDS) / 60));
   const clock = getClock();
-  last.given = last.given || {};
+  b.given = b.given || {};
   // Given to its trainer already from the catch popup (battle-live.js), during the battle
-  (last.participants || []).forEach((p) => { if (p.givenTo && !last.given[p.id]) last.given[p.id] = p.givenTo; });
-  last.lootGiven = last.lootGiven || {};
+  (b.participants || []).forEach((p) => { if (p.givenTo && !b.given[p.id]) b.given[p.id] = p.givenTo; });
+  b.lootGiven = b.lootGiven || {};
 
   // Loot: held items of the defeated wild Pokemon, and the items of defeated NPC trainers (from the NPC library).
   const setup = getSetup();
@@ -1538,10 +1692,15 @@ function drawAftermath(body) {
     <div class="dm-after">
       <div class="dm-after-head">
         <div>
+          ${fromList ? '<button class="dm-btn small" id="afBack">← Previous battles</button>' : ''}
           <h2>${escapeHtml(run?.name || 'Battle')} -- post battle</h2>
-          <div class="dm-hint">Ended ${ended.toLocaleString()} · ${last.round || 1} round${last.round === 1 ? '' : 's'}${last.done ? ' · <strong>marked done</strong>' : ''}</div>
+          <div class="dm-hint">Ended ${ended.toLocaleString()} · ${b.round || 1} round${b.round === 1 ? '' : 's'}${b.done ? ' · <strong>finished</strong>' : ''}</div>
         </div>
-        <button class="dm-btn ${last.done ? '' : 'primary'}" id="afDone">${last.done ? 'Done ✓' : '✓ Done with this battle'}</button>
+        <div class="dm-after-headbtns">
+          ${modesHtml()}
+          ${isLast ? `<button class="dm-btn ${b.done ? '' : 'primary'}" id="afDone" title="${b.done ? 'Finished -- click to open it again' : 'Its encounter is no longer in play, and the battle goes into Previous battles'}">${b.done ? 'Done ✓' : '✓ Finish battle'}</button>`
+            : '<button class="dm-btn danger" id="afRemove" title="Take it out of Previous battles">Remove</button>'}
+        </div>
       </div>
 
       <div class="dm-after-stats">
@@ -1565,7 +1724,7 @@ function drawAftermath(body) {
             <div class="dm-after-caught" data-caught="${escapeHtml(p.id)}">
               <span class="dm-enc-thumb" data-img="${escapeHtml(p.image || '')}"></span>
               <span><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(p.speciesName || '')} · Lv ${p.level ?? '?'}</small></span>
-              ${last.given[p.id] ? `<span class="dm-pill ok">✓ In ${escapeHtml(last.given[p.id])}'s team</span>` : `
+              ${b.given[p.id] ? `<span class="dm-pill ok">✓ In ${escapeHtml(b.given[p.id])}'s team</span>` : `
                 <select class="dm-select" data-k="trainer">${trainerOptions()}</select>
                 <input class="dm-input" data-k="nickname" placeholder="Nickname (optional)">
                 <button class="dm-btn primary small" data-act="give-mon">Give</button>`}
@@ -1573,12 +1732,26 @@ function drawAftermath(body) {
           <div class="dm-hint">Built the way you set it up (level, nature, abilities, held item), with full HP -- it shows up on their phone straight away.</div>
         </div>` : ''}
 
+        <div class="dm-card dm-after-wide">
+          <div class="dm-card-title"><span>Experience <span class="dm-label-note">(only you see XP)</span></span>
+            <span class="dm-row dm-enc-titlebtns"><button class="dm-btn small" id="afXpImport" title="Read the XP from the old DM tool's trainer backup (shima-trainers-....json)">📂 Import from the old DM tool</button></span></div>
+          ${s.trainers.length ? `
+          <div class="dm-after-quick">
+            <label>Every trainer <input class="dm-input dm-inline-num" id="afQuickT" type="number" placeholder="+XP"></label>
+            <button class="dm-btn small" id="afQuickTGo">Add</button>
+            <label>Every Pokémon that fought <input class="dm-input dm-inline-num" id="afQuickP" type="number" placeholder="+XP"></label>
+            <button class="dm-btn small" id="afQuickPGo">Add</button>
+          </div>
+          <div class="dm-after-xp">${s.trainers.map(t => xpCardHtml(t, s)).join('')}</div>
+          <div class="dm-row" style="justify-content:flex-end;margin-top:0.6rem"><button class="dm-btn primary" id="afXpSave">Save XP</button></div>` : '<div class="dm-hint">No player trainers were in this battle.</div>'}
+        </div>
+
         <div class="dm-card">
           <div class="dm-card-title">Loot & money</div>
           ${loot.length ? loot.map(it => `
             <div class="dm-after-loot" data-loot="${escapeHtml(it.key)}" data-name="${escapeHtml(it.name)}" data-desc="${escapeHtml(it.description)}">
               <span><strong>${escapeHtml(it.name)}</strong>${it.quantity > 1 ? ` ×${it.quantity}` : ''}<small>from ${escapeHtml(it.from)}</small></span>
-              ${last.lootGiven[it.key] ? `<span class="dm-pill ok">✓ ${escapeHtml(last.lootGiven[it.key])}</span>` : `
+              ${b.lootGiven[it.key] ? `<span class="dm-pill ok">✓ ${escapeHtml(b.lootGiven[it.key])}</span>` : `
                 <input class="dm-input" type="number" min="1" value="${it.quantity}" data-k="qty">
                 <select class="dm-select" data-k="trainer">${trainerOptions()}</select>
                 <button class="dm-btn small primary" data-act="give-loot">Give</button>`}
@@ -1599,32 +1772,19 @@ function drawAftermath(body) {
           </div>
         </div>
 
+        ${isLast ? `
         <div class="dm-card">
           <div class="dm-card-title">⏱ World clock</div>
-          <div class="dm-hint">Now: <strong>${clock ? `${escapeHtml(formatDate(clock))} -- ${formatTime(clock)} (${escapeHtml(phaseName(clock))})` : '?'}</strong>. The fight took ${last.round || 1} round${last.round === 1 ? '' : 's'} (~${minutes} min).</div>
+          <div class="dm-hint">Now: <strong>${clock ? `${escapeHtml(formatDate(clock))} -- ${formatTime(clock)} (${escapeHtml(phaseName(clock))})` : '?'}</strong>. The fight took ${b.round || 1} round${b.round === 1 ? '' : 's'} (~${minutes} min).</div>
           <label class="dm-check" style="margin-top:0.5rem"><input type="radio" name="afTime" value="combat" checked><span>Move it on by the fight (${minutes} min)</span></label>
           <label class="dm-check"><input type="radio" name="afTime" value="custom"><span>By <input class="dm-input dm-inline-num" id="afMinutes" type="number" min="0" step="5" value="60"> minutes</span></label>
           <label class="dm-check"><input type="radio" name="afTime" value="phase"><span>On to <select class="dm-select dm-inline-sel" id="afPhase">${PHASES.map(p => `<option>${p.name}</option>`).join('')}</select></span></label>
           <div class="dm-row" style="margin-top:0.4rem">
             <button class="dm-btn small primary" id="afTimeGo">Move the clock</button>
             <button class="dm-btn small" id="afWeather">🎲 Roll weather</button>
-            <button class="dm-btn small" id="afLog" ${last.logged ? 'disabled' : ''}>${last.logged ? 'Logged ✓' : '📌 Log as calendar event'}</button>
+            <button class="dm-btn small" id="afLog" ${b.logged ? 'disabled' : ''}>${b.logged ? 'Logged ✓' : '📌 Log as calendar event'}</button>
           </div>
-        </div>
-
-        <div class="dm-card dm-after-wide">
-          <div class="dm-card-title"><span>Experience <span class="dm-label-note">(only you see XP)</span></span>
-            <span class="dm-row dm-enc-titlebtns"><button class="dm-btn small" id="afXpImport" title="Read the XP from the old DM tool's trainer backup (shima-trainers-....json)">📂 Import from the old DM tool</button></span></div>
-          ${s.trainers.length ? `
-          <div class="dm-after-quick">
-            <label>Every trainer <input class="dm-input dm-inline-num" id="afQuickT" type="number" placeholder="+XP"></label>
-            <button class="dm-btn small" id="afQuickTGo">Add</button>
-            <label>Every Pokémon that fought <input class="dm-input dm-inline-num" id="afQuickP" type="number" placeholder="+XP"></label>
-            <button class="dm-btn small" id="afQuickPGo">Add</button>
-          </div>
-          <div class="dm-after-xp">${s.trainers.map(t => xpCardHtml(t, s)).join('')}</div>
-          <div class="dm-row" style="justify-content:flex-end;margin-top:0.6rem"><button class="dm-btn primary" id="afXpSave">Save XP</button></div>` : '<div class="dm-hint">No player trainers were in this battle.</div>'}
-        </div>
+        </div>` : ''}
 
         <div class="dm-card">
           <div class="dm-card-title">Notes</div>
@@ -1634,8 +1794,8 @@ function drawAftermath(body) {
         </div>
 
         <details class="dm-card dm-collapsible">
-          <summary class="dm-card-title">📜 Battle log (${(last.log || []).length})</summary>
-          <div class="dm-after-log">${(last.log || []).map(l => `<div>${escapeHtml(l)}</div>`).join('')}</div>
+          <summary class="dm-card-title">📜 Battle log (${(b.log || []).length})</summary>
+          <div class="dm-after-log">${(b.log || []).map(l => `<div>${escapeHtml(l)}</div>`).join('')}</div>
         </details>
       </div>
     </div>`;
@@ -1643,8 +1803,10 @@ function drawAftermath(body) {
     const items = JSON.parse(sessionStorage.getItem('items') || '[]');
     document.body.insertAdjacentHTML('beforeend', `<datalist id="afItems">${items.map(i => `<option value="${escapeHtml(i.name)}">`).join('')}</datalist>`);
   }
-  body.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
-  wireAftermath(body, s, minutes);
+  const root = body.querySelector('.dm-after');
+  showPics(root);
+  wireModes(root, body);
+  wireAftermath(root, body, b, s, minutes);
 }
 
 /** The DM-only XP that came with the party (DmAPI.party): a trainer's, or one of their Pokemon's (by species name). */
@@ -1662,55 +1824,96 @@ function xpLine(current, add) {
   return `${now.toLocaleString()} XP${to > from ? ` <span class="dm-after-lvup">↑ level ${to}</span>` : ''}`;
 }
 
+/** A trainer in the battle and their Pokemon that fought in it (the user's call, 2026-11-19: only those can get XP --
+ * a Pokemon outside the active party never fights), each with its picture and its impact. */
 function xpCardHtml(name, s) {
   const rec = trainerRecord(name);
   const level = rec?.trainer?.level || 1;
   const tKey = lower(name);
   const tXp = xpOf(rec);
-  const mons = rec?.pokemon || [];
+  const tp = s.trainerOf[tKey];
+  const mons = s.monsOf[tKey] || [];
+  const impactBtn = p => (p ? `<button class="dm-btn small" data-impact="${escapeHtml(p.id)}">💥 Show impact</button>` : '<span></span>');
   return `
     <div class="dm-after-xpcard" data-trainer="${escapeHtml(name)}">
-      <div class="dm-after-xprow head">
+      <div class="dm-after-xprow head" data-cur="${tXp}">
+        <span class="dm-enc-thumb dm-after-pic" data-img="${escapeHtml(tp?.image || rec?.trainer?.image || '')}"></span>
         <strong>${escapeHtml(name)} <small>Lv ${level}</small></strong>
         <span>${tXp.toLocaleString()}</span>
         <input class="dm-input" type="number" data-xp-t value="${_xpAdd.trainers[tKey] ?? ''}" placeholder="+XP">
         <span class="dm-after-new">${xpLine(tXp, _xpAdd.trainers[tKey])}</span>
+        ${impactBtn(tp)}
       </div>
-      ${mons.map((m) => {
+      ${mons.map((p) => {
+        // (by its species -- or its nickname, if it has evolved since)
+        const m = rec?.pokemon.find(x => lower(x.name) === lower(p.speciesName || p.name))
+          || rec?.pokemon.find(x => x.nickname && lower(x.nickname) === lower(p.name));
+        const fainted = Number(p.currentHP) <= 0 ? ' · fainted' : '';
+        const pic = `<span class="dm-enc-thumb dm-after-pic" data-img="${escapeHtml(p.image || m?.image || '')}"></span>`;
+        if (!m) {
+          return `
+        <div class="dm-after-xprow gone">
+          ${pic}<span>${escapeHtml(p.name)} <small>not in ${escapeHtml(name)}'s team any more</small></span><span></span><span></span><span></span>${impactBtn(p)}
+        </div>`;
+        }
         const key = monKey(name, m.name);
         const xp = xpOf(rec, m.name);
-        const fought = s.present.has(key);
+        const on = !_xpSkip.has(key);
         return `
-        <div class="dm-after-xprow${fought ? '' : ' absent'}" data-mon="${escapeHtml(m.name)}">
-          <label><input type="checkbox" data-present ${fought ? 'checked' : ''} title="Fought in this battle (gets the 'every Pokémon' XP)"> ${escapeHtml(m.nickname || m.name)} <small>Lv ${m.level}</small></label>
+        <div class="dm-after-xprow${on ? '' : ' absent'}" data-mon="${escapeHtml(m.name)}" data-cur="${xp}">
+          ${pic}
+          <label><input type="checkbox" data-present ${on ? 'checked' : ''} title="Gets the 'Every Pokémon that fought' XP"> ${escapeHtml(m.nickname || p.name)} <small>Lv ${m.level}${fainted}</small></label>
           <span>${xp.toLocaleString()}</span>
           <input class="dm-input" type="number" data-xp-p value="${_xpAdd.pokemon[key] ?? ''}" placeholder="+XP">
           <span class="dm-after-new">${xpLine(xp, _xpAdd.pokemon[key])}</span>
+          ${impactBtn(p)}
         </div>`;
       }).join('')}
+      ${mons.length ? '' : '<div class="dm-hint">None of their Pokémon fought.</div>'}
     </div>`;
 }
 
-function wireAftermath(body, s, minutes) {
-  const { last } = _after;
-  const saveLast = () => DmAPI.saveState('last-battle', last).catch(err => toast(`Couldn't save: ${err.message}`));
+function wireAftermath(root, body, b, s, minutes) {
+  const save = () => saveBattleRecord(b);
   const redraw = () => drawAftermath(body);
 
-  body.querySelector('#afDone').addEventListener('click', async () => {
-    last.done = !last.done;
-    if (last.done) {
-      try { await finishBattleEncounter(); } catch (err) { toast(`Couldn't take the encounter out of play: ${err.message}`); }
+  root.querySelector('#afBack')?.addEventListener('click', () => { _afterOpen = null; clearXpTyped(); redraw(); });
+
+  root.querySelector('#afDone')?.addEventListener('click', async (e) => {
+    e.currentTarget.disabled = true;
+    if (!b.done) {
+      b.done = true;
+      b.doneAt = new Date().toISOString();
+      try {
+        await resolveEncounter(_after);
+        await finishBattleEncounter(_after);
+      } catch (err) { toast(`Couldn't take the encounter out of play: ${err.message}`); }
+    } else {
+      b.done = false;
+      delete b.doneAt;
+      try { await DmAPI.deleteBattle(battleId(b)); } catch (err) { toast(`Couldn't take it out of Previous battles: ${err.message}`); }
+      if (_after.list) _after.list = _after.list.filter(x => x.id !== b.id);
     }
-    await saveLast();
+    await save();
     redraw();
     window.dispatchEvent(new CustomEvent('dm:aftermath-changed'));
   });
 
-  body.addEventListener('click', async (e) => {
+  root.querySelector('#afRemove')?.addEventListener('click', async () => {
+    if (!await showCombatConfirm(`Take "${b.encounter?.name || 'Battle'}" (${new Date(b.endedAt).toLocaleString()}) out of Previous battles? It's gone for good.`, { title: 'Previous battles', yesLabel: 'Remove', noLabel: 'Cancel' })) return;
+    try { await DmAPI.deleteBattle(battleId(b)); } catch (err) { showCombatAlert(err.message, { title: 'Previous battles' }); return; }
+    if (_after.list) _after.list = _after.list.filter(x => x.id !== b.id);
+    _afterOpen = null;
+    redraw();
+  });
+
+  root.addEventListener('click', async (e) => {
+    const impact = e.target.closest('[data-impact]')?.dataset.impact;
+    if (impact) { openImpact(b, impact); return; }
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'give-mon') {
       const row = e.target.closest('[data-caught]');
-      const p = last.participants.find(x => x.id === row.dataset.caught);
+      const p = b.participants.find(x => x.id === row.dataset.caught);
       const trainer = row.querySelector('[data-k="trainer"]').value;
       const nickname = row.querySelector('[data-k="nickname"]').value.trim();
       const c = getSetup()?.creatures.find(x => x.id === p.id);
@@ -1718,8 +1921,8 @@ function wireAftermath(body, s, minutes) {
       e.target.disabled = true;
       try {
         await DmAPI.givePokemon(trainer, { ...cfg, nickname: nickname || (p.name !== cfg.species && !/ [A-Z]$/.test(p.name) ? p.name : '') });
-        last.given[p.id] = trainer;
-        await saveLast();
+        b.given[p.id] = trainer;
+        await save();
         toast(`${nickname || p.name} is now in ${trainer}'s team.`);
         redraw();
       } catch (err) { e.target.disabled = false; showCombatAlert(err.message, { title: `Give ${p.name}` }); }
@@ -1730,58 +1933,58 @@ function wireAftermath(body, s, minutes) {
       e.target.disabled = true;
       try {
         await giveItem(trainer, row.dataset.name, qty, row.dataset.desc);
-        last.lootGiven[row.dataset.loot] = `${trainer}${qty > 1 ? ` ×${qty}` : ''}`;
-        await saveLast();
+        b.lootGiven[row.dataset.loot] = `${trainer}${qty > 1 ? ` ×${qty}` : ''}`;
+        await save();
         redraw();
       } catch (err) { e.target.disabled = false; showCombatAlert(err.message, { title: 'Give item' }); }
     }
   });
 
-  body.querySelector('#afItemGive').addEventListener('click', async () => {
-    const name = body.querySelector('#afItem').value.trim();
+  root.querySelector('#afItemGive').addEventListener('click', async () => {
+    const name = root.querySelector('#afItem').value.trim();
     if (!name) return;
-    const qty = Math.max(1, Number(body.querySelector('#afItemQty').value) || 1);
-    const trainer = body.querySelector('#afItemTo').value;
-    try { await giveItem(trainer, name, qty, ''); body.querySelector('#afItem').value = ''; toast(`Gave ${trainer} ${qty} × ${name}.`); } catch (err) { showCombatAlert(err.message, { title: 'Give item' }); }
+    const qty = Math.max(1, Number(root.querySelector('#afItemQty').value) || 1);
+    const trainer = root.querySelector('#afItemTo').value;
+    try { await giveItem(trainer, name, qty, ''); root.querySelector('#afItem').value = ''; toast(`Gave ${trainer} ${qty} × ${name}.`); } catch (err) { showCombatAlert(err.message, { title: 'Give item' }); }
   });
-  body.querySelector('#afMoneyGive').addEventListener('click', async () => {
-    const amount = Number(body.querySelector('#afMoney').value) || 0;
+  root.querySelector('#afMoneyGive').addEventListener('click', async () => {
+    const amount = Number(root.querySelector('#afMoney').value) || 0;
     if (!amount) return;
-    const to = body.querySelector('#afMoneyTo').value;
+    const to = root.querySelector('#afMoneyTo').value;
     const who = to === '__all' ? s.trainers : [to];
     try {
       for (const t of who) await DmAPI.giveMoney(t, amount);
-      body.querySelector('#afMoney').value = '';
+      root.querySelector('#afMoney').value = '';
       toast(`Gave ${amount} to ${who.join(', ')}.`);
     } catch (err) { showCombatAlert(err.message, { title: 'Give money' }); }
   });
 
-  // World clock
-  body.querySelector('#afTimeGo').addEventListener('click', () => {
-    const mode = body.querySelector('input[name="afTime"]:checked').value;
+  // World clock (the last battle only)
+  root.querySelector('#afTimeGo')?.addEventListener('click', () => {
+    const mode = root.querySelector('input[name="afTime"]:checked').value;
     if (mode === 'combat') advanceMinutes(minutes);
-    else if (mode === 'custom') advanceMinutes(Number(body.querySelector('#afMinutes').value) || 0);
-    else skipToPhase(body.querySelector('#afPhase').value);
+    else if (mode === 'custom') advanceMinutes(Number(root.querySelector('#afMinutes').value) || 0);
+    else skipToPhase(root.querySelector('#afPhase').value);
     const c = getClock();
     toast(`The clock is now ${formatDate(c)}, ${formatTime(c)}.`);
     redraw();
   });
-  body.querySelector('#afWeather').addEventListener('click', () => { const w = rollWeather(); toast(`New weather: ${WEATHER[w]?.icon || ''} ${WEATHER[w]?.name || w}`); });
-  body.querySelector('#afLog').addEventListener('click', async () => {
+  root.querySelector('#afWeather')?.addEventListener('click', () => { const w = rollWeather(); toast(`New weather: ${WEATHER[w]?.icon || ''} ${WEATHER[w]?.name || w}`); });
+  root.querySelector('#afLog')?.addEventListener('click', async () => {
     const c = getClock();
-    const parts = [`Rounds: ${last.round || 1}`];
+    const parts = [`Rounds: ${b.round || 1}`];
     if (s.defeated.length) parts.push(`Defeated: ${s.defeated.map(p => p.name).join(', ')}`);
     if (s.caught.length) parts.push(`Caught: ${s.caught.map(p => p.name).join(', ')}`);
     if (s.trainers.length) parts.push(`Trainers: ${s.trainers.join(', ')}`);
-    updateClock(cl => cl.events.push({ id: newId('evt'), year: c.year, month: c.month, day: c.day, title: battleRun()?.name || 'Battle', notes: parts.join('\n'), recurring: false }));
-    last.logged = true;
-    await saveLast();
+    updateClock(cl => cl.events.push({ id: newId('evt'), year: c.year, month: c.month, day: c.day, title: b.encounter?.name || 'Battle', notes: parts.join('\n'), recurring: false }));
+    b.logged = true;
+    await save();
     toast(`Logged on ${formatDate(c)}.`);
     redraw();
   });
 
   // Experience
-  const xpBox = body.querySelector('.dm-after-xp');
+  const xpBox = root.querySelector('.dm-after-xp');
   if (xpBox) {
     xpBox.addEventListener('input', (e) => {
       const card = e.target.closest('[data-trainer]');
@@ -1789,26 +1992,28 @@ function wireAftermath(body, s, minutes) {
       if (e.target.matches('[data-xp-t]')) _xpAdd.trainers[lower(card.dataset.trainer)] = e.target.value === '' ? undefined : Number(e.target.value);
       if (e.target.matches('[data-xp-p]')) _xpAdd.pokemon[monKey(card.dataset.trainer, e.target.closest('[data-mon]').dataset.mon)] = e.target.value === '' ? undefined : Number(e.target.value);
       const row = e.target.closest('.dm-after-xprow');
-      const cur = Number(row.children[1].textContent.replace(/\D/g, '')) || 0;
-      row.querySelector('.dm-after-new').innerHTML = xpLine(cur, e.target.value);
+      row.querySelector('.dm-after-new').innerHTML = xpLine(Number(row.dataset.cur) || 0, e.target.value);
     });
     xpBox.addEventListener('change', (e) => {
-      if (e.target.matches('[data-present]')) e.target.closest('.dm-after-xprow').classList.toggle('absent', !e.target.checked);
+      if (!e.target.matches('[data-present]')) return;
+      const key = monKey(e.target.closest('[data-trainer]').dataset.trainer, e.target.closest('[data-mon]').dataset.mon);
+      if (e.target.checked) _xpSkip.delete(key); else _xpSkip.add(key);
+      e.target.closest('.dm-after-xprow').classList.toggle('absent', !e.target.checked);
     });
-    body.querySelector('#afQuickTGo').addEventListener('click', () => {
-      const v = Number(body.querySelector('#afQuickT').value) || 0;
+    root.querySelector('#afQuickTGo').addEventListener('click', () => {
+      const v = Number(root.querySelector('#afQuickT').value) || 0;
       s.trainers.forEach(t => { _xpAdd.trainers[lower(t)] = (_xpAdd.trainers[lower(t)] || 0) + v; });
       redraw();
     });
-    body.querySelector('#afQuickPGo').addEventListener('click', () => {
-      const v = Number(body.querySelector('#afQuickP').value) || 0;
+    root.querySelector('#afQuickPGo').addEventListener('click', () => {
+      const v = Number(root.querySelector('#afQuickP').value) || 0;
       xpBox.querySelectorAll('[data-present]:checked').forEach((cb) => {
         const k = monKey(cb.closest('[data-trainer]').dataset.trainer, cb.closest('[data-mon]').dataset.mon);
         _xpAdd.pokemon[k] = (_xpAdd.pokemon[k] || 0) + v;
       });
       redraw();
     });
-    body.querySelector('#afXpSave').addEventListener('click', async () => {
+    root.querySelector('#afXpSave').addEventListener('click', async () => {
       const changes = [];
       s.trainers.forEach((t) => {
         const rec = trainerRecord(t);
@@ -1836,7 +2041,178 @@ function wireAftermath(body, s, minutes) {
       else toast('XP saved.');
     });
   }
-  body.querySelector('#afXpImport').addEventListener('click', importXp);
+  root.querySelector('#afXpImport').addEventListener('click', importXp);
+}
+
+// ---- 💥 Impact: what one creature did in a battle and what was done to it (the user's call, 2026-11-19) ----
+
+// Log lines that say nothing about a creature's part in the fight.
+const QUIET_LOG = new Set(['turn-advance', 'reaction-window-open', 'reaction-window-close', 'placement', 'join', 'move',
+  'reaction-start', 'reaction-end', 'session-start', 'session-end', 'refund', 'dm-turn', 'hidden', 'extra-action-end']);
+
+/** A battle's whole log (its file on the Pi -- the post battle keeps only the last 200 lines as text). A battle that
+ * ended before the Pi noted its file (2026-11-19) has its file found by when it ended. null: not on the Pi. */
+async function battleEntries(b) {
+  const id = battleId(b);
+  if (_entries.has(id)) return _entries.get(id);
+  let file = b.logFile;
+  if (!file) {
+    const ended = Date.parse(b.endedAt || '');
+    const logs = await DmAPI.adminBattleLogs();
+    file = logs.find(l => l.kind === 'pve' && l.ended && Math.abs(Date.parse(l.ended) - ended) < 120000)?.file || null;
+  }
+  const entries = file ? await DmAPI.adminBattleLog(file) : null;
+  if (entries?.length) _entries.set(id, entries);
+  return entries?.length ? entries : null;
+}
+
+/** Everything `pid` did and had done to it, added up from the log `entries`. */
+function impactOf(entries, pid, b) {
+  const who = id => (b.participants || []).find(p => p.id === id);
+  // The hits (a hit retyped afterwards -- its own "retyped" line has the new amount -- counts as that)
+  const hits = [];
+  const lastHit = {};
+  entries.forEach((e) => {
+    if (e.type !== 'damage') return;
+    if (!e.actorId && lastHit[e.targetId] && /retyped/.test(e.text || '')) { lastHit[e.targetId].amount = Number(e.amount) || 0; return; }
+    const h = { ...e, amount: Number(e.amount) || 0 };
+    hits.push(h);
+    if (h.pool !== 'vp') lastHit[e.targetId] = h;
+  });
+  const fainted = id => Number(who(id)?.currentHP) <= 0 && !who(id)?.captured;
+  const add = (map, key, name, h) => {
+    const row = map.get(key) || { id: key, name, hp: 0, vp: 0, hits: 0, crits: 0 };
+    if (h.pool === 'vp') row.vp += h.amount; else row.hp += h.amount;
+    row.hits += 1;
+    if (h.crit) row.crits += 1;
+    map.set(key, row);
+  };
+
+  const moves = new Map();
+  const move = (name) => {
+    const k = name || 'Attack';
+    if (!moves.has(k)) moves.set(k, { name: k, used: 0, hits: 0, misses: 0, crits: 0, damage: 0 });
+    return moves.get(k);
+  };
+  entries.forEach((e) => {
+    if (e.actorId !== pid) return;
+    if (e.type === 'move-used') move(e.move).used += 1;
+    else if (e.type === 'miss') move(e.move).misses += 1;
+  });
+
+  const dealt = new Map();
+  const taken = new Map();
+  hits.forEach((h) => {
+    if (h.actorId === pid && h.targetId && h.targetId !== pid) {
+      add(dealt, h.targetId, h.targetName || who(h.targetId)?.name || '?', h);
+      const m = move(h.move);
+      m.hits += 1;
+      if (h.crit) m.crits += 1;
+      if (h.pool !== 'vp') m.damage += h.amount;
+    }
+    if (h.targetId === pid) {
+      const from = h.actorId === pid ? 'self' : h.actorId || 'other';
+      add(taken, from, from === 'self' ? 'Itself' : h.actorName || 'Something else', h);
+    }
+  });
+  dealt.forEach((row) => { row.ko = fainted(row.id) && lastHit[row.id]?.actorId === pid; });
+  // Burns, poison, weather, its own ability's cost...
+  const other = entries.filter(e => e.type === 'status-damage' && e.actorId === pid).map(e => ({
+    text: e.text, amount: Number(e.amount ?? (String(e.text || '').match(/(?:takes |-)(\d+)/) || [])[1]) || 0, pool: e.pool,
+  }));
+  const heals = entries.filter(e => e.type === 'heal' && e.targetId === pid).reduce((n, e) => n + (Number(e.amount) || 0), 0);
+  const healsGiven = entries.filter(e => e.type === 'heal' && e.actorId === pid && e.targetId && e.targetId !== pid)
+    .reduce((n, e) => n + (Number(e.amount) || 0), 0);
+
+  const rounds = new Map();
+  entries.forEach((e) => {
+    if (QUIET_LOG.has(e.type) || !e.text || (e.actorId !== pid && e.targetId !== pid)) return;
+    const dir = e.actorId === pid && e.targetId && e.targetId !== pid ? 'out' : e.targetId === pid && e.actorId !== pid ? 'in' : '';
+    const r = Number(e.round) || 0;
+    if (!rounds.has(r)) rounds.set(r, []);
+    rounds.get(r).push({ text: e.text, dir });
+  });
+
+  const sum = (map, k) => [...map.values()].reduce((n, row) => n + row[k], 0);
+  return {
+    moves: [...moves.values()].sort((x, y) => y.damage - x.damage || y.used - x.used),
+    dealt: [...dealt.values()].sort((x, y) => y.hp - x.hp),
+    taken: [...taken.values()].sort((x, y) => y.hp - x.hp),
+    other,
+    dealtHp: sum(dealt, 'hp'), dealtVp: sum(dealt, 'vp'),
+    takenHp: sum(taken, 'hp') + other.filter(o => o.pool !== 'vp').reduce((n, o) => n + o.amount, 0),
+    used: [...moves.values()].reduce((n, m) => n + m.used, 0),
+    kos: [...dealt.values()].filter(row => row.ko).length,
+    heals, healsGiven,
+    faintedBy: fainted(pid) ? lastHit[pid]?.actorName || null : undefined,
+    rounds: [...rounds.entries()].sort((x, y) => x[0] - y[0]),
+  };
+}
+
+function impactHtml(im, p) {
+  const owner = p.owner && p.owner !== 'DM' ? ` · ${escapeHtml(p.owner)}'s` : p.owner === 'DM' || !p.owner ? ' · the DM\'s' : '';
+  const end = p.captured ? 'Caught'
+    : im.faintedBy !== undefined ? `Fainted${im.faintedBy ? ` (knocked out by ${escapeHtml(im.faintedBy)})` : ''}`
+      : `Ended on ${p.currentHP ?? '?'}/${p.maxHP ?? '?'} HP${p.maxVP ? `, ${p.currentVP ?? '?'}/${p.maxVP} VP` : ''}`;
+  const rows = (list, label) => (list.length ? list.map(row => `
+    <div class="dm-impact-row"><span>${escapeHtml(row.name)}${row.ko ? ' <span class="dm-impact-ko">KO</span>' : ''}</span>
+      <span>${row.hp ? `<strong>${row.hp}</strong> HP` : ''}${row.vp ? ` ${row.hp ? '+ ' : ''}<strong>${row.vp}</strong> VP` : ''}${!row.hp && !row.vp ? '0' : ''}
+      <small>${row.hits} hit${row.hits === 1 ? '' : 's'}${row.crits ? `, ${row.crits} crit${row.crits === 1 ? '' : 's'}` : ''}</small></span></div>`).join('')
+    : `<div class="dm-hint">${label}</div>`);
+  return `
+    <div class="dm-impact">
+      <div class="dm-impact-head">
+        <span class="dm-enc-thumb dm-impact-pic" data-img="${escapeHtml(p.image || '')}"></span>
+        <div>
+          <strong>${escapeHtml(p.name)}</strong> <small>${escapeHtml(p.speciesName && p.speciesName !== p.name ? `${p.speciesName} · ` : '')}Lv ${p.level ?? '?'}${owner}</small>
+          <div class="dm-hint">${end}</div>
+        </div>
+      </div>
+      <div class="dm-after-stats dm-impact-stats">
+        <div><strong>${im.dealtHp}</strong><span>Damage dealt${im.dealtVp ? ` (+${im.dealtVp} VP drained)` : ''}</span></div>
+        <div><strong>${im.takenHp}</strong><span>Damage taken</span></div>
+        <div><strong>${im.used}</strong><span>Moves used</span></div>
+        <div><strong>${im.kos}</strong><span>Knocked out</span></div>
+        <div><strong>${im.heals}</strong><span>HP healed${im.healsGiven ? ` (healed others ${im.healsGiven})` : ''}</span></div>
+      </div>
+      <div class="dm-impact-grid">
+        <div class="dm-card">
+          <div class="dm-card-title">Moves</div>
+          ${im.moves.length ? im.moves.map(m => `
+            <div class="dm-impact-row"><span><strong>${escapeHtml(m.name)}</strong>${m.used ? ` ×${m.used}` : ''}</span>
+              <span>${m.damage ? `<strong>${m.damage}</strong> dmg ` : ''}<small>${[m.hits && `${m.hits} hit${m.hits === 1 ? '' : 's'}`, m.misses && `${m.misses} miss${m.misses === 1 ? '' : 'es'}`, m.crits && `${m.crits} crit${m.crits === 1 ? '' : 's'}`].filter(Boolean).join(', ') || 'no hits'}</small></span></div>`).join('')
+            : '<div class="dm-hint">Used no moves.</div>'}
+        </div>
+        <div class="dm-card">
+          <div class="dm-card-title">Damage dealt -- on whom</div>
+          ${rows(im.dealt, 'Hit nobody.')}
+        </div>
+        <div class="dm-card">
+          <div class="dm-card-title">Damage taken -- from whom</div>
+          ${rows(im.taken, im.other.length ? '' : 'Took no hits.')}
+          ${im.other.map(o => `<div class="dm-impact-row"><span>${escapeHtml(o.text)}</span><span><strong>${o.amount}</strong> ${o.pool === 'vp' ? 'VP' : 'HP'}</span></div>`).join('')}
+        </div>
+      </div>
+      <details class="dm-impact-log">
+        <summary>Round by round (${im.rounds.reduce((n, [, lines]) => n + lines.length, 0)})</summary>
+        ${im.rounds.map(([r, lines]) => `<div class="dm-impact-round"><span>Round ${r}</span>
+          ${lines.map(l => `<div class="${l.dir}">${escapeHtml(l.text)}</div>`).join('')}</div>`).join('')}
+      </details>
+    </div>`;
+}
+
+async function openImpact(b, pid) {
+  const p = (b.participants || []).find(x => x.id === pid);
+  if (!p) return;
+  let entries;
+  try { entries = await battleEntries(b); } catch (err) { showCombatAlert(err.message, { title: `${p.name} -- impact` }); return; }
+  openDmModal({
+    title: `💥 ${p.name} -- impact`,
+    wide: true,
+    html: entries ? impactHtml(impactOf(entries, pid, b), p)
+      : '<div class="dm-hint">This battle\'s log isn\'t on the Pi, so there\'s nothing to add up.</div>',
+    onOpen: body => showPics(body),
+  });
 }
 
 async function reloadParty() {

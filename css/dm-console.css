@@ -908,8 +908,27 @@ button.dm-enc-tag:hover { background: rgba(255, 255, 255, 0.12); }
 .dm-disp-preview iframe { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; pointer-events: none; }
 .dm-disp-preview-hint { position: absolute; right: 10px; bottom: 10px; padding: 0.3rem 0.7rem; border-radius: 8px; background: rgba(10, 10, 18, 0.85); color: var(--dm-gold); font-size: 0.82rem; font-weight: 700; opacity: 0; transition: opacity 0.15s; }
 .dm-disp-preview:hover .dm-disp-preview-hint { opacity: 1; }
-.dm-disp-battleinfo { display: flex; align-items: center; gap: 0.7rem; font-size: 0.84rem; color: var(--dm-muted); }
-.dm-disp-battleinfo .dm-seg { flex: 1; max-width: 400px; }
+.dm-disp-battleinfo { display: flex; align-items: center; gap: 0.5rem 0.7rem; flex-wrap: wrap; font-size: 0.84rem; color: var(--dm-muted); }
+.dm-disp-battleinfo .dm-seg[hidden] { display: none; }
+.dm-disp-battleinfo .dm-seg button:disabled { opacity: 0.35; cursor: default; }
+.dm-disp-overseg button.active[data-over="1"] { background: rgba(255, 152, 0, 0.2); color: #ffb74d; }
+/* Where a click goes (the user's call, 2026-11-20): ● LIVE in red, a planned scene in blue -- on the preview, above the
+   workspace's tabs and in the big editor's bar */
+.dm-disp-preview-badge { position: absolute; left: 10px; top: 10px; padding: 0.25rem 0.65rem; border-radius: 8px; font-size: 0.8rem; font-weight: 800;
+  background: rgba(192, 57, 43, 0.92); color: #fff; pointer-events: none; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+.dm-disp.planning .dm-disp-preview { border-color: #4fc3f7; box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.25), 0 10px 30px rgba(0, 0, 0, 0.45); }
+.dm-disp.planning .dm-disp-preview-badge { background: rgba(2, 119, 189, 0.95); }
+.dm-disp-target { padding: 0.45rem 0.8rem; font-size: 0.84rem; color: var(--dm-text); background: rgba(192, 57, 43, 0.16); border-bottom: 1px solid rgba(192, 57, 43, 0.5); }
+.dm-disp-target small { color: var(--dm-muted); }
+.dm-disp.planning .dm-disp-target { background: rgba(79, 195, 247, 0.13); border-bottom-color: rgba(79, 195, 247, 0.55); }
+.dm-disp-editor.planning .dm-disp-ed-bar { background: #0b1a2a; border-bottom-color: rgba(79, 195, 247, 0.55); }
+.dm-disp-editor.planning .dm-disp-ed-bar strong { color: #4fc3f7; }
+.dm-disp-ed-bar strong small { color: var(--dm-muted); font-weight: 600; }
+.dm-disp-editor.planning .dm-disp-ed-stage { box-shadow: 0 0 0 3px #4fc3f7, 0 20px 60px rgba(0, 0, 0, 0.7); }
+/* The planned scene on the display, and ▶ Next */
+.dm-disp-plan.onnow { box-shadow: inset 3px 0 0 var(--dm-green); background: rgba(39, 174, 96, 0.1); }
+.dm-disp-onnow { color: #4cd07d; font-weight: 800; }
+.dm-disp-next { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dm-seg.two { grid-template-columns: repeat(2, 1fr); }
 .dm-disp-away {
   margin-bottom: 0.4rem; padding: 0.4rem 0.6rem; border-radius: 8px; font-size: 0.8rem;
@@ -1142,7 +1161,8 @@ button.dm-enc-tag:hover { background: rgba(255, 255, 255, 0.12); }
 .dm-navmod > .dm-adv-module:not([hidden]) { flex: 1; min-height: 0; }
 .dm-navmod-tabs { align-items: flex-end; }
 .dm-navmod-screen { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; padding-bottom: 0.35rem; color: var(--dm-muted); font-weight: 700; font-size: 0.85rem; }
-.dm-navmod-screen .dm-select { width: auto; padding: 0.3rem 0.5rem; }
+.dm-navmod-screen .dm-seg button { padding: 0.35rem 0.9rem; }
+.dm-navmod-screen .dm-seg button:disabled { opacity: 0.4; cursor: default; }
 /* The running adventure's switches for the players. */
 .dm-adv-switches { display: flex; gap: 0.9rem; flex-wrap: wrap; font-size: 0.85rem; font-weight: 700; }
 .dm-adv-switches label { display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; }
@@ -1557,22 +1577,16 @@ span.dm-trap-pick { cursor: default; }
 .dm-disp-planfolder { cursor: pointer; }
 .dm-disp-planfolder:hover { background: rgba(255, 255, 255, 0.04); }
 .dm-disp-plan.dragging { opacity: 0.45; }
-/* A planned scene's Override: greyed while off, lit while on */
-.dm-disp-ovbtn { opacity: 0.4; filter: grayscale(1); font-size: 0.72rem; padding: 0.22rem 0.5rem; }
-.dm-disp-ovbtn:hover { opacity: 0.75; }
-.dm-disp-ovbtn.on { opacity: 1; filter: none; color: #1a1205; background: linear-gradient(135deg, #ffb74d, #ff9800); border-color: #ff9800; }
 .dm-disp-ovtag { display: inline-block; margin-left: 0.3rem; padding: 0.05rem 0.4rem; border-radius: 999px; font-size: 0.64rem; font-weight: 900;
   color: #1a1205; background: #ff9800; vertical-align: middle; }
-.dm-disp-overbattle { margin-left: 0.4rem; white-space: nowrap; }
-/* Folder mode and Override battle screen: easy to see and hit (the user's call, 2026-10-21) -- a framed switch, not a
-   small tick box */
-.dm-check.dm-disp-foldermode, .dm-check.dm-disp-overbattle {
+/* Folder mode: easy to see and hit (the user's call, 2026-10-21) -- a framed switch, not a small tick box */
+.dm-check.dm-disp-foldermode {
   align-items: center; gap: 0.5rem; margin-bottom: 0; padding: 0.35rem 0.7rem; border-radius: 9px; font-size: 0.9rem; font-weight: 700;
   border: 1px solid var(--dm-line); background: rgba(255, 255, 255, 0.05);
 }
-.dm-check.dm-disp-foldermode:hover, .dm-check.dm-disp-overbattle:hover { border-color: var(--dm-gold); }
-.dm-check.dm-disp-foldermode:has(input:checked), .dm-check.dm-disp-overbattle:has(input:checked) { border-color: #ffb74d; background: rgba(255, 183, 77, 0.14); }
-.dm-disp-foldermode input, .dm-disp-overbattle input { width: 1.15rem; height: 1.15rem; margin: 0; accent-color: #ff9800; cursor: pointer; }
+.dm-check.dm-disp-foldermode:hover { border-color: var(--dm-gold); }
+.dm-check.dm-disp-foldermode:has(input:checked) { border-color: #ffb74d; background: rgba(255, 183, 77, 0.14); }
+.dm-disp-foldermode input { width: 1.15rem; height: 1.15rem; margin: 0; accent-color: #ff9800; cursor: pointer; }
 /* the Planned scenes tab: the scenes as rows, in folders */
 .dm-disp-grid.dm-disp-scenes { display: flex; flex-direction: column; gap: 0.35rem; }
 .dm-disp-scenes-head { align-items: center; gap: 0.6rem; margin-bottom: 0.3rem; flex-wrap: nowrap; }

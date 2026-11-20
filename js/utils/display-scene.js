@@ -4,7 +4,7 @@
 // arranges is exactly what the TV shows. During a battle the background stays and the battle (turn order, whoever's
 // turn it is) goes on top; the placed pictures are put away until it ends unless `battlePictures` is 'keep'.
 //
-// Scene: { background: {url, name} | null, items: [Item], battlePictures: 'away' | 'keep', overBattle, override }
+// Scene: { background: {url, name} | null, items: [Item], battlePictures: 'away' | 'keep', overBattle, shownPlan, override }
 //   overBattle: during a battle the scene stays over everything -- the turn order too (the user's call, 2026-10-20: a
 //   planned scene's Override, carried onto the display when it's shown)
 //   override: a planned scene the DM put on the display over everything else -- a battle too -- until they stop it
@@ -32,6 +32,9 @@ export function normaliseScene(s) {
     // Tied to that one battle, so the next one shows again even if the box was left unticked.
     hideBattle: typeof s?.hideBattle === 'string' ? s.hideBattle : '',
     overBattle: !!s?.overBattle,
+    // The planned scene last put on with Show (its id) -- marked "On the display" in the DM's lists, and where ▶ Next
+    // goes on from (the user's call, 2026-11-20). Let go when the DM changes the background by hand.
+    shownPlan: typeof s?.shownPlan === 'string' ? s.shownPlan : '',
     override: s?.override && typeof s.override === 'object'
       ? { id: String(s.override.id || ''), name: String(s.override.name || ''), background: backgroundOf(s.override), items: itemsOf(s.override) } : null,
   };

@@ -5,8 +5,9 @@
 // board itself can't be touched. three.js is only loaded the first time the module is opened.
 //
 // The module has two tabs (the user's call, 2026-10-19 -- both are about what the board screen shows outside a battle):
-// Region Map (the above) and Adventure Mode (adventure.js: a map the players walk around on). "On the table screen", at
-// the tabs' right, picks which one the board shows; picking the adventure map starts the adventure if it isn't running.
+// Region Map (the above) and Adventure Mode (adventure.js: a map the players walk around on). "Showing on screen", at
+// the tabs' right -- two buttons, the one on the board lit -- picks which one the board shows; picking the adventure map
+// starts the adventure if it isn't running.
 import { CombatAPI, DmAPI } from '../api.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, toast, openDmModal } from './dm-common.js';
@@ -71,11 +72,12 @@ export async function renderPokenav(section, { session } = {}) {
       <div class="dm-enc-tabs dm-navmod-tabs" id="navTabs">
         <button data-ntab="region"><img class="dm-tab-icon" src="assets/pokenav-icon.png" alt="">Region Map</button>
         <button data-ntab="adventure">🧭 Adventure Mode</button>
-        <label class="dm-navmod-screen" title="What the table's board screen shows while no battle is running">📺 On the table screen
-          <select class="dm-select" id="navOnScreen">
-            <option value="region">Region map</option>
-            <option value="adventure">Adventure map</option>
-          </select></label>
+        <div class="dm-navmod-screen">
+          <span id="navOnScreenLabel">Showing on screen</span>
+          <div class="dm-seg two" id="navOnScreen">
+            <button data-on="region">Region map</button>
+            <button data-on="adventure">Adventure map</button>
+          </div></div>
       </div>
       <div class="dm-nav" id="navRegionView">
         <div class="dm-nav-head">
@@ -94,7 +96,10 @@ export async function renderPokenav(section, { session } = {}) {
     const b = e.target.closest('[data-ntab]');
     if (b) showTab(b.dataset.ntab);
   });
-  section.querySelector('#navOnScreen').addEventListener('change', (e) => pickOnScreen(e.target.value));
+  section.querySelector('#navOnScreen').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-on]');
+    if (b && !b.disabled && !b.classList.contains('active')) pickOnScreen(b.dataset.on);
+  });
   showTab(_tab);
   renderStatus();
   drawLocations();
@@ -399,19 +404,27 @@ function renderStatus() {
     el.textContent = shows === 'battle' ? (_session.adventurePaused ? 'Battle running -- the adventure comes back when it ends' : 'Battle running -- back on the table screen when it ends')
       : shows === 'adventure' ? 'The adventure map is on the table screen' : 'On the table screen';
   }
-  const pick = document.getElementById('navOnScreen');
-  if (pick) {
-    const battle = shows === 'battle';
-    pick.disabled = battle;
-    pick.value = battle ? 'region' : shows;
-    pick.title = battle ? 'A battle is on the table screen -- this applies again once it has ended' : '';
-  }
+  // "Showing on screen" (the user's call, 2026-11-20 -- a dropdown before): both choices always in sight, the one on the
+  // table screen lit. During a battle neither is: the battle is on it, and both wait until it ends.
+  const battle = shows === 'battle';
+  const label = document.getElementById('navOnScreenLabel');
+  if (label) label.textContent = battle ? 'Showing on screen: ⚔️ a battle' : 'Showing on screen';
+  const running = !!_session?.active && _session.battleType === 'adventure';
+  document.querySelectorAll('#navOnScreen [data-on]').forEach((b) => {
+    b.disabled = battle;
+    b.classList.toggle('active', b.dataset.on === shows);
+    b.title = battle ? (_session.adventurePaused ? 'A battle is on the table screen -- the adventure comes back when it ends' : 'A battle is on the table screen -- pick again once it has ended')
+      : b.dataset.on === shows ? 'On the table screen now'
+        : b.dataset.on === 'region' ? 'Put the region map on the table screen'
+          : running ? 'Put the adventure map on the table screen' : 'Start the adventure and put its map on the table screen';
+  });
 }
 
 /** The DM picked what the board shows: the adventure map (starting the adventure if it isn't running) or the region
- * map (a running adventure carries on in the players' app). */
+ * map (a running adventure carries on in the players' app). Lit at once; the battle's push confirms it. */
 async function pickOnScreen(value) {
   const running = !!_session?.active && _session.battleType === 'adventure';
+  document.querySelectorAll('#navOnScreen [data-on]').forEach(b => b.classList.toggle('active', b.dataset.on === value));
   try {
     if (running) {
       await CombatAPI.adventureSettings({ onScreen: value });
@@ -419,10 +432,10 @@ async function pickOnScreen(value) {
       await startAdventure({ canJoin: false, onScreen: 'adventure' });
     }
   } catch (err) {
-    showCombatAlert(err.message, { title: 'On the table screen' });
+    renderStatus();
+    showCombatAlert(err.message, { title: 'Showing on screen' });
     if (!running && value === 'adventure') showTab('adventure'); // most likely: no adventure map made yet
   }
-  renderStatus();
 }
 
 function queue(view) {

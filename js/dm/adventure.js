@@ -201,7 +201,7 @@ async function askEncounterName(title, start, hint) {
 }
 
 /** Opens the adventure on the saved adventure map (what's being edited here first, its creatures too) -- "Allow player
- * placement", or PokeNav's "On the table screen". `settings`: {canJoin, onScreen} to start with. Throws when it can't (no
+ * placement", or PokeNav's "Showing on screen". `settings`: {canJoin, onScreen} to start with. Throws when it can't (no
  * map yet, a battle running). */
 export async function startAdventure(settings = {}) {
   if (_store) await _store.flushSetup();

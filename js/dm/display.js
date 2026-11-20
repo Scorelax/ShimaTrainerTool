@@ -14,8 +14,10 @@
 // The planner (the user's call, 2026-10-19): the 📅 Planner switch at the top turns everything here onto a planned scene
 // instead of the display -- built with the same tabs, preview and editor while the display carries on (a battle, the
 // scene the players are in) -- saved as they change, in folders. Planned scenes wait in the queue under "On the screen":
-// Show puts one on the display, and its Override (the user's call, 2026-10-20) comes along: with it on, the scene stays
-// over everything during a battle -- the turn order too. The live "During a battle" row has the same switch.
+// Show (or ▶ Next, the next one in the folder) puts one on the display, and its "Scene stays on top" (the user's call,
+// 2026-10-20; named so 2026-11-20 -- it was "Override battle screen") comes along: with it on, the scene stays over
+// everything during a battle -- the turn order too. The "During a battle" row switches it, for the display or for the
+// planned scene open. ● LIVE / 📅 Planning on the preview, the workspace and the editor say where a click goes.
 import { DmAPI } from '../api.js';
 import { parentOf } from '../region-map/map-version.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
@@ -146,12 +148,13 @@ function draw() {
         ${_mode === 'plan' ? '<div class="dm-card dm-disp-plans" id="dispPlans"></div>' : ''}
         <div class="dm-disp-preview" id="dispPreview" role="button" tabindex="0" title="Click to arrange the pictures">
           <iframe id="dispFrame" src="display.html?preview" tabindex="-1" title="The display" aria-hidden="true"></iframe>
+          <span class="dm-disp-preview-badge" id="dispBadge"></span>
           <span class="dm-disp-preview-hint">🔍 Click to arrange</span>
         </div>
-        <div class="dm-disp-battleinfo" ${_mode === 'plan' ? 'hidden' : ''} title="During a battle the background stays, with the turn order and whoever's turn it is on top">
+        <div class="dm-disp-battleinfo">
           <span>⚔️ During a battle</span>
+          <div class="dm-seg two dm-disp-overseg" id="dispOverBattle"></div>
           <div class="dm-seg two" id="dispBattlePictures"></div>
-          <label class="dm-check dm-disp-overbattle" title="The scene stays over everything during a battle -- the turn order too. Showing a planned scene sets it to that scene's Override."><input type="checkbox" id="dispOverBattle"><span>Override battle screen</span></label>
         </div>
         <div class="dm-card dm-disp-layers">
           <div class="dm-card-title">
@@ -166,6 +169,7 @@ function draw() {
         ${_mode === 'live' ? '<div class="dm-card dm-disp-queue" id="dispQueue"></div>' : ''}
       </div>
       <div class="dm-disp-work" id="dispWork">
+        <div class="dm-disp-target" id="dispTarget"></div>
         <div class="dm-enc-tabs dm-disp-tabs" id="dispTabs">
           ${Object.entries(SOURCES).map(([k, l]) => `<button data-src="${k}" class="${k === _source ? 'active' : ''}">${l}</button>`).join('')}
         </div>
@@ -200,10 +204,17 @@ function draw() {
   document.getElementById('dispUpload').addEventListener('click', pickFiles);
   document.getElementById('dispGrid').addEventListener('click', onGridClick);
   document.getElementById('dispGrid').addEventListener('change', (e) => { if (e.target.matches('[data-folder-mode]')) setFolderMode(e.target.checked); });
-  document.getElementById('dispOverBattle').addEventListener('change', (e) => updateLive((s) => { s.overBattle = e.target.checked; }));
+  // During a battle: the turn order on top, or the scene staying on top (the display's own, or the planned scene open)
+  document.getElementById('dispOverBattle').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-over]');
+    if (!b) return;
+    const on = b.dataset.over === '1';
+    const plan = openPlan();
+    if (plan) updatePlans(() => { plan.overBattle = on; }); else updateLive((s) => { s.overBattle = on; });
+  });
   document.getElementById('dispBattlePictures').addEventListener('click', (e) => {
     const b = e.target.closest('[data-bp]');
-    if (b) updateLive((s) => { s.battlePictures = b.dataset.bp; });
+    if (b && !b.disabled) updateLive((s) => { s.battlePictures = b.dataset.bp; });
   });
   document.getElementById('dispHideAll').addEventListener('click', () => {
     const scene = getScene();
@@ -254,13 +265,40 @@ function postToPreview(msg) {
   try { frame?.contentWindow?.postMessage({ source: 'dm-display', ...msg }, location.origin); } catch { /* not loaded yet */ }
 }
 
+/** The "During a battle" row (the user's call, 2026-11-20: a two-way switch with both choices named, in place of the
+ * "Override battle screen" button): the turn order on top, or the scene staying on top -- the display's own, or the
+ * planned scene open. The pictures' switch is the display's own, and only matters while the turn order is on top. */
 function drawBattlePictures() {
   const box = document.getElementById('dispBattlePictures');
-  if (!box) return;
+  const overBox = document.getElementById('dispOverBattle');
+  if (!box || !overBox) return;
+  const plan = openPlan();
+  const whose = plan ? 'this scene' : 'the display';
+  const over = plan ? !!plan.overBattle : !!getLive().overBattle;
+  overBox.innerHTML = `
+    <button data-over="0" class="${over ? '' : 'active'}" title="During a battle the turn order and whoever's turn it is show on top of ${whose}'s background">⚔️ Turn order on top</button>
+    <button data-over="1" class="${over ? 'active' : ''}" title="During a battle ${whose} stays as it is -- the turn order isn't shown">🖼️ Scene stays on top</button>`;
+  box.hidden = !!plan;
   const current = getLive().battlePictures;
-  box.innerHTML = Object.entries(BATTLE_PICTURES).map(([k, l]) => `<button data-bp="${k}" class="${k === current ? 'active' : ''}">${l}</button>`).join('');
-  const over = document.getElementById('dispOverBattle');
-  if (over) over.checked = !!getLive().overBattle;
+  box.innerHTML = Object.entries(BATTLE_PICTURES).map(([k, l]) => `<button data-bp="${k}" class="${k === current ? 'active' : ''}" ${over ? 'disabled title="Not needed while the scene stays on top"' : ''}>${l}</button>`).join('');
+}
+
+/** Where a click goes, impossible to miss (the user's call, 2026-11-20): ● LIVE on the preview, or the planned scene open
+ * in blue -- on the preview, above the workspace's tabs and in the big editor's bar. */
+function drawModeMarks() {
+  const plan = openPlan();
+  const name = `"${escapeHtml(plan?.name || 'Scene')}"`;
+  _root?.querySelector('.dm-disp')?.classList.toggle('planning', !!plan);
+  const badge = document.getElementById('dispBadge');
+  if (badge) badge.innerHTML = plan ? `📅 Planning <b>${name}</b> -- the display isn't changing` : '● LIVE -- what the players see';
+  const target = document.getElementById('dispTarget');
+  if (target) target.innerHTML = plan ? `Adding to: 📅 <b>${name}</b> <small>-- a planned scene, not on the display</small>`
+    : 'Adding to: 📺 <b>the display</b> <small>-- the players see it at once</small>';
+  if (_editor) {
+    _editor.overlay.classList.toggle('planning', !!plan);
+    const title = _editor.overlay.querySelector('#edTitle');
+    if (title) title.innerHTML = plan ? `📅 Arrange ${name} <small>-- planned, not on the display</small>` : '📺 Arrange the display <small>-- live</small>';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -345,11 +383,29 @@ function planThumb(plan) {
     : first ? `<span class="dm-disp-plan-thumb">${thumbHtml(first.src, '', { still: first.still })}</span>` : '<span class="dm-disp-plan-thumb empty">📅</span>';
 }
 
+/** The planned scene last put on the display with Show (see display-scene.js's shownPlan). */
+const isOnNow = plan => !!plan && getLive().shownPlan === plan.id;
+
 function planSummary(plan) {
   const sc = plan.scene;
   const n = sc.items.length;
   return [sc.background ? escapeHtml(sc.background.name || 'a background') : 'no background',
-    `${n} picture${n === 1 ? '' : 's'}`, plan.shownAt ? '✓ shown' : ''].filter(Boolean).join(' · ');
+    `${n} picture${n === 1 ? '' : 's'}`,
+    isOnNow(plan) ? '<span class="dm-disp-onnow">● On the display</span>' : plan.shownAt ? '✓ shown' : ''].filter(Boolean).join(' · ');
+}
+
+/** A planned scene's classes in a list: the one open, the one on the display, one shown before. */
+const planRowClass = (p, open) => `${p.id === open ? ' open' : ''}${isOnNow(p) ? ' onnow' : p.shownAt ? ' shown' : ''}`;
+
+/** "Stays on top in battles" (the scene's overBattle), as a tag after its name. */
+const overTag = p => (p.overBattle ? ' <span class="dm-disp-ovtag" title="During a battle this scene stays on top -- the turn order isn\'t shown">🖼️ Stays on top in battles</span>' : '');
+
+/** ▶ Next (the user's call, 2026-11-20): the scene after the one on the display, in the folder open (in the order they
+ * were made) -- or its first, when the one on the display isn't in it. null at the end. */
+function nextPlan() {
+  const list = plansIn(_planFolder);
+  const i = list.findIndex(isOnNow);
+  return i === -1 ? list[0] || null : list[i + 1] || null;
 }
 
 /** The override bar: a planned scene is on the display over the battle. */
@@ -420,13 +476,18 @@ function planBrowserHtml(row, { manage = false } = {}) {
 function drawQueue() {
   const box = document.getElementById('dispQueue');
   if (!box) return;
+  const here = plansIn(_planFolder);
+  const next = nextPlan();
+  const nextBtn = !here.length ? ''
+    : next ? `<button class="dm-btn small primary dm-disp-next" data-plan-act="show" data-id="${escapeHtml(next.id)}" title="Put &quot;${escapeHtml(next.name)}&quot; on the display -- the next scene in this folder">▶ Next: ${escapeHtml(next.name)}</button>`
+      : '<button class="dm-btn small dm-disp-next" disabled title="The scene on the display is the last one in this folder">▶ Next</button>';
   box.innerHTML = `
     <div class="dm-card-title"><span>📅 Queued scenes</span>
-      <span class="dm-row dm-enc-titlebtns"><button class="dm-btn small" data-plan-act="new-live" title="Plan a new scene in the planner">＋ Plan a scene</button></span></div>
+      <span class="dm-row dm-enc-titlebtns">${nextBtn}<button class="dm-btn small" data-plan-act="new-live" title="Plan a new scene in the planner">＋ Plan a scene</button></span></div>
     ${getPlans().length || _planFolders.length ? planBrowserHtml(p => `
-      <div class="dm-disp-plan${p.shownAt ? ' shown' : ''}" data-plan="${escapeHtml(p.id)}" draggable="true">
+      <div class="dm-disp-plan${planRowClass(p)}" data-plan="${escapeHtml(p.id)}" draggable="true">
         ${planThumb(p)}
-        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}${p.overBattle ? ' <span class="dm-disp-ovtag" title="Override battle screen: over everything during a battle">Override battle screen</span>' : ''}</strong><small>${planSummary(p)}</small></span>
+        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}${overTag(p)}</strong><small>${planSummary(p)}</small></span>
         <button class="dm-btn small primary" data-plan-act="show" title="Put it on the display -- its background and pictures in place of the ones there now${p.overBattle ? ', over the battle too' : ''}">📺 Show</button>
         <button class="dm-icon-btn" data-plan-act="edit" title="Change it in the planner">✎</button>
         <button class="dm-icon-btn danger" data-plan-act="delete" title="Delete it">✕</button>
@@ -445,11 +506,9 @@ function drawPlans() {
         <button class="dm-btn small" data-plan-act="new" title="An empty scene, in the folder open">＋ New</button>
         <button class="dm-btn small" data-plan-act="copy-live" title="A new scene starting from what's on the display now">⧉ From the display</button></span></div>
     ${planBrowserHtml(p => `
-      <div class="dm-disp-plan${p.id === open?.id ? ' open' : ''}" data-plan="${escapeHtml(p.id)}" draggable="true" role="button" tabindex="0" title="Work on this one">
+      <div class="dm-disp-plan${planRowClass(p, open?.id)}" data-plan="${escapeHtml(p.id)}" draggable="true" role="button" tabindex="0" title="Work on this one">
         ${planThumb(p)}
-        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}</strong><small>${planSummary(p)}</small></span>
-        <button class="dm-btn small dm-disp-ovbtn${p.overBattle ? ' on' : ''}" data-plan-act="override" aria-pressed="${p.overBattle ? 'true' : 'false'}"
-          title="${p.overBattle ? 'Override battle screen is on: during a battle this scene stays over everything, the turn order too. Click to turn it off.' : 'Override battle screen is off: during a battle the turn order shows over this scene. Click to turn it on.'}">Override battle screen</button>
+        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}${overTag(p)}</strong><small>${planSummary(p)}</small></span>
         <button class="dm-icon-btn" data-plan-act="rename" title="Rename">✎</button>
         <button class="dm-icon-btn" data-plan-act="move" title="Move it to another folder">📁</button>
         <button class="dm-icon-btn danger" data-plan-act="delete" title="Delete it">✕</button>
@@ -528,7 +587,6 @@ async function onPlanClick(e) {
   if (!plan) return;
   if (act === 'show') showPlan(plan);
   else if (act === 'stop') stopOverride();
-  else if (act === 'override') updatePlans(() => { plan.overBattle = !plan.overBattle; });
   else if (act === 'edit') switchMode('plan', plan.id);
   else if (act === 'move') {
     const into = await pickPlanFolder(`📁 Move "${plan.name}" to…`);
@@ -600,9 +658,9 @@ async function pickPlanFolder(title) {
  * its Override comes along -- on, the scene stays over the battle too, turn order and all (the user's call, 2026-10-20). */
 function showPlan(plan) {
   const sc = copyScene(plan.scene);
-  updateLive((s) => { s.background = sc.background; s.items = sc.items; s.overBattle = !!plan.overBattle; s.override = null; });
+  updateLive((s) => { s.background = sc.background; s.items = sc.items; s.overBattle = !!plan.overBattle; s.override = null; s.shownPlan = plan.id; });
   updatePlans(() => { plan.shownAt = new Date().toISOString(); });
-  toast(`"${plan.name}" is on the display${battleOnDisplay(getLive(), _session) ? (plan.overBattle ? ' -- over the battle (Override)' : ' -- behind the battle') : ''}.`);
+  toast(`"${plan.name}" is on the display${battleOnDisplay(getLive(), _session) ? (plan.overBattle ? ' -- it stays on top of the battle' : ' -- the battle\'s turn order is on top') : ''}.`);
 }
 
 /** An older planned scene put over the display (scene.override, before Override was the scene's own switch) taken off. */
@@ -631,6 +689,7 @@ function drawLayers() {
     hideAll.disabled = !scene.items.length;
   }
   const items = [...scene.items].reverse(); // the top one first
+  drawModeMarks();
   drawOverride();
   if (_mode === 'plan') drawPlans(); else drawQueue();
   if (_source === 'scenes') drawScenesTab();
@@ -670,7 +729,7 @@ function onLayerClick(e) {
   e.preventDefault();
   const act = b.dataset.l;
   if (act === 'bg-change') { switchSource('backgrounds'); return; }
-  if (act === 'bg-remove') { updateScene((s) => { s.background = null; }); return; }
+  if (act === 'bg-remove') { updateScene((s) => { s.background = null; if (!openPlan()) s.shownPlan = ''; }); return; }
   itemAction(b.closest('[data-id]')?.dataset.id, act);
 }
 
@@ -767,9 +826,9 @@ function drawScenesTab() {
   const q = (_queries.scenes || '').trim().toLowerCase();
   const open = _mode === 'plan' ? openPlan()?.id : null;
   const row = p => `
-      <div class="dm-disp-plan${p.id === open ? ' open' : ''}${p.shownAt ? ' shown' : ''}" data-plan="${escapeHtml(p.id)}" draggable="true">
+      <div class="dm-disp-plan${planRowClass(p, open)}" data-plan="${escapeHtml(p.id)}" draggable="true">
         ${planThumb(p)}
-        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}${p.overBattle ? ' <span class="dm-disp-ovtag" title="Over everything during a battle">Override battle screen</span>' : ''}</strong>
+        <span class="dm-disp-layer-name"><strong>${escapeHtml(p.name)}${overTag(p)}</strong>
           <small>${planSummary(p)}${q && p.folder ? ` · 📁 ${escapeHtml(planFolderPath(p.folder).map(f => f.name).join(' › '))}` : ''}</small></span>
         <button class="dm-btn small" data-plan-act="edit" title="Work on it in the planner">✎ Edit</button>
         <button class="dm-icon-btn" data-plan-act="rename" title="Rename">Aa</button>
@@ -891,7 +950,7 @@ async function onGridClick(e) {
       drawGrid();
       return;
     }
-    if (!bgTool) { updateScene((s) => { s.background = { url: img.url, name: img.name }; }); drawGrid(); toast(`${img.name} is the background now.`); return; }
+    if (!bgTool) { updateScene((s) => { s.background = { url: img.url, name: img.name }; if (!openPlan()) s.shownPlan = ''; }); drawGrid(); toast(`${img.name} is the background now.`); return; }
     const act = bgTool.dataset.bgact;
     if (act === 'pic') addPicture({ kind: 'image', label: img.name, still: img.url });
     else if (act === 'rename') renameImage(img);
@@ -1015,7 +1074,7 @@ function openEditor() {
   overlay.className = 'dm-disp-editor';
   overlay.innerHTML = `
     <div class="dm-disp-ed-bar">
-      <strong>📺 Arrange the display</strong>
+      <strong id="edTitle"></strong>
       <span class="dm-hint">Drag a picture to move it · drag a corner to resize it · arrow keys nudge · Delete takes it off.</span>
       <button class="dm-btn primary" id="edDone">Done</button>
     </div>
@@ -1029,6 +1088,7 @@ function openEditor() {
   const top = getScene().items[getScene().items.length - 1];
   _editor = { overlay, stage, area, selectedId: top?.id || null, observer: new ResizeObserver(fitStage) };
   _editor.observer.observe(area);
+  drawModeMarks();
   fitStage();
   drawEditorStage();
   drawEditorSide();

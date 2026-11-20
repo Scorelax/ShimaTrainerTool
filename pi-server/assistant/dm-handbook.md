@@ -124,8 +124,9 @@ of 28 days, years counted AFR) with festivals, the DM's calendar events and the 
 Kept on the Pi, so a reload or a second laptop shows the same time.
 
 ## PokéNav module
-What the board screen shows outside a battle. Two tabs, and "On the table screen" (at the tabs' right) picks which one
-the board shows:
+What the board screen shows outside a battle. Two tabs, and **Showing on screen** (at the tabs' right: two buttons,
+Region map | Adventure map, the one on the board lit) picks which one the board shows. Picking Adventure map starts the
+adventure if it isn't running. During a battle both buttons are greyed out (the battle is on the board):
 - **Region Map**: the 3D map of Shima. Turning, zooming, moving it or flying to a town here moves it on the board.
 - **Adventure Mode**: a map the players walk around on without a battle (no turns, no initiative, no movement limit).
   The DM builds the map (same editor as Map setup) with Pokémon and NPCs, hidden or not. **Allow player placement**
@@ -138,9 +139,14 @@ the board shows:
 What the display shows. Left: a live preview with what's on it; right: every Pokémon, NPC and trainer to put on
 the screen with a click, and background pictures uploaded from the DM's computer (kept on the Pi). Click the preview
 for the big editor: drag pictures, resize from a corner. A picture can be put on hidden first and shown with one click.
-During a battle the display shows the turn order over the background.
+A red **● LIVE** badge on the preview means clicks change the display at once; in the planner the preview has a blue frame
+and says which planned scene clicks go into ("Adding to: …" above the tabs on the right says the same).
+**⚔️ During a battle** row: **Turn order on top** (the battle's turn order over the background; pictures put away or
+kept on) or **Scene stays on top** (the scene stays as it is, no turn order) -- for the display, or in the planner for
+the planned scene open. (It used to be called "Override battle screen".)
 **📅 Planner**: build planned scenes (in folders) while the display carries on; they wait in the queue under "On the
-screen" and **Show** puts one on. A scene's **Override** keeps it over everything during a battle.
+screen" and **Show** puts one on. The one on the display is marked **● On the display**; **▶ Next: <name>** shows the
+next scene in the folder open (in the order they were made). Changing the display's background by hand drops the mark.
 
 ## Admin module
 The game's data the DM adds to or changes, with their pictures. Tabs:

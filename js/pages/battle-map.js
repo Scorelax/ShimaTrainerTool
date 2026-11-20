@@ -121,7 +121,7 @@ function render() {
   const stage = document.getElementById('mapStage');
   if (!stage) return;
 
-  // An adventure the DM has taken off this screen (the PokeNav module's "On the table screen") leaves the region map up.
+  // An adventure the DM has taken off this screen (the PokeNav module's "Showing on screen") leaves the region map up.
   const adventureAway = session.battleType === 'adventure' && session.adventure?.onScreen === 'region';
   const active = !!(session.active && session.board) && !adventureAway;
   stage.classList.toggle('active', active);
